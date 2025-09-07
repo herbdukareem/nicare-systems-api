@@ -1,53 +1,107 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
-use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\EnrolleeController;
-use App\Http\Controllers\PremiumController;
-use App\Http\Controllers\FacilityController;
-use App\Http\Controllers\LgaController;
-use App\Http\Controllers\WardController;
-use App\Http\Controllers\EnrolleeTypeController;
-use App\Http\Controllers\DashboardController;
+use Illuminate\Http\Request;
+use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DashboardController;
+use App\Models\Enrollee;
+use App\Http\Controllers\Api\V1\EnrolleeController;
+use App\Exports\EnrolleesExport;
+use Maatwebsite\Excel\Facades\Excel;
+use Barryvdh\DomPDF\Facade\Pdf;
+use App\Http\Controllers\Api\V1\RoleController;
+use App\Http\Controllers\Api\V1\PermissionController;
+use App\Http\Controllers\Api\V1\UserController;
+use App\Http\Controllers\Api\V1\EnrolleeTypeController;
+use App\Http\Controllers\Api\V1\BankController;
+use App\Http\Controllers\Api\V1\FacilityController;
+use App\Http\Controllers\Api\V1\PremiumController;
+use App\Http\Controllers\Api\V1\FundingTypeController;
+use App\Http\Controllers\Api\V1\BenefactorController;
+use App\Http\Controllers\Api\V1\LgaController;
+use App\Http\Controllers\Api\V1\WardController;
+use App\Http\Controllers\Api\V1\VillageController;
+use App\Http\Controllers\Api\V1\AccountDetailController;
+use App\Http\Controllers\Api\V1\EmploymentDetailController;
+use App\Http\Controllers\Api\V1\AuditTrailController;
+use App\Http\Controllers\Api\V1\DepartmentController;
+use App\Http\Controllers\Api\V1\DesignationController;
+use App\Http\Controllers\Api\V1\StaffController;
 
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/login', [AuthController::class, 'login']);
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+|
+| Here is where you can register API routes for your application. These
+| routes are loaded by the RouteServiceProvider within a group which
+| is assigned the "api" middleware group. Enjoy building your API!
+|
+*/
 
-// Public routes for PIN validation
-Route::post('/premiums/validate-pin', [PremiumController::class, 'validatePin']);
+// Auth routes
+Route::post('login', [AuthController::class, 'login']);
+Route::post('register', [AuthController::class, 'register']);
+Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
+Route::post('forget-password', [AuthController::class, 'forgetPassword']);
+Route::post('reset-password', [AuthController::class, 'resetPassword']);
+Route::get('user', [AuthController::class, 'user'])->middleware('auth:sanctum');
 
+// Dashboard routes
 Route::middleware('auth:sanctum')->group(function () {
-    // Auth routes
-    Route::post('/logout', [AuthController::class, 'logout']);
-    Route::get('/user', [ApiAuthController::class, 'user']);
-
-    // Dashboard
-    Route::get('/dashboard/stats', [DashboardController::class, 'stats']);
-
-    // Enrollees
-    Route::apiResource('enrollees', EnrolleeController::class);
-    Route::post('/enrollees/{enrollee}/approve', [EnrolleeController::class, 'approve']);
-    Route::post('/enrollees/bulk-import', [EnrolleeController::class, 'bulkImport']);
-    Route::get('/enrollees/{enrollee}/audit-trail', [EnrolleeController::class, 'auditTrail']);
-
-    // Premiums
-    Route::apiResource('premiums', PremiumController::class)->only(['index', 'show']);
-    Route::post('/premiums/generate-pins', [PremiumController::class, 'generatePins']);
-    Route::post('/premiums/redeem-pin', [PremiumController::class, 'redeemPin']);
-    Route::post('/premiums/bulk-upload', [PremiumController::class, 'bulkUpload']);
-    Route::get('/premiums/stats', [PremiumController::class, 'getStats']);
-
-    // Facilities
-    Route::apiResource('facilities', FacilityController::class);
-    Route::get('/facilities/by-location/{lga}/{ward}', [FacilityController::class, 'byLocation']);
-
-    // LGAs and Wards
-    Route::apiResource('lgas', LgaController::class);
-    Route::get('/lgas/{lga}/wards', [WardController::class, 'byLga']);
-    Route::apiResource('wards', WardController::class);
-
-    // Enrollee Types
-    Route::apiResource('enrollee-types', EnrolleeTypeController::class);
+    Route::get('dashboard/overview', [DashboardController::class, 'overview']);
+    Route::get('dashboard/enrollee-stats', [DashboardController::class, 'enrolleeStats']);
+    Route::get('dashboard/facility-stats', [DashboardController::class, 'facilityStats']);
+    Route::get('dashboard/chart-data', [DashboardController::class, 'chartData']);
+    Route::get('dashboard/recent-activities', [DashboardController::class, 'recentActivities']);
 });
 
+Route::prefix('v1')->group(function () {
+    // Enrollee routes
+    Route::apiResource('enrollees', EnrolleeController::class);
+    Route::get('enrollees-export', function (Request $request) {
+        $filename = 'enrollees_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+        return Excel::download(new EnrolleesExport($request), $filename);
+    });
+    Route::get('enrollees/{enrollee}/export-pdf', function (Enrollee $enrollee) {
+        $enrollee->load([
+            'enrolleeType', 'facility', 'lga', 'ward', 'village',
+            'premium', 'employmentDetail', 'fundingType', 'benefactor',
+            'creator', 'approver'
+        ]);
+
+        $pdf = Pdf::loadView('enrollee-profile', compact('enrollee'));
+        $filename = 'enrollee_' . $enrollee->enrollee_id . '_' . now()->format('Y-m-d') . '.pdf';
+
+        return $pdf->download($filename);
+    });
+
+    // Role and permission routes
+    Route::apiResource('roles', RoleController::class);
+    Route::apiResource('permissions', PermissionController::class);
+    // Assign permissions to roles
+    Route::post('roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
+
+    // User routes
+    Route::apiResource('users', UserController::class);
+    Route::get('users-with-roles', [UserController::class, 'withRoles']);
+    Route::post('users/{user}/roles', [UserController::class, 'syncRoles']);
+
+    Route::apiResource('enrollee-types', EnrolleeTypeController::class);
+    Route::apiResource('banks', BankController::class);
+    Route::apiResource('facilities', FacilityController::class);
+    Route::get('facilities/{facility}/enrollees', [FacilityController::class, 'enrollees']);
+    Route::apiResource('premiums', PremiumController::class);
+    Route::apiResource('funding-types', FundingTypeController::class);
+    Route::apiResource('benefactors', BenefactorController::class);
+    Route::apiResource('lgas', LgaController::class);
+    Route::apiResource('wards', WardController::class);
+    Route::apiResource('villages', VillageController::class);
+    Route::apiResource('account-details', AccountDetailController::class);
+    Route::apiResource('employment-details', EmploymentDetailController::class);
+    Route::apiResource('audit-trails', AuditTrailController::class);
+
+    Route::apiResource('departments', DepartmentController::class);
+    Route::apiResource('designations', DesignationController::class);
+    Route::apiResource('staff', StaffController::class);
+});

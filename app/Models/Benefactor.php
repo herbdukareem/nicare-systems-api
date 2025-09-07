@@ -13,13 +13,7 @@ class Benefactor extends Model
 {
     protected $table = 'benefactors';
 
-    protected $fillable = [
-        'name',
-        'email',
-        'phone',
-        'address',
-        'status',
-    ];
+    
 
     /**
      * Benefactor has many enrollees.

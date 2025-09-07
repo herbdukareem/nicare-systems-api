@@ -27,8 +27,6 @@ class EnrolleeType extends Model
         'name',
         'code',
         'description',
-        'premium_duration_months',
-        'premium_amount',
         'status',
     ];
 

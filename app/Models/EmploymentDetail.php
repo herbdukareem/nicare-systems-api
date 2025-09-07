@@ -4,17 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
-/**
- * Class EmploymentDetail
- *
- * Stores employment information for enrollees.
- */
 class EmploymentDetail extends Model
 {
     protected $table = 'employment_details';
 
     protected $fillable = [
-        'enrollee_id',
         'employer_name',
         'employer_address',
         'employer_phone',
@@ -30,22 +24,12 @@ class EmploymentDetail extends Model
         'verified_at',
         'verification_method',
         'metadata',
+        'employable_id',
+        'employable_type',
     ];
 
-    protected $casts = [
-        'monthly_income' => 'decimal:2',
-        'employment_start_date' => 'date',
-        'employment_end_date' => 'date',
-        'is_verified' => 'boolean',
-        'verified_at' => 'datetime',
-        'metadata' => 'array',
-    ];
-
-    /**
-     * Employment detail belongs to an enrollee.
-     */
-    public function enrollee()
+    public function employable()
     {
-        return $this->belongsTo(Enrollee::class);
+        return $this->morphTo();
     }
 }

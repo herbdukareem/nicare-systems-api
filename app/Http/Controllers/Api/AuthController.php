@@ -4,10 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Notifications\ResetPassword;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -15,7 +19,7 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         $validator = Validator::make($request->all(), [
-            'email' => 'required|email',
+            'username' => 'required',
             'password' => 'required',
         ]);
 
@@ -26,7 +30,7 @@ class AuthController extends Controller
             ], 422);
         }
 
-        $user = User::where('email', $request->email)->first();
+        $user = User::where('username', $request->username)->first();
 
         if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
@@ -48,7 +52,9 @@ class AuthController extends Controller
             'success' => true,
             'message' => 'Login successful',
             'data' => [
-                'user' => $user->load(['roles', 'lga', 'ward']),
+                'user' => $user->load(['roles']),
+                'roles' => $user->roles->pluck('name'),
+                'permissions' => $user->permissions()->pluck('name'),
                 'token' => $token,
             ],
         ]);
@@ -61,9 +67,7 @@ class AuthController extends Controller
             'email' => 'required|email|unique:users',
             'password' => 'required|min:8|confirmed',
             'phone' => 'required|string|unique:users',
-            'agent_reg_number' => 'nullable|string|unique:users',
-            'lga_id' => 'required|exists:lgas,id',
-            'ward_id' => 'required|exists:wards,id',
+            'username' => 'nullable|string|unique:users',
         ]);
 
         if ($validator->fails()) {
@@ -78,9 +82,7 @@ class AuthController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
             'phone' => $request->phone,
-            'agent_reg_number' => $request->agent_reg_number,
-            'lga_id' => $request->lga_id,
-            'ward_id' => $request->ward_id,
+            'username' => $request->username,
             'status' => 'pending', // Requires admin approval
         ]);
 
@@ -101,11 +103,117 @@ class AuthController extends Controller
         ]);
     }
 
-    public function user(Request $request): JsonResponse
+    public function forgetPassword(Request $request): JsonResponse
     {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email|exists:users,email',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $user = User::where('email', $request->email)->first();
+
+        if (!$user) {
+            return response()->json([
+                'success' => false,
+                'message' => 'User not found',
+            ], 404);
+        }
+
+        $token = Str::random(60);
+
+        DB::table('password_resets')->insert([
+            'email' => $request->email,
+            'token' => Hash::make($token),
+            'created_at' => now(),
+        ]);
+
+        $user->notify(new ResetPassword($token));
+
         return response()->json([
             'success' => true,
-            'data' => $request->user()->load(['roles', 'permissions', 'lga', 'ward']),
+            'message' => 'Password reset link sent to your email',
         ]);
     }
+
+    public function resetPassword(Request $request): JsonResponse
+    {
+        $validator = Validator::make($request->all(), [
+            'email' => 'required|email|exists:users,email',
+            'token' => 'required|string',
+            'password' => 'required|min:8|confirmed',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'errors' => $validator->errors(),
+            ], 422);
+        }
+
+        $passwordReset = DB::table('password_resets')
+            ->where('email', $request->email)
+            ->first();
+
+        if (!$passwordReset) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid token',
+            ], 400);
+        }
+
+        if (!Hash::check($request->token, $passwordReset->token)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid token',
+            ], 400);
+        }
+
+        if (Carbon::parse($passwordReset->created_at)->addMinutes(60)->isPast()) {
+            DB::table('password_resets')->where('email', $request->email)->delete();
+            return response()->json([
+                'success' => false,
+                'message' => 'Token has expired',
+            ], 400);
+        }
+
+        $user = User::where('email', $request->email)->first();
+        $user->password = Hash::make($request->password);
+        $user->save();
+
+        DB::table('password_resets')->where('email', $request->email)->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset successfully',
+        ]);
+    }
+
+ public function user(Request $request): \Illuminate\Http\JsonResponse
+{
+    $user = $request->user()->load([
+        'roles:id,name,label',
+        'roles.permissions:id,name,label', // load perms through roles
+    ]);
+
+    // build a flat unique collection of permissions
+    $computedPermissions = $user->roles
+        ->flatMap(fn ($role) => $role->permissions) // collect all perms
+        ->unique('id')
+        ->values();
+
+    // attach it so the JSON includes "permissions" as if it were a relation
+    $user->setRelation('permissions', $computedPermissions);
+
+    return response()->json([
+        'success' => true,
+        'data'    => $user,
+    ]);
+}
+
 }

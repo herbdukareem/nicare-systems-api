@@ -12,10 +12,8 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->foreignId('lga_id')->constrained()->onDelete('cascade');
-            $table->integer('enrollment_cap')->default(0);
-            $table->integer('total_enrolled')->default(0);
-            $table->enum('settlement_type', ['Urban', 'Rural'])->default('Rural');
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->unsignedTinyInteger('settlement_type')->default(1); //enum App\Enums\SettleType
+             $table->unsignedSmallInteger('status')->default(1);
             $table->timestamps();
         });
     }

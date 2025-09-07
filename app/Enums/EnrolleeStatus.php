@@ -11,8 +11,8 @@ enum EnrolleeStatus: int
 {
     case PENDING = 0;
     case ACTIVE = 1;
-    case EXPIRED = 3;
-    case SUSPENDED = 4;
+    case EXPIRED = 2;
+    case SUSPENDED = 3;
 
     /**
      * Get the human‑readable label for the enum value.

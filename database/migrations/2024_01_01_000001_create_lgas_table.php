@@ -15,7 +15,7 @@ return new class extends Migration
             $table->integer('zone')->nullable();
             $table->integer('baseline')->default(0);
             $table->integer('total_enrolled')->default(0);
-            $table->enum('status', ['active', 'inactive'])->default('active');
+             $table->unsignedSmallInteger('status')->default(1);
             $table->timestamps();
         });
     }

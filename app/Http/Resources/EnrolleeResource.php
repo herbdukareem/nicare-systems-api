@@ -20,16 +20,27 @@ class EnrolleeResource extends JsonResource
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
             'middle_name' => $this->middle_name,
+            'name' => trim($this->first_name . ' ' . $this->middle_name . ' ' . $this->last_name), // Full name for frontend
             'email' => $this->email,
             'phone' => $this->phone,
             'date_of_birth' => $this->date_of_birth,
+            'age' => $this->date_of_birth ? now()->diffInYears($this->date_of_birth) : null,
             'gender' => $this->gender,
             'marital_status' => $this->marital_status,
             'address' => $this->address,
             'enrollee_type' => new EnrolleeTypeResource($this->whenLoaded('enrolleeType')),
+            'type' => $this->whenLoaded('enrolleeType', function() {
+                return $this->enrolleeType->name ?? null;
+            }),
             'enrollee_category' => $this->enrollee_category,
             'facility' => new FacilityResource($this->whenLoaded('facility')),
+            'facility_name' => $this->whenLoaded('facility', function() {
+                return $this->facility->name ?? null;
+            }),
             'lga' => new LgaResource($this->whenLoaded('lga')),
+            'lga_name' => $this->whenLoaded('lga', function() {
+                return $this->lga->name ?? null;
+            }),
             'ward' => new WardResource($this->whenLoaded('ward')),
             'village' => $this->village,
             'premium' => new PremiumResource($this->whenLoaded('premium')),
@@ -39,11 +50,31 @@ class EnrolleeResource extends JsonResource
             'capitation_start_date' => $this->capitation_start_date,
             'approval_date' => $this->approval_date,
             'status' => $this->status,
+            'status_label' => $this->getStatusLabel(),
             'creator' => new UserResource($this->whenLoaded('creator')),
             'approver' => new UserResource($this->whenLoaded('approver')),
             'account_detail' => new EnrolleeAccountDetailResource($this->whenLoaded('accountDetail')),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
+    }
+
+    /**
+     * Get human-readable status label
+     */
+    private function getStatusLabel()
+    {
+        switch ($this->status) {
+            case 0:
+                return 'Pending';
+            case 1:
+                return 'Active';
+            case 2:
+                return 'Inactive';
+            case 3:
+                return 'Suspended';
+            default:
+                return 'Unknown';
+        }
     }
 }

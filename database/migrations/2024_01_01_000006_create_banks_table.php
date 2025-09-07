@@ -11,9 +11,9 @@ return new class extends Migration
         Schema::create('banks', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('code')->unique();
+            $table->string('code')->nullable();
             $table->string('sort_code')->nullable();
-            $table->enum('status', ['active', 'inactive'])->default('active');
+            $table->unsignedTinyInteger('status')->default(1);
             $table->timestamps();
         });
     }
