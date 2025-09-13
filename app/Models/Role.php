@@ -23,11 +23,7 @@ class Role extends Model
      *
      * @var array<int, string>
      */
-    protected $fillable = [
-        'name',
-        'label',
-        'description',
-    ];
+    protected $guarded = ['id'];
 
     /**
      * A role may be assigned to many users.

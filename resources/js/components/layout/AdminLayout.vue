@@ -1,43 +1,46 @@
 <template>
   <div class="tw-flex tw-h-screen tw-bg-gray-50">
+    <!-- Mobile Backdrop -->
+    <div
+      v-if="sidebarOpen"
+      @click="sidebarOpen = false"
+      class="tw-fixed tw-inset-0 tw-bg-black tw-bg-opacity-50 tw-z-40 md:tw-hidden"
+    ></div>
+
     <!-- Sidebar -->
     <div
       :class="[
-        'tw-fixed tw-inset-y-0 tw-left-0 tw-z-50 tw-w-64 tw-bg-white tw-shadow-lg tw-transform tw-transition-transform tw-duration-300 tw-ease-in-out tw-flex tw-flex-col',
+        'tw-fixed tw-inset-y-0 tw-left-0 tw-z-50 tw-w-64 tw-bg-white tw-shadow-lg tw-transform tw-transition-transform tw-duration-300 tw-ease-in-out tw-flex tw-flex-col tw-max-h-screen',
         sidebarOpen ? 'tw-translate-x-0' : '-tw-translate-x-full',
         'md:tw-relative md:tw-translate-x-0'
       ]"
     >
       <!-- Sidebar Header -->
-      <div class="tw-flex tw-items-center tw-justify-center tw-h-16 tw-bg-gradient-to-r tw-from-blue-600 tw-to-purple-600 tw-border-b tw-border-blue-700">
+      <div class="tw-flex tw-items-center tw-justify-center tw-h-16 tw-bg-blue-600 tw-border-b tw-border-blue-700 tw-flex-shrink-0">
         <div class="tw-flex tw-items-center tw-space-x-3">
-          <div class="tw-w-8 tw-h-8 tw-bg-white tw-bg-opacity-20 tw-rounded-lg tw-flex tw-items-center tw-justify-center tw-backdrop-blur-sm tw-overflow-hidden">
-            <img
-              src="/resources/images/logo.png"
-              alt="NGSCHA Logo"
-              class="tw-w-6 tw-h-6 tw-object-contain"
-              @error="showFallbackIcon = true"
-              v-if="!showFallbackIcon"
-            />
-            <v-icon v-else color="white" size="20">mdi-shield-account</v-icon>
-          </div>
+          <Logo
+            size="md"
+            variant="square"
+            icon-color="white"
+            class="tw-bg-white tw-bg-opacity-20 tw-backdrop-blur-sm"
+          />
           <span class="tw-text-white tw-font-bold tw-text-xl tw-tracking-wide">NGSCHA</span>
         </div>
       </div>
 
       <!-- Navigation Menu -->
-      <nav class="tw-flex-1 tw-overflow-y-auto tw-mt-4 tw-pb-4">
-        <div class="tw-px-3 tw-space-y-1">
+      <nav class="tw-flex-1 tw-overflow-y-auto tw-scrollbar-thin tw-scrollbar-thumb-gray-300 tw-scrollbar-track-gray-100 tw-min-h-0">
+        <div class="tw-px-3 tw-py-4 tw-space-y-1">
           <template v-for="item in menuItems" :key="item.name">
             <!-- Regular menu item -->
             <router-link
               v-if="!item.children"
               :to="item.path"
               :class="[
-                'tw-group tw-flex tw-items-center tw-px-3 tw-py-2.5 tw-text-sm tw-font-medium tw-rounded-lg tw-transition-all tw-duration-200',
+                'tw-group tw-flex tw-items-center tw-px-3 tw-py-2.5 tw-text-sm tw-font-medium tw-rounded-lg tw-transition-all tw-duration-300 tw-hover-slide-right',
                 $route.path === item.path
-                  ? 'tw-bg-gradient-to-r tw-from-blue-500 tw-to-purple-600 tw-text-white tw-shadow-md'
-                  : 'tw-text-gray-600 hover:tw-bg-gray-50 hover:tw-text-gray-900'
+                  ? 'tw-bg-blue-600 tw-text-white tw-shadow-md tw-animate-fade-in'
+                  : 'tw-text-gray-600 hover:tw-bg-blue-50 hover:tw-text-blue-700 hover:tw-shadow-sm'
               ]"
             >
               <v-icon
@@ -68,10 +71,10 @@
               <button
                 @click="toggleSubmenu(item.name)"
                 :class="[
-                  'tw-group tw-flex tw-items-center tw-w-full tw-px-4 tw-py-3 tw-text-sm tw-font-medium tw-rounded-xl tw-transition-all tw-duration-300 tw-transform hover:tw-scale-105',
+                  'tw-group tw-flex tw-items-center tw-w-full tw-px-4 tw-py-3 tw-text-sm tw-font-medium tw-rounded-xl tw-transition-all tw-duration-300 tw-transform hover:tw-scale-105 tw-hover-glow',
                   isSubmenuActive(item) || expandedMenus.includes(item.name)
-                    ? 'tw-bg-gradient-to-r tw-from-blue-500 tw-to-purple-600 tw-text-white tw-shadow-lg tw-shadow-blue-500/25'
-                    : 'tw-text-gray-600 hover:tw-bg-gradient-to-r hover:tw-from-gray-50 hover:tw-to-blue-50 hover:tw-text-gray-900 hover:tw-shadow-md'
+                    ? 'tw-bg-blue-600 tw-text-white tw-shadow-lg tw-animate-bounce-in'
+                    : 'tw-text-gray-600 hover:tw-bg-blue-50 hover:tw-text-blue-700 hover:tw-shadow-md'
                 ]"
               >
                 <v-icon
@@ -99,18 +102,19 @@
               <!-- Submenu items -->
               <div
                 v-show="expandedMenus.includes(item.name)"
-                class="tw-mt-1 tw-ml-3 tw-space-y-0.5 tw-transition-all tw-duration-200"
+                class="tw-mt-1 tw-ml-3 tw-space-y-0.5 tw-transition-all tw-duration-300 tw-animate-slide-up"
               >
                 <router-link
-                  v-for="child in item.children"
+                  v-for="(child, index) in item.children"
                   :key="child.name"
                   :to="child.path"
                   :class="[
-                    'tw-group tw-flex tw-items-center tw-px-3 tw-py-2 tw-text-xs tw-rounded-md tw-transition-all tw-duration-200',
+                    'tw-group tw-flex tw-items-center tw-px-3 tw-py-2 tw-text-xs tw-rounded-md tw-transition-all tw-duration-300 tw-hover-slide-right',
                     $route.path === child.path
-                      ? 'tw-bg-blue-100 tw-text-blue-700 tw-font-medium'
+                      ? 'tw-bg-blue-100 tw-text-blue-700 tw-font-medium tw-animate-fade-in'
                       : 'tw-text-gray-600 hover:tw-bg-gray-50 hover:tw-text-gray-900'
                   ]"
+                  :style="{ animationDelay: `${index * 0.1}s` }"
                 >
                   <v-icon
                     :size="14"
@@ -130,10 +134,10 @@
       </nav>
 
       <!-- User Info at Bottom -->
-      <div class="tw-absolute tw-bottom-0 tw-left-0 tw-right-0 tw-p-4 tw-border-t tw-border-gray-200 tw-bg-gray-50">
+      <div class="tw-flex-shrink-0 tw-p-4 tw-border-t tw-border-gray-200 tw-bg-gray-50">
         <div class="tw-flex tw-items-center tw-space-x-3">
-          <v-avatar size="40" color="blue" class="tw-text-white">
-            <v-icon>mdi-account</v-icon>
+          <v-avatar size="32" color="blue" class="tw-text-white tw-flex-shrink-0">
+            <v-icon size="18">mdi-account</v-icon>
           </v-avatar>
           <div class="tw-flex-1 tw-min-w-0">
             <p class="tw-text-sm tw-font-medium tw-text-gray-900 tw-truncate">
@@ -149,8 +153,9 @@
             size="small"
             @click="handleLogout"
             :loading="logoutLoading"
+            class="tw-flex-shrink-0"
           >
-            <v-icon>mdi-logout</v-icon>
+            <v-icon size="18">mdi-logout</v-icon>
           </v-btn>
         </div>
       </div>
@@ -170,7 +175,10 @@
           </button>
 
           <!-- Page title -->
-          <div class="tw-flex-1 tw-md:ml-0">
+          <div class="tw-flex-1 tw-md:ml-0 tw-flex tw-items-center">
+            <div class="tw-hidden md:tw-flex tw-items-center tw-mr-4">
+              <Logo size="md" class="tw-mr-2" />
+            </div>
             <h1 class="tw-text-2xl tw-font-semibold tw-text-gray-900">
               {{ pageTitle }}
             </h1>
@@ -209,6 +217,8 @@
       <!-- Page Content -->
       <main class="tw-flex-1 tw-overflow-y-auto tw-bg-gray-50">
         <div class="tw-p-4 sm:tw-p-6 lg:tw-p-8">
+          <!-- Breadcrumb Navigation -->
+          <Breadcrumb />
           <slot />
         </div>
       </main>
@@ -229,9 +239,10 @@ import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { useToast } from '../../composables/useToast';
 import RoleSwitcher from '../common/RoleSwitcher.vue';
+import Breadcrumb from '../common/Breadcrumb.vue';
+import Logo from '../common/Logo.vue';
 
 // Reactive data
-const showFallbackIcon = ref(false);
 
 const router = useRouter();
 const route = useRoute();
@@ -272,6 +283,12 @@ const menuItems = [
       {
         name: 'Enrollees List',
         path: '/enrollees',
+        icon: 'mdi-format-list-bulleted',
+        badge: '12.8k'
+      },
+       {
+        name: 'Pending Enrollee List',
+        path: '/enrollees/pending',
         icon: 'mdi-format-list-bulleted',
         badge: '12.8k'
       },
@@ -354,6 +371,12 @@ const menuItems = [
     name: 'Pre-authorization System (PAS)',
     icon: 'mdi-shield-check',
     children: [
+      {
+        name: 'PAS Management',
+        path: '/pas',
+        icon: 'mdi-clipboard-list',
+        badge: 'New'
+      },
       {
         name: 'Generate Referral/PA-Code',
         path: '/pas/generate',
@@ -488,9 +511,9 @@ router.afterEach(() => {
 <style scoped>
 /* Additional custom styles */
 .router-link-active {
-  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  background: #2563eb;
   color: white;
-  box-shadow: 0 10px 25px -5px rgba(59, 130, 246, 0.25);
+  box-shadow: 0 10px 25px -5px rgba(37, 99, 235, 0.25);
 }
 
 /* Smooth animations */

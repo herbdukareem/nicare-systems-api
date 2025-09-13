@@ -20,16 +20,20 @@ return new class extends Migration
             $table->unsignedTinyInteger('sex')->nullable();
             $table->unsignedTinyInteger('marital_status')->nullable()->comment('1=S,2=M,3-D,4=W');
             $table->date('date_of_birth')->nullable();
-            $table->string('imgage_url')->nullable();
+            $table->string('image_url')->nullable();
 
             // contact
             $table->string('email')->nullable();
             $table->string('phone', 20)->nullable();
             $table->text('address')->nullable();
             $table->string('village')->nullable();
+        
+            $table->string('disability')->nullable();
+            $table->unsignedTinyInteger('pregnant')->nullable()->default(0);
             
         
             $table->foreignId('sector_id')->nullable();
+            $table->foreignId('benefit_package_id')->nullable()->default(null);
              $table->foreignId('vulnerable_group_id')->nullable()->default(null); 
              $table->unsignedTinyInteger('relationship_to_principal')->default(1)
              ->comment('1=princiapl,2=spouse,3=child,4=other');
@@ -38,12 +42,14 @@ return new class extends Migration
             $table->foreignId('ward_id')->constrained();
 
             $table->foreignId('enrollment_phase_id')->nullable()->constrained();
+           
             
             $table->foreignId('premium_id')->nullable()->constrained('premiums');
             $table->foreignId('funding_type_id')->nullable()->constrained();
             $table->foreignId('benefactor_id')->nullable()->constrained();
             $table->date('capitation_start_date')->nullable();
-            $table->timestamp('approval_date')->nullable();
+            $table->dateTime('approval_date')->nullable();
+             $table->dateTime('enrollment_date')->nullable();
             
             $table->foreignId('created_by')->constrained('users');
             $table->foreignId('approved_by')->nullable()->constrained('users');
@@ -60,6 +66,8 @@ return new class extends Migration
             $table->date('dfa')->nullable();
             $table->date('dpa')->nullable();
             $table->decimal('basic_salary', 10, 2)->nullable();
+            $table->string('station')->nullable();
+            $table->string('salary_scheme')->nullable();
             $table->foreignId('mda_id')->nullable()->constrained();
 
             $table->unsignedTinyInteger('status')->default(0);

@@ -23,12 +23,7 @@ class Bank extends Model
      *
      * @var array<int, string>
      */
-    protected $fillable = [
-        'name',
-        'code',
-        'sort_code',
-        'status',
-    ];
+   protected $guarded = ['id'];
 
     /**
      * A bank may have many account details associated with it.

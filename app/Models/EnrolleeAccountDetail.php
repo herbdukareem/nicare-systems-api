@@ -24,19 +24,7 @@ class EnrolleeAccountDetail extends Model
      *
      * @var array<int, string>
      */
-    protected $fillable = [
-        'enrollee_id',
-        'account_number',
-        'bank_name',
-        'bank_code',
-        'account_name',
-        'bvn',
-        'nin',
-        'is_verified',
-        'verified_at',
-        'verification_method',
-        'metadata',
-    ];
+  protected $guarded = ['id'];
 
     /**
      * Casts for attributes.

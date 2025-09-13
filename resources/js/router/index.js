@@ -3,15 +3,18 @@ import { useAuthStore } from '../stores/auth';
 
 // Components
 import LoginPage from '../components/auth/LoginPage.vue';
-import ModernDashboard from '../components/dashboard/ModernDashboard.vue';
+import Dashboard from '../components/dashboard/Dashboard.vue';
 import PremiumDashboard from '../components/dashboard/PremiumDashboard.vue';
 import PreAuthDashboard from '../components/dashboard/PreAuthDashboard.vue';
 import EnrolleesPage from '../components/enrollees/EnrolleesPage.vue';
+import EnrolleeProfilePage from '../components/enrollees/EnrolleeProfilePage.vue';
 import FacilitiesPage from '../components/facilities/FacilitiesPage.vue';
 import UsersPage from '../components/settings/UsersPage.vue';
 import BenefactorsPage from '../components/settings/BenefactorsPage.vue';
 import RolesPermissionsPage from '../components/settings/RolesPermissionsPage.vue';
+import PASManagementPage from '../components/pas/PASManagementPage.vue';
 import ComingSoonPage from '../components/common/ComingSoonPage.vue';
+import PendingEnrolleesPage from '../components/enrollees/PendingEnrolleesPage.vue';
 
 const routes = [
   {
@@ -25,20 +28,35 @@ const routes = [
   {
     path: '/dashboard',
     name: 'dashboard',
-    component: ModernDashboard,
-    meta: { requiresAuth: true },
+    component: Dashboard,
+    meta: {
+      requiresAuth: true,
+      title: 'Dashboard',
+      description: 'Overview of enrollees and system statistics',
+      breadcrumb: 'Dashboard'
+    },
   },
   {
     path: '/dashboard/premium',
     name: 'dashboard-premium',
     component: PremiumDashboard,
-    meta: { requiresAuth: true },
+    meta: {
+      requiresAuth: true,
+      title: 'Premium Dashboard',
+      description: 'Premium collection and payment tracking',
+      breadcrumb: 'Premium Dashboard'
+    },
   },
   {
     path: '/dashboard/preauth',
     name: 'dashboard-preauth',
     component: PreAuthDashboard,
-    meta: { requiresAuth: true },
+    meta: {
+      requiresAuth: true,
+      title: 'Preauthorization Dashboard',
+      description: 'Preauthorization requests and approvals',
+      breadcrumb: 'Preauth Dashboard'
+    },
   },
 
   // Enrollment Routes
@@ -46,7 +64,34 @@ const routes = [
     path: '/enrollees',
     name: 'enrollees',
     component: EnrolleesPage,
-    meta: { requiresAuth: true },
+    meta: {
+      requiresAuth: true,
+      title: 'Enrollees',
+      description: 'Manage and view all enrollee information',
+      breadcrumb: 'Enrollees List'
+    },
+  },
+    {
+    path: '/enrollees/pending',
+    name: 'enrollee-profile',
+    component: PendingEnrolleesPage,
+    meta: {
+      requiresAuth: true,
+      title: 'Enrollee Profile',
+      description: 'View and manage enrollee details',
+      breadcrumb: 'Enrollee Profile'
+    },
+  },
+  {
+    path: '/enrollees/:id',
+    name: 'enrollee-profile',
+    component: EnrolleeProfilePage,
+    meta: {
+      requiresAuth: true,
+      title: 'Enrollee Profile',
+      description: 'View and manage enrollee details',
+      breadcrumb: 'Enrollee Profile'
+    },
   },
   {
     path: '/enrollment/change-facility',
@@ -118,6 +163,17 @@ const routes = [
 
   // PAS Routes
   {
+    path: '/pas',
+    name: 'pas-management',
+    component: PASManagementPage,
+    meta: {
+      requiresAuth: true,
+      title: 'Pre-Authorisation System',
+      description: 'Manage referrals and PA codes for Fee-For-Service claims',
+      breadcrumb: 'PAS Management'
+    },
+  },
+  {
     path: '/pas/generate',
     name: 'pas-generate',
     component: () => import('../components/common/ComingSoonPage.vue'),
@@ -181,7 +237,12 @@ const routes = [
     path: '/facilities',
     name: 'facilities',
     component: FacilitiesPage,
-    meta: { requiresAuth: true },
+    meta: {
+      requiresAuth: true,
+      title: 'Facilities',
+      description: 'Manage healthcare facilities and providers',
+      breadcrumb: 'Facilities'
+    },
   },
 
   // Settings Routes
@@ -234,9 +295,9 @@ const router = createRouter({
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
 
-  // Initialize auth if not already done
+  // Initialize auth if not already done - AWAIT the initialization
   if (!authStore.token) {
-    authStore.initializeAuth();
+    await authStore.initializeAuth();
   }
 
   const isAuthenticated = authStore.isLoggedIn;
@@ -247,6 +308,19 @@ router.beforeEach(async (to, _from, next) => {
     next('/dashboard');
   } else {
     next();
+  }
+});
+
+// Navigation guard for page titles
+router.afterEach((to) => {
+  // Set page title based on route meta or default
+  const baseTitle = 'NGSCHA';
+  const pageTitle = to.meta?.title;
+
+  if (pageTitle) {
+    document.title = `${pageTitle} - ${baseTitle}`;
+  } else {
+    document.title = baseTitle;
   }
 });
 

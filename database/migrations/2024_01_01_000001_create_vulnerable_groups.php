@@ -15,22 +15,12 @@ return new class extends Migration
         Schema::create('vulnerable_groups', function (Blueprint $table) {
             $table->id();
             $table->string('name');
-            $table->string('code', 20)->unique();
-            $table->unsignedSmallInteger('status')->default(1);
+            $table->string('code')->unique();
+            $table->unsignedTinyInteger('status')->default(1);
             $table->timestamps();
         });
 
-        $vulnerable_groups = [
-            [ 'name' => '', 'code', 'none'],
-            [ 'name' => 'Children Under 5 Years', 'code', 'cu5'],
-            [ 'name' => 'Female Reproductive Age', 'code', 'fra'],
-            [ 'name' => 'Elderly', 'code', 'elder'],
-            [ 'name' => 'Othes', 'code', 'others'],
-        ];
-
-        foreach ($vulnerable_groups as $vulnerable_group) {
-            DB::table('vulnerable_groups')->insert($vulnerable_group);
-        }
+     
     }
 
     /**

@@ -2,9 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Model;
-use App\Enums\EnrolleeStatus;
+use App\Enums\Status;
 
 /**
  * Class Enrollee
@@ -13,7 +12,7 @@ use App\Enums\EnrolleeStatus;
  */
 class Enrollee extends Model
 {
-    use SoftDeletes;
+
 
     /**
      * The table associated with the model.
@@ -27,37 +26,7 @@ class Enrollee extends Model
      *
      * @var array<int, string>
      */
-    protected $fillable = [
-        'legacy_id',
-        'legacy_enrollee_id',
-        'enrollee_id',
-        'enrollee_id',
-        'nin',
-        'first_name',
-        'last_name',
-        'middle_name',
-        'email',
-        'phone',
-        'date_of_birth',
-        'gender',
-        'marital_status',
-        'address',
-        'enrollee_type_id',
-        'enrollee_category',
-        'facility_id',
-        'lga_id',
-        'ward_id',
-        'village',
-        'premium_id',
-        'employment_detail_id',
-        'funding_type_id',
-        'benefactor_id',
-        'capitation_start_date',
-        'approval_date',
-        'status',
-        'created_by',
-        'approved_by',
-    ];
+protected $guarded = ['id'];
 
     /**
      * Date casting for attributes.
@@ -68,8 +37,7 @@ class Enrollee extends Model
         'date_of_birth' => 'date',
         'capitation_start_date' => 'date',
         'approval_date' => 'datetime',
-        // Cast the status attribute to the EnrolleeStatus enum
-        'status' => EnrolleeStatus::class,
+        'status' => Status::class,
     ];
 
     /**

@@ -8,15 +8,7 @@ class AccountDetail extends Model
 {
     protected $table = 'account_details';
 
-    protected $fillable = [
-        'account_name',
-        'account_number',
-        'bank_id',
-        'account_type',
-        'status',
-        'accountable_id',
-        'accountable_type',
-    ];
+   protected $guarded = ['id'];
 
     public function accountable()
     {

@@ -27,6 +27,8 @@ use App\Http\Controllers\Api\V1\AuditTrailController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\DesignationController;
 use App\Http\Controllers\Api\V1\StaffController;
+use App\Http\Controllers\ReferralController;
+use App\Http\Controllers\PACodeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -54,11 +56,15 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard/facility-stats', [DashboardController::class, 'facilityStats']);
     Route::get('dashboard/chart-data', [DashboardController::class, 'chartData']);
     Route::get('dashboard/recent-activities', [DashboardController::class, 'recentActivities']);
+    Route::get('dashboard/status-options', [DashboardController::class, 'getStatusOptions']);
 });
 
-Route::prefix('v1')->group(function () {
+Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Enrollee routes
     Route::apiResource('enrollees', EnrolleeController::class);
+    Route::post('enrollees/{enrollee}/upload-passport', [EnrolleeController::class, 'uploadPassport']);
+    Route::put('enrollees/{enrollee}/status', [EnrolleeController::class, 'updateStatus']);
+    Route::get('enrollees/{enrollee}/statistics', [EnrolleeController::class, 'getStatistics']);
     Route::get('enrollees-export', function (Request $request) {
         $filename = 'enrollees_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
         return Excel::download(new EnrolleesExport($request), $filename);
@@ -104,4 +110,24 @@ Route::prefix('v1')->group(function () {
     Route::apiResource('departments', DepartmentController::class);
     Route::apiResource('designations', DesignationController::class);
     Route::apiResource('staff', StaffController::class);
+
+    // PAS (Pre-Authorization System) routes
+    Route::prefix('pas')->group(function () {
+        // Referral routes
+        Route::get('referrals', [ReferralController::class, 'index']);
+        Route::post('referrals', [ReferralController::class, 'store']);
+        Route::get('referrals/{referral}', [ReferralController::class, 'show']);
+        Route::post('referrals/{referral}/approve', [ReferralController::class, 'approve']);
+        Route::post('referrals/{referral}/deny', [ReferralController::class, 'deny']);
+        Route::get('referrals-statistics', [ReferralController::class, 'statistics']);
+
+        // PA Code routes
+        Route::get('pa-codes', [PACodeController::class, 'index']);
+        Route::post('referrals/{referral}/generate-pa-code', [PACodeController::class, 'generateFromReferral']);
+        Route::get('pa-codes/{paCode}', [PACodeController::class, 'show']);
+        Route::post('pa-codes/{paCode}/mark-used', [PACodeController::class, 'markAsUsed']);
+        Route::post('pa-codes/{paCode}/cancel', [PACodeController::class, 'cancel']);
+        Route::post('pa-codes/verify', [PACodeController::class, 'verify']);
+        Route::get('pa-codes-statistics', [PACodeController::class, 'statistics']);
+    });
 });

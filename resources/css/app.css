@@ -61,6 +61,124 @@
   .tw-animate-scale-in {
     animation: scaleIn 0.3s ease-out;
   }
+
+  .tw-animate-fade-in-up {
+    animation: fadeInUp 0.6s ease-out;
+  }
+
+  .tw-animate-fade-in-down {
+    animation: fadeInDown 0.6s ease-out;
+  }
+
+  .tw-animate-slide-up {
+    animation: slideUp 0.4s ease-out;
+  }
+
+  .tw-animate-bounce-in {
+    animation: bounceIn 0.6s ease-out;
+  }
+
+  .tw-animate-zoom-in {
+    animation: zoomIn 0.4s ease-out;
+  }
+
+  .tw-animate-rotate-in {
+    animation: rotateIn 0.5s ease-out;
+  }
+
+  .tw-animate-stagger-1 {
+    animation-delay: 0.1s;
+  }
+
+  .tw-animate-stagger-2 {
+    animation-delay: 0.2s;
+  }
+
+  .tw-animate-stagger-3 {
+    animation-delay: 0.3s;
+  }
+
+  .tw-animate-stagger-4 {
+    animation-delay: 0.4s;
+  }
+
+  /* Custom scrollbar styles */
+  .tw-scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: #d1d5db #f3f4f6;
+  }
+
+  .tw-scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .tw-scrollbar-thin::-webkit-scrollbar-track {
+    background: #f3f4f6;
+    border-radius: 3px;
+  }
+
+  .tw-scrollbar-thin::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+    border-radius: 3px;
+  }
+
+  .tw-scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background: #9ca3af;
+  }
+
+  .tw-scrollbar-thumb-gray-300::-webkit-scrollbar-thumb {
+    background: #d1d5db;
+  }
+
+  .tw-scrollbar-track-gray-100::-webkit-scrollbar-track {
+    background: #f3f4f6;
+  }
+
+  /* Hover effects and transitions */
+  .tw-hover-lift {
+    transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  }
+
+  .tw-hover-lift:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+  }
+
+  .tw-hover-scale {
+    transition: transform 0.2s ease-in-out;
+  }
+
+  .tw-hover-scale:hover {
+    transform: scale(1.02);
+  }
+
+  .tw-hover-glow {
+    transition: box-shadow 0.3s ease-in-out;
+  }
+
+  .tw-hover-glow:hover {
+    box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
+  }
+
+  .tw-hover-slide-right {
+    transition: transform 0.2s ease-in-out;
+  }
+
+  .tw-hover-slide-right:hover {
+    transform: translateX(4px);
+  }
+
+  /* Loading animations */
+  .tw-loading-dots::after {
+    content: '';
+    animation: loadingDots 1.5s infinite;
+  }
+
+  @keyframes loadingDots {
+    0%, 20% { content: '.'; }
+    40% { content: '..'; }
+    60%, 100% { content: '...'; }
+  }
 }
 
 /* Keyframes for custom animations */
@@ -99,6 +217,79 @@
   to {
     opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounceIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.05);
+  }
+  70% {
+    transform: scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes zoomIn {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes rotateIn {
+  from {
+    opacity: 0;
+    transform: rotate(-10deg) scale(0.9);
+  }
+  to {
+    opacity: 1;
+    transform: rotate(0deg) scale(1);
   }
 }
 

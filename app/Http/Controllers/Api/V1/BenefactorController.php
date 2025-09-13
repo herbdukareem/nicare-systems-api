@@ -28,21 +28,13 @@ class BenefactorController extends BaseController
         $sortBy = $request->get('sort_by', 'created_at');
         $sortDirection = $request->get('sort_direction', 'desc');
 
-        $benefactors = $this->service->paginate($filters, $perPage, $sortBy, $sortDirection);
+        // $benefactors = $this->service->paginate($filters, $perPage, $sortBy, $sortDirection);
 
-        $response = BenefactorResource::collection($benefactors);
-        $response->additional([
-            'meta' => [
-                'total' => $benefactors->total(),
-                'per_page' => $benefactors->perPage(),
-                'current_page' => $benefactors->currentPage(),
-                'last_page' => $benefactors->lastPage(),
-                'from' => $benefactors->firstItem(),
-                'to' => $benefactors->lastItem(),
-            ],
-        ]);
-
-        return $this->sendResponse($response, 'Benefactors retrieved successfully');
+       
+          return response()->json([
+                'success' => true,
+                'data' => BenefactorResource::collection(Benefactor::all()),
+          ]);
     }
 
     public function store(StoreBenefactorRequest $request)

@@ -8,7 +8,7 @@ class EnrollmentPhase extends Model
 {
     protected $table = 'enrollment_phases';
     protected $primaryKey = 'id';
-    protected $guarded  = [];
+    protected $guarded = ['id'];
 
     // enrollees
     public function enrollees(){

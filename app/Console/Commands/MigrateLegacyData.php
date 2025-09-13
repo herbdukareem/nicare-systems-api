@@ -20,13 +20,18 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Bank;
 use App\Models\AccountDetail;
-use App\Models\EnrolleeType;
+use App\Models\BenefitPackage;
 use App\Models\EnrollmentPhase;
+use App\Models\Invoice;
+use App\Models\Mda;
+use App\Models\PaymentCategory;
 use App\Models\PremiumType;
 use App\Models\Sector;
 use App\Models\Staff;
 use App\Models\VulnerableGroup;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Storage;
 
 class MigrateLegacyData extends Command
 {
@@ -39,6 +44,7 @@ class MigrateLegacyData extends Command
     protected $enrollee_array = [];
     protected $fund_array = [];
     protected $benefactor_array = [];
+    protected $benefactor_by_name_array = [];
     protected $premium_array = [];
     protected $pin_array = [];
     protected $enrollee_type_array = [];
@@ -49,12 +55,16 @@ class MigrateLegacyData extends Command
     protected $funding_array = [];
     protected $vulnerable_groups_arr = [];
     protected $enrollment_phase_array = [];
+    protected $mda_array = [];
+    protected $paymentInvoice_array = [];
+    protected $standardPackage = null;
+    protected $BMPHSPackage = null;
 
 
     public function handle()
     {
         
-        DB::transaction(function () {
+        // DB::transaction(function () {
             // 1. Migrate LGAs
             $legacyLgas = DB::connection('legacy')->table('lga')->get();
             foreach ($legacyLgas as $lgaRow) {
@@ -64,8 +74,6 @@ class MigrateLegacyData extends Command
                         'name'           => $lgaRow->lga,
                         'code'           => $lgaRow->code,
                         'zone'           => $lgaRow->zone,
-                        'baseline'       => $lgaRow->base_line,
-                        'total_enrolled' => $lgaRow->total_enrolled
                     ]
                 );
 
@@ -79,8 +87,6 @@ class MigrateLegacyData extends Command
                 $newWard =Ward::updateOrCreate(
                     ['name' => $wardRow->ward, 'lga_id' => $this->lga_array[$wardRow->lga_id]],
                     [
-                        'enrollment_cap'  => $wardRow->enrolmentCap ?? 0,
-                        'total_enrolled'  => $wardRow->total_enrolled,
                         'settlement_type' => Settlement::from($wardRow->settlement ?? 'Rural')->value,
                         'status'          => 1,
                     ]
@@ -118,6 +124,7 @@ class MigrateLegacyData extends Command
                 );
                 
                 $this->benefactor_array[$ben->id] = $newBenefactor->id;
+                $this->benefactor_by_name_array[strtolower($ben->name)] = $newBenefactor->id;
             }
 
             //Create GAC Counterpart
@@ -190,89 +197,18 @@ class MigrateLegacyData extends Command
 
             $this->info('Facilities migrated.');
 
-            // 6. Migrate pin inventory into premiums
-            $legacyPins = DB::connection('legacy')->table('tbl_pin_inven')->get();
-            foreach ($legacyPins as $pin) {
+            // create sector
+            $this->createEnrolleeTypes();
 
-                $request = DB::connection('legacy')
-                    ->table('tbl_request')
-                    ->where('payment_id', $pin->payment_id)
-                    ->first();
-
-                $perPinAmount = 0;
-                if ($request && $request->quantity && $request->quantity > 0) {
-                    $perPinAmount = (float) $request->amount / (int) $request->quantity;
-                }
-
-              
-
-                $pin_category = match ($pin->category) {
-                    'formal' => 1,
-                    'informal' => 2,
-                    'vulnerable' => 3,
-                    'retiree' => 4,
-                    default => 1,
-                };
-
-                $benefit_type = match ($pin->benefit_type) {
-                    'basic' => 1,
-                    'standard' => 2,
-                    'premium' => 3,
-                    default => 1,
-                };
-
-                // create premium types
-
-                $premium_types = [
-                    'individual' => ['premium_amount' => 16100],
-                    'household' => ['premium_amount' => 43200],
-                    'group' => ['premium_amount' => 43200],
-                ];
-
-                foreach ($premium_types as $type => $premium) {
-                    $premium_type = PremiumType::updateOrCreate(
-                        ['name' => $type],
-                        [
-                            'description' => null,
-                            'premium_amount' => $premium['premium_amount'],
-                        ]
-                    );
-
-                    $this->premium_type_array[strtolower($type)] = $premium_type->id;
-                }
-                
-                
-                
-               $newPremium = Premium::updateOrCreate(
-                    ['pin' => $pin->pin_raw, 'serial_no' => $pin->serial_no],
-                    [
-                        'pin'          => $pin->pin_raw,
-                        'pin_type'     => $this->premium_type_array[strtolower($pin->pin_type)],
-                        'pin_category' => $pin_category,
-                        'benefit_type' => $benefit_type,
-                        'amount'       => $perPinAmount,
-                        'date_generated'=> $pin->date_generate,
-                        'date_used'     => $pin->date_used,
-                        'date_expired'  => $pin->date_expired,
-                        'status'        => strtolower($pin->status) === 'used' ? 2 : 1,
-                        'lga_id'        => $this->lga_array[$pin->lga],
-                        'ward_id'       => $this->ward_array[$pin->ward],
-                        'payment_id'    => $pin->payment_id,
-                        'request_id'    => $pin->request_id,
-                    ]
-                );
-
-                $this->pin_array[$pin->id] = $newPremium->id;
-            }
-            $this->info('Premiums migrated.');
+            $this->standardPackage = BenefitPackage::where('code', 'standard')->first();
+            $this->BMPHSPackage = BenefitPackage::where('code', 'BMPHS')->first();
 
 
-            // 7. Create System Admin role and migrate users with user_role_id=1
+              // 6. Create System Admin role and migrate users with user_role_id=1
             $role = Role::firstOrCreate([
                 'name' => 'System Admin',
             ], [
                 'description' => 'System Administrator',
-                'status'      => 'active',
             ]);
 
             // Create Supper Admin User
@@ -289,8 +225,7 @@ class MigrateLegacyData extends Command
                     'phone'           => '08130051228',
                     'designation_id'  => null,
                     'department_id'   => null,
-                    'address'         => null,
-                    'status'          => 'active',
+                    'address'         => null
                 ]
             );
 
@@ -302,8 +237,8 @@ class MigrateLegacyData extends Command
                     [
                         'name'          => 'System Admin',
                         'phone'         => '08130051228',
+                        'username'      => 'admin',
                         'password'      => Hash::make('password'), // change to a secure value in production
-                        'status'        => 'active',
                         'userable_id'   => $staff->id,
                         'userable_type' => Staff::class,
                     ]
@@ -347,7 +282,6 @@ class MigrateLegacyData extends Command
                             'designation_id'=> null,
                             'department_id' => null,
                             'address'       => null,
-                            'status'        => 'active',
                         ]
                     );
 
@@ -357,9 +291,10 @@ class MigrateLegacyData extends Command
                         [
                             'name'          => trim($legacyUser->fullname),
                             'email'         => $email,
+                            'username'      => $legacyUser->nicare_code,
                             'phone'         => $phone,
                             'password'      => Hash::make('password'),
-                            'status'        => 'active',
+                            'status'        => 1,
                             'userable_id'   => $staff->id,
                             'userable_type' => Staff::class,
                         ]
@@ -372,15 +307,82 @@ class MigrateLegacyData extends Command
                 $this->info('System Admin users migrated, staff profiles created, and role assigned.');
 
 
+            // 7. Migrate pin inventory into premiums
+            // first create payment invoices
+
+              $premium_types = PremiumType::pluck('id', 'code')
+                    ->toArray();
+
+                foreach ($premium_types as $key => $value) {
+                   $this->premium_type_array[strtolower($key)] = $value;
+                }
+
+              
+
+            $this->createPaymentInvoices();
+            // $this->updatePremiumUsedby();
+            $legacyPins = DB::connection('legacy')->table('tbl_pin_inven')->get();
+            foreach ($legacyPins as $pin) {
+
+                $request = DB::connection('legacy')
+                    ->table('tbl_request')
+                    ->where('payment_id', $pin->payment_id)
+                    ->first();
+
+                $perPinAmount = 0;
+                if ($request && $request->quantity && $request->quantity > 0) {
+                    $perPinAmount = (float) $request->amount / (int) $request->quantity;
+                }
+
+              
+
+
+                  $sector_id = $this->enrollee_type_array[strtolower($pin->category)];
+            
+               $newPremium = Premium::updateOrCreate(
+                    ['pin' => $pin->pin_raw, 'serial_no' => $pin->serial_no],
+                    [
+                        'pin'          => $pin->pin_raw,
+                        'premium_type_id'     => $this->premium_type_array[strtolower($pin->pin_type)] ?? null,
+                        'sector_id' => $sector_id,
+                        'benefit_package_id' => $this->standardPackage->id,
+                        'amount'       => $perPinAmount,
+                        'date_used'     => $pin->date_used,
+                        'date_expired'  => $pin->date_expired,
+                        'userable_type' => Enrollee::class,
+                        'userable_id' => 0,
+                        'status'        => strtolower($pin->status) === 'used' ? Status::USED()->value : Status::NOTUSED()->value,
+                        'lga_id'        => $this->lga_array[$pin->lga],
+                        'ward_id'       => $this->ward_array[$pin->ward],
+                        'reference'    => $pin->payment_id,
+                        'invoice_id'    => $this->paymentInvoice_array[$pin->request_id] ?? null,
+                        'metadata'      => [
+                            'legacy_id' => $pin->id,
+                            'legacy_payment_id' => $pin->payment_id,
+                            'user' => $pin->agent_reg_number,
+                        ],
+                    ]
+                );
+
+                $this->pin_array[$pin->id] = $newPremium->id;
+            }
+            $this->info('Premiums migrated.');
+
+
+          
+
 
 
             // 8. Migrate enrollees
-            $this->createEnrolleeTypes();
-            $this->migrateEnrollee('Informal');
+            $this->createVulnerableGroups();
+            $this->createEnrollmentPhases();
+            $this->migrateEnrollee('informal');
+            // $this->createMdas();
+            // $this->migrateEnrollee('formal');
 
 
-            
-        });
+            // end transaction
+        // });   
 
         $this->info('Legacy data migration completed successfully.');
     }
@@ -391,70 +393,47 @@ class MigrateLegacyData extends Command
         $sectors = Sector::all();
         
         foreach ($sectors as $sector) {
-            $this->enrollee_type_array[$sector->name] = $sector->id;
+            $this->enrollee_type_array[strtolower($sector->name)] = $sector->id;
         }
     }
 
 
     protected function migrateEnrollee($sector = 'informal'){ 
+
+        $table = $sector == 'informal' ? 'tbl_enrolee' : 'tbl_enrolee_formal';
           // Create Enrollee Types
-          
-
-          $vulnerable_groups = [
-            [ 'name' => '', 'code', 'none'],
-            [ 'name' => 'Children under 5yrs', 'code', 'cu5'],
-            [ 'name' => 'Female Reproductive (15-45 years)', 'code', 'fra'],
-            [ 'name' => 'Elderly (85 and above)', 'code', 'elder'],
-            [ 'name' => 'Othes', 'code', 'others'],
-        ];
-
-        foreach ($vulnerable_groups as $vulnerable_group) {
-           $vulnerable = VulnerableGroup::updateOrCreate(
-                ['name' => $vulnerable_group['name']],
-                [
-                    'code' => $vulnerable_group['code'],
-                ]);
-
-                $this->vulnerable_groups_arr[strtolower($vulnerable_group['name'])] = $vulnerable->id;
-        }
-
-            /// enrolment phases
-            $enrollees_phases = DB::connection('legacy')->table('tbl_enrolee')
-                ->select('tracking', 'benefactor')
-                ->distinct()
-                ->orderBy('tracking')
-                ->get();
-
-                foreach ($enrollees_phases as $enrollee_phase) {
-
-                    $enrollee_phase->counterpart = null;
-
-                    $benefactor_id = $this->getBenefactorID($enrollee_phase);
-                    $newEnrolleePhase = EnrollmentPhase::updateOrCreate(
-                        ['name' => $enrollee_phase->tracking],
-                        [
-                            'benefactor_id' => $benefactor_id,
-                            'status'        => 1,
-                        ]
-                    );
-                    $this->enrollment_phase_array[$enrollee_phase->tracking][$benefactor_id] = $newEnrolleePhase->id;
-                }
-
-
-          
             DB::connection('legacy')
-            ->table('tbl_enrolee')
+            ->table($table)
             ->orderBy('id')
             ->chunkById(100, function ($legacyEnrollees) use ($sector) {
                 foreach ($legacyEnrollees as $enrollee) {
+
+                       
+
+                $premium_id = null;
+                if($enrollee->pin){
+                    $premium_id = $this->pin_array[$enrollee->pin] ?? null;
+                }
+               
                 // lookup enrollee type by name
                 $sector_id = $this->enrollee_type_array[strtolower($sector)];
+                if(!$sector_id){
+                    $this->warn("Sector {$sector} not found");
+                   continue;
+                }
+
+                 if(Enrollee::where('legacy_id', $enrollee->id)
+                    ->where('sector_id', $sector_id)
+                    ->exists()){
+                    $this->info("Enrollee {$enrollee->enrolment_number} already exists");
+                    continue;
+                }
+
+                $this->info("creating {$enrollee->enrolment_number} enrollee");
 
                 $benefactor_id = $this->getBenefactorID($enrollee);
                
-                $funding = $enrollee->funding ? $this->funding_array[$enrollee->funding] : null;
-
-               
+                $funding = $enrollee->funding ? $this->funding_array[$enrollee->funding] : $this->funding_array['premium'];
 
                 $gender = match ($enrollee->sex) {
                     'Male', 'M' => 1,
@@ -470,27 +449,38 @@ class MigrateLegacyData extends Command
                     default => 1,
                 };
 
-                $relationship_to_principal = RelationshipToPrincipal::from($enrollee->enrolee_category)->value;
+                $relationship_to_principal = match($enrollee->enrolee_category){
+                    'Principal' => RelationshipToPrincipal::PRINCIPAL,
+                    'Spouse' => RelationshipToPrincipal::SPOUSE,
+                    'Child' => RelationshipToPrincipal::CHILD,
+                    'Other' => RelationshipToPrincipal::OTHER,
+                };
 
                 $enrollee->status = $enrollee->enrolment_approval_status != 1 ? 100 : $enrollee->status;
 
                 $status = match($enrollee->status){
-                    1, '1' => Status::ACTIVE,
-                    2, '2' => Status::EXPIRED,
-                    0, '0' => Status::DELETED,
-                    default => Status::PENDING
+                    1, '1' => Status::ACTIVE()->value,
+                    2, '2' => Status::EXPIRED()->value,
+                    0, '0' => Status::DELETED()->value,
+                    default => Status::PENDING()->value,
                 };
 
-                $vulnerable_group_id = $this->vulnerable_groups_arr[$enrollee->vulnerability_status] ?? null;
+                $vulnerable_group_id = $this->vulnerable_groups_arr[strtolower($enrollee->vulnerability_status)] ?? $this->vulnerable_groups_arr['none'] ?? null;
 
+                $enrollment_phase_id = $this->enrollment_phase_array[$enrollee->tracking][$benefactor_id] ?? null;
+                $enrollee->mda_id = $this->mda_array[$enrollee->ministry] ?? null;
 
+                $image_url = null;//$this->getImage($enrollee->id, $sector);
               
                 // create enrollee
                 $newEnrollee = Enrollee::updateOrCreate(
-                    ['legacy_id' => $enrollee->id],
+                    ['legacy_id' => $enrollee->id, 'sector_id' => $sector_id],
                     [   
+                        
                         'enrollee_id' => $enrollee->enrolment_number,
                         'legacy_enrollee_id' => $enrollee->enrolment_number,
+                        'benefit_package_id' => $enrollee->mode_of_enrolment == 'huwe' ? $this->BMPHSPackage->id : $this->standardPackage->id,
+                        'premium_id' => $premium_id,
                         'nin'             => $enrollee->nin,
                         'benefactor_id'   => $benefactor_id,
                         'funding_type_id' => $funding,
@@ -500,7 +490,7 @@ class MigrateLegacyData extends Command
                         'email'           => $enrollee->email_address,
                         'phone'           => $enrollee->phone_number,
                         'date_of_birth'   => $enrollee->date_of_birth,
-                        'gender'          => $gender,
+                        'sex'          => $gender,
                         'marital_status'  => $marital_status,
                         'address'         => $enrollee->address ?? $enrollee->community,
                         'sector_id'=> $sector_id,
@@ -508,31 +498,230 @@ class MigrateLegacyData extends Command
                         'facility_id'     => $this->facility_array[$enrollee->provider_id],
                         'lga_id'          => $this->lga_array[$enrollee->lga],
                         'ward_id'         => $this->ward_array[$enrollee->ward],
-                        'village'         => $enrollee->village,
-                        'national_number'    => $enrollee->BHCPF_number,
+                        'village'         => $enrollee->community,
+                        'disability'      => $enrollee->disability,
+                        'pregnant'        => $enrollee->pregnant,
+                        'national_number'    => $enrollee->BHCPF_number ?? $enrollee->nin ?? null,
                         'vulnerable_group_id' => $vulnerable_group_id,
                         'status'          => $status,
                         'created_by'      => $this->superadmin->id,
                         'approved_by'     => $this->user_array[$enrollee->approved_by] ?? $this->superadmin->id,
+                        'enrollment_phase_id' => $enrollment_phase_id,
+                        'approval_date' => $enrollee->approved_date, 
+                        'cno' => $enrollee->cno,
+                        'occupation' => $enrollee->occupation,
+                        'dfa' => $enrollee->date_of_first_appointment,
+                        'basic_salary' => $enrollee->basic_salary,
+                        'station' => $enrollee->station,
+                        'salary_scheme' => $enrollee->salary_scheme,
+                        'mda_id' => $enrollee->mda_id,
+                        'enrollment_date' => $enrollee->enrol_date,
+                        'capitation_start_date' => $enrollee->cap_date_month,
+                        'created_at' => $enrollee->synced_datetime,
+                        'updated_at' => now(),
+                        'nok_name' => $enrollee->nok_name,
+                        'nok_phone_number' => $enrollee->nok_phone_number,
+                        'nok_address' => $enrollee->nok_address,
+                        'nok_relationship' => $enrollee->nok_relationship,
+                        'image_url' => $image_url
                       ]
                     );
+
+                    if($enrollee->pin){
+                        Premium::whereKey($premium_id)->update([
+                            'userable_type' => Enrollee::class, 
+                            'userable_id'   => $newEnrollee->id,
+                        ]);
+                    }
                 }
             });
             $this->info('Enrollees migrated.');
     }
 
+    
+
+    protected function createPaymentInvoices(){
+        $subscriptionType = PaymentCategory::where('code', 'subscription')->first();
+        $reSubscriptionType = PaymentCategory::where('code', 're-subscription')->first();
+        $paymentInvoices = DB::connection('legacy')->table('tbl_request')
+            ->orderBy('sn')
+            ->get();
+
+       
+            foreach ($paymentInvoices as $paymentInvoice) {
+
+                $newPaymentInvoice = Invoice::updateOrCreate(
+                    ['reference' => $paymentInvoice->payment_id],
+                    [
+                        'invoice_number' => uniqid(),
+                        'description' => ucfirst($paymentInvoice->benefit_type)." ".ucfirst($paymentInvoice->pin_type)." PIN ",
+                        'amount' => $paymentInvoice->amount,
+                        'invoice_type' => 'createEnrolleeTypes',
+                        'payment_date' => $paymentInvoice->payment_date,
+                        'merchant_id' => 1,
+                        'merchant_service_type_id' => 1,
+                        'userable_type' => User::class,
+                        'userable_id' => User::first()->id,
+                        'payable_type' => PremiumType::class,
+                        'payable_id' => $this->premium_type_array[strtolower($paymentInvoice->pin_type)],
+                        'payment_catgory_id' => $paymentInvoice->request_type == 'new' ? $subscriptionType->id : $reSubscriptionType->id,
+                        'metadata' => [
+                            'legacy_id' => $paymentInvoice->sn,
+                            'legacy_payment_id' => $paymentInvoice->payment_id,
+                            'user' => $paymentInvoice->agent_reg_number,
+                            'ward' => $paymentInvoice->ward
+                        ],
+                    ]
+                );
+
+                $this->paymentInvoice_array[$paymentInvoice->sn] = $newPaymentInvoice->id;
+            }
+            $this->info('Payment Invoices migrated.');
+    }
+
+    protected function updatePremiumUsedby(){
+        $enrollees = DB::connection('legacy')->table('tbl_enrolee')
+            ->select('id', 'pin', 'enrolment_number')
+            ->distinct()
+            ->whereNotNull('pin')
+            ->where('pin', '<>', 0)
+            ->get();
+
+        foreach ($enrollees as $enrollee) {
+            $premium_id = $enrollee->pin;
+            $enrollee_id = $enrollee->id;
+
+            $this->info("Updating used by of {$premium_id} to {$enrollee_id}");
+
+            if ($premium_id) {
+               $affected = DB::connection('legacy')
+                ->table('tbl_pin_inven')
+                ->where('id', $premium_id)
+                ->update(['enrollee_id' => $enrollee_id]);
+
+            }
+        }
+
+        //    $enrollees = DB::connection('legacy')->table('tbl_enrolee_formal')
+        //     ->select('id', 'pin', 'cno')
+        //     ->distinct()
+        //     ->whereNotNull('pin')
+        //     ->where('pin', '<>', 0)
+        //     ->get();
+
+        // foreach ($enrollees as $enrollee) {
+        //     $premium_id = $enrollee->pin;
+        //     $enrollee_id = $enrollee->id;
+
+        //     $this->info("Updating used by of {$premium_id} to {$enrollee_id}");
+
+        //     if ($premium_id) {
+        //       DB::connection('legacy')
+        //         ->table('tbl_pin_inven_formal')
+        //         ->where('id', $premium_id)
+        //         ->update(['enrollee_id' => $enrollee_id]);
+
+        //     }
+        // }
+
+        
+
+
+
+    }
+
+    protected function createEnrollmentPhases(){
+         /// enrolment phases
+        $enrollees_phases = DB::connection('legacy')->table('tbl_enrolee')
+            ->select('tracking', 'benefactor', 'mode_of_enrolment')
+            ->distinct()
+            ->orderBy('tracking')
+            ->get();
+
+
+            foreach ($enrollees_phases as $enrollee_phase) {
+
+                $enrollee_phase->counterpart = null;
+                if(!$enrollee_phase->benefactor){
+                    continue;
+                }
+
+                if($enrollee_phase->tracking == '0' || $enrollee_phase->tracking == null){
+                    continue;
+                }
+                
+                $benefactor_id = $this->getBenefactorID($enrollee_phase);
+                $this->info("creating {$enrollee_phase->tracking} of {$benefactor_id}");
+                $newEnrolleePhase = EnrollmentPhase::updateOrCreate(
+                    ['name' => "Phase $enrollee_phase->tracking", 'benefactor_id' => $benefactor_id],
+                    [
+                        'status'        => 1,
+                    ]
+                );
+                $this->enrollment_phase_array[$enrollee_phase->tracking][$benefactor_id] = $newEnrolleePhase->id;
+            }
+    }
+
+    protected function createMdas(){
+       /// enrolment phases
+        $ministries =  DB::connection('legacy')->table('tbl_enrolee_formal')
+        ->distinct()
+        ->pluck('ministry')
+        ->toArray();
+        foreach ($ministries as $ministry) {
+            $this->info("creating {$ministry} mda");
+            $newMda = Mda::updateOrCreate(
+                ['name' => $ministry],
+                [
+                    'status'        => 1,
+                ]
+            );
+            $this->mda_array[$ministry] = $newMda->id;
+        }
+
+    }
+
+
+    protected function createVulnerableGroups(){
+         $vulnerable_groups = [
+            [ 'name' => '', 'code' => 'none'],
+            [ 'name' => 'Children under 5yrs', 'code' =>  'cu5'],
+            [ 'name' => 'Female Reproductive (15-45 years)', 'code' =>  'fra'],
+            [ 'name' => 'Elderly (85 and above)', 'code' =>  'elder'],
+            [ 'name' => 'Othes', 'code' => 'others'],
+        ];
+
+        foreach ($vulnerable_groups as $vulnerable_group) {
+
+            $this->info("creating {$vulnerable_group['name']} vulnerable");
+           $vulnerable = VulnerableGroup::updateOrCreate(
+                ['name' => $vulnerable_group['name']],
+                [
+                    'code' => $vulnerable_group['code'],
+                ]);
+
+                $this->vulnerable_groups_arr[strtolower($vulnerable_group['name'])] = $vulnerable->id;
+        }
+    }
+
     protected function getBenefactorID($enrollee){
-         if(strlen($enrollee->benefactor) > 2){
+
+        //UPDATE `tbl_enrolee` SET benefactor = 'NGSCHA' WHERE mode_of_enrolment = 'huwe' AND benefactor IS NULL;
+        // UPDATE `tbl_enrolee` SET benefactor = 'Self' WHERE mode_of_enrolment = 'premium' AND benefactor IS NULL;
+        
+
+         if(strlen($enrollee->benefactor) > 3){
                 $enrollee->benefactor = match($enrollee->benefactor){
                     'Peculiar Cooperative' => '1',
                     'NGSCHA' => '3',
+                    'Self' => '7',
                     'Nigeria For Women' => '6',
                     'Dr. MM Makusidi' => '5',
                     default => $enrollee->benefactor,
                 };
             }
 
-            $benefactor_id = $enrollee->benefactor ? $this->benefactor_array[$enrollee->benefactor] : null;
+            $benefactor_id =  $this->benefactor_array[$enrollee->benefactor];
 
              if ($enrollee->counterpart == 'gac') {
                     if($this->gacCounterpart) {
@@ -542,4 +731,45 @@ class MigrateLegacyData extends Command
                 }
             return $benefactor_id;
     }
+
+   protected function getImage($id, $sector)
+    {
+        // Build the remote URL
+        $remoteUrl = 'https://eims.ngscha.com/pictures/' . rawurlencode($id) . '/' . rawurlencode($sector);
+
+        // Fetch the image (with retries + timeout)
+        $response = Http::timeout(15)->retry(3, 500)->get($remoteUrl);
+
+        if ($response->failed() || $response->body() === '' ) {
+            throw new \RuntimeException("Failed to fetch image from {$remoteUrl}");
+        }
+
+        // Detect MIME → choose file extension
+        $mime = strtolower(strtok((string) $response->header('Content-Type', 'image/jpeg'), ';'));
+        $ext = match ($mime) {
+            'image/jpeg', 'image/jpg' => 'jpg',
+            'image/png'                  => 'png',
+            'image/gif'                  => 'gif',
+            'image/webp'                 => 'webp',
+            default                      => 'jpg',
+        };
+
+        // Make a stable but unique-ish filename (prevents collisions)
+        $hash = substr(sha1($response->body()), 0, 12);
+        $path = "pictures/{$sector}/{$id}-{$hash}." . $ext;
+
+        // Save to S3 (public bucket). If your bucket is private, set visibility to 'private'
+        Storage::disk('s3')->put($path, $response->body(), [
+            'visibility'  => 'public',     // change to 'private' if needed
+            'ContentType' => $mime,
+            'CacheControl'=> 'public, max-age=31536000, immutable',
+        ]);
+
+        // Return URL (for private buckets, use temporaryUrl instead)
+        return Storage::disk('s3')->url($path);
+        // For private buckets:
+        // return Storage::disk('s3')->temporaryUrl($path, now()->addMinutes(10));
+    }
+
+    
 }

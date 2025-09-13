@@ -158,6 +158,24 @@ export const useAuthStore = defineStore('auth', {
         this.token = token;
         try {
           await this.fetchUser();
+
+          // Restore current role from localStorage if available
+          const storedRole = localStorage.getItem('currentRole');
+          if (storedRole) {
+            try {
+              const role = JSON.parse(storedRole);
+              // Verify the role is still available for this user
+              if (this.availableRoles.find(r => r.id === role.id)) {
+                this.currentRole = role;
+              } else {
+                // Role no longer available, clear it
+                localStorage.removeItem('currentRole');
+              }
+            } catch (e) {
+              // Invalid JSON, clear it
+              localStorage.removeItem('currentRole');
+            }
+          }
         } catch (error) {
           // If token is invalid, clear it silently
           console.warn('Failed to initialize auth with stored token:', error.message);

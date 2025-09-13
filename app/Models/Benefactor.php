@@ -11,9 +11,8 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Benefactor extends Model
 {
+   protected $guarded = ['id'];
     protected $table = 'benefactors';
-
-    
 
     /**
      * Benefactor has many enrollees.

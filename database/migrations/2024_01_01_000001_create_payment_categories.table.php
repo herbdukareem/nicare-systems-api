@@ -9,7 +9,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('payment_catgories', function (Blueprint $table) {
+        Schema::create('payment_categories', function (Blueprint $table) {
            $table->id();
            $table->string('name'); 
            $table->string('code')->unique(); // pin, capitable
@@ -19,19 +19,19 @@ return new class extends Migration
 
         });
 
-        $payment_catgories = [
+        $payment_categories = [
             ['name' => 'Subscription', 'code' => 'subscription', 'invoice_type' => 'cr'],
             ['name' => 'Re-subscription', 'code' => 're-subscription', 'invoice_type' => 'cr'],
             ['name' => 'Capitation Payment', 'code' => 'capitation', 'invoice_type' => 'dr'], 
         ];
 
-        foreach ($payment_catgories as $payment_catgory) {
-            DB::table('payment_catgories')->insert($payment_catgory);
+        foreach ($payment_categories as $payment_catgory) {
+            DB::table('payment_categories')->insert($payment_catgory);
         }
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('payment_catgories');
+        Schema::dropIfExists('payment_categories');
     }
 };

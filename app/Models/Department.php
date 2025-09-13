@@ -9,11 +9,7 @@ class Department extends Model
 {
     use HasFactory;
 
-    protected $fillable = [
-        'name',
-        'description',
-        'status',
-    ];
+   protected $guarded = ['id'];
 
     public function designations()
     {

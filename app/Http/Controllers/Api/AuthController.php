@@ -39,7 +39,7 @@ class AuthController extends Controller
             ], 401);
         }
 
-        if ($user->status !== 'active') {
+        if ($user->status !== 1) {
             return response()->json([
                 'success' => false,
                 'message' => 'Account is not active',
@@ -83,7 +83,7 @@ class AuthController extends Controller
             'password' => Hash::make($request->password),
             'phone' => $request->phone,
             'username' => $request->username,
-            'status' => 'pending', // Requires admin approval
+            'status' => 0, // 0 = pending, 1 = active, 2 = suspended
         ]);
 
         return response()->json([

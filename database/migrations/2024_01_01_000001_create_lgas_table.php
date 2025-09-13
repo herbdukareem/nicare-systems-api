@@ -13,9 +13,7 @@ return new class extends Migration
             $table->string('name');
             $table->string('code')->unique();
             $table->integer('zone')->nullable();
-            $table->integer('baseline')->default(0);
-            $table->integer('total_enrolled')->default(0);
-             $table->unsignedSmallInteger('status')->default(1);
+             $table->unsignedTinyInteger('status')->default(1);
             $table->timestamps();
         });
     }

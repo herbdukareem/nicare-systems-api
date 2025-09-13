@@ -25,7 +25,7 @@ class EnrolleeService
     {
         $query = Enrollee::query();
         $query = EnrolleeFilter::apply($query, $filters);
-        return $query->with(['enrolleeType', 'facility', 'lga', 'ward'])
+        return $query->with(['enrolleeType', 'facility', 'lga', 'ward', 'benefactor', 'fundingType'])
             ->orderBy('created_at', 'desc')
             ->paginate($perPage);
     }

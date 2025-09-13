@@ -2,24 +2,26 @@
   <AdminLayout>
     <div class="tw-space-y-6">
       <!-- Page Header -->
-      <div class="tw-flex tw-items-center tw-justify-between">
+      <div class="tw-flex tw-items-center tw-justify-between tw-animate-fade-in-up">
         <div>
           <h1 class="tw-text-3xl tw-font-bold tw-text-gray-900">Manage Benefactors</h1>
           <p class="tw-text-gray-600 tw-mt-1">Manage healthcare scheme benefactors and sponsors</p>
         </div>
         <div class="tw-flex tw-space-x-3">
-          <v-btn 
-            color="primary" 
-            variant="outlined" 
+          <v-btn
+            color="primary"
+            variant="outlined"
             prepend-icon="mdi-download"
             @click="exportBenefactors"
+            class="tw-hover-lift tw-transition-all tw-duration-300"
           >
             Export
           </v-btn>
-          <v-btn 
-            color="primary" 
+          <v-btn
+            color="primary"
             prepend-icon="mdi-plus"
             @click="showCreateDialog = true"
+            class="tw-hover-lift tw-transition-all tw-duration-300 tw-shadow-lg"
           >
             Add Benefactor
           </v-btn>
@@ -28,9 +30,9 @@
 
       <!-- Statistics Cards -->
       <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-4 tw-gap-6">
-        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
+        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6 tw-animate-slide-up tw-animate-stagger-1 tw-hover-lift tw-hover-glow">
           <div class="tw-flex tw-items-center">
-            <div class="tw-p-3 tw-rounded-full tw-bg-blue-100">
+            <div class="tw-p-3 tw-rounded-full tw-bg-blue-100 tw-transition-all tw-duration-300">
               <v-icon color="blue" size="24">mdi-account-heart</v-icon>
             </div>
             <div class="tw-ml-4">
@@ -39,10 +41,10 @@
             </div>
           </div>
         </div>
-        
-        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
+
+        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6 tw-animate-slide-up tw-animate-stagger-2 tw-hover-lift tw-hover-glow">
           <div class="tw-flex tw-items-center">
-            <div class="tw-p-3 tw-rounded-full tw-bg-green-100">
+            <div class="tw-p-3 tw-rounded-full tw-bg-green-100 tw-transition-all tw-duration-300">
               <v-icon color="green" size="24">mdi-check-circle</v-icon>
             </div>
             <div class="tw-ml-4">

@@ -1,7 +1,16 @@
 <template>
   <v-app>
     <v-main>
-      <router-view />
+      <router-view v-slot="{ Component, route }">
+        <transition
+          name="page"
+          mode="out-in"
+          @enter="onEnter"
+          @leave="onLeave"
+        >
+          <component :is="Component" :key="route.path" />
+        </transition>
+      </router-view>
     </v-main>
     <!-- Global Toast Notifications -->
     <ToastContainer />
@@ -14,6 +23,24 @@ import { useAuthStore } from './stores/auth';
 import ToastContainer from './components/layout/ToastContainer.vue';
 
 const authStore = useAuthStore();
+
+// Route transition handlers
+const onEnter = (el) => {
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(20px)';
+
+  setTimeout(() => {
+    el.style.transition = 'all 0.3s ease-out';
+    el.style.opacity = '1';
+    el.style.transform = 'translateY(0)';
+  }, 10);
+};
+
+const onLeave = (el) => {
+  el.style.transition = 'all 0.2s ease-in';
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(-10px)';
+};
 
 onMounted(() => {
   // Initialize authentication state on app load
@@ -43,5 +70,27 @@ onMounted(() => {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* Page transition styles */
+.page-enter-active,
+.page-leave-active {
+  transition: all 0.3s ease;
+}
+
+.page-enter-from {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+.page-enter-to,
+.page-leave-from {
+  opacity: 1;
+  transform: translateY(0);
 }
 </style>

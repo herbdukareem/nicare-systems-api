@@ -13,27 +13,8 @@ class Premium extends Model
 {
     protected $table = 'premiums';
 
-    protected $fillable = [
-        'pin',
-        'pin_raw',
-        'serial_no',
-        'pin_type',
-        'pin_category',
-        'benefit_type',
-        'amount',
-        'date_generated',
-        'date_used',
-        'date_expired',
-        'status',
-        'used_by',
-        'agent_reg_number',
-        'lga_id',
-        'ward_id',
-        'payment_id',
-        'request_id',
-        'metadata',
-    ];
-
+   protected $guarded = ['id'];
+    
     protected $casts = [
         'amount' => 'decimal:2',
         'date_generated' => 'datetime',
@@ -73,4 +54,6 @@ class Premium extends Model
     {
         return $this->hasMany(Enrollee::class);
     }
+
+     public function userable() { return $this->morphTo(); }
 }

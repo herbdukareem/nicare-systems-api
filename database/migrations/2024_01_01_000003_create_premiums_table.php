@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\PremiumType;
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
@@ -10,6 +11,7 @@ return new class extends Migration
     {
         Schema::create('premiums', function (Blueprint $table) {
             $table->id();
+            $table->string('legacy_id')->nullable();
             $table->string('pin', 20); 
             $table->string('serial_no', 20); // Serial number
             $table->foreignId('premium_type_id')->constrained(); // Premium type
@@ -19,7 +21,6 @@ return new class extends Migration
             $table->timestamp('date_used')->nullable();
             $table->timestamp('date_expired')->nullable();
             $table->unsignedSmallInteger('status')->default(1);
-            $table->string('agent_reg_number')->nullable(); // Agent registration number
             $table->foreignId('lga_id')->nullable()->constrained(); // Set when used
             $table->foreignId('ward_id')->nullable()->constrained(); // Set when used
             $table->string('reference')->nullable(); // For bulk payment tracking
@@ -31,6 +32,8 @@ return new class extends Migration
             $table->index(['premium_type_id']);
 
         });
+
+        
     }
 
     public function down(): void

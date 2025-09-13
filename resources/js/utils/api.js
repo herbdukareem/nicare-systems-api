@@ -26,6 +26,7 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
+    console.log('token', token);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -86,6 +87,8 @@ export const dashboardAPI = {
   getFacilityStats: () => api.get('/dashboard/facility-stats'),
   getChartData: () => api.get('/dashboard/chart-data'),
   getRecentActivities: () => api.get('/dashboard/recent-activities'),
+  getLgas: () => api.get('/v1/lgas'),
+  getBenefactors: () => api.get('/v1/benefactors'),
 };
 
 export const facilityAPI = {

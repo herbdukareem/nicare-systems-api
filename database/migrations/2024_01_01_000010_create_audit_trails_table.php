@@ -10,10 +10,10 @@ return new class extends Migration
     {
         Schema::create('audit_trails', function (Blueprint $table) {
             $table->id();
-            $table->foreignId('enrollee_id')->constrained()->onDelete('cascade');
-            $table->string('action'); // created, updated, approved, rejected, etc.
+            $table->morphs('auditable');
+            $table->string('action');
             $table->text('description');
-            $table->foreignId('user_id')->constrained();
+            $table->foreignId('user_id')->constrained('users');
             $table->json('old_values')->nullable();
             $table->json('new_values')->nullable();
             $table->timestamps();

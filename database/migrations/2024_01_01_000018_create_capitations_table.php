@@ -14,7 +14,8 @@ return new class extends Migration
             $table->unsignedTinyInteger('capitated_month');
             $table->unsignedTinyInteger('capitation_month');
             $table->unsignedTinyInteger('year');
-            $table->integer('user_id');
+            $table->foreignId('user_id')->constrained();
+            $table->unsignedTinyInteger('status')->default(1);
             $table->timestamps();
         });
     }

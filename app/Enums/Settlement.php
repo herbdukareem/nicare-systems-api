@@ -1,36 +1,50 @@
 <?php
-
 namespace App\Enums;
 
+use Spatie\Enum\Laravel\Enum;
+
 /**
- * Enum SettleType
- *
- * Defines the numeric status codes for an enrollee and provides a label() helper.
+ * @method static self RURAL()
+ * @method static self URBAN()
  */
-enum Settlement: int
+final class Settlement extends Enum
 {
-    case RURAL = 1;
-    case URBAN = 2;
-
-    /**
-     * Get the human‑readable label for the enum value.
-     */
-    public function label(): string
-    {
-        return match($this) {
-            self::RURAL => 'Rural',
-            self::URBAN => 'Urban'
-        };
-    }
-
-    /**
-     * Build an array of available codes to labels (e.g. for form select lists).
-     */
-    public static function options(): array
+    // store as integers in DB
+    protected static function values(): array
     {
         return [
-            self::RURAL->value => self::RURAL->label(),
-            self::URBAN->value => self::URBAN->label(),
+            'RURAL' => 1,
+            'URBAN' => 2,
         ];
+    }
+
+    // human-readable labels
+    protected static function labels(): array
+    {
+        return [
+            'RURAL' => 'Rural',
+            'URBAN' => 'Urban',
+        ];
+    }
+
+    /** Accepts 1/2, "1"/"2", "rural"/"urban", "R"/"U", null (defaults to Rural) */
+    public static function coerce(int|string|null $raw): self
+    {
+        if ($raw === null) return self::RURAL();
+        $v = strtolower(trim((string)$raw));
+
+        if (is_numeric($v)) {
+            return match ((int)$v) {
+                1 => self::RURAL(),
+                2 => self::URBAN(),
+                default => self::RURAL(),
+            };
+        }
+
+        return match ($v) {
+            'r', 'rural' => self::RURAL(),
+            'u', 'urban' => self::URBAN(),
+            default => self::RURAL(),
+        };
     }
 }

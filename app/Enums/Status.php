@@ -2,77 +2,154 @@
 
 namespace App\Enums;
 
-/**
- * Enum Status
- *
- * Defines the numeric status codes for a user and provides a label() helper.
- */
-enum Status: int
-{
-    case PENDING = 0;
-    case ACTIVE = 1;
-    case EXPIRED = 2;
-    case SUSPENDED = 3;
-    case APPROVED = 4;
-    case REJECTED = 5;
-    case CANCELLED = 6;
-    case COMPLETED = 7;
-    case FAILED = 8;
-    case REVIEWED = 9;
-    case PAID = 10;
-    case RECOMMENDED = 11;
-    case REFERRED = 12;
-    case ACTIVATED = 13;
-    case NOTACTIVATED = 14;
-    case DELETED = 15;
+use Spatie\Enum\Laravel\Enum;
 
+/**
+ * Status enum (Spatie)
+ *
+ * @method static self PENDING()
+ * @method static self ACTIVE()
+ * @method static self EXPIRED()
+ * @method static self SUSPENDED()
+ * @method static self APPROVED()
+ * @method static self REJECTED()
+ * @method static self CANCELLED()
+ * @method static self COMPLETED()
+ * @method static self FAILED()
+ * @method static self REVIEWED()
+ * @method static self PAID()
+ * @method static self RECOMMENDED()
+ * @method static self REFERRED()
+ * @method static self ACTIVATED()
+ * @method static self NOTACTIVATED()
+ * @method static self DELETED()
+ * @method static self USED()
+ * @method static self NOTUSED()
+ */
+final class Status extends Enum
+{
     /**
-     * Get the human‑readable label for the enum value.
+     * Store numeric codes in DB
      */
-    public function label(): string
+    protected static function values(): array
     {
-        return match($this) {
-            self::PENDING => 'pending',
-            self::ACTIVE => 'active',
-            self::EXPIRED => 'expired',
-            self::SUSPENDED => 'suspended',
-            self::APPROVED => 'approved',
-            self::REJECTED => 'rejected',
-            self::CANCELLED => 'cancelled',
-            self::COMPLETED => 'completed',
-            self::FAILED => 'failed',
-            self::REVIEWED => 'reviewed',
-            self::PAID => 'paid',
-            self::RECOMMENDED => 'recommended',
-            self::REFERRED => 'referred',
-            self::ACTIVATED => 'activated',
-            self::NOTACTIVATED => 'not activated',
-            self::DELETED => 'deleted',
-        };
+        return [
+            'PENDING'       => 0,
+            'ACTIVE'        => 1,
+            'EXPIRED'       => 2,
+            'SUSPENDED'     => 3,
+            'APPROVED'      => 4,
+            'REJECTED'      => 5,
+            'CANCELLED'     => 6,
+            'COMPLETED'     => 7,
+            'FAILED'        => 8,
+            'REVIEWED'      => 9,
+            'PAID'          => 10,
+            'RECOMMENDED'   => 11,
+            'REFERRED'      => 12,
+            'ACTIVATED'     => 13,
+            'NOTACTIVATED'  => 14,
+            'DELETED'       => 15,
+            'USED'          => 16,
+            'NOTUSED'       => 17,
+        ];
     }
 
     /**
-     * Build an array of available codes to labels (e.g. for form select lists).
+     * Human-readable labels
+     */
+    protected static function labels(): array
+    {
+        return [
+            'PENDING'       => 'pending',
+            'ACTIVE'        => 'active',
+            'EXPIRED'       => 'expired',
+            'SUSPENDED'     => 'suspended',
+            'APPROVED'      => 'approved',
+            'REJECTED'      => 'rejected',
+            'CANCELLED'     => 'cancelled',
+            'COMPLETED'     => 'completed',
+            'FAILED'        => 'failed',
+            'REVIEWED'      => 'reviewed',
+            'PAID'          => 'paid',
+            'RECOMMENDED'   => 'recommended',
+            'REFERRED'      => 'referred',
+            'ACTIVATED'     => 'activated',
+            'NOTACTIVATED'  => 'not activated',
+            'DELETED'       => 'deleted',
+            'USED'          => 'used',
+            'NOTUSED'       => 'not used',
+        ];
+    }
+
+    /**
+     * Flexible parsing:
+     * - integers/strings of the numeric codes (0..17)
+     * - exact labels ('active', 'pending', etc.)
+     * - enum names/case-insensitive ('ACTIVE', 'active')
+     */
+    public static function coerce(int|string|null $raw): self
+    {
+        if ($raw === null) {
+            return self::PENDING();
+        }
+
+        $v = trim((string) $raw);
+
+        // numeric code
+        if (is_numeric($v)) {
+            $code = (int) $v;
+            // map code to instance by scanning values()
+            foreach (self::values() as $name => $value) {
+                if ($value === $code) {
+                    /** @var self $enum */
+                    $enum = \call_user_func([self::class, $name]);
+                    return $enum;
+                }
+            }
+            return self::PENDING();
+        }
+
+        // match by label or name (case-insensitive)
+        $lower = strtolower($v);
+
+        // try labels()
+        foreach (self::labels() as $name => $label) {
+            if ($lower === strtolower($label)) {
+                /** @var self $enum */
+                $enum = \call_user_func([self::class, $name]);
+                return $enum;
+            }
+        }
+
+        // try names (e.g. 'ACTIVE', 'notActivated')
+        $upper = strtoupper($v);
+        if (\array_key_exists($upper, self::values())) {
+            /** @var self $enum */
+            $enum = \call_user_func([self::class, $upper]);
+            return $enum;
+        }
+
+        return self::PENDING();
+    }
+
+    /**
+     * Build a "code => label" array (useful for selects).
      */
     public static function options(): array
     {
-        return [
-            self::PENDING->value => self::PENDING->label(),
-            self::ACTIVE->value => self::ACTIVE->label(),
-            self::EXPIRED->value => self::EXPIRED->label(),
-            self::SUSPENDED->value => self::SUSPENDED->label(),
-            self::APPROVED->value => self::APPROVED->label(),
-            self::REJECTED->value => self::REJECTED->label(),
-            self::CANCELLED->value => self::CANCELLED->label(),
-            self::COMPLETED->value => self::COMPLETED->label(),
-            self::FAILED->value => self::FAILED->label(),
-            self::REVIEWED->value => self::REVIEWED->label(),
-            self::PAID->value => self::PAID->label(),
-            self::RECOMMENDED->value => self::RECOMMENDED->label(),
-            self::REFERRED->value => self::REFERRED->label(),
-            self::ACTIVATED->value => self::ACTIVATED->label(),
-            self::NOTACTIVATED->value => self::NOTACTIVATED->label(),
-            self::DELETED->value => self::DELETED->label(),
-        ];
+        $out = [];
+        foreach (self::values() as $name => $value) {
+            $out[$value] = self::labels()[$name];
+        }
+        return $out;
+    }
+
+    /**
+     * Just the numeric codes (validation helpers)
+     */
+    public static function toValues(): array
+    {
+        return array_values(self::values());
     }
 }

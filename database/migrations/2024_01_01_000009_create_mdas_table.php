@@ -14,6 +14,7 @@ return new class extends Migration
             $table->string('code')->nullable();
             $table->unsignedTinyInteger('premium_type')->default(2);// 1=>percentage 2=value
             $table->decimal('premium_type_value')->default(3600);
+            $table->unsignedTinyInteger('status')->default(1);
             $table->timestamps();
         });
     }
