@@ -130,7 +130,7 @@
             <div class="tw-p-6">
               <v-data-table
                 :headers="referralHeaders"
-                :items="referrals"
+                :items="filteredReferrals"
                 :loading="loading"
                 item-key="id"
                 class="tw-elevation-0"
@@ -195,7 +195,7 @@
             <div class="tw-p-6">
               <v-data-table
                 :headers="paCodeHeaders"
-                :items="paCodes"
+                :items="filteredPACodes"
                 :loading="loading"
                 item-key="id"
                 class="tw-elevation-0"
@@ -293,11 +293,11 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed, watch } from 'vue';
 import AdminLayout from '../layout/AdminLayout.vue';
 import ReferralRequestForm from './ReferralRequestForm.vue';
 import { useToast } from '../../composables/useToast';
-import axios from 'axios';
+import { pasAPI } from '../../utils/api.js';
 
 const { success, error } = useToast();
 
@@ -359,9 +359,14 @@ const paCodeHeaders = [
   { title: 'Actions', key: 'actions', sortable: false, width: '120px' }
 ];
 
-// Mock data
+// Data
 const referrals = ref([]);
 const paCodes = ref([]);
+const pagination = ref({
+  page: 1,
+  itemsPerPage: 15,
+  totalItems: 0
+});
 
 // Methods
 const getSeverityColor = (severity) => {
@@ -429,15 +434,25 @@ const handleReferralSubmit = (referralData) => {
 
 const loadStatistics = async () => {
   try {
-    const response = await axios.get('/api/v1/pas/referrals-statistics');
-    if (response.data.success) {
-      const stats = response.data.data;
+    const [referralStats, paCodeStats] = await Promise.all([
+      pasAPI.getReferralStatistics(),
+      pasAPI.getPACodeStatistics()
+    ]);
+
+    if (referralStats.data.success) {
+      const stats = referralStats.data.data;
       totalReferrals.value = stats.total_referrals || 0;
       pendingRequests.value = stats.pending_requests || 0;
       emergencyCases.value = stats.emergency_cases || 0;
     }
+
+    if (paCodeStats.data.success) {
+      const stats = paCodeStats.data.data;
+      approvedPACodes.value = stats.active_pa_codes || 0;
+    }
   } catch (err) {
     console.error('Failed to load statistics:', err);
+    error('Failed to load statistics');
   }
 };
 
@@ -448,12 +463,16 @@ const loadReferrals = async () => {
       search: searchQuery.value,
       status: selectedStatus.value,
       severity_level: selectedSeverity.value,
+      page: pagination.value.page,
+      per_page: pagination.value.itemsPerPage
     };
 
-    const response = await axios.get('/api/v1/pas/referrals', { params });
+    const response = await pasAPI.getReferrals(params);
     if (response.data.success) {
-      // Update referrals data
-      console.log('Referrals loaded:', response.data.data);
+      const data = response.data.data;
+      referrals.value = data.data || [];
+      pagination.value.totalItems = data.total || 0;
+      pagination.value.page = data.current_page || 1;
     }
   } catch (err) {
     console.error('Failed to load referrals:', err);
@@ -462,6 +481,67 @@ const loadReferrals = async () => {
     loading.value = false;
   }
 };
+
+const loadPACodes = async () => {
+  try {
+    loading.value = true;
+    const params = {
+      search: searchQuery.value,
+      status: selectedStatus.value,
+      page: pagination.value.page,
+      per_page: pagination.value.itemsPerPage
+    };
+
+    const response = await pasAPI.getPACodes(params);
+    if (response.data.success) {
+      const data = response.data.data;
+      paCodes.value = data.data || [];
+      pagination.value.totalItems = data.total || 0;
+      pagination.value.page = data.current_page || 1;
+    }
+  } catch (err) {
+    console.error('Failed to load PA codes:', err);
+    error('Failed to load PA codes');
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Computed
+const filteredReferrals = computed(() => {
+  return referrals.value.map(referral => ({
+    ...referral,
+    enrollee_name: referral.enrollee_full_name,
+    referring_facility: referral.referring_facility_name,
+    receiving_facility: referral.receiving_facility_name,
+    severity: referral.severity_level,
+    created_at: new Date(referral.created_at).toLocaleDateString()
+  }));
+});
+
+const filteredPACodes = computed(() => {
+  return paCodes.value.map(paCode => ({
+    ...paCode,
+    expires_at: paCode.expires_at ? new Date(paCode.expires_at).toLocaleDateString() : 'N/A'
+  }));
+});
+
+// Watchers
+watch(activeTab, (newTab) => {
+  if (newTab === 'referrals') {
+    loadReferrals();
+  } else if (newTab === 'pa-codes') {
+    loadPACodes();
+  }
+});
+
+watch([searchQuery, selectedStatus, selectedSeverity], () => {
+  if (activeTab.value === 'referrals') {
+    loadReferrals();
+  } else if (activeTab.value === 'pa-codes') {
+    loadPACodes();
+  }
+}, { debounce: 300 });
 
 // Lifecycle
 onMounted(() => {

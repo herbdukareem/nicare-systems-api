@@ -183,16 +183,14 @@ const routes = [
   {
     path: '/pas/programmes',
     name: 'pas-programmes',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Manage Programmes/Services', subtitle: 'Manage healthcare programmes', icon: 'mdi-format-list-bulleted-type' }
+    component: () => import('../components/pas/ServicesManagementPage.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/pas/drugs',
     name: 'pas-drugs',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Manage Drugs', subtitle: 'Manage drug formulary', icon: 'mdi-pill' }
+    component: () => import('../components/pas/DrugsManagementPage.vue'),
+    meta: { requiresAuth: true }
   },
   {
     path: '/pas/labs',

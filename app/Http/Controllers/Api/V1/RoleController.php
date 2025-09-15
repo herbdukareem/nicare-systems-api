@@ -5,6 +5,9 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\BaseController;
 use App\Models\Role;
 use App\Services\RoleService;
+use App\Http\Resources\RoleResource;
+use App\Http\Requests\StoreRoleRequest;
+use App\Http\Requests\UpdateRoleRequest;
 use Illuminate\Http\Request;
 
 /**
@@ -46,15 +49,22 @@ class RoleController extends BaseController
     /**
      * Store a newly created role.
      */
-    public function store(Request $request)
+    public function store(StoreRoleRequest $request)
     {
-        $validated = $request->validate([
-            'name' => 'required|string|unique:roles,name',
-            'label' => 'nullable|string',
-            'description' => 'nullable|string',
-        ]);
-        $role = $this->roleService->create($validated);
-        return $this->sendResponse($role, 'Role created successfully', 201);
+        $data = $request->validated();
+
+        // Handle permissions separately
+        $permissions = $data['permissions'] ?? [];
+        unset($data['permissions']);
+
+        $role = $this->roleService->create($data);
+
+        // Assign permissions if provided
+        if (!empty($permissions)) {
+            $role->permissions()->sync($permissions);
+        }
+
+        return $this->sendResponse(new RoleResource($role->load('permissions')), 'Role created successfully', 201);
     }
 
     /**
@@ -62,22 +72,29 @@ class RoleController extends BaseController
      */
     public function show(Role $role)
     {
-        $role->load('permissions');
-        return $this->sendResponse($role, 'Role retrieved successfully');
+        $role->load('permissions', 'users');
+        return $this->sendResponse(new RoleResource($role), 'Role retrieved successfully');
     }
 
     /**
      * Update the specified role.
      */
-    public function update(Request $request, Role $role)
+    public function update(UpdateRoleRequest $request, Role $role)
     {
-        $validated = $request->validate([
-            'name' => 'sometimes|string|unique:roles,name,' . $role->id,
-            'label' => 'nullable|string',
-            'description' => 'nullable|string',
-        ]);
-        $role = $this->roleService->update($role, $validated);
-        return $this->sendResponse($role, 'Role updated successfully');
+        $data = $request->validated();
+
+        // Handle permissions separately
+        $permissions = $data['permissions'] ?? null;
+        unset($data['permissions']);
+
+        $role = $this->roleService->update($role, $data);
+
+        // Sync permissions if provided
+        if ($permissions !== null) {
+            $role->permissions()->sync($permissions);
+        }
+
+        return $this->sendResponse(new RoleResource($role->load('permissions')), 'Role updated successfully');
     }
 
     /**
@@ -99,6 +116,54 @@ class RoleController extends BaseController
             'permissions.*' => 'exists:permissions,id',
         ]);
         $this->roleService->syncPermissions($role, $validated['permissions']);
-        return $this->sendResponse($role->load('permissions'), 'Permissions synced successfully');
+        return $this->sendResponse(new RoleResource($role->load('permissions')), 'Permissions synced successfully');
+    }
+
+    /**
+     * Get roles with user counts
+     */
+    public function withUserCounts()
+    {
+        $roles = Role::withCount('users')->with('permissions')->get();
+        return $this->sendResponse(RoleResource::collection($roles), 'Roles with user counts retrieved successfully');
+    }
+
+    /**
+     * Bulk delete roles
+     */
+    public function bulkDelete(Request $request)
+    {
+        $validated = $request->validate([
+            'role_ids' => 'required|array',
+            'role_ids.*' => 'exists:roles,id',
+        ]);
+
+        $deleted = Role::whereIn('id', $validated['role_ids'])->delete();
+
+        return $this->sendResponse(
+            ['deleted_count' => $deleted],
+            "Successfully deleted {$deleted} roles"
+        );
+    }
+
+    /**
+     * Clone a role with its permissions
+     */
+    public function clone(Request $request, Role $role)
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|unique:roles,name',
+            'label' => 'required|string',
+            'description' => 'nullable|string',
+        ]);
+
+        $newRole = Role::create($validated);
+        $newRole->permissions()->sync($role->permissions->pluck('id'));
+
+        return $this->sendResponse(
+            new RoleResource($newRole->load('permissions')),
+            'Role cloned successfully',
+            201
+        );
     }
 }

@@ -28,60 +28,60 @@
 
       <!-- Statistics Cards -->
       <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-4 tw-gap-6">
-        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
+        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6 tw-border tw-border-gray-100">
           <div class="tw-flex tw-items-center">
             <div class="tw-p-3 tw-rounded-full tw-bg-blue-100">
               <v-icon color="blue" size="24">mdi-shield-account</v-icon>
             </div>
             <div class="tw-ml-4">
               <p class="tw-text-sm tw-font-medium tw-text-gray-600">Total Roles</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ roles.length }}</p>
+              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ totalRoles.toLocaleString() }}</p>
             </div>
           </div>
         </div>
-        
-        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
+
+        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6 tw-border tw-border-gray-100">
           <div class="tw-flex tw-items-center">
             <div class="tw-p-3 tw-rounded-full tw-bg-green-100">
               <v-icon color="green" size="24">mdi-key</v-icon>
             </div>
             <div class="tw-ml-4">
               <p class="tw-text-sm tw-font-medium tw-text-gray-600">Permissions</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ allPermissions.length }}</p>
+              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ allPermissions.length.toLocaleString() }}</p>
             </div>
           </div>
         </div>
         
-        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
+        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6 tw-border tw-border-gray-100">
           <div class="tw-flex tw-items-center">
             <div class="tw-p-3 tw-rounded-full tw-bg-purple-100">
               <v-icon color="purple" size="24">mdi-account-group</v-icon>
             </div>
             <div class="tw-ml-4">
               <p class="tw-text-sm tw-font-medium tw-text-gray-600">Users Assigned</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">1,247</p>
+              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ totalUsersWithRoles.toLocaleString() }}</p>
             </div>
           </div>
         </div>
-        
-        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
+
+        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6 tw-border tw-border-gray-100">
           <div class="tw-flex tw-items-center">
             <div class="tw-p-3 tw-rounded-full tw-bg-orange-100">
               <v-icon color="orange" size="24">mdi-shield-check</v-icon>
             </div>
             <div class="tw-ml-4">
-              <p class="tw-text-sm tw-font-medium tw-text-gray-600">Active Roles</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ activeRolesCount }}</p>
+              <p class="tw-text-sm tw-font-medium tw-text-gray-600">Permission Categories</p>
+              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ permissionCategories.length }}</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Roles Table -->
-      <div class="tw-bg-white tw-rounded-lg tw-shadow-sm">
-        <div class="tw-p-6 tw-border-b tw-border-gray-200">
-          <div class="tw-flex tw-items-center tw-justify-between">
-            <h3 class="tw-text-lg tw-font-semibold tw-text-gray-900">System Roles</h3>
+      <!-- Filters and Actions -->
+      <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6 tw-border tw-border-gray-100">
+        <div class="tw-flex tw-flex-col tw-lg:tw-flex-row tw-gap-4 tw-items-start tw-lg:tw-items-center tw-justify-between">
+          <!-- Search and Filters -->
+          <div class="tw-flex tw-gap-4 tw-flex-1">
             <v-text-field
               v-model="searchQuery"
               label="Search roles..."
@@ -89,15 +89,44 @@
               variant="outlined"
               density="compact"
               clearable
-              class="tw-max-w-xs"
+              hide-details
+              class="tw-max-w-sm"
             />
+            <v-btn
+              color="primary"
+              variant="outlined"
+              prepend-icon="mdi-view-grid"
+              @click="showPermissionMatrix = !showPermissionMatrix"
+            >
+              {{ showPermissionMatrix ? 'Hide' : 'Show' }} Permission Matrix
+            </v-btn>
+          </div>
+
+          <!-- Bulk Actions -->
+          <div class="tw-flex tw-gap-2">
+            <v-btn
+              color="warning"
+              variant="outlined"
+              size="small"
+              @click="showBulkActionsDialog = true"
+              v-if="selectedRoles.length > 0"
+            >
+              <v-icon start>mdi-cog</v-icon>
+              Bulk Actions ({{ selectedRoles.length }})
+            </v-btn>
           </div>
         </div>
+      </div>
 
+      <!-- Roles Table -->
+      <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-border tw-border-gray-100">
         <v-data-table
+          v-model="selectedRoles"
           :headers="roleHeaders"
           :items="roles"
           :loading="loading"
+          show-select
+          return-object
           class="tw-elevation-0"
           item-value="id"
         >
@@ -156,6 +185,59 @@
             </div>
           </template>
         </v-data-table>
+      </div>
+
+      <!-- Permission Matrix -->
+      <div v-if="showPermissionMatrix" class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-border tw-border-gray-100">
+        <div class="tw-p-6 tw-border-b tw-border-gray-200">
+          <h3 class="tw-text-lg tw-font-semibold tw-text-gray-900">Permission Matrix</h3>
+          <p class="tw-text-sm tw-text-gray-600 tw-mt-1">Visual overview of role permissions</p>
+        </div>
+
+        <div class="tw-p-6">
+          <div class="tw-overflow-x-auto">
+            <table class="tw-w-full tw-text-sm">
+              <thead>
+                <tr class="tw-border-b tw-border-gray-200">
+                  <th class="tw-text-left tw-py-3 tw-px-4 tw-font-medium tw-text-gray-900">Permission</th>
+                  <th
+                    v-for="role in roles"
+                    :key="role.id"
+                    class="tw-text-center tw-py-3 tw-px-2 tw-font-medium tw-text-gray-900 tw-min-w-[100px]"
+                  >
+                    {{ role.label || role.name }}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr
+                  v-for="permission in allPermissions"
+                  :key="permission.id"
+                  class="tw-border-b tw-border-gray-100 hover:tw-bg-gray-50"
+                >
+                  <td class="tw-py-3 tw-px-4">
+                    <div>
+                      <p class="tw-font-medium tw-text-gray-900">{{ permission.label || permission.name }}</p>
+                      <p class="tw-text-xs tw-text-gray-500">{{ permission.description }}</p>
+                    </div>
+                  </td>
+                  <td
+                    v-for="role in roles"
+                    :key="`${permission.id}-${role.id}`"
+                    class="tw-text-center tw-py-3 tw-px-2"
+                  >
+                    <v-icon
+                      :color="hasPermission(role, permission) ? 'success' : 'grey'"
+                      size="20"
+                    >
+                      {{ hasPermission(role, permission) ? 'mdi-check-circle' : 'mdi-circle-outline' }}
+                    </v-icon>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -280,6 +362,53 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Bulk Actions Dialog -->
+    <v-dialog v-model="showBulkActionsDialog" max-width="500px">
+      <v-card>
+        <v-card-title>
+          <span class="tw-text-xl tw-font-semibold">
+            Bulk Actions ({{ selectedRoles.length }} roles)
+          </span>
+        </v-card-title>
+        <v-card-text>
+          <div class="tw-space-y-4">
+            <v-select
+              v-model="bulkAction"
+              :items="bulkActionOptions"
+              label="Select Action"
+              variant="outlined"
+              required
+            />
+
+            <div v-if="bulkAction === 'delete'" class="tw-p-4 tw-bg-red-50 tw-rounded-lg">
+              <p class="tw-text-red-800 tw-text-sm">
+                <v-icon color="red" size="16" class="tw-mr-1">mdi-alert</v-icon>
+                This action cannot be undone. {{ selectedRoles.length }} roles will be permanently deleted.
+              </p>
+            </div>
+
+            <div v-if="bulkAction === 'clone'" class="tw-p-4 tw-bg-blue-50 tw-rounded-lg">
+              <p class="tw-text-blue-800 tw-text-sm">
+                <v-icon color="blue" size="16" class="tw-mr-1">mdi-information</v-icon>
+                {{ selectedRoles.length }} roles will be cloned with their permissions.
+              </p>
+            </div>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showBulkActionsDialog = false">Cancel</v-btn>
+          <v-btn
+            :color="bulkAction === 'delete' ? 'error' : 'primary'"
+            @click="handleBulkAction"
+            :disabled="!bulkAction"
+          >
+            {{ bulkAction === 'delete' ? 'Delete Roles' : 'Apply Action' }}
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </AdminLayout>
 </template>
 
@@ -296,8 +425,13 @@ const loading = ref(false);
 const searchQuery = ref('');
 const showCreateRoleDialog = ref(false);
 const showViewRoleDialog = ref(false);
+const showPermissionMatrix = ref(false);
+const showBulkActionsDialog = ref(false);
 const editingRole = ref(null);
 const viewingRole = ref(null);
+const selectedRoles = ref([]);
+const bulkAction = ref('');
+const bulkActionData = ref({});
 
 // Form data
 const roleForm = ref({
@@ -342,18 +476,21 @@ const activeRolesCount = computed(() => {
 });
 
 const permissionCategories = computed(() => {
-  const categories = {};
+  const categories = new Set();
   allPermissions.value.forEach(permission => {
-    if (!categories[permission.category]) {
-      categories[permission.category] = {
-        name: permission.category,
-        permissions: []
-      };
-    }
-    categories[permission.category].permissions.push(permission);
+    categories.add(permission.category || 'General');
   });
-  return Object.values(categories);
+  return Array.from(categories);
 });
+
+const totalUsersWithRoles = computed(() => {
+  return roles.value.reduce((total, role) => total + (role.users_count || 0), 0);
+});
+
+const bulkActionOptions = [
+  { title: 'Delete Roles', value: 'delete' },
+  { title: 'Clone Roles', value: 'clone' }
+];
 
 // Methods
 const getPermissionName = (permissionId) => {
@@ -419,6 +556,38 @@ const closeRoleDialog = () => {
       roleForm.value[key] = '';
     }
   });
+};
+
+// Permission Matrix Methods
+const hasPermission = (role, permission) => {
+  if (!role.permissions || !Array.isArray(role.permissions)) return false;
+  return role.permissions.some(p => p.id === permission.id);
+};
+
+// Bulk Operations
+const handleBulkAction = async () => {
+  if (selectedRoles.value.length === 0) {
+    error('Please select roles first');
+    return;
+  }
+
+  try {
+    if (bulkAction.value === 'delete') {
+      if (!confirm(`Are you sure you want to delete ${selectedRoles.value.length} roles?`)) return;
+      await roleAPI.bulkDelete({ role_ids: selectedRoles.value.map(r => r.id) });
+      success(`Deleted ${selectedRoles.value.length} roles`);
+    } else if (bulkAction.value === 'clone') {
+      // Implement clone functionality
+      success('Clone feature coming soon');
+    }
+
+    selectedRoles.value = [];
+    showBulkActionsDialog.value = false;
+    loadRoles();
+  } catch (err) {
+    error('Bulk operation failed');
+    console.error(err);
+  }
 };
 
 // API Methods

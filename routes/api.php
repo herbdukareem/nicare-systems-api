@@ -29,6 +29,9 @@ use App\Http\Controllers\Api\V1\DesignationController;
 use App\Http\Controllers\Api\V1\StaffController;
 use App\Http\Controllers\ReferralController;
 use App\Http\Controllers\PACodeController;
+use App\Http\Controllers\Api\SecurityController;
+use App\Http\Controllers\Api\V1\DrugController;
+use App\Http\Controllers\Api\V1\ServiceController;
 
 /*
 |--------------------------------------------------------------------------
@@ -41,8 +44,18 @@ use App\Http\Controllers\PACodeController;
 |
 */
 
-// Auth routes
-Route::post('login', [AuthController::class, 'login']);
+// Test route to verify API is working
+Route::get('test', function () {
+    return response()->json([
+        'success' => true,
+        'message' => 'API is working',
+        'timestamp' => now(),
+        'csrf_token' => csrf_token(),
+    ]);
+});
+
+// Auth routes (without middleware to avoid CSRF issues)
+Route::post('login', [AuthController::class, 'login'])->withoutMiddleware(['web']);
 Route::post('register', [AuthController::class, 'register']);
 Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::post('forget-password', [AuthController::class, 'forgetPassword']);
@@ -85,13 +98,39 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     // Role and permission routes
     Route::apiResource('roles', RoleController::class);
     Route::apiResource('permissions', PermissionController::class);
-    // Assign permissions to roles
+
+    // Role management routes
     Route::post('roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
+    Route::get('roles-with-user-counts', [RoleController::class, 'withUserCounts']);
+    Route::post('roles/{role}/clone', [RoleController::class, 'clone']);
+    Route::delete('roles/bulk-delete', [RoleController::class, 'bulkDelete']);
+
+    // Permission management routes
+    Route::get('permissions/by-category', [PermissionController::class, 'byCategory']);
+    Route::post('permissions/bulk-create', [PermissionController::class, 'bulkCreate']);
+    Route::delete('permissions/bulk-delete', [PermissionController::class, 'bulkDelete']);
 
     // User routes
     Route::apiResource('users', UserController::class);
     Route::get('users-with-roles', [UserController::class, 'withRoles']);
     Route::post('users/{user}/roles', [UserController::class, 'syncRoles']);
+    Route::get('users/{user}/profile', [UserController::class, 'profile']);
+    Route::patch('users/{user}/password', [UserController::class, 'updatePassword']);
+    Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
+    Route::post('users/bulk-update-status', [UserController::class, 'bulkUpdateStatus']);
+    Route::delete('users/bulk-delete', [UserController::class, 'bulkDelete']);
+    // Profile management routes
+    Route::get('users/{user}/activities', [UserController::class, 'activities']);
+    Route::post('users/{user}/roles', [UserController::class, 'updateRoles']);
+    Route::post('users/{user}/avatar', [UserController::class, 'uploadAvatar']);
+    Route::patch('users/{user}/toggle-2fa', [UserController::class, 'toggle2FA']);
+    Route::post('users/{user}/revoke-sessions', [UserController::class, 'revokeAllSessions']);
+    // Advanced user features
+    Route::post('users/{user}/impersonate', [UserController::class, 'impersonate']);
+    Route::post('users/stop-impersonation', [UserController::class, 'stopImpersonation']);
+    Route::get('users/export', [UserController::class, 'export']);
+    Route::post('users/import', [UserController::class, 'import']);
+    Route::get('users/{user}/activity-stats', [UserController::class, 'activityStats']);
 
     Route::apiResource('enrollee-types', EnrolleeTypeController::class);
     Route::apiResource('banks', BankController::class);
@@ -111,6 +150,21 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::apiResource('designations', DesignationController::class);
     Route::apiResource('staff', StaffController::class);
 
+    // Drug Management routes
+    Route::apiResource('drugs', DrugController::class);
+    Route::post('drugs/import', [DrugController::class, 'import']);
+    Route::get('drugs-export', [DrugController::class, 'export']);
+    Route::get('drugs-template', [DrugController::class, 'downloadTemplate']);
+    Route::get('drugs-statistics', [DrugController::class, 'statistics']);
+
+    // Service Management routes
+    Route::apiResource('services', ServiceController::class);
+    Route::post('services/import', [ServiceController::class, 'import']);
+    Route::get('services-export', [ServiceController::class, 'export']);
+    Route::get('services-template', [ServiceController::class, 'downloadTemplate']);
+    Route::get('services-statistics', [ServiceController::class, 'statistics']);
+    Route::get('services-groups', [ServiceController::class, 'getGroups']);
+
     // PAS (Pre-Authorization System) routes
     Route::prefix('pas')->group(function () {
         // Referral routes
@@ -129,5 +183,16 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::post('pa-codes/{paCode}/cancel', [PACodeController::class, 'cancel']);
         Route::post('pa-codes/verify', [PACodeController::class, 'verify']);
         Route::get('pa-codes-statistics', [PACodeController::class, 'statistics']);
+    });
+
+    // Security routes
+    Route::prefix('security')->group(function () {
+        Route::get('dashboard', [SecurityController::class, 'dashboard']);
+        Route::get('logs', [SecurityController::class, 'logs']);
+        Route::post('logs/{securityLog}/resolve', [SecurityController::class, 'resolve']);
+        Route::post('logs/bulk-resolve', [SecurityController::class, 'bulkResolve']);
+        Route::get('audit-trail', [SecurityController::class, 'auditTrail']);
+        Route::get('sessions', [SecurityController::class, 'sessions']);
+        Route::post('sessions/revoke', [SecurityController::class, 'revokeSessions']);
     });
 });

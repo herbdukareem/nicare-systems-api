@@ -11,53 +11,74 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
-use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
     public function login(Request $request): JsonResponse
     {
-        $validator = Validator::make($request->all(), [
-            'username' => 'required',
-            'password' => 'required',
-        ]);
+        try {
+            $validator = Validator::make($request->all(), [
+                'username' => 'required',
+                'password' => 'required',
+            ]);
 
-        if ($validator->fails()) {
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'errors' => $validator->errors(),
+                ], 422);
+            }
+
+            // Find user by username or email
+            $user = User::where('username', $request->username)
+                       ->orWhere('email', $request->username)
+                       ->first();
+
+            if (!$user || !Hash::check($request->password, $user->password)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid credentials',
+                ], 401);
+            }
+
+            if ($user->status !== 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Account is not active',
+                ], 401);
+            }
+
+            // Delete old tokens for this user
+            $user->tokens()->delete();
+
+            // Create new token
+            $token = $user->createToken('api-token', ['*'], now()->addDays(30))->plainTextToken;
+
+            // Load user relationships
+            $user->load(['roles']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Login successful',
+                'data' => [
+                    'user' => $user,
+                    'roles' => $user->roles->pluck('name'),
+                    'permissions' => $user->getAllPermissions()->pluck('name'),
+                    'token' => $token,
+                ],
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Login error: ' . $e->getMessage());
+
             return response()->json([
                 'success' => false,
-                'errors' => $validator->errors(),
-            ], 422);
+                'message' => 'An error occurred during login',
+                'error' => config('app.debug') ? $e->getMessage() : 'Internal server error',
+            ], 500);
         }
-
-        $user = User::where('username', $request->username)->first();
-
-        if (!$user || !Hash::check($request->password, $user->password)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Invalid credentials',
-            ], 401);
-        }
-
-        if ($user->status !== 1) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Account is not active',
-            ], 401);
-        }
-
-        $token = $user->createToken('api-token')->plainTextToken;
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Login successful',
-            'data' => [
-                'user' => $user->load(['roles']),
-                'roles' => $user->roles->pluck('name'),
-                'permissions' => $user->permissions()->pluck('name'),
-                'token' => $token,
-            ],
-        ]);
     }
 
     public function register(Request $request): JsonResponse

@@ -14,13 +14,27 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->api(prepend: [
-            EnsureFrontendRequestsAreStateful::class,
+        // Remove stateful middleware for pure API usage
+        // $middleware->api(prepend: [
+        //     EnsureFrontendRequestsAreStateful::class,
+        // ]);
+
+        // Exclude API routes from CSRF verification
+        $middleware->validateCsrfTokens(except: [
+            'api/*',
+            'sanctum/csrf-cookie',
+        ]);
+
+        $middleware->web(append: [
+            \App\Http\Middleware\VerifyCsrfToken::class,
         ]);
 
         $middleware->alias([
             'verified' => EnsureEmailIsVerified::class,
             'permission' => \App\Http\Middleware\CheckPermission::class,
+            'audit' => \App\Http\Middleware\AuditMiddleware::class,
+            'security' => \App\Http\Middleware\SecurityMiddleware::class,
+            'impersonation' => \App\Http\Middleware\ImpersonationMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

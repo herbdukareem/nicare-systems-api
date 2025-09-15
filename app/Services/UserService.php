@@ -69,4 +69,36 @@ class UserService
     {
         $user->roles()->sync($roleIds);
     }
+
+    /**
+     * Get users for export (without pagination)
+     */
+    public function getForExport(array $filters = [])
+    {
+        $query = User::with('roles');
+
+        // Apply filters
+        if (!empty($filters['search'])) {
+            $search = $filters['search'];
+            $query->where(function($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%")
+                  ->orWhere('username', 'like', "%{$search}%");
+            });
+        }
+
+        if (!empty($filters['name'])) {
+            $query->where('name', 'like', "%{$filters['name']}%");
+        }
+
+        if (!empty($filters['email'])) {
+            $query->where('email', 'like', "%{$filters['email']}%");
+        }
+
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+
+        return $query->orderBy('created_at', 'desc')->get();
+    }
 }

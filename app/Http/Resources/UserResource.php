@@ -18,12 +18,32 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
-            'agent_reg_number' => $this->agent_reg_number,
+            'username' => $this->username,
             'status' => $this->status,
-            'lga' => new LgaResource($this->whenLoaded('lga')),
-            'ward' => new WardResource($this->whenLoaded('ward')),
+            'status_label' => $this->getStatusLabel(),
+            'userable_type' => $this->userable_type,
+            'userable_id' => $this->userable_id,
+            'userable' => $this->whenLoaded('userable'),
+            'roles' => RoleResource::collection($this->whenLoaded('roles')),
+            'permissions' => PermissionResource::collection($this->whenLoaded('permissions')),
+            'audit_trails' => AuditTrailResource::collection($this->whenLoaded('auditTrails')),
+            'last_login_at' => $this->last_login_at,
+            'email_verified_at' => $this->email_verified_at,
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];
+    }
+
+    /**
+     * Get human-readable status label
+     */
+    private function getStatusLabel(): string
+    {
+        return match($this->status) {
+            0 => 'Pending',
+            1 => 'Active',
+            2 => 'Suspended',
+            default => 'Unknown'
+        };
     }
 }
