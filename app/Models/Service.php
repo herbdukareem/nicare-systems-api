@@ -16,6 +16,7 @@ class Service extends Model
         'level_of_care',
         'price',
         'group',
+        'service_group_id',
         'pa_required',
         'referable',
         'status',
@@ -64,6 +65,14 @@ class Service extends Model
     public function updater()
     {
         return $this->belongsTo(User::class, 'updated_by');
+    }
+
+    /**
+     * Get the service group this service belongs to
+     */
+    public function serviceGroup()
+    {
+        return $this->belongsTo(ServiceGroup::class, 'service_group_id');
     }
 
     /**

@@ -404,6 +404,30 @@ const menuItems = [
       }
     ]
   },
+   {
+    name: 'Referrals and PA Codes Feedback',
+    icon: 'mdi-shield-check',
+    children: [
+      {
+        name: 'Feedback',
+        path: '/feedback',
+        icon: 'mdi-clipboard-list',
+        badge: 'New'
+      },
+    ]
+   },
+   {
+    name: 'Task Management',
+    icon: 'mdi-clipboard-check',
+    children: [
+      {
+        name: 'Task Management',
+        path: '/task-management',
+        icon: 'mdi-clipboard-check',
+        badge: 'New'
+      },
+    ]
+   },
   {
     name: 'Claims Management',
     icon: 'mdi-file-document-multiple',

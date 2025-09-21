@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\Service;
+use App\Models\ServiceGroup;
 use App\Services\ServiceService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -290,11 +291,9 @@ class ServiceController extends Controller
     public function getGroups(): JsonResponse
     {
         try {
-            $groups = Service::select('group')
-                ->distinct()
-                ->where('status', true)
-                ->orderBy('group')
-                ->pluck('group');
+            $groups = ServiceGroup::active()
+                ->orderBy('name')
+                ->get(['id', 'name', 'description']);
 
             return response()->json([
                 'success' => true,

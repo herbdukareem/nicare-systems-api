@@ -135,4 +135,80 @@ protected $guarded = ['id'];
     {
         return $this->hasOne(EnrolleeAccountDetail::class);
     }
+
+    /**
+     * Enrollee has many relations (NOK, family members, etc.)
+     */
+    public function relations()
+    {
+        return $this->hasMany(EnrolleeRelation::class);
+    }
+
+    /**
+     * Enrollee has many primary encounters
+     */
+    public function primaryEncounters()
+    {
+        return $this->hasMany(PrimaryEncounter::class);
+    }
+
+    /**
+     * Enrollee has many feedback records
+     */
+    public function feedbackRecords()
+    {
+        return $this->hasMany(FeedbackRecord::class);
+    }
+
+    /**
+     * Enrollee has many referrals
+     */
+    public function referrals()
+    {
+        return $this->hasMany(Referral::class);
+    }
+
+    /**
+     * Enrollee has many PA codes
+     */
+    public function paCodes()
+    {
+        return $this->hasMany(PACode::class);
+    }
+
+    /**
+     * Get the primary contact relation
+     */
+    public function primaryContact()
+    {
+        return $this->hasOne(EnrolleeRelation::class)->where('is_primary_contact', true);
+    }
+
+    /**
+     * Get the next of kin relation
+     */
+    public function nextOfKin()
+    {
+        return $this->hasOne(EnrolleeRelation::class)->where('is_next_of_kin', true);
+    }
+
+    /**
+     * Get emergency contacts
+     */
+    public function emergencyContacts()
+    {
+        return $this->hasMany(EnrolleeRelation::class)->where('is_emergency_contact', true);
+    }
+
+    /**
+     * Get the enrollee's age
+     */
+    public function getAgeAttribute()
+    {
+        if (!$this->date_of_birth) {
+            return null;
+        }
+
+        return $this->date_of_birth->age;
+    }
 }

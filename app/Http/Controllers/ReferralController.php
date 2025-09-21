@@ -27,15 +27,15 @@ class ReferralController extends Controller
             $query = Referral::with(['approvedBy', 'deniedBy']);
 
             // Apply filters
-            if ($request->has('status')) {
+            if ($request->has('status') && !empty($request->status)) {
                 $query->where('status', $request->status);
             }
 
-            if ($request->has('severity_level')) {
+            if ($request->has('severity_level') && !empty($request->severity_level)) {
                 $query->where('severity_level', $request->severity_level);
             }
 
-            if ($request->has('search')) {
+            if ($request->has('search') && !empty($request->search)) {
                 $search = $request->search;
                 $query->where(function($q) use ($search) {
                     $q->where('referral_code', 'like', "%{$search}%")

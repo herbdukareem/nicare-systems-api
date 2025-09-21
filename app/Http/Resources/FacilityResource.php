@@ -19,7 +19,7 @@ class FacilityResource extends JsonResource
             'name' => $this->name,
             'category' => $this->category,
             'type' => $this->type,
-            'level' => $this->level,
+            'level_of_care' => $this->level_of_care,
             'address' => $this->address,
             'phone' => $this->phone,
             'email' => $this->email,

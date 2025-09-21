@@ -26,33 +26,28 @@ const api = axios.create({
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('token');
-    console.log('token', token);
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => {
-    return Promise.reject(error);
-  }
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor
+
 api.interceptors.response.use(
-  (response) => {
-    return response;
-  },
+  (response) => response,
   (error) => {
-    if (error.response?.status === 401) {
-      // Token expired or invalid
-      localStorage.removeItem('token');
-      window.location.href = '/login';
+    const status = error?.response?.status;
+
+    if (status === 401) {
+      // Let the auth store decide how to handle this.
+      // We'll just emit a lightweight event the app can listen to.
+      window.dispatchEvent(new Event('auth:unauthorized'));
     }
 
-    // Handle other errors
-    const message = error.response?.data?.message || error.message || 'An error occurred';
+    const message = error?.response?.data?.message || error.message || 'An error occurred';
     console.error('API Error:', message);
-
     return Promise.reject(error);
   }
 );
@@ -72,6 +67,9 @@ export const enrolleeAPI = {
   create: (data) => api.post('/v1/enrollees', data),
   update: (id, data) => api.put(`/v1/enrollees/${id}`, data),
   delete: (id) => api.delete(`/v1/enrollees/${id}`),
+  getStatsByFacility: (facilityId) => api.get(`/v1/enrollees/stats/facility/${facilityId}`),
+  getActivity: (id) => api.get(`/v1/enrollees/${id}/activity`),
+  getMedicalSummary: (id) => api.get(`/v1/enrollees/${id}/medical-summary`),
   exportExcel: (params) => api.get('/v1/enrollees-export', {
     params,
     responseType: 'blob'
@@ -98,6 +96,11 @@ export const facilityAPI = {
   update: (id, data) => api.put(`/v1/facilities/${id}`, data),
   delete: (id) => api.delete(`/v1/facilities/${id}`),
   getEnrollees: (id, params) => api.get(`/v1/facilities/${id}/enrollees`, { params }),
+};
+
+export const lgaAPI = {
+  getAll: (params) => api.get('/v1/lgas', { params }),
+  getById: (id) => api.get(`/v1/lgas/${id}`),
 };
 
 export const userAPI = {
@@ -130,8 +133,6 @@ export const userAPI = {
   }),
   getActivityStats: (id) => api.get(`/v1/users/${id}/activity-stats`),
 };
-
-
 
 export const benefactorAPI = {
   getAll: (params) => api.get('/v1/benefactors', { params }),
@@ -178,15 +179,21 @@ export const securityAPI = {
 export const pasAPI = {
   // Referral APIs
   getReferrals: (params) => api.get('/v1/pas/referrals', { params }),
-  createReferral: (data) => api.post('/v1/pas/referrals', data),
+  createReferral: (data) => api.post('/v1/pas/workflow/referral', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   getReferral: (id) => api.get(`/v1/pas/referrals/${id}`),
+  getReferralByCode: (code) => api.get(`/v1/pas/referrals`, { params: { search: code } }),
   approveReferral: (id, data) => api.post(`/v1/pas/referrals/${id}/approve`, data),
   denyReferral: (id, data) => api.post(`/v1/pas/referrals/${id}/deny`, data),
+  generatePACodeFromReferral: (referralId, data) => api.post(`/v1/pas/referrals/${referralId}/generate-pa-code`, data),
   getReferralStatistics: () => api.get('/v1/pas/referrals-statistics'),
 
   // PA Code APIs
   getPACodes: (params) => api.get('/v1/pas/pa-codes', { params }),
-  generatePACode: (referralId, data) => api.post(`/v1/pas/referrals/${referralId}/generate-pa-code`, data),
+  generatePACode: (data) => api.post('/v1/pas/workflow/pa-code', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   getPACode: (id) => api.get(`/v1/pas/pa-codes/${id}`),
   markPACodeUsed: (id, data) => api.post(`/v1/pas/pa-codes/${id}/mark-used`, data),
   cancelPACode: (id) => api.post(`/v1/pas/pa-codes/${id}/cancel`),
@@ -234,5 +241,23 @@ export const serviceAPI = {
   getStatistics: () => api.get('/v1/services-statistics'),
   getGroups: () => api.get('/v1/services-groups'),
 };
+
+// Feedback Management API
+export const feedbackAPI = {
+  getAll: (params) => api.get('/v1/feedback', { params }),
+  getById: (id) => api.get(`/v1/feedback/${id}`),
+  create: (data) => api.post('/v1/feedback', data),
+  update: (id, data) => api.put(`/v1/feedback/${id}`, data),
+  getStatistics: () => api.get('/v1/feedback/statistics'),
+  searchEnrollees: (params) => api.get('/v1/feedback/search-enrollees', { params }),
+  getFeedbackOfficers: () => api.get('/v1/feedback/officers'),
+  getMyFeedbacks: (params) => api.get('/v1/feedback/my-feedbacks', { params }),
+  getEnrolleeComprehensiveData: (enrolleeId) => api.get(`/v1/feedback/enrollee/${enrolleeId}/comprehensive-data`),
+  assignToOfficer: (id, data) => api.post(`/v1/feedback/${id}/assign`, data),
+};
+
+
+
+
 
 export default api;

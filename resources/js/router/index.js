@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import Ls from '@/js/utils/ls';
 
 // Components
 import LoginPage from '../components/auth/LoginPage.vue';
@@ -176,9 +177,13 @@ const routes = [
   {
     path: '/pas/generate',
     name: 'pas-generate',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Generate Referral/PA-Code', subtitle: 'Generate preauthorization codes', icon: 'mdi-qrcode' }
+    component: () => import('../components/pas/CreateReferralPAPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Create Referral/PA Code',
+      description: 'Generate referrals and PA codes for enrollees',
+      breadcrumb: 'Create Referral/PA Code'
+    }
   },
   {
     path: '/pas/programmes',
@@ -186,6 +191,40 @@ const routes = [
     component: () => import('../components/pas/ServicesManagementPage.vue'),
     meta: { requiresAuth: true }
   },
+  {
+    path: '/pas/referrals/:referralCode',
+    name: 'pas-referral-detail',
+    component: () => import('../components/pas/ReferralDetailPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Referral Details',
+      description: 'View referral information and status',
+      breadcrumb: 'Referral Details'
+    }
+  },
+  {
+    path: '/feedback',
+    name: 'feedback-management',
+    component: () => import('../components/feedback/FeedbackManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Feedback Management',
+      description: 'Manage referral and PA code feedback for claims vetting',
+      breadcrumb: 'Feedback Management'
+    }
+  },
+    {
+    path: '/task-management',
+    name: 'task-management',
+    component: () => import('../components/task-management/TaskManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Task Management',
+      description: 'Manage projects, tasks, and team collaboration',
+      breadcrumb: 'Task Management'
+    }
+  },
+ 
   {
     path: '/pas/drugs',
     name: 'pas-drugs',
@@ -292,21 +331,24 @@ const router = createRouter({
 // Navigation guard for authentication
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
+  // const isAuthenticated = authStore.isLoggedIn;
+  const isAuthenticated = authStore.isAuthenticated;
 
-  // Initialize auth if not already done - AWAIT the initialization
-  if (!authStore.token) {
-    await authStore.initializeAuth();
-  }
-
-  const isAuthenticated = authStore.isLoggedIn;
-
-  if (to.meta.requiresAuth && !isAuthenticated) {
-    next('/login');
-  } else if (to.path === '/login' && isAuthenticated) {
-    next('/dashboard');
+    if (to.meta.requiresAuth) {
+    
+    authStore.initializeAuth();
+    if (Ls.get('token')) {
+      next();
+    } else {
+      next({ path: '/login', replace: true });
+    }
   } else {
     next();
   }
+
+
+
+
 });
 
 // Navigation guard for page titles

@@ -26,9 +26,8 @@ class Facility extends Model
     protected $fillable = [
         'hcp_code',
         'name',
-        'category',
-        'type',
-        'level',
+        'ownership',
+        'level_of_care',
         'address',
         'phone',
         'email',
@@ -69,5 +68,43 @@ class Facility extends Model
     public function enrollees()
     {
         return $this->hasMany(Enrollee::class);
+    }
+
+    /**
+     * Scope to filter by level of care
+     */
+    public function scopeByLevelOfCare($query, $level)
+    {
+        return $query->where('level_of_care', $level);
+    }
+
+    /**
+     * Check if facility can provide services of a specific level
+     */
+    public function canProvideServiceLevel($serviceLevel)
+    {
+        // Primary facilities can only provide Primary services
+        // Secondary facilities can provide Primary and Secondary services
+        // Tertiary facilities can provide all levels
+
+        $facilityLevel = $this->level_of_care;
+
+        if ($facilityLevel === 'Primary') {
+            return $serviceLevel === 'Primary';
+        } elseif ($facilityLevel === 'Secondary') {
+            return in_array($serviceLevel, ['Primary', 'Secondary']);
+        } elseif ($facilityLevel === 'Tertiary') {
+            return in_array($serviceLevel, ['Primary', 'Secondary', 'Tertiary']);
+        }
+
+        return false;
+    }
+
+    /**
+     * Get available levels of care
+     */
+    public static function getLevelsOfCare()
+    {
+        return ['Primary', 'Secondary', 'Tertiary'];
     }
 }

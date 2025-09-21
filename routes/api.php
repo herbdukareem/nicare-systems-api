@@ -18,6 +18,11 @@ use App\Http\Controllers\Api\V1\FacilityController;
 use App\Http\Controllers\Api\V1\PremiumController;
 use App\Http\Controllers\Api\V1\FundingTypeController;
 use App\Http\Controllers\Api\V1\BenefactorController;
+use App\Http\Controllers\Api\V1\FeedbackController;
+use App\Http\Controllers\Api\V1\PASWorkflowController;
+use App\Http\Controllers\Api\V1\TaskController;
+use App\Http\Controllers\Api\V1\ProjectController;
+use App\Http\Controllers\Api\V1\TaskCategoryController;
 use App\Http\Controllers\Api\V1\LgaController;
 use App\Http\Controllers\Api\V1\WardController;
 use App\Http\Controllers\Api\V1\VillageController;
@@ -165,25 +170,64 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('services-statistics', [ServiceController::class, 'statistics']);
     Route::get('services-groups', [ServiceController::class, 'getGroups']);
 
-    // PAS (Pre-Authorization System) routes
-    Route::prefix('pas')->group(function () {
-        // Referral routes
-        Route::get('referrals', [ReferralController::class, 'index']);
-        Route::post('referrals', [ReferralController::class, 'store']);
-        Route::get('referrals/{referral}', [ReferralController::class, 'show']);
-        Route::post('referrals/{referral}/approve', [ReferralController::class, 'approve']);
-        Route::post('referrals/{referral}/deny', [ReferralController::class, 'deny']);
-        Route::get('referrals-statistics', [ReferralController::class, 'statistics']);
-
-        // PA Code routes
-        Route::get('pa-codes', [PACodeController::class, 'index']);
-        Route::post('referrals/{referral}/generate-pa-code', [PACodeController::class, 'generateFromReferral']);
-        Route::get('pa-codes/{paCode}', [PACodeController::class, 'show']);
-        Route::post('pa-codes/{paCode}/mark-used', [PACodeController::class, 'markAsUsed']);
-        Route::post('pa-codes/{paCode}/cancel', [PACodeController::class, 'cancel']);
-        Route::post('pa-codes/verify', [PACodeController::class, 'verify']);
-        Route::get('pa-codes-statistics', [PACodeController::class, 'statistics']);
+    // Feedback Management
+    Route::prefix('feedback')->group(function () {
+        Route::get('/', [FeedbackController::class, 'index']);
+        Route::post('/', [FeedbackController::class, 'store']);
+        Route::get('/statistics', [FeedbackController::class, 'getStatistics']);
+        Route::get('/search-enrollees', [FeedbackController::class, 'searchEnrollees']);
+        Route::get('/officers', [FeedbackController::class, 'getFeedbackOfficers']);
+        Route::get('/my-feedbacks', [FeedbackController::class, 'getMyFeedbacks']);
+        Route::get('/enrollee/{enrolleeId}/comprehensive-data', [FeedbackController::class, 'getEnrolleeComprehensiveData']);
+        Route::get('/{id}', [FeedbackController::class, 'show']);
+        Route::put('/{id}', [FeedbackController::class, 'update']);
+        Route::post('/{id}/assign', [FeedbackController::class, 'assignToOfficer']);
     });
+
+    // Task Management
+    Route::prefix('task-management')->group(function () {
+        // Task Categories
+        Route::apiResource('categories', TaskCategoryController::class);
+        Route::post('categories/sort-order', [TaskCategoryController::class, 'updateSortOrder']);
+        Route::get('categories-dropdown', [TaskCategoryController::class, 'dropdown']);
+
+        // Projects
+        Route::apiResource('projects', ProjectController::class);
+        Route::get('projects-statistics', [ProjectController::class, 'statistics']);
+
+        // Tasks
+        Route::apiResource('tasks', TaskController::class);
+        Route::get('tasks-statistics', [TaskController::class, 'statistics']);
+        Route::post('tasks/{task}/assign', [TaskController::class, 'assignUser']);
+        Route::post('tasks/{task}/comments', [TaskController::class, 'addComment']);
+        Route::post('tasks/{task}/attachments', [TaskController::class, 'addAttachment']);
+        Route::delete('task-attachments/{attachment}', [TaskController::class, 'deleteAttachment']);
+    });
+
+});
+
+// PAS (Pre-Authorization System) routes (outside v1 group)
+Route::middleware(['auth:sanctum'])->prefix('v1/pas')->group(function () {
+    // Referral routes
+    Route::get('referrals', [ReferralController::class, 'index']);
+    Route::post('referrals', [ReferralController::class, 'store']);
+    Route::get('referrals/{referral}', [ReferralController::class, 'show']);
+    Route::post('referrals/{referral}/approve', [ReferralController::class, 'approve']);
+    Route::post('referrals/{referral}/deny', [ReferralController::class, 'deny']);
+    Route::get('referrals-statistics', [ReferralController::class, 'statistics']);
+
+    // PA Code routes
+    Route::get('pa-codes', [PACodeController::class, 'index']);
+    Route::post('referrals/{referral}/generate-pa-code', [PACodeController::class, 'generateFromReferral']);
+    Route::get('pa-codes/{paCode}', [PACodeController::class, 'show']);
+    Route::post('pa-codes/{paCode}/mark-used', [PACodeController::class, 'markAsUsed']);
+    Route::post('pa-codes/{paCode}/cancel', [PACodeController::class, 'cancel']);
+    Route::post('pa-codes/verify', [PACodeController::class, 'verify']);
+    Route::get('pa-codes-statistics', [PACodeController::class, 'statistics']);
+
+    // Workflow routes (new simplified API)
+    Route::post('workflow/referral', [PASWorkflowController::class, 'createReferral']);
+    Route::post('workflow/pa-code', [PASWorkflowController::class, 'generatePACode']);
 
     // Security routes
     Route::prefix('security')->group(function () {

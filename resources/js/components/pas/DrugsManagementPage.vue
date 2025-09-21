@@ -217,24 +217,30 @@
                 variant="outlined"
                 required
               />
-              <v-text-field
+              <v-select
                 v-model="drugForm.drug_dosage_form"
+                :items="dosageFormOptions"
                 label="Dosage Form"
                 :rules="[rules.required]"
                 variant="outlined"
                 required
+                clearable
               />
-              <v-text-field
+              <v-select
                 v-model="drugForm.drug_strength"
+                :items="strengthOptions"
                 label="Strength"
                 variant="outlined"
+                clearable
               />
-              <v-text-field
+              <v-select
                 v-model="drugForm.drug_presentation"
+                :items="presentationOptions"
                 label="Presentation"
                 :rules="[rules.required]"
                 variant="outlined"
                 required
+                clearable
               />
               <v-text-field
                 v-model="drugForm.drug_unit_price"
@@ -371,6 +377,56 @@ const drugForm = ref({
 const statusOptions = [
   { title: 'Active', value: true },
   { title: 'Inactive', value: false }
+];
+
+const dosageFormOptions = [
+  { title: 'Tablet', value: 'Tablet' },
+  { title: 'Capsule', value: 'Capsule' },
+  { title: 'Syrup', value: 'Syrup' },
+  { title: 'Injection', value: 'Injection' },
+  { title: 'Cream', value: 'Cream' },
+  { title: 'Ointment', value: 'Ointment' },
+  { title: 'Drops', value: 'Drops' },
+  { title: 'Suspension', value: 'Suspension' },
+  { title: 'Solution', value: 'Solution' },
+  { title: 'Powder', value: 'Powder' },
+  { title: 'Gel', value: 'Gel' },
+  { title: 'Patch', value: 'Patch' },
+  { title: 'Inhaler', value: 'Inhaler' },
+  { title: 'Suppository', value: 'Suppository' }
+];
+
+const strengthOptions = [
+  { title: '5mg', value: '5mg' },
+  { title: '10mg', value: '10mg' },
+  { title: '25mg', value: '25mg' },
+  { title: '50mg', value: '50mg' },
+  { title: '100mg', value: '100mg' },
+  { title: '250mg', value: '250mg' },
+  { title: '500mg', value: '500mg' },
+  { title: '1g', value: '1g' },
+  { title: '2.5ml', value: '2.5ml' },
+  { title: '5ml', value: '5ml' },
+  { title: '10ml', value: '10ml' },
+  { title: '20ml', value: '20ml' },
+  { title: '1%', value: '1%' },
+  { title: '2%', value: '2%' },
+  { title: '5%', value: '5%' },
+  { title: '10%', value: '10%' }
+];
+
+const presentationOptions = [
+  { title: 'Tab', value: 'Tab' },
+  { title: 'Cap', value: 'Cap' },
+  { title: 'Bot', value: 'Bot' },
+  { title: 'Vial', value: 'Vial' },
+  { title: 'Amp', value: 'Amp' },
+  { title: 'Tube', value: 'Tube' },
+  { title: 'Sachet', value: 'Sachet' },
+  { title: 'Pack', value: 'Pack' },
+  { title: 'Box', value: 'Box' },
+  { title: 'Strip', value: 'Strip' },
+  { title: 'Blister', value: 'Blister' }
 ];
 
 const sortOptions = [

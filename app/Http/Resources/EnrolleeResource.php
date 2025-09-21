@@ -71,11 +71,11 @@ class EnrolleeResource extends JsonResource
             case 1:
                 return 'Active';
             case 2:
-                return 'Inactive';
+                return 'Expired';
             case 3:
                 return 'Suspended';
             default:
-                return 'Unknown';
+                return 'Inactive';
         }
     }
 }

@@ -65,8 +65,8 @@ class PACodeController extends Controller
                 'service_description' => 'required|string',
                 'approved_amount' => 'nullable|numeric|min:0',
                 'conditions' => 'nullable|string',
-                'validity_days' => 'required|integer|min:1|max:365',
-                'max_usage' => 'required|integer|min:1|max:10',
+                'validity_days' => 'required|numeric|min:1|max:365',
+                'max_usage' => 'required|numeric|min:1|max:10',
                 'issuer_comments' => 'nullable|string|max:1000'
             ]);
 
@@ -106,9 +106,9 @@ class PACodeController extends Controller
                 'conditions' => $request->conditions,
                 'status' => 'active',
                 'issued_at' => now(),
-                'expires_at' => now()->addDays($request->validity_days),
+                'expires_at' => now()->addDays((int) $request->validity_days),
                 'usage_count' => 0,
-                'max_usage' => $request->max_usage,
+                'max_usage' => (int) $request->max_usage,
                 'issued_by' => Auth::id(),
                 'issuer_comments' => $request->issuer_comments
             ]);

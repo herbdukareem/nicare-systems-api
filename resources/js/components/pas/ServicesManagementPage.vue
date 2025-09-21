@@ -267,12 +267,16 @@
                 variant="outlined"
                 required
               />
-              <v-text-field
-                v-model="serviceForm.group"
-                label="Group"
+              <v-select
+                v-model="serviceForm.service_group_id"
+                :items="serviceGroupOptions"
+                item-title="name"
+                item-value="id"
+                label="Service Group"
                 :rules="[rules.required]"
                 variant="outlined"
                 required
+                clearable
               />
             </div>
             <v-textarea
@@ -394,6 +398,7 @@ const importFile = ref([]);
 // Data
 const services = ref([]);
 const groupOptions = ref([]);
+const serviceGroupOptions = ref([]);
 const statistics = ref({
   total_services: 0,
   active_services: 0,
@@ -415,6 +420,7 @@ const serviceForm = ref({
   level_of_care: '',
   price: '',
   group: '',
+  service_group_id: null,
   pa_required: false,
   referable: true,
   status: true
@@ -482,9 +488,10 @@ const loadGroups = async () => {
   try {
     const response = await serviceAPI.getGroups();
     if (response.data.success) {
+      serviceGroupOptions.value = response.data.data;
       groupOptions.value = response.data.data.map(group => ({
-        title: group,
-        value: group
+        title: group.name,
+        value: group.name
       }));
     }
   } catch (err) {
@@ -527,6 +534,7 @@ const resetForm = () => {
     level_of_care: '',
     price: '',
     group: '',
+    service_group_id: null,
     pa_required: false,
     referable: true,
     status: true

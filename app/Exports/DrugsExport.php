@@ -75,12 +75,12 @@ class DrugsExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
     {
         if ($this->isTemplate) {
             return [
-                'NiCare_Code',
-                'drug_Name',
-                'drug_Dosage_Form',
-                'drug_Strength',
-                'drug_Presentation',
-                'drug_Unit_Price'
+                'nicare_code',
+                'drug_name',
+                'drug_dosage_form',
+                'drug_strength',
+                'drug_presentation',
+                'drug_unit_price'
             ];
         }
 

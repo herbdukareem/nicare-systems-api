@@ -19,7 +19,7 @@ class FacilityService
     /**
      * Get paginated facilities with filters
      */
-    public function paginate(array $filters = [], int $perPage = 15, string $sortBy = 'created_at', string $sortDirection = 'desc'): LengthAwarePaginator
+    public function paginate(array $filters = [], int $perPage = 500, string $sortBy = 'created_at', string $sortDirection = 'desc'): LengthAwarePaginator
     {
         $query = Facility::with(['lga', 'ward', 'accountDetail']);
 
@@ -51,6 +51,10 @@ class FacilityService
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['level_of_care'])) {
+            $query->where('level_of_care', $filters['level_of_care']);
         }
 
         // Apply sorting

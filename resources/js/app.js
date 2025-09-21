@@ -4,6 +4,7 @@ import { createVuetify } from 'vuetify';
 import { createPinia } from 'pinia';
 import router from './router';
 import App from './App.vue';
+import UtilsPlugin from './utils/utils';
 
 // Vuetify styles (load first)
 import 'vuetify/styles';
@@ -15,6 +16,9 @@ import * as directives from 'vuetify/directives';
 
 // Tailwind CSS (load after Vuetify)
 import '../css/app.css';
+
+// ⬇️ NEW: auth store for pre-mount rehydration
+import { useAuthStore } from './stores/auth';
 
 // Create Vuetify instance
 const vuetify = createVuetify({
@@ -40,21 +44,32 @@ const vuetify = createVuetify({
     },
   },
   defaults: {
-    global: {
-      ripple: false,
-    },
-    VBtn: {
-      style: 'text-transform: none;',
-    },
+    global: { ripple: false },
+    VBtn: { style: 'text-transform: none;' },
   },
 });
 
 // Create Pinia store
 const pinia = createPinia();
 
-// Create and mount Vue app
+// Create app
 const app = createApp(App);
 app.use(vuetify);
 app.use(pinia);
 app.use(router);
-app.mount('#app');
+app.use(UtilsPlugin);
+
+// 🔐 Restore auth BEFORE mounting to avoid logout-on-refresh flicker
+const authStore = useAuthStore();
+authStore.initializeAuth().finally(() => {
+  app.mount('#app');
+});
+
+// (Optional) Central listener for unauthorized events fired by api.js
+window.addEventListener('auth:unauthorized', async () => {
+  // Prevent double work if we're already initializing
+  if (!authStore._initializing) {
+    await authStore.logout();
+    router.replace('/login');
+  }
+});

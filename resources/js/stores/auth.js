@@ -9,10 +9,11 @@ export const useAuthStore = defineStore('auth', {
     loading: false,
     currentRole: null, // Currently active role
     availableRoles: [], // All roles user can switch to
+    _initializing: false, // Flag to prevent multiple initializations
   }),
 
   getters: {
-    isLoggedIn: (state) => !!state.token && !!state.user,
+    isLoggedIn: (state) => !!state.token,
     userName: (state) => state.user?.name || '',
     userRoles: (state) => state.user?.roles || [],
     getUserAvailableRoles: (state) => state.availableRoles || [],
@@ -90,12 +91,15 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
-    async fetchUser() {
-      if (!this.token) return;
+   async fetchUser() {
+      if (!this.token) return false;
 
       try {
         const response = await authAPI.getUser();
-        if (response.data.success) {
+        console.log(response)
+        // Expecting { success: true, data: { ...user } }
+        if (response?.data?.success) {
+          
           this.user = response.data.data;
           this.isAuthenticated = true;
 
@@ -110,20 +114,24 @@ export const useAuthStore = defineStore('auth', {
               // Verify the saved role is still available
               const roleExists = this.availableRoles.find(role => role.id === parsedRole.id);
               this.currentRole = roleExists || (this.availableRoles.length > 0 ? this.availableRoles[0] : null);
-            } catch (e) {
+            } catch {
               this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
             }
           } else {
             this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
           }
-        } else {
-          throw new Error(response.data.message || 'Failed to fetch user');
+
+          return true; // ✅ success
         }
+
+        // Backend responded but not success
+        this.isAuthenticated = false;
+        return false;
       } catch (error) {
-        // Token might be invalid
+        // ❌ Do NOT logout here — just mark unauthenticated and let the caller decide
         console.error('Failed to fetch user:', error);
-        this.logout();
-        throw error;
+        this.isAuthenticated = false;
+        return false;
       }
     },
 
@@ -152,37 +160,33 @@ export const useAuthStore = defineStore('auth', {
     },
 
     // Initialize auth state from localStorage
-    async initializeAuth() {
-      const token = localStorage.getItem('token');
-      if (token) {
-        this.token = token;
-        try {
-          await this.fetchUser();
+   async initializeAuth() {
+  if (this._initializing) return;
 
-          // Restore current role from localStorage if available
-          const storedRole = localStorage.getItem('currentRole');
-          if (storedRole) {
-            try {
-              const role = JSON.parse(storedRole);
-              // Verify the role is still available for this user
-              if (this.availableRoles.find(r => r.id === role.id)) {
-                this.currentRole = role;
-              } else {
-                // Role no longer available, clear it
-                localStorage.removeItem('currentRole');
-              }
-            } catch (e) {
-              // Invalid JSON, clear it
-              localStorage.removeItem('currentRole');
-            }
-          }
-        } catch (error) {
-          // If token is invalid, clear it silently
-          console.warn('Failed to initialize auth with stored token:', error.message);
-          this.logout();
-        }
+  this._initializing = true;
+  try {
+    const token = localStorage.getItem('token');
+    if (token) {
+      this.token = token;
+
+      const ok = await this.fetchUser();
+      if (!ok) {
+  
+        // Token invalid or /user failed — clear quietly, no redirect here
+        this.user = null;
+        this.isAuthenticated = false;
+        this.currentRole = null;
+        this.availableRoles = [];
+
+        this.token = null;
+        localStorage.removeItem('token');
+        localStorage.removeItem('currentRole');
       }
-    },
+    }
+  } finally {
+    this._initializing = false;
+  }
+},
 
     // Role switching methods
     switchRole(role) {

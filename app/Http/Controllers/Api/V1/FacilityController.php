@@ -24,8 +24,9 @@ class FacilityController extends BaseController
 
     public function index(Request $request)
     {
-        $filters = $request->only(['name', 'type', 'category', 'lga_id', 'status', 'search']);
-        $perPage = (int) $request->get('per_page', 15);
+        $filters = $request->only(['name', 'type', 'category', 'lga_id', 'status', 'search', 'level_of_care']);
+      
+        $perPage = (int) $request->get('per_page', 500);
         $sortBy = $request->get('sort_by', 'created_at');
         $sortDirection = $request->get('sort_direction', 'desc');
 

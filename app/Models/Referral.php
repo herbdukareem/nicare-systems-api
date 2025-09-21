@@ -82,7 +82,7 @@ class Referral extends Model
         $facilityCode = substr($this->referring_nicare_code, -4);
         $serial = str_pad($this->id, 6, '0', STR_PAD_LEFT);
 
-        return "{$prefix}/{$facilityCode}/{$serial}";
+        return "{$prefix}-{$facilityCode}-{$serial}";
     }
 
     public function approve(User $user, ?string $comments = null): bool
