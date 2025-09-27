@@ -37,6 +37,10 @@ use App\Http\Controllers\PACodeController;
 use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\V1\DrugController;
 use App\Http\Controllers\Api\V1\ServiceController;
+use App\Http\Controllers\ClaimsController;
+use App\Http\Controllers\DoctorReviewController;
+use App\Http\Controllers\PharmacistReviewController;
+use App\Http\Controllers\ClaimsReviewController;
 
 /*
 |--------------------------------------------------------------------------
@@ -238,5 +242,53 @@ Route::middleware(['auth:sanctum'])->prefix('v1/pas')->group(function () {
         Route::get('audit-trail', [SecurityController::class, 'auditTrail']);
         Route::get('sessions', [SecurityController::class, 'sessions']);
         Route::post('sessions/revoke', [SecurityController::class, 'revokeSessions']);
+    });
+
+    // Claims Management System Routes
+    Route::prefix('claims')->group(function () {
+        // General Claims Routes
+        Route::get('/', [ClaimsController::class, 'index']);
+        Route::post('/', [ClaimsController::class, 'store']);
+        Route::get('{claim}', [ClaimsController::class, 'show']);
+        Route::put('{claim}', [ClaimsController::class, 'update']);
+        Route::post('{claim}/submit', [ClaimsController::class, 'submit']);
+
+        // Doctor Review Routes
+        Route::prefix('doctor')->group(function () {
+            Route::get('pending', [DoctorReviewController::class, 'pendingReview']);
+            Route::get('reviewed', [DoctorReviewController::class, 'reviewedClaims']);
+            Route::post('diagnoses/{diagnosis}/validate', [DoctorReviewController::class, 'validateDiagnosis']);
+            Route::post('treatments/{treatment}/validate', [DoctorReviewController::class, 'validateTreatment']);
+            Route::post('{claim}/approve', [DoctorReviewController::class, 'approveClaim']);
+            Route::post('{claim}/reject', [DoctorReviewController::class, 'rejectClaim']);
+            Route::get('statistics', [DoctorReviewController::class, 'statistics']);
+        });
+
+        // Pharmacist Review Routes
+        Route::prefix('pharmacist')->group(function () {
+            Route::get('pending', [PharmacistReviewController::class, 'pendingReview']);
+            Route::get('reviewed', [PharmacistReviewController::class, 'reviewedClaims']);
+            Route::get('{claim}/medications', [PharmacistReviewController::class, 'getClaimMedications']);
+            Route::post('medications/{treatment}/validate', [PharmacistReviewController::class, 'validateMedication']);
+            Route::post('{claim}/approve', [PharmacistReviewController::class, 'approveClaim']);
+            Route::post('{claim}/reject', [PharmacistReviewController::class, 'rejectClaim']);
+            Route::get('statistics', [PharmacistReviewController::class, 'statistics']);
+        });
+
+        // Claims Review Routes (Reviewer, Confirmer, Approver)
+        Route::prefix('review')->group(function () {
+            Route::get('pending', [ClaimsReviewController::class, 'pendingReview']);
+            Route::post('{claim}/review', [ClaimsReviewController::class, 'reviewClaim']);
+        });
+
+        Route::prefix('confirm')->group(function () {
+            Route::get('pending', [ClaimsReviewController::class, 'pendingConfirmation']);
+            Route::post('{claim}/confirm', [ClaimsReviewController::class, 'confirmClaim']);
+        });
+
+        Route::prefix('approve')->group(function () {
+            Route::get('pending', [ClaimsReviewController::class, 'pendingApproval']);
+            Route::post('{claim}/approve', [ClaimsReviewController::class, 'approveClaim']);
+        });
     });
 });

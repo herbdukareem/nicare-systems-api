@@ -35,6 +35,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'audit' => \App\Http\Middleware\AuditMiddleware::class,
             'security' => \App\Http\Middleware\SecurityMiddleware::class,
             'impersonation' => \App\Http\Middleware\ImpersonationMiddleware::class,
+            'claims.role' => \App\Http\Middleware\ClaimsRoleMiddleware::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
