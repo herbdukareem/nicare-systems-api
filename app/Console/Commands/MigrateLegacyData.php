@@ -64,7 +64,7 @@ class MigrateLegacyData extends Command
     public function handle()
     {
         
-        // DB::transaction(function () {
+        DB::transaction(function () {
             // 1. Migrate LGAs
             $legacyLgas = DB::connection('legacy')->table('lga')->get();
             foreach ($legacyLgas as $lgaRow) {
@@ -382,7 +382,7 @@ class MigrateLegacyData extends Command
 
 
             // end transaction
-        // });   
+        });   
 
         $this->info('Legacy data migration completed successfully.');
     }
@@ -721,7 +721,7 @@ class MigrateLegacyData extends Command
                 };
             }
 
-            $benefactor_id =  $this->benefactor_array[$enrollee->benefactor];
+            $benefactor_id =  $this->benefactor_array[$enrollee->benefactor] ?? '7';
 
              if ($enrollee->counterpart == 'gac') {
                     if($this->gacCounterpart) {

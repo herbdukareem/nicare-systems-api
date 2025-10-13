@@ -43,13 +43,14 @@ return new class extends Migration
             $table->text('validation_comments')->nullable();
             
             // Audit
-            $table->unsignedBigInteger('uploaded_by');
+            
+                $table->foreignId('uploaded_by')->nullable()->constrained('users')->nullOnDelete();
+
             $table->timestamps();
             
             // Foreign Keys
             $table->foreign('claim_id')->references('id')->on('claims')->onDelete('cascade');
             $table->foreign('treatment_id')->references('id')->on('claim_treatments')->onDelete('cascade');
-            $table->foreign('uploaded_by')->references('id')->on('users')->nullOnDelete();
             $table->foreign('validated_by')->references('id')->on('users')->nullOnDelete();
             
             // Indexes

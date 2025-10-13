@@ -96,41 +96,57 @@
         </v-card-title>
         <v-card-text class="tw-pt-4">
           <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-            <v-text-field
-              v-model="form.receiving_facility_name"
-              label="Facility Name *"
+            <v-select
+              v-model="form.receiving_facility_id"
+              :items="facilities"
+              item-title="name"
+              item-value="id"
+              label="Receiving Facility *"
               variant="outlined"
               density="compact"
+              :loading="facilitiesLoading"
               :rules="[rules.required]"
-            />
+              @update:model-value="handleFacilitySelection"
+            >
+              <template #item="{ props, item }">
+                <v-list-item v-bind="props">
+                  <v-list-item-title>{{ item.raw.name }}</v-list-item-title>
+                  <v-list-item-subtitle>{{ item.raw.hcp_code }} - {{ item.raw.type }}</v-list-item-subtitle>
+                </v-list-item>
+              </template>
+            </v-select>
             <v-text-field
               v-model="form.receiving_nicare_code"
-              label="NiCare Code *"
+              label="NiCare Code"
               variant="outlined"
               density="compact"
-              :rules="[rules.required]"
+              readonly
+              bg-color="grey-lighten-4"
             />
             <v-textarea
               v-model="form.receiving_address"
-              label="Address *"
+              label="Address"
               variant="outlined"
               density="compact"
               rows="2"
-              :rules="[rules.required]"
+              readonly
+              bg-color="grey-lighten-4"
             />
             <v-text-field
               v-model="form.receiving_phone"
-              label="Phone Number *"
+              label="Phone Number"
               variant="outlined"
               density="compact"
-              :rules="[rules.required, rules.phone]"
+              readonly
+              bg-color="grey-lighten-4"
             />
             <v-text-field
               v-model="form.receiving_email"
               label="Email Address"
               variant="outlined"
               density="compact"
-              :rules="[rules.email]"
+              readonly
+              bg-color="grey-lighten-4"
             />
           </div>
         </v-card-text>
@@ -438,10 +454,18 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useToast } from '../../composables/useToast';
 import FileUpload from '../common/FileUpload.vue';
+import { facilityAPI } from '../../utils/api.js';
 import axios from 'axios';
+
+const props = defineProps({
+  selectedFacility: {
+    type: Object,
+    default: null
+  }
+});
 
 const emit = defineEmits(['submit', 'cancel']);
 const { success, error } = useToast();
@@ -449,6 +473,8 @@ const { success, error } = useToast();
 const formRef = ref(null);
 const loading = ref(false);
 const uploadProgress = ref({});
+const facilities = ref([]);
+const facilitiesLoading = ref(false);
 
 // Form data
 const form = reactive({
@@ -466,6 +492,7 @@ const form = reactive({
   contact_email: '',
   
   // Receiving Provider
+  receiving_facility_id: null,
   receiving_facility_name: '',
   receiving_nicare_code: '',
   receiving_address: '',
@@ -511,8 +538,8 @@ const form = reactive({
   personnel_email: '',
   
   // Supporting Documents
-  enrollee_id_card: null,
-  referral_letter: null
+  enrollee_id_card: [],
+  referral_letter: []
 });
 
 // Validation rules
@@ -532,6 +559,35 @@ const specializationOptions = ['O&G', 'Paediatrics', 'Public Health', 'ENT', 'Fa
 const cadreOptions = ['CHEW', 'M.O', 'CHO', 'D.O', 'N.O', 'Registrar', 'Consultant'];
 
 // Methods
+const loadFacilities = async () => {
+  try {
+    facilitiesLoading.value = true;
+    const response = await facilityAPI.getAll({
+      status: 1, // Only active facilities
+      per_page: 1000 // Get all facilities
+    });
+
+    if (response.data.success) {
+      facilities.value = response.data.data.data || response.data.data || [];
+    }
+  } catch (err) {
+    console.error('Failed to load facilities:', err);
+    error('Failed to load facilities');
+  } finally {
+    facilitiesLoading.value = false;
+  }
+};
+
+const handleFacilitySelection = (facilityId) => {
+  const selectedFacility = facilities.value.find(f => f.id === facilityId);
+  if (selectedFacility) {
+    form.receiving_facility_name = selectedFacility.name;
+    form.receiving_nicare_code = selectedFacility.hcp_code;
+    form.receiving_address = selectedFacility.address || '';
+    form.receiving_phone = selectedFacility.phone || '';
+    form.receiving_email = selectedFacility.email || '';
+  }
+};
 const submitForm = async () => {
   const { valid } = await formRef.value.validate();
   if (!valid) return;
@@ -601,11 +657,30 @@ const resetForm = () => {
       form[key] = '';
     } else if (typeof form[key] === 'number') {
       form[key] = '';
-    } else if (form[key] === null || Array.isArray(form[key])) {
+    } else if (Array.isArray(form[key])) {
+      form[key] = [];
+    } else if (form[key] === null) {
       form[key] = null;
     }
   });
+  // Specifically reset facility selection
+  form.receiving_facility_id = null;
 };
+
+// Load facilities on component mount
+onMounted(() => {
+  loadFacilities();
+
+  // Pre-populate facility data if provided
+  if (props.selectedFacility) {
+    form.receiving_facility_id = props.selectedFacility.id;
+    form.receiving_facility_name = props.selectedFacility.name;
+    form.receiving_nicare_code = props.selectedFacility.hcp_code;
+    form.receiving_address = props.selectedFacility.address || '';
+    form.receiving_phone = props.selectedFacility.phone || '';
+    form.receiving_email = props.selectedFacility.email || '';
+  }
+});
 
 defineExpose({
   submitForm,

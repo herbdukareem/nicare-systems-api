@@ -4,7 +4,7 @@ import axios from 'axios';
 const getApiBaseUrl = () => {
   // Check if we're in development mode with Vite
   if (import.meta.env.DEV) {
-    return 'http://ngscha-api.test/api';
+    return import.meta.env.VITE_API_URL;
   }
   // In production, use relative URL
   return '/api';
@@ -188,6 +188,8 @@ export const pasAPI = {
   denyReferral: (id, data) => api.post(`/v1/pas/referrals/${id}/deny`, data),
   generatePACodeFromReferral: (referralId, data) => api.post(`/v1/pas/referrals/${referralId}/generate-pa-code`, data),
   getReferralStatistics: () => api.get('/v1/pas/referrals-statistics'),
+  getPendingReferralsByFacility: (facilityId) => api.get(`/v1/pas/referrals/pending/${facilityId}`),
+  modifyReferral: (referralId, data) => api.put(`/v1/pas/referrals/${referralId}/modify`, data),
 
   // PA Code APIs
   getPACodes: (params) => api.get('/v1/pas/pa-codes', { params }),

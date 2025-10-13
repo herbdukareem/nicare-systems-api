@@ -18,7 +18,8 @@ class Referral extends Model
         'approved_at' => 'datetime',
         'denied_at' => 'datetime',
         'created_at' => 'datetime',
-        'updated_at' => 'datetime'
+        'updated_at' => 'datetime',
+        'modification_history' => 'array'
     ];
 
     // Relationships
@@ -35,6 +36,16 @@ class Referral extends Model
     public function deniedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'denied_by');
+    }
+
+    public function service(): BelongsTo
+    {
+        return $this->belongsTo(Service::class);
+    }
+
+    public function receivingFacility(): BelongsTo
+    {
+        return $this->belongsTo(Facility::class, 'receiving_facility_id');
     }
 
     // Scopes

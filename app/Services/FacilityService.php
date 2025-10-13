@@ -54,7 +54,11 @@ class FacilityService
         }
 
         if (!empty($filters['level_of_care'])) {
-            $query->where('level_of_care', $filters['level_of_care']);
+            if (is_array($filters['level_of_care'])) {
+                $query->whereIn('level_of_care', $filters['level_of_care']);
+            } else {
+                $query->where('level_of_care', $filters['level_of_care']);
+            }
         }
 
         // Apply sorting

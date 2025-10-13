@@ -13,4 +13,4 @@ if (token) {
 
 // Set up axios defaults for SPA authentication
 window.axios.defaults.withCredentials = true;
-window.axios.defaults.baseURL = 'http://ngscha-api.test';
+window.axios.defaults.baseURL = import.meta.env.VITE_API_URL ;

@@ -5,11 +5,22 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\User;
 use App\Models\Staff;
+use App\Models\Role;
 use Illuminate\Support\Facades\Hash;
-use Spatie\Permission\Models\Role;
 
 class ClaimsUsersSeeder extends Seeder
 {
+    /**
+     * Helper method to assign role to user
+     */
+    private function assignRoleToUser(User $user, string $roleName): void
+    {
+        $role = Role::where('name', $roleName)->first();
+        if ($role) {
+            $user->roles()->attach($role->id);
+        }
+    }
+
     /**
      * Run the database seeds.
      */
@@ -36,7 +47,7 @@ class ClaimsUsersSeeder extends Seeder
             'status' => 1,
             'email_verified_at' => now(),
         ]);
-        $deskOfficerUser->assignRole('desk_officer');
+        $this->assignRoleToUser($deskOfficerUser, 'desk_officer');
 
         // 2. Doctor
         $doctorStaff = Staff::create([
@@ -57,7 +68,7 @@ class ClaimsUsersSeeder extends Seeder
             'status' => 1,
             'email_verified_at' => now(),
         ]);
-        $doctorUser->assignRole('doctor');
+        $this->assignRoleToUser($doctorUser, 'doctor');
 
         // 3. Pharmacist
         $pharmacistStaff = Staff::create([
@@ -78,7 +89,7 @@ class ClaimsUsersSeeder extends Seeder
             'status' => 1,
             'email_verified_at' => now(),
         ]);
-        $pharmacistUser->assignRole('pharmacist');
+        $this->assignRoleToUser($pharmacistUser, 'pharmacist');
 
         // 4. Claim Reviewer
         $reviewerStaff = Staff::create([
@@ -99,7 +110,7 @@ class ClaimsUsersSeeder extends Seeder
             'status' => 1,
             'email_verified_at' => now(),
         ]);
-        $reviewerUser->assignRole('claim_reviewer');
+        $this->assignRoleToUser($reviewerUser, 'claim_reviewer');
 
         // 5. Claim Confirmer
         $confirmerStaff = Staff::create([
@@ -120,7 +131,7 @@ class ClaimsUsersSeeder extends Seeder
             'status' => 1,
             'email_verified_at' => now(),
         ]);
-        $confirmerUser->assignRole('claim_confirmer');
+        $this->assignRoleToUser($confirmerUser, 'claim_confirmer');
 
         // 6. Claim Approver
         $approverStaff = Staff::create([
@@ -141,7 +152,7 @@ class ClaimsUsersSeeder extends Seeder
             'status' => 1,
             'email_verified_at' => now(),
         ]);
-        $approverUser->assignRole('claim_approver');
+        $this->assignRoleToUser($approverUser, 'claim_approver');
 
         // 7. Claims Administrator
         $adminStaff = Staff::create([
@@ -162,7 +173,7 @@ class ClaimsUsersSeeder extends Seeder
             'status' => 1,
             'email_verified_at' => now(),
         ]);
-        $adminUser->assignRole('claims_admin');
+        $this->assignRoleToUser($adminUser, 'claims_admin');
 
         $this->command->info('Claims users created successfully!');
         $this->command->info('Login credentials:');

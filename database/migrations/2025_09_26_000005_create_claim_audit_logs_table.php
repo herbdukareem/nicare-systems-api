@@ -24,7 +24,7 @@ return new class extends Migration
             $table->text('comments')->nullable();
             
             // User Information
-            $table->unsignedBigInteger('user_id');
+            $table->unsignedBigInteger('user_id')->nullable();
             $table->string('user_role');
             $table->string('user_name');
             

@@ -23,7 +23,7 @@
             @click="showCreateReferralDialog = true"
             class="tw-hover-lift tw-transition-all tw-duration-300 tw-shadow-lg"
           >
-            New Referral Request
+            New Request
           </v-btn>
         </div>
       </div>
@@ -251,13 +251,13 @@
 
     <!-- Create Referral Dialog -->
     <v-dialog v-model="showCreateReferralDialog" max-width="1200px" persistent scrollable>
-      <v-card>
+      <v-card v-if="showCreateReferralDialog">
         <v-card-title class="tw-text-lg tw-font-semibold tw-bg-blue-50 tw-text-blue-800">
           <v-icon class="tw-mr-2">mdi-file-document-plus</v-icon>
-          New Referral Request
+          New Referral/PA Code Request
         </v-card-title>
         <v-card-text class="tw-p-0">
-          <ReferralRequestForm
+          <ReferralPACodeWizard
             ref="referralFormRef"
             @submit="handleReferralSubmit"
             @cancel="showCreateReferralDialog = false"
@@ -295,7 +295,7 @@
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
 import AdminLayout from '../layout/AdminLayout.vue';
-import ReferralRequestForm from './ReferralRequestForm.vue';
+import ReferralPACodeWizard from './ReferralPACodeWizard.vue';
 import { useToast } from '../../composables/useToast';
 import { pasAPI } from '../../utils/api.js';
 
@@ -424,8 +424,50 @@ const submitReferralForm = () => {
   }
 };
 
-const handleReferralSubmit = (referralData) => {
-  console.log('Referral submitted:', referralData);
+const handleReferralSubmit = async (requestData) => {
+  console.log('Request submitted:', requestData);
+
+  try {
+    // Handle different request types
+    switch (requestData.request_type) {
+      case 'referral':
+        // Referral creation is handled by the form itself
+        success('Referral request created successfully');
+        break;
+
+      case 'pa_code':
+        // Generate PA Code from the selected referral
+        if (requestData.referral_id) {
+          // Call the PA Code generation API
+          const response = await pasAPI.generatePACodeFromReferral(requestData.referral_id, {
+            service_type: requestData.referral?.current_service || 'General Service',
+            service_description: requestData.referral?.current_service || 'General Service',
+            validity_days: 30,
+            max_usage: 1,
+            issuer_comments: 'Generated from referral via wizard'
+          });
+
+          if (response.data.success) {
+            success('PA Code generated successfully');
+          } else {
+            error(response.data.message || 'Failed to generate PA Code');
+          }
+        }
+        break;
+
+      case 'modify_referral':
+        // Modification is handled by the wizard itself
+        success('Referral modified successfully');
+        break;
+
+      default:
+        success('Request processed successfully');
+    }
+  } catch (err) {
+    console.error('Error processing request:', err);
+    error('Failed to process request');
+  }
+
   showCreateReferralDialog.value = false;
   // Refresh data
   loadStatistics();

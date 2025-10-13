@@ -175,7 +175,7 @@ const emit = defineEmits(['update:modelValue', 'files-selected', 'file-removed']
 
 // Reactive data
 const fileInput = ref(null);
-const files = ref([...props.modelValue]);
+const files = ref([...(props.modelValue || [])]);
 const isDragOver = ref(false);
 const error = ref('');
 
@@ -199,7 +199,7 @@ const uploadSubtext = computed(() => {
 
 // Watch for external changes
 watch(() => props.modelValue, (newValue) => {
-  files.value = [...newValue];
+  files.value = [...(newValue || [])];
 });
 
 // Methods

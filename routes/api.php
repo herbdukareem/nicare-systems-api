@@ -218,6 +218,8 @@ Route::middleware(['auth:sanctum'])->prefix('v1/pas')->group(function () {
     Route::get('referrals/{referral}', [ReferralController::class, 'show']);
     Route::post('referrals/{referral}/approve', [ReferralController::class, 'approve']);
     Route::post('referrals/{referral}/deny', [ReferralController::class, 'deny']);
+    Route::get('referrals/pending/{facility}', [ReferralController::class, 'getPendingByFacility']);
+    Route::put('referrals/{referral}/modify', [ReferralController::class, 'modifyService']);
     Route::get('referrals-statistics', [ReferralController::class, 'statistics']);
 
     // PA Code routes

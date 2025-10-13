@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Auth;
 
 class ReferralController extends Controller
 {
@@ -240,7 +241,7 @@ class ReferralController extends Controller
                 ], 400);
             }
 
-            $referral->approve(auth()->user(), $request->comments);
+            $referral->approve(Auth::user(), $request->comments);
 
             return response()->json([
                 'success' => true,
@@ -282,7 +283,7 @@ class ReferralController extends Controller
                 ], 400);
             }
 
-            $referral->deny(auth()->user(), $request->comments);
+            $referral->deny(Auth::user(), $request->comments);
 
             return response()->json([
                 'success' => true,
@@ -294,6 +295,118 @@ class ReferralController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to deny referral',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get pending referrals by facility
+     */
+    public function getPendingByFacility($facilityId): JsonResponse
+    {
+        try {
+            $referrals = Referral::where('status', 'pending')
+                ->where(function($query) use ($facilityId) {
+                    // Check if facilityId is numeric (ID) or string (NiCare code)
+                    if (is_numeric($facilityId)) {
+                        $query->where('receiving_facility_id', $facilityId);
+                    } else {
+                        $query->where('receiving_nicare_code', $facilityId);
+                    }
+                })
+                ->with(['approvedBy', 'deniedBy'])
+                ->orderBy('created_at', 'desc')
+                ->get()
+                ->map(function($referral) {
+                    return [
+                        'id' => $referral->id,
+                        'referral_code' => $referral->referral_code,
+                        'patient_name' => $referral->enrollee_full_name,
+                        'current_service' => $referral->service_description ?? 'General Consultation',
+                        'severity_level' => $referral->severity_level,
+                        'created_at' => $referral->created_at,
+                        'nicare_number' => $referral->nicare_number,
+                        'presenting_complaints' => $referral->presenting_complaints,
+                        'preliminary_diagnosis' => $referral->preliminary_diagnosis,
+                    ];
+                });
+
+            return response()->json([
+                'success' => true,
+                'data' => $referrals
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to fetch pending referrals',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Modify referral service
+     */
+    public function modifyService(Request $request, Referral $referral): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'new_service_id' => 'required|integer|exists:services,id',
+                'modification_reason' => 'required|string|max:1000'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            if ($referral->status !== 'pending') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Only pending referrals can be modified'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            // Store the old service information for history tracking
+            $oldServiceData = [
+                'old_service_id' => $referral->service_id,
+                'old_service_description' => $referral->service_description,
+                'modified_at' => now(),
+                'modified_by' => Auth::id(),
+                'modification_reason' => $request->modification_reason
+            ];
+
+            // Update referral with new service
+            $referral->update([
+                'service_id' => $request->new_service_id,
+                'service_description' => $request->service_description ?? 'Updated Service',
+                'modification_history' => json_encode(array_merge(
+                    json_decode($referral->modification_history ?? '[]', true),
+                    [$oldServiceData]
+                ))
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Referral service modified successfully',
+                'data' => $referral->fresh()
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to modify referral service',
                 'error' => $e->getMessage()
             ], 500);
         }
