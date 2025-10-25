@@ -17,6 +17,8 @@ class Referral extends Model
         'referral_date' => 'date',
         'approved_at' => 'datetime',
         'denied_at' => 'datetime',
+        'utn_validated' => 'boolean',
+        'utn_validated_at' => 'datetime',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'modification_history' => 'array'
@@ -43,9 +45,24 @@ class Referral extends Model
         return $this->belongsTo(Service::class);
     }
 
+    public function referringFacility(): BelongsTo
+    {
+        return $this->belongsTo(Facility::class, 'referring_facility_id');
+    }
+
     public function receivingFacility(): BelongsTo
     {
         return $this->belongsTo(Facility::class, 'receiving_facility_id');
+    }
+
+    public function enrollee(): BelongsTo
+    {
+        return $this->belongsTo(Enrollee::class, 'enrollee_id');
+    }
+
+    public function utnValidatedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'utn_validated_by');
     }
 
     // Scopes
@@ -67,6 +84,26 @@ class Referral extends Model
     public function scopeUrgent($query)
     {
         return $query->where('severity_level', 'urgent');
+    }
+
+    public function scopeUtnValidated($query)
+    {
+        return $query->where('utn_validated', true);
+    }
+
+    public function scopePendingUtnValidation($query)
+    {
+        return $query->whereNotNull('utn')->where('utn_validated', false);
+    }
+
+    public function scopeForFacility($query, $facilityId)
+    {
+        return $query->where('receiving_facility_id', $facilityId);
+    }
+
+    public function scopeFromFacility($query, $facilityId)
+    {
+        return $query->where('referring_facility_id', $facilityId);
     }
 
     // Accessors

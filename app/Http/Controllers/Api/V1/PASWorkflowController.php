@@ -73,6 +73,11 @@ class PASWorkflowController extends Controller
 
             // Prepare referral data
             $referralData = [
+                // Facility IDs (Foreign Keys)
+                'referring_facility_id' => $requestData['facility_id'],
+                'receiving_facility_id' => $requestData['receiving_facility_id'],
+                'enrollee_id' => $requestData['enrollee_id'],
+
                 // Referring Provider
                 'referring_facility_name' => $referringFacility->name,
                 'referring_nicare_code' => $referringFacility->hcp_code,

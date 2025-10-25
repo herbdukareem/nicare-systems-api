@@ -51,6 +51,31 @@ class Drug extends Model
     }
 
     /**
+     * Scope to find drugs with the same combination (name, dosage form, strength, presentation)
+     */
+    public function scopeWithSameCombination($query, $name, $dosageForm, $strength, $presentation)
+    {
+        return $query->where('drug_name', $name)
+                    ->where('drug_dosage_form', $dosageForm)
+                    ->where('drug_strength', $strength)
+                    ->where('drug_presentation', $presentation);
+    }
+
+    /**
+     * Check if a drug with the same combination already exists
+     */
+    public static function existsWithCombination($name, $dosageForm, $strength, $presentation, $excludeId = null)
+    {
+        $query = static::withSameCombination($name, $dosageForm, $strength, $presentation);
+
+        if ($excludeId) {
+            $query->where('id', '!=', $excludeId);
+        }
+
+        return $query->exists();
+    }
+
+    /**
      * Scope to get only active drugs
      */
     public function scopeActive($query)

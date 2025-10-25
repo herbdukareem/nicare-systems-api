@@ -37,6 +37,10 @@ use App\Http\Controllers\PACodeController;
 use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\V1\DrugController;
 use App\Http\Controllers\Api\V1\ServiceController;
+use App\Http\Controllers\Api\V1\CaseCategoryController;
+use App\Http\Controllers\Api\V1\ServiceCategoryController;
+use App\Http\Controllers\Api\V1\DOFacilityController;
+use App\Http\Controllers\Api\V1\DODashboardController;
 use App\Http\Controllers\ClaimsController;
 use App\Http\Controllers\DoctorReviewController;
 use App\Http\Controllers\PharmacistReviewController;
@@ -82,6 +86,29 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+
+     // Case Categories Management
+    Route::apiResource('case-categories', CaseCategoryController::class);
+    Route::post('case-categories/{id}/toggle-status', [CaseCategoryController::class, 'toggleStatus']);
+
+    // Service Categories Management
+    Route::apiResource('service-categories', ServiceCategoryController::class);
+    Route::post('service-categories/{id}/toggle-status', [ServiceCategoryController::class, 'toggleStatus']);
+
+    // DOFacility Management - Specific routes must come before apiResource
+    Route::get('do-facilities/desk-officers', [DOFacilityController::class, 'getDeskOfficers']);
+    Route::get('do-facilities/facilities', [DOFacilityController::class, 'getFacilities']);
+    Route::get('do-facilities/user/{userId}/facilities', [DOFacilityController::class, 'getUserFacilities']);
+    Route::apiResource('do-facilities', DOFacilityController::class);
+
+    // DO Dashboard routes (for desk officers)
+    Route::prefix('do-dashboard')->middleware('claims.role:desk_officer')->group(function () {
+        Route::get('overview', [DODashboardController::class, 'overview']);
+        Route::get('referrals', [DODashboardController::class, 'getReferrals']);
+        Route::get('pa-codes', [DODashboardController::class, 'getPACodes']);
+        Route::post('validate-utn', [DODashboardController::class, 'validateUTN']);
+    });
+
     // Enrollee routes
     Route::apiResource('enrollees', EnrolleeController::class);
     Route::post('enrollees/{enrollee}/upload-passport', [EnrolleeController::class, 'uploadPassport']);
@@ -226,6 +253,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1/pas')->group(function () {
     Route::get('pa-codes', [PACodeController::class, 'index']);
     Route::post('referrals/{referral}/generate-pa-code', [PACodeController::class, 'generateFromReferral']);
     Route::get('pa-codes/{paCode}', [PACodeController::class, 'show']);
+    Route::post('pa-codes/{paCode}/generate-utn', [PACodeController::class, 'generateUTN']);
     Route::post('pa-codes/{paCode}/mark-used', [PACodeController::class, 'markAsUsed']);
     Route::post('pa-codes/{paCode}/cancel', [PACodeController::class, 'cancel']);
     Route::post('pa-codes/verify', [PACodeController::class, 'verify']);
@@ -293,4 +321,6 @@ Route::middleware(['auth:sanctum'])->prefix('v1/pas')->group(function () {
             Route::post('{claim}/approve', [ClaimsReviewController::class, 'approveClaim']);
         });
     });
+
+   
 });

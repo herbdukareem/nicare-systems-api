@@ -158,7 +158,7 @@ class MigrateLegacyData extends Command
                         ['hcp_code' => $provider->hcpcode, 'name'  => $provider->hcpname],
                         [
                             'ownership' => $hcpcategory,
-                            'type'     => $hcptype,
+                            'level_of_care'     => $hcptype,
                             'lga_id'   => $this->lga_array[$provider->hcplga],
                             'ward_id'  => $this->ward_array[$provider->hcpward],
                             'capacity' => $provider->hcpcap ?? 1000,

@@ -6,6 +6,10 @@ import router from './router';
 import App from './App.vue';
 import UtilsPlugin from './utils/utils';
 
+// PrimeVue
+import PrimeVue from 'primevue/config';
+import ToastService from 'primevue/toastservice';
+
 // Vuetify styles (load first)
 import 'vuetify/styles';
 import '@mdi/font/css/materialdesignicons.css';
@@ -58,6 +62,8 @@ app.use(vuetify);
 app.use(pinia);
 app.use(router);
 app.use(UtilsPlugin);
+app.use(PrimeVue);
+app.use(ToastService);
 
 // 🔐 Restore auth BEFORE mounting to avoid logout-on-refresh flicker
 const authStore = useAuthStore();

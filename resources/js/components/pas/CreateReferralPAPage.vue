@@ -40,30 +40,8 @@
               </div>
             </template>
 
+            <!-- Step 2: Request Type Selection (for all flows) -->
             <template v-slot:item.2>
-              <div class="tw-p-4">
-                <h3 class="tw-text-lg tw-font-semibold tw-mb-4">Select Enrollee</h3>
-                <EnrolleeSelector 
-                  v-model="selectedEnrollee"
-                  :facility="selectedFacility"
-                  @update:modelValue="onEnrolleeSelected"
-                  :loading="loadingEnrollees"
-                />
-              </div>
-            </template>
-
-            <template v-slot:item.3>
-              <div class="tw-p-4">
-                <h3 class="tw-text-lg tw-font-semibold tw-mb-4">Enrollee Profile</h3>
-                <EnrolleeProfile 
-                  v-if="selectedEnrollee"
-                  :enrollee="selectedEnrollee"
-                  :facility="selectedFacility"
-                />
-              </div>
-            </template>
-
-            <template v-slot:item.4>
               <div class="tw-p-4">
                 <h3 class="tw-text-lg tw-font-semibold tw-mb-4">Request Type</h3>
                 <RequestTypeSelector
@@ -73,14 +51,66 @@
               </div>
             </template>
 
-            <!-- PA Code: Approved Referral Selection (Step 5) -->
-            <template v-if="requestType === 'pa_code'" v-slot:item.5>
+            <!-- Step 3: Dynamic content based on request type -->
+            <template v-slot:item.3>
               <div class="tw-p-4">
-                <h3 class="tw-text-lg tw-font-semibold tw-mb-4">Select Approved Referral</h3>
-                <ApprovedReferralSelector
-                  v-model="selectedApprovedReferral"
-                  :enrollee="selectedEnrollee"
-                />
+                <!-- Enrollee Selection (for referral and PA code requests) -->
+                <div v-if="requestType === 'referral' || requestType === 'pa_code'">
+                  <h3 class="tw-text-lg tw-font-semibold tw-mb-4">Select Enrollee</h3>
+                  <EnrolleeSelector
+                    v-model="selectedEnrollee"
+                    :facility="selectedFacility"
+                    @update:modelValue="onEnrolleeSelected"
+                    :loading="loadingEnrollees"
+                  />
+                </div>
+
+                <!-- Pending Referral Selection (for modify referral) -->
+                <div v-else-if="requestType === 'modify_referral'">
+                  <h3 class="tw-text-lg tw-font-semibold tw-mb-4">Select Pending Referral</h3>
+                  <PendingReferralSelector
+                    v-model="selectedReferral"
+                    :facility="selectedFacility"
+                    :loading="loadingPendingReferrals"
+                    @update:modelValue="onReferralSelected"
+                  />
+                </div>
+              </div>
+            </template>
+
+            <!-- Step 4: Dynamic content based on request type -->
+            <template v-slot:item.4>
+              <div class="tw-p-4">
+                <!-- Approved Referral Selection (for PA Code requests) -->
+                <div v-if="requestType === 'pa_code'">
+                  <h3 class="tw-text-lg tw-font-semibold tw-mb-4">Select Approved Referral</h3>
+                  <ApprovedReferralSelector
+                    v-model="selectedApprovedReferral"
+                    :enrollee="selectedEnrollee"
+                  />
+                </div>
+
+                <!-- Enrollee Profile (for referral requests only) -->
+                <div v-else-if="requestType === 'referral'">
+                  <h3 class="tw-text-lg tw-font-semibold tw-mb-4">Enrollee Profile</h3>
+                  <EnrolleeProfile
+                    v-if="selectedEnrollee"
+                    :enrollee="selectedEnrollee"
+                    :facility="selectedFacility"
+                  />
+                </div>
+
+                <!-- New Service Selection (for modify referral) -->
+                <div v-else-if="requestType === 'modify_referral'">
+                  <h3 class="tw-text-lg tw-font-semibold tw-mb-4">Select New Service</h3>
+                  <SimpleServiceSelector
+                    v-model="newService"
+                    :current-referral="selectedReferral"
+                    :modification-reason-value="modificationReason"
+                    @update:modelValue="onServiceSelected"
+                    @update:modificationReason="(value) => modificationReason = value"
+                  />
+                </div>
               </div>
             </template>
 
@@ -109,6 +139,9 @@
                   :services="selectedServices"
                   :selected-approved-referral="selectedApprovedReferral"
                   :additional-data="additionalData"
+                  :selected-referral="selectedReferral"
+                  :new-service="newService"
+                  :modification-reason="modificationReason"
                   @submit="submitRequest"
                   :loading="submitting"
                 />
@@ -182,7 +215,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '../layout/AdminLayout.vue';
 import FacilitySelector from './components/FacilitySelector.vue';
@@ -192,6 +225,8 @@ import RequestTypeSelector from './components/RequestTypeSelector.vue';
 import ServiceSelector from './components/ServiceSelector.vue';
 import RequestReview from './components/RequestReview.vue';
 import ApprovedReferralSelector from './components/ApprovedReferralSelector.vue';
+import PendingReferralSelector from './components/PendingReferralSelector.vue';
+import SimpleServiceSelector from './components/SimpleServiceSelector.vue';
 import { useToast } from '../../composables/useToast';
 import { pasAPI } from '../../utils/api.js';
 
@@ -208,71 +243,123 @@ const showSuccessDialog = ref(false);
 // Form data
 const selectedFacility = ref(null);
 const selectedEnrollee = ref(null);
-const requestType = ref(''); // 'referral' or 'pa_code'
+const requestType = ref(''); // 'referral', 'pa_code', or 'modify_referral'
 const selectedServices = ref([]);
 const selectedApprovedReferral = ref(null);
 const additionalData = ref({});
 const createdRequest = ref(null);
+
+// Modify referral specific data
+const pendingReferrals = ref([]);
+const selectedReferral = ref(null);
+const newService = ref(null);
+const modificationReason = ref('');
+const loadingPendingReferrals = ref(false);
 
 // Stepper configuration
 const stepperItems = computed(() => {
   if (requestType.value === 'pa_code') {
     return [
       { title: 'Facility', value: 1, icon: 'mdi-hospital-building' },
-      { title: 'Enrollee', value: 2, icon: 'mdi-account-search' },
-      { title: 'Profile', value: 3, icon: 'mdi-account-details' },
-      { title: 'Request Type', value: 4, icon: 'mdi-clipboard-list' },
-      { title: 'Referral', value: 5, icon: 'mdi-file-document-check' },
-      { title: 'Services', value: 6, icon: 'mdi-medical-bag' },
-      { title: 'Review', value: 7, icon: 'mdi-check-circle' }
-    ];
-  } else {
-    return [
-      { title: 'Facility', value: 1, icon: 'mdi-hospital-building' },
-      { title: 'Enrollee', value: 2, icon: 'mdi-account-search' },
-      { title: 'Profile', value: 3, icon: 'mdi-account-details' },
-      { title: 'Request Type', value: 4, icon: 'mdi-clipboard-list' },
+      { title: 'Request Type', value: 2, icon: 'mdi-clipboard-list' },
+      { title: 'Enrollee', value: 3, icon: 'mdi-account-search' },
+      { title: 'Referral', value: 4, icon: 'mdi-file-document-check' },
       { title: 'Services', value: 5, icon: 'mdi-medical-bag' },
       { title: 'Review', value: 6, icon: 'mdi-check-circle' }
+    ];
+  } else if (requestType.value === 'modify_referral') {
+    return [
+      { title: 'Facility', value: 1, icon: 'mdi-hospital-building' },
+      { title: 'Request Type', value: 2, icon: 'mdi-clipboard-list' },
+      { title: 'Select Referral', value: 3, icon: 'mdi-file-document-check' },
+      { title: 'New Service', value: 4, icon: 'mdi-medical-bag' },
+      { title: 'Review', value: 5, icon: 'mdi-check-circle' }
+    ];
+  } else if (requestType.value === 'referral') {
+    return [
+      { title: 'Facility', value: 1, icon: 'mdi-hospital-building' },
+      { title: 'Request Type', value: 2, icon: 'mdi-clipboard-list' },
+      { title: 'Enrollee', value: 3, icon: 'mdi-account-search' },
+      { title: 'Profile', value: 4, icon: 'mdi-account-details' },
+      { title: 'Services', value: 5, icon: 'mdi-medical-bag' },
+      { title: 'Review', value: 6, icon: 'mdi-check-circle' }
+    ];
+  } else {
+    // Default flow when no request type is selected yet
+    return [
+      { title: 'Facility', value: 1, icon: 'mdi-hospital-building' },
+      { title: 'Request Type', value: 2, icon: 'mdi-clipboard-list' },
+      { title: 'Details', value: 3, icon: 'mdi-file-document' },
+      { title: 'Services', value: 4, icon: 'mdi-medical-bag' },
+      { title: 'Review', value: 5, icon: 'mdi-check-circle' }
     ];
   }
 });
 
 // Computed properties
-const maxSteps = computed(() => requestType.value === 'pa_code' ? 7 : 6);
+const maxSteps = computed(() => {
+  if (requestType.value === 'pa_code') return 6;
+  if (requestType.value === 'modify_referral') return 5;
+  if (requestType.value === 'referral') return 6;
+  return 5; // Default when no request type selected
+});
 
 const servicesSlotName = computed(() => {
-  return requestType.value === 'pa_code' ? 'item.6' : 'item.5';
+  if (requestType.value === 'pa_code') return 'item.5';
+  if (requestType.value === 'modify_referral') return 'item.4';
+  if (requestType.value === 'referral') return 'item.5';
+  return 'item.4'; // Default
 });
 
 const reviewSlotName = computed(() => {
-  return requestType.value === 'pa_code' ? 'item.7' : 'item.6';
+  if (requestType.value === 'pa_code') return 'item.6';
+  if (requestType.value === 'modify_referral') return 'item.5';
+  if (requestType.value === 'referral') return 'item.6';
+  return 'item.5'; // Default
 });
 
 const canProceedToNext = computed(() => {
   switch (currentStep.value) {
-    case 1: return !!selectedFacility.value;
-    case 2: return !!selectedEnrollee.value;
-    case 3: return !!selectedEnrollee.value;
-    case 4: return !!requestType.value;
+    case 1:
+      return !!selectedFacility.value;
+    case 2:
+      return !!requestType.value;
+    case 3:
+      if (requestType.value === 'pa_code') {
+        return !!selectedEnrollee.value;
+      } else if (requestType.value === 'modify_referral') {
+        return !!selectedReferral.value;
+      } else if (requestType.value === 'referral') {
+        return !!selectedEnrollee.value;
+      }
+      return false;
+    case 4:
+      if (requestType.value === 'pa_code') {
+        return !!selectedApprovedReferral.value;
+      } else if (requestType.value === 'modify_referral') {
+        return !!newService.value;
+      } else if (requestType.value === 'referral') {
+        return true; // Profile step
+      }
+      return false;
     case 5:
       if (requestType.value === 'pa_code') {
-        // PA Code workflow: Step 5 is approved referral selection
-        return !!selectedApprovedReferral.value;
-      } else {
-        // Referral workflow: Step 5 is services selection
+        return selectedServices.value.length > 0;
+      } else if (requestType.value === 'modify_referral') {
+        return false; // Review step (no next step)
+      } else if (requestType.value === 'referral') {
         return selectedServices.value.length > 0;
       }
+      return false;
     case 6:
       if (requestType.value === 'pa_code') {
-        // PA Code workflow: Step 6 is services (optional)
-        return true; // Services are optional for PA codes
-      } else {
-        // Referral workflow: Step 6 is review (no next step)
-        return false;
+        return false; // Review step (no next step)
+      } else if (requestType.value === 'referral') {
+        return false; // Review step (no next step)
       }
-    case 7: return false; // PA Code review step (no next step)
-    default: return false;
+      return false;
+    default:
+      return false;
   }
 });
 
@@ -296,6 +383,16 @@ const onFacilitySelected = (facility) => {
   requestType.value = '';
   selectedServices.value = [];
   selectedApprovedReferral.value = null;
+  selectedReferral.value = null;
+  newService.value = null;
+  modificationReason.value = '';
+
+  // Automatically advance to next step after selecting facility
+  nextTick(() => {
+    if (canProceedToNext.value && currentStep.value < maxSteps.value) {
+      currentStep.value++;
+    }
+  });
 };
 
 const onEnrolleeSelected = (enrollee) => {
@@ -307,9 +404,33 @@ const onEnrolleeSelected = (enrollee) => {
 };
 
 const onRequestTypeSelected = (type) => {
+ 
   requestType.value = type;
   selectedServices.value = [];
   selectedApprovedReferral.value = null;
+  selectedReferral.value = null;
+  newService.value = null;
+  modificationReason.value = '';
+
+  // Reset enrollee selection for non-referral requests
+  if (type !== 'referral') {
+    selectedEnrollee.value = null;
+  }
+
+  // Automatically advance to next step after selecting request type
+  nextTick(() => {
+    if (canProceedToNext.value && currentStep.value < maxSteps.value) {
+      currentStep.value++;
+    }
+  });
+};
+
+const onReferralSelected = (referral) => {
+  selectedReferral.value = referral;
+};
+
+const onServiceSelected = (service) => {
+  newService.value = service;
 };
 
 const submitRequest = async (formData) => {
@@ -344,6 +465,13 @@ const submitRequest = async (formData) => {
     let response;
     if (requestType.value === 'referral') {
       response = await pasAPI.createReferral(submitData);
+    } else if (requestType.value === 'modify_referral') {
+      // For modify referral, use the modify API
+      const modifyData = {
+        new_service_id: newService.value?.id,
+        modification_reason: modificationReason.value || 'Service modification requested'
+      };
+      response = await pasAPI.modifyReferral(selectedReferral.value.id, modifyData);
     } else {
       // For PA codes, use the direct PA code generation from referral
       // Extract referral_id from original formData before using FormData
@@ -357,7 +485,9 @@ const submitRequest = async (formData) => {
     if (response.data.success) {
       createdRequest.value = response.data.data;
       showSuccessDialog.value = true;
-      success(`${requestType.value === 'referral' ? 'Referral' : 'PA Code'} created successfully!`);
+      const successMessage = requestType.value === 'referral' ? 'Referral' :
+                           requestType.value === 'modify_referral' ? 'Referral modification' : 'PA Code';
+      success(`${successMessage} ${requestType.value === 'modify_referral' ? 'completed' : 'created'} successfully!`);
     }
   } catch (err) {
     console.error('Failed to create request:', err);

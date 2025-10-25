@@ -25,7 +25,7 @@ class ReferralController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Referral::with(['approvedBy', 'deniedBy']);
+            $query = Referral::with(['referringFacility', 'receivingFacility', 'enrollee', 'approvedBy', 'deniedBy']);
 
             // Apply filters
             if ($request->has('status') && !empty($request->status)) {
@@ -302,20 +302,22 @@ class ReferralController extends Controller
 
     /**
      * Get pending referrals by facility
+     * For modify referral flow - shows referrals FROM the selected facility
      */
     public function getPendingByFacility($facilityId): JsonResponse
     {
         try {
             $referrals = Referral::where('status', 'pending')
                 ->where(function($query) use ($facilityId) {
+                    // For modify referral, we want referrals FROM this facility (referring_facility_id)
                     // Check if facilityId is numeric (ID) or string (NiCare code)
                     if (is_numeric($facilityId)) {
-                        $query->where('receiving_facility_id', $facilityId);
+                        $query->where('referring_facility_id', $facilityId);
                     } else {
-                        $query->where('receiving_nicare_code', $facilityId);
+                        $query->where('referring_nicare_code', $facilityId);
                     }
                 })
-                ->with(['approvedBy', 'deniedBy'])
+                ->with(['referringFacility', 'receivingFacility', 'enrollee', 'approvedBy', 'deniedBy'])
                 ->orderBy('created_at', 'desc')
                 ->get()
                 ->map(function($referral) {

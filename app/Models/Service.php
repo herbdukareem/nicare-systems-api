@@ -17,6 +17,8 @@ class Service extends Model
         'price',
         'group',
         'service_group_id',
+        'service_category',
+        'service_category_id',
         'pa_required',
         'referable',
         'status',
@@ -26,6 +28,7 @@ class Service extends Model
 
     protected $casts = [
         'price' => 'decimal:2',
+        'service_category' => 'integer',
         'pa_required' => 'boolean',
         'referable' => 'boolean',
         'status' => 'boolean',
@@ -44,6 +47,10 @@ class Service extends Model
     const LEVEL_PRIMARY = 'Primary';
     const LEVEL_SECONDARY = 'Secondary';
     const LEVEL_TERTIARY = 'Tertiary';
+
+    // Service category constants
+    const CATEGORY_MAIN_SERVICE = 1;
+    const CATEGORY_SUB_SERVICE = 2;
 
     // Service groups constants
     const GROUP_GENERAL_CONSULTATION = 'GENERAL CONSULTATION';
@@ -73,6 +80,14 @@ class Service extends Model
     public function serviceGroup()
     {
         return $this->belongsTo(ServiceGroup::class, 'service_group_id');
+    }
+
+    /**
+     * Get the service category this service belongs to
+     */
+    public function serviceCategoryRelation()
+    {
+        return $this->belongsTo(ServiceCategory::class, 'service_category_id');
     }
 
     /**
@@ -183,5 +198,40 @@ class Service extends Model
             self::GROUP_PAEDIATRICS,
             self::GROUP_INTERNAL_MEDICINE
         ];
+    }
+
+    /**
+     * Get available service categories
+     */
+    public static function getServiceCategories()
+    {
+        return [
+            self::CATEGORY_MAIN_SERVICE => 'Main Service',
+            self::CATEGORY_SUB_SERVICE => 'Sub Service'
+        ];
+    }
+
+    /**
+     * Get service category text
+     */
+    public function getServiceCategoryTextAttribute()
+    {
+        return $this->service_category === self::CATEGORY_MAIN_SERVICE ? 'Main Service' : 'Sub Service';
+    }
+
+    /**
+     * Scope for main services
+     */
+    public function scopeMainServices($query)
+    {
+        return $query->where('service_category', self::CATEGORY_MAIN_SERVICE);
+    }
+
+    /**
+     * Scope for sub services
+     */
+    public function scopeSubServices($query)
+    {
+        return $query->where('service_category', self::CATEGORY_SUB_SERVICE);
     }
 }

@@ -13,7 +13,6 @@ import FacilitiesPage from '../components/facilities/FacilitiesPage.vue';
 import UsersPage from '../components/settings/UsersPage.vue';
 import BenefactorsPage from '../components/settings/BenefactorsPage.vue';
 import RolesPermissionsPage from '../components/settings/RolesPermissionsPage.vue';
-import PASManagementPage from '../components/pas/PASManagementPage.vue';
 import ComingSoonPage from '../components/common/ComingSoonPage.vue';
 import PendingEnrolleesPage from '../components/enrollees/PendingEnrolleesPage.vue';
 
@@ -35,6 +34,18 @@ const routes = [
       title: 'Dashboard',
       description: 'Overview of enrollees and system statistics',
       breadcrumb: 'Dashboard'
+    },
+  },
+  {
+    path: '/do-dashboard',
+    name: 'do-dashboard',
+    component: () => import('../components/do/DODashboardPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Desk Officer Dashboard',
+      description: 'Manage referrals and PA codes for assigned facilities',
+      breadcrumb: 'DO Dashboard',
+      role: 'desk_officer'
     },
   },
   {
@@ -166,7 +177,7 @@ const routes = [
   {
     path: '/pas',
     name: 'pas-management',
-    component: PASManagementPage,
+    component: () => import('../components/pas/PASManagementPage.vue'),
     meta: {
       requiresAuth: true,
       title: 'Pre-Authorisation System',
@@ -175,13 +186,46 @@ const routes = [
     },
   },
   {
+    path: '/pas/create-referral',
+    name: 'pas-create-referral',
+    component: () => import('../components/pas/ReferralCreationWizard.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Create Referral Request',
+      description: 'Submit a new referral request for patient authorization',
+      breadcrumb: 'Create Referral'
+    }
+  },
+  {
+    path: '/pas/generate-pa-code',
+    name: 'pas-generate-pa-code',
+    component: () => import('../components/pas/PACodeGenerationWizard.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Generate PA Code',
+      description: 'Generate a Pre-Authorization code from approved referral',
+      breadcrumb: 'Generate PA Code'
+    }
+  },
+  {
+    path: '/pas/modify-referral',
+    name: 'pas-modify-referral',
+    component: () => import('../components/pas/ModifyReferralWizard.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Modify Referral Service',
+      description: 'Modify the service details of an existing referral',
+      breadcrumb: 'Modify Referral'
+    }
+  },
+  {
     path: '/pas/generate',
     name: 'pas-generate',
     component: () => import('../components/pas/CreateReferralPAPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Create Referral/PA Code',
-      description: 'Generate referrals and PA codes for enrollees',
+      title: 'Create Referral/PA Code (Legacy)',
+      description: 'Legacy unified workflow - use separate workflows instead',
       breadcrumb: 'Create Referral/PA Code'
     }
   },
@@ -200,6 +244,41 @@ const routes = [
       title: 'Referral Details',
       description: 'View referral information and status',
       breadcrumb: 'Referral Details'
+    }
+  },
+  {
+    path: '/pas/pa-codes/:paCodeId',
+    name: 'pas-pa-code-detail',
+    component: () => import('../components/pas/PACodeDetailPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'PA Code Details',
+      description: 'View PA code information and status',
+      breadcrumb: 'PA Code Details'
+    }
+  },
+
+  // Drug Management Routes
+  {
+    path: '/drugs',
+    name: 'drugs-management',
+    component: () => import('../components/pas/DrugsManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Drug Management',
+      description: 'Manage drug formulary and pricing',
+      breadcrumb: 'Drug Management'
+    }
+  },
+  {
+    path: '/drugs/:drugId',
+    name: 'drug-detail',
+    component: () => import('../components/pas/DrugDetailPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Drug Details',
+      description: 'View drug information and details',
+      breadcrumb: 'Drug Details'
     }
   },
   {
@@ -244,6 +323,45 @@ const routes = [
     component: () => import('../components/common/ComingSoonPage.vue'),
     meta: { requiresAuth: true },
     props: { title: 'Manage Clinical Services', subtitle: 'Manage clinical services', icon: 'mdi-medical-bag' }
+  },
+
+  // Case Category Management Routes
+  {
+    path: '/case-categories',
+    name: 'case-categories-management',
+    component: () => import('../components/pas/CaseCategoryManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Case Categories',
+      description: 'Manage medical case categories',
+      breadcrumb: 'Case Categories'
+    }
+  },
+
+  // Service Category Management Routes
+  {
+    path: '/service-categories',
+    name: 'service-categories-management',
+    component: () => import('../components/pas/ServiceCategoryManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Service Categories',
+      description: 'Manage healthcare service categories',
+      breadcrumb: 'Service Categories'
+    }
+  },
+
+  // DOFacility Management Routes
+  {
+    path: '/do-facilities',
+    name: 'do-facilities-management',
+    component: () => import('../components/pas/DOFacilityManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Desk Officer Facility Assignments',
+      description: 'Assign facilities to desk officers',
+      breadcrumb: 'DO Facility Assignments'
+    }
   },
 
   // Claims Routes
@@ -328,27 +446,53 @@ const router = createRouter({
   routes,
 });
 
-// Navigation guard for authentication
+// Navigation guard for authentication and role-based routing
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
-  // const isAuthenticated = authStore.isLoggedIn;
-  const isAuthenticated = authStore.isAuthenticated;
 
-    if (to.meta.requiresAuth) {
-    
-    authStore.initializeAuth();
-    if (Ls.get('token')) {
+  if (to.meta.requiresAuth) {
+    await authStore.initializeAuth();
+
+    if (Ls.get('token') && authStore.isAuthenticated) {
+      // Check role-based access
+      if (to.meta.role) {
+        if (!authStore.hasRole(to.meta.role)) {
+          // User doesn't have required role, redirect to appropriate dashboard
+          const userRole = authStore.userRoles[0]?.name;
+          if (userRole === 'desk_officer') {
+            next({ path: '/do-dashboard', replace: true });
+          } else {
+            next({ path: '/dashboard', replace: true });
+          }
+          return;
+        }
+      }
+
+      // Special handling for desk officers accessing general dashboard
+      if (to.name === 'dashboard' && authStore.hasRole('desk_officer')) {
+        // Redirect desk officers to their specialized dashboard
+        next({ path: '/do-dashboard', replace: true });
+        return;
+      }
+
       next();
     } else {
       next({ path: '/login', replace: true });
     }
   } else {
+    // Handle login page redirect for already authenticated users
+    if (to.name === 'login' && authStore.isAuthenticated) {
+      // Redirect authenticated users away from login page
+      if (authStore.hasRole('desk_officer')) {
+        next({ path: '/do-dashboard', replace: true });
+      } else {
+        next({ path: '/dashboard', replace: true });
+      }
+      return;
+    }
+
     next();
   }
-
-
-
-
 });
 
 // Navigation guard for page titles

@@ -1,92 +1,7 @@
 <template>
   <v-form ref="formRef" @submit.prevent="submitForm">
     <div class="tw-space-y-6">
-      <!-- Referring Provider Details -->
-      <v-card class="tw-mb-6">
-        <v-card-title class="tw-bg-blue-50 tw-text-blue-800">
-          <v-icon class="tw-mr-2">mdi-hospital-building</v-icon>
-          Referring Provider/Facility Details
-        </v-card-title>
-        <v-card-text class="tw-pt-4">
-          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-            <v-text-field
-              v-model="form.referring_facility_name"
-              label="Facility Name *"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required]"
-            />
-            <v-text-field
-              v-model="form.referring_nicare_code"
-              label="NiCare Code *"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required]"
-            />
-            <v-textarea
-              v-model="form.referring_address"
-              label="Address *"
-              variant="outlined"
-              density="compact"
-              rows="2"
-              :rules="[rules.required]"
-            />
-            <v-text-field
-              v-model="form.referring_phone"
-              label="Provider Phone Number *"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required, rules.phone]"
-            />
-            <v-text-field
-              v-model="form.referring_email"
-              label="Email Address"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.email]"
-            />
-            <v-text-field
-              v-model="form.tpa_name"
-              label="TPA Name"
-              variant="outlined"
-              density="compact"
-            />
-          </div>
-        </v-card-text>
-      </v-card>
 
-      <!-- Contact Person Details -->
-      <v-card class="tw-mb-6">
-        <v-card-title class="tw-bg-green-50 tw-text-green-800">
-          <v-icon class="tw-mr-2">mdi-account-circle</v-icon>
-          Contact Person for Questions/Enquiries
-        </v-card-title>
-        <v-card-text class="tw-pt-4">
-          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-            <v-text-field
-              v-model="form.contact_full_name"
-              label="Full Name *"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required]"
-            />
-            <v-text-field
-              v-model="form.contact_phone"
-              label="Direct Phone Number *"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required, rules.phone]"
-            />
-            <v-text-field
-              v-model="form.contact_email"
-              label="Email Address"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.email]"
-            />
-          </div>
-        </v-card-text>
-      </v-card>
 
       <!-- Receiving Provider Details -->
       <v-card class="tw-mb-6">
@@ -98,7 +13,7 @@
           <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
             <v-select
               v-model="form.receiving_facility_id"
-              :items="facilities"
+              :items="secondaryFacilities"
               item-title="name"
               item-value="id"
               label="Receiving Facility *"
@@ -111,7 +26,7 @@
               <template #item="{ props, item }">
                 <v-list-item v-bind="props">
                   <v-list-item-title>{{ item.raw.name }}</v-list-item-title>
-                  <v-list-item-subtitle>{{ item.raw.hcp_code }} - {{ item.raw.type }}</v-list-item-subtitle>
+                  <v-list-item-subtitle>{{ item.raw.hcp_code }} - {{ item.raw.level_of_care }}</v-list-item-subtitle>
                 </v-list-item>
               </template>
             </v-select>
@@ -147,118 +62,6 @@
               density="compact"
               readonly
               bg-color="grey-lighten-4"
-            />
-          </div>
-        </v-card-text>
-      </v-card>
-
-      <!-- Patient/Enrollee Details -->
-      <v-card class="tw-mb-6">
-        <v-card-title class="tw-bg-orange-50 tw-text-orange-800">
-          <v-icon class="tw-mr-2">mdi-account-heart</v-icon>
-          Patient/Enrollee Details
-        </v-card-title>
-        <v-card-text class="tw-pt-4">
-          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-4">
-            <v-text-field
-              v-model="form.nicare_number"
-              label="NiCare Number *"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required]"
-            />
-            <v-text-field
-              v-model="form.enrollee_full_name"
-              label="Full Name (as on NiCare Card) *"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required]"
-            />
-            <v-select
-              v-model="form.gender"
-              :items="genderOptions"
-              label="Gender *"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required]"
-            />
-            <v-text-field
-              v-model="form.age"
-              label="Age *"
-              type="number"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required]"
-            />
-            <v-select
-              v-model="form.marital_status"
-              :items="maritalStatusOptions"
-              label="Marital Status"
-              variant="outlined"
-              density="compact"
-            />
-            <v-select
-              v-model="form.enrollee_category"
-              :items="categoryOptions"
-              label="Enrollee Category"
-              variant="outlined"
-              density="compact"
-            />
-            <v-text-field
-              v-model="form.enrollee_phone_main"
-              label="Phone Number (Main) *"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required, rules.phone]"
-            />
-            <v-text-field
-              v-model="form.enrollee_phone_encounter"
-              label="Phone Number (During Care/Encounter)"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.phone]"
-            />
-            <v-text-field
-              v-model="form.enrollee_phone_relation"
-              label="Phone Number (Patient Relation)"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.phone]"
-            />
-            <v-text-field
-              v-model="form.enrollee_email"
-              label="Email Address"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.email]"
-            />
-            <v-select
-              v-model="form.programme"
-              :items="programmeOptions"
-              label="Programme"
-              variant="outlined"
-              density="compact"
-            />
-            <v-text-field
-              v-model="form.organization"
-              label="Organization (for formal sector/TiSHIP)"
-              variant="outlined"
-              density="compact"
-            />
-            <v-select
-              v-model="form.benefit_plan"
-              :items="benefitPlanOptions"
-              label="Benefit Plan"
-              variant="outlined"
-              density="compact"
-            />
-            <v-text-field
-              v-model="form.referral_date"
-              label="Date of Referral *"
-              type="date"
-              variant="outlined"
-              density="compact"
-              :rules="[rules.required]"
             />
           </div>
         </v-card-text>
@@ -423,7 +226,7 @@
           <div class="tw-space-y-6">
             <div>
               <label class="tw-block tw-text-sm tw-font-medium tw-text-gray-700 tw-mb-2">
-                Enrollee ID Card/Slip *
+                Enrollee ID Card/Slip
               </label>
               <FileUpload
                 v-model="form.enrollee_id_card"
@@ -454,16 +257,23 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, watch } from 'vue';
 import { useToast } from '../../composables/useToast';
 import FileUpload from '../common/FileUpload.vue';
-import { facilityAPI } from '../../utils/api.js';
-import axios from 'axios';
+import { facilityAPI, pasAPI } from '../../utils/api.js';
 
 const props = defineProps({
   selectedFacility: {
     type: Object,
     default: null
+  },
+  selectedEnrollee: {
+    type: Object,
+    default: null
+  },
+  selectedServices: {
+    type: Array,
+    default: () => []
   }
 });
 
@@ -473,11 +283,17 @@ const { success, error } = useToast();
 const formRef = ref(null);
 const loading = ref(false);
 const uploadProgress = ref({});
-const facilities = ref([]);
+const secondaryFacilities = ref([]);
 const facilitiesLoading = ref(false);
 
 // Form data
 const form = reactive({
+  // Required API fields
+  facility_id: null,
+  enrollee_id: '',
+  request_type: 'referral',
+  services: [],
+
   // Referring Provider
   referring_facility_name: '',
   referring_nicare_code: '',
@@ -550,36 +366,32 @@ const rules = {
 };
 
 // Options for select fields
-const genderOptions = ['Male', 'Female'];
-const maritalStatusOptions = ['Single', 'Married', 'Divorced', 'Widowed'];
-const categoryOptions = ['U5', 'Elderly', 'Pregnant Women', 'General'];
-const programmeOptions = ['Formal', 'Informal', 'BHCPF'];
-const benefitPlanOptions = ['Standard', 'Basic', 'Premium'];
 const specializationOptions = ['O&G', 'Paediatrics', 'Public Health', 'ENT', 'Family Medicine', 'Internal Medicine', 'Surgery'];
 const cadreOptions = ['CHEW', 'M.O', 'CHO', 'D.O', 'N.O', 'Registrar', 'Consultant'];
 
 // Methods
-const loadFacilities = async () => {
+const loadSecondaryFacilities = async () => {
   try {
     facilitiesLoading.value = true;
     const response = await facilityAPI.getAll({
       status: 1, // Only active facilities
+      level_of_care: 'secondary', // Only secondary facilities
       per_page: 1000 // Get all facilities
     });
 
     if (response.data.success) {
-      facilities.value = response.data.data.data || response.data.data || [];
+      secondaryFacilities.value = response.data.data.data || response.data.data || [];
     }
   } catch (err) {
-    console.error('Failed to load facilities:', err);
-    error('Failed to load facilities');
+    console.error('Failed to load secondary facilities:', err);
+    error('Failed to load secondary facilities');
   } finally {
     facilitiesLoading.value = false;
   }
 };
 
 const handleFacilitySelection = (facilityId) => {
-  const selectedFacility = facilities.value.find(f => f.id === facilityId);
+  const selectedFacility = secondaryFacilities.value.find(f => f.id === facilityId);
   if (selectedFacility) {
     form.receiving_facility_name = selectedFacility.name;
     form.receiving_nicare_code = selectedFacility.hcp_code;
@@ -600,32 +412,37 @@ const submitForm = async () => {
 
     // Add all form fields
     Object.keys(form).forEach(key => {
-      if (form[key] !== null && form[key] !== '') {
+      if (form[key] !== null && form[key] !== '' && form[key] !== undefined) {
         if (key === 'enrollee_id_card' || key === 'referral_letter') {
           // Handle file uploads
           if (form[key] && form[key].length > 0) {
             formData.append(key, form[key][0]);
           }
+        } else if (key === 'services') {
+          // Handle services array - send as JSON string for FormData
+          formData.append('services', JSON.stringify(form[key]));
         } else {
           formData.append(key, form[key]);
         }
       }
     });
 
-    // Submit to API
-    const response = await axios.post('/api/v1/pas/referrals', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      onUploadProgress: (progressEvent) => {
-        const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-        uploadProgress.value = { percent: percentCompleted };
-      }
-    });
+    // Submit to API using the API utility
+    const response = await pasAPI.createReferral(formData);
 
     if (response.data.success) {
-      success('Referral request submitted successfully!');
-      emit('submit', response.data.data);
+      const referralData = response.data.data;
+      const referralCode = referralData.referral_code;
+
+      success(`Referral submitted successfully! Code: ${referralCode}`);
+
+      // Emit the referral data with navigation info
+      emit('submit', {
+        ...referralData,
+        showSuccessDialog: true,
+        referralCode
+      });
+
       resetForm();
     } else {
       error(response.data.message || 'Failed to submit referral request');
@@ -667,20 +484,56 @@ const resetForm = () => {
   form.receiving_facility_id = null;
 };
 
-// Load facilities on component mount
+// Load secondary facilities on component mount
 onMounted(() => {
-  loadFacilities();
+  loadSecondaryFacilities();
 
-  // Pre-populate facility data if provided
+  // Pre-populate referring facility data if provided
   if (props.selectedFacility) {
-    form.receiving_facility_id = props.selectedFacility.id;
-    form.receiving_facility_name = props.selectedFacility.name;
-    form.receiving_nicare_code = props.selectedFacility.hcp_code;
-    form.receiving_address = props.selectedFacility.address || '';
-    form.receiving_phone = props.selectedFacility.phone || '';
-    form.receiving_email = props.selectedFacility.email || '';
+    form.facility_id = props.selectedFacility.id;
+    form.referring_facility_name = props.selectedFacility.name;
+    form.referring_nicare_code = props.selectedFacility.hcp_code || props.selectedFacility.code;
+    form.referring_address = props.selectedFacility.address || '';
+    form.referring_phone = props.selectedFacility.phone || '';
+    form.referring_email = props.selectedFacility.email || '';
   }
+
+  // Pre-populate enrollee data if provided
+  if (props.selectedEnrollee) {
+    // Use the database ID, not the enrollee_id string
+    form.enrollee_id = props.selectedEnrollee.id;
+    form.nicare_number = props.selectedEnrollee.enrollee_id;
+    form.enrollee_full_name = `${props.selectedEnrollee.first_name} ${props.selectedEnrollee.last_name}`;
+    form.gender = props.selectedEnrollee.sex || props.selectedEnrollee.gender;
+    form.age = props.selectedEnrollee.age;
+    form.enrollee_phone_main = props.selectedEnrollee.phone || props.selectedEnrollee.phone_number;
+    form.enrollee_email = props.selectedEnrollee.email;
+    form.marital_status = props.selectedEnrollee.marital_status;
+    form.enrollee_category = props.selectedEnrollee.category;
+    form.programme = props.selectedEnrollee.programme;
+    form.organization = props.selectedEnrollee.organization;
+    form.benefit_plan = props.selectedEnrollee.benefit_plan;
+  }
+
+  // Pre-populate services if provided
+  if (props.selectedServices && props.selectedServices.length > 0) {
+    form.services = props.selectedServices.map(service => ({
+      id: service.id || service
+    }));
+  }
+
+  // Set referral date to today
+  form.referral_date = new Date().toISOString().split('T')[0];
 });
+
+// Watch for prop changes and update form
+watch(() => props.selectedServices, (newServices) => {
+  if (newServices && newServices.length > 0) {
+    form.services = newServices.map(service => ({
+      id: service.id || service
+    }));
+  }
+}, { immediate: true });
 
 defineExpose({
   submitForm,

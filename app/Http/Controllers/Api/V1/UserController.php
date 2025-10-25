@@ -83,6 +83,46 @@ class UserController extends BaseController
         $roles = $data['roles'] ?? [];
         unset($data['roles']);
 
+        // Extract userable type and related data
+        $userableType = $data['userable_type'];
+        unset($data['userable_type']);
+
+        // Extract userable-specific fields
+        $userableData = [
+            'first_name' => $data['first_name'],
+            'last_name' => $data['last_name'],
+            'middle_name' => $data['middle_name'] ?? null,
+            'date_of_birth' => $data['date_of_birth'] ?? null,
+            'gender' => $data['gender'] ?? null,
+            'email' => $data['email'],
+            'phone' => $data['phone'] ?? null,
+            'department_id' => $data['department_id'] ?? null,
+            'designation_id' => $data['designation_id'] ?? null,
+            'address' => $data['address'] ?? null,
+            'status' => 1, // Active by default
+        ];
+
+        // Remove userable fields from user data
+        unset($data['first_name'], $data['last_name'], $data['middle_name'],
+              $data['date_of_birth'], $data['gender'], $data['department_id'],
+              $data['designation_id'], $data['address']);
+
+        // Create the userable record (Staff or DeskOfficer)
+        $userableModel = null;
+        if ($userableType === 'Staff') {
+            $userableModel = \App\Models\Staff::create($userableData);
+        } elseif ($userableType === 'DeskOfficer') {
+            $userableModel = \App\Models\DeskOfficer::create($userableData);
+        }
+
+        if (!$userableModel) {
+            return $this->sendError('Failed to create user profile', [], 500);
+        }
+
+        // Set userable relationship data
+        $data['userable_type'] = 'App\\Models\\' . $userableType;
+        $data['userable_id'] = $userableModel->id;
+
         $user = $this->userService->create($data);
 
         // Assign roles if provided
@@ -90,7 +130,15 @@ class UserController extends BaseController
             $user->roles()->sync($roles);
         }
 
-        return $this->sendResponse(new UserResource($user->load('roles')), 'User created successfully', 201);
+        // If creating a DeskOfficer, automatically assign desk_officer role
+        if ($userableType === 'DeskOfficer') {
+            $deskOfficerRole = \App\Models\Role::where('name', 'desk_officer')->first();
+            if ($deskOfficerRole) {
+                $user->roles()->syncWithoutDetaching([$deskOfficerRole->id]);
+            }
+        }
+
+        return $this->sendResponse(new UserResource($user->load('roles', 'userable')), 'User created successfully', 201);
     }
 
     /**

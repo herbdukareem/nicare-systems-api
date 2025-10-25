@@ -327,11 +327,13 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import { useRouter } from 'vue-router';
 import AdminLayout from '../layout/AdminLayout.vue';
 import { useToast } from '../../composables/useToast';
 import { drugAPI } from '../../utils/api.js';
 
 const { success, error } = useToast();
+const router = useRouter();
 
 // Reactive data
 const loading = ref(false);
@@ -522,11 +524,21 @@ const saveDrug = async () => {
     saving.value = true;
 
     if (editingDrug.value) {
-      await drugAPI.update(editingDrug.value.id, drugForm.value);
-      success('Drug updated successfully');
+      const response = await drugAPI.update(editingDrug.value.id, drugForm.value);
+      if (response.data.success) {
+        success('Drug updated successfully');
+      } else {
+        error(response.data.message || 'Failed to update drug');
+        return;
+      }
     } else {
-      await drugAPI.create(drugForm.value);
-      success('Drug created successfully');
+      const response = await drugAPI.create(drugForm.value);
+      if (response.data.success) {
+        success('Drug created successfully');
+      } else {
+        error(response.data.message || 'Failed to create drug');
+        return;
+      }
     }
 
     closeDialog();
@@ -534,15 +546,22 @@ const saveDrug = async () => {
     loadStatistics();
   } catch (err) {
     console.error('Failed to save drug:', err);
-    error('Failed to save drug');
+    if (err.response?.data?.message) {
+      error(err.response.data.message);
+    } else if (err.response?.data?.errors) {
+      const errorMessages = Object.values(err.response.data.errors).flat();
+      error(errorMessages.join(', '));
+    } else {
+      error('Failed to save drug');
+    }
   } finally {
     saving.value = false;
   }
 };
 
 const viewDrug = (drug) => {
-  // Implement view functionality
-  success(`Viewing drug: ${drug.drug_name}`);
+  // Navigate to drug details page
+  router.push(`/drugs/${drug.id}`);
 };
 
 const editDrug = (drug) => {

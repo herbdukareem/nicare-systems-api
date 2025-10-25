@@ -1,7 +1,7 @@
 <template>
   <div class="tw-space-y-6">
     <!-- Request Type Selection -->
-    <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-6">
+    <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-3 tw-gap-6">
       <!-- Referral Option -->
       <v-card
         :class="[
@@ -111,27 +111,88 @@
           </v-btn>
         </v-card-text>
       </v-card>
+
+      <!-- Modify Referral Option -->
+      <v-card
+        :class="[
+          'tw-cursor-pointer tw-transition-all tw-duration-300 tw-hover:shadow-lg',
+          selectedType === 'modify_referral' ? 'tw-ring-2 tw-ring-orange-500 tw-bg-orange-50' : 'hover:tw-bg-gray-50'
+        ]"
+        @click="selectType('modify_referral')"
+        elevation="2"
+      >
+        <v-card-text class="tw-p-6 tw-text-center">
+          <div class="tw-mb-4">
+            <v-icon
+              :color="selectedType === 'modify_referral' ? 'orange' : 'grey'"
+              size="64"
+            >
+              mdi-pencil-circle
+            </v-icon>
+          </div>
+          <h3 class="tw-text-xl tw-font-bold tw-mb-2 tw-text-gray-900">
+            Modify Referral
+          </h3>
+          <p class="tw-text-gray-600 tw-mb-4">
+            Change the referral service for an existing pending referral while maintaining the original referral code
+          </p>
+          <div class="tw-space-y-2 tw-text-sm tw-text-left">
+            <div class="tw-flex tw-items-center">
+              <v-icon size="16" class="tw-mr-2 tw-text-green-500">mdi-check</v-icon>
+              <span>Select from pending referrals</span>
+            </div>
+            <div class="tw-flex tw-items-center">
+              <v-icon size="16" class="tw-mr-2 tw-text-green-500">mdi-check</v-icon>
+              <span>Change referral service</span>
+            </div>
+            <div class="tw-flex tw-items-center">
+              <v-icon size="16" class="tw-mr-2 tw-text-green-500">mdi-check</v-icon>
+              <span>Maintains original code</span>
+            </div>
+            <div class="tw-flex tw-items-center">
+              <v-icon size="16" class="tw-mr-2 tw-text-green-500">mdi-check</v-icon>
+              <span>Tracks service history</span>
+            </div>
+          </div>
+          <v-btn
+            v-if="selectedType === 'modify_referral'"
+            color="orange"
+            variant="flat"
+            class="tw-mt-4"
+            block
+          >
+            <v-icon class="tw-mr-2">mdi-check</v-icon>
+            Selected
+          </v-btn>
+        </v-card-text>
+      </v-card>
     </div>
 
     <!-- Selected Type Details -->
-    <v-card v-if="selectedType" class="tw-border-l-4" :class="selectedType === 'referral' ? 'tw-border-blue-500' : 'tw-border-green-500'">
+    <v-card v-if="selectedType" class="tw-border-l-4" :class="{
+      'tw-border-blue-500': selectedType === 'referral',
+      'tw-border-green-500': selectedType === 'pa_code',
+      'tw-border-orange-500': selectedType === 'modify_referral'
+    }">
       <v-card-text class="tw-p-6">
         <div class="tw-flex tw-items-center tw-mb-4">
           <v-icon
-            :color="selectedType === 'referral' ? 'blue' : 'green'"
+            :color="selectedType === 'referral' ? 'blue' : selectedType === 'pa_code' ? 'green' : 'orange'"
             size="32"
             class="tw-mr-3"
           >
-            {{ selectedType === 'referral' ? 'mdi-account-arrow-right' : 'mdi-qrcode' }}
+            {{ selectedType === 'referral' ? 'mdi-account-arrow-right' : selectedType === 'pa_code' ? 'mdi-qrcode' : 'mdi-pencil-circle' }}
           </v-icon>
           <div>
             <h3 class="tw-text-lg tw-font-semibold tw-text-gray-900">
-              {{ selectedType === 'referral' ? 'Referral Request' : 'PA Code Request' }} Selected
+              {{ selectedType === 'referral' ? 'Referral Request' : selectedType === 'pa_code' ? 'PA Code Request' : 'Modify Referral' }} Selected
             </h3>
             <p class="tw-text-gray-600">
-              {{ selectedType === 'referral' 
-                ? 'You are creating a referral for patient transfer' 
-                : 'You are creating a PA code for service authorization' 
+              {{ selectedType === 'referral'
+                ? 'You are creating a referral for patient transfer'
+                : selectedType === 'pa_code'
+                ? 'You are creating a PA code for service authorization'
+                : 'You are modifying an existing referral service'
               }}
             </p>
           </div>
@@ -140,7 +201,7 @@
         <!-- Workflow Information -->
         <div class="tw-bg-gray-50 tw-rounded-lg tw-p-4">
           <h4 class="tw-font-semibold tw-mb-3 tw-text-gray-900">
-            {{ selectedType === 'referral' ? 'Referral' : 'PA Code' }} Workflow:
+            {{ selectedType === 'referral' ? 'Referral' : selectedType === 'pa_code' ? 'PA Code' : 'Modify Referral' }} Workflow:
           </h4>
           <div class="tw-space-y-2">
             <div v-if="selectedType === 'referral'" class="tw-space-y-2">
@@ -161,7 +222,7 @@
                 <span class="tw-text-sm">Referral code generated upon approval</span>
               </div>
             </div>
-            <div v-else class="tw-space-y-2">
+            <div v-else-if="selectedType === 'pa_code'" class="tw-space-y-2">
               <div class="tw-flex tw-items-center">
                 <v-icon size="16" class="tw-mr-2 tw-text-green-500">mdi-numeric-1-circle</v-icon>
                 <span class="tw-text-sm">Select services/drugs requiring authorization</span>
@@ -179,12 +240,30 @@
                 <span class="tw-text-sm">Code ready for use at facility</span>
               </div>
             </div>
+            <div v-else class="tw-space-y-2">
+              <div class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-orange-500">mdi-numeric-1-circle</v-icon>
+                <span class="tw-text-sm">Select pending referral to modify</span>
+              </div>
+              <div class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-orange-500">mdi-numeric-2-circle</v-icon>
+                <span class="tw-text-sm">Choose new referral service</span>
+              </div>
+              <div class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-orange-500">mdi-numeric-3-circle</v-icon>
+                <span class="tw-text-sm">Provide reason for modification</span>
+              </div>
+              <div class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-orange-500">mdi-numeric-4-circle</v-icon>
+                <span class="tw-text-sm">Original referral code maintained</span>
+              </div>
+            </div>
           </div>
         </div>
 
         <!-- Important Notes -->
         <v-alert
-          :type="selectedType === 'referral' ? 'info' : 'success'"
+          :type="selectedType === 'referral' ? 'info' : selectedType === 'pa_code' ? 'success' : 'warning'"
           variant="tonal"
           class="tw-mt-4"
         >
@@ -202,6 +281,15 @@
               </li>
               <li v-if="selectedType === 'pa_code'">
                 Ensure all selected services are medically necessary
+              </li>
+              <li v-if="selectedType === 'modify_referral'">
+                Only pending referrals can be modified
+              </li>
+              <li v-if="selectedType === 'modify_referral'">
+                Modification history is tracked for audit purposes
+              </li>
+              <li v-if="selectedType === 'modify_referral'">
+                Original referral code remains unchanged
               </li>
               <li>All requests must include proper clinical justification</li>
               <li>Codes have expiration dates and usage limits</li>

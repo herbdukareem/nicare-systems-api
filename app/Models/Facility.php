@@ -63,6 +63,24 @@ class Facility extends Model
     }
 
     /**
+     * The desk officers assigned to this facility.
+     */
+    public function assignedDeskOfficers()
+    {
+        return $this->hasMany(DOFacility::class);
+    }
+
+    /**
+     * Get desk officers through the DOFacility pivot.
+     */
+    public function deskOfficers()
+    {
+        return $this->belongsToMany(User::class, 'd_o_facilities', 'facility_id', 'user_id')
+                    ->withPivot('assigned_at')
+                    ->withTimestamps();
+    }
+
+    /**
      * Facility has many enrollees.
      */
     public function enrollees()

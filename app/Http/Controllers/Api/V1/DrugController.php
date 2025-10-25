@@ -73,6 +73,20 @@ class DrugController extends Controller
             }
 
             $drugData = $request->all();
+
+            // Check for duplicate drug combination
+            if (Drug::existsWithCombination(
+                $drugData['drug_name'],
+                $drugData['drug_dosage_form'],
+                $drugData['drug_strength'] ?? null,
+                $drugData['drug_presentation']
+            )) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A drug with the same name, dosage form, strength, and presentation already exists'
+                ], 422);
+            }
+
             $drugData['created_by'] = Auth::id();
 
             $drug = Drug::create($drugData);
@@ -139,6 +153,21 @@ class DrugController extends Controller
             }
 
             $drugData = $request->all();
+
+            // Check for duplicate drug combination (excluding current drug)
+            if (Drug::existsWithCombination(
+                $drugData['drug_name'],
+                $drugData['drug_dosage_form'],
+                $drugData['drug_strength'] ?? null,
+                $drugData['drug_presentation'],
+                $drug->id
+            )) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A drug with the same name, dosage form, strength, and presentation already exists'
+                ], 422);
+            }
+
             $drugData['updated_by'] = Auth::id();
 
             $drug->update($drugData);

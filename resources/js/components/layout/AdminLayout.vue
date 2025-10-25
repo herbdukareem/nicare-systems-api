@@ -31,7 +31,7 @@
       <!-- Navigation Menu -->
       <nav class="tw-flex-1 tw-overflow-y-auto tw-scrollbar-thin tw-scrollbar-thumb-gray-300 tw-scrollbar-track-gray-100 tw-min-h-0">
         <div class="tw-px-3 tw-py-4 tw-space-y-1">
-          <template v-for="item in menuItems" :key="item.name">
+          <template v-for="item in filteredMenuItems" :key="item.name">
             <!-- Regular menu item -->
             <router-link
               v-if="!item.children"
@@ -262,7 +262,14 @@ const menuItems = [
       {
         name: 'Enrollee Dashboard',
         path: '/dashboard',
-        icon: 'mdi-account-group'
+        icon: 'mdi-account-group',
+        roles: ['admin', 'doctor', 'pharmacist', 'reviewer', 'confirmer', 'approver'] // Hide from desk officers
+      },
+      {
+        name: 'DO Dashboard',
+        path: '/do-dashboard',
+        icon: 'mdi-desk',
+        roles: ['desk_officer'] // Only show to desk officers
       },
       {
         name: 'Premium Dashboard',
@@ -325,48 +332,7 @@ const menuItems = [
       }
     ]
   },
-  {
-    name: 'Device Management',
-    icon: 'mdi-devices',
-    children: [
-      {
-        name: 'Manage Device',
-        path: '/devices/manage',
-        icon: 'mdi-tablet'
-      },
-      {
-        name: 'Enrollment Configuration',
-        path: '/devices/config',
-        icon: 'mdi-cog'
-      }
-    ]
-  },
-  {
-    name: 'Capitation Module',
-    icon: 'mdi-calculator',
-    children: [
-      {
-        name: 'Generate Capitation',
-        path: '/capitation/generate',
-        icon: 'mdi-plus-circle'
-      },
-      {
-        name: 'Review Capitation',
-        path: '/capitation/review',
-        icon: 'mdi-eye'
-      },
-      {
-        name: 'Capitation Approval',
-        path: '/capitation/approval',
-        icon: 'mdi-check-circle'
-      },
-      {
-        name: 'Capitation Payment/Invoices',
-        path: '/capitation/payments',
-        icon: 'mdi-receipt'
-      }
-    ]
-  },
+  
   {
     name: 'Pre-authorization System (PAS)',
     icon: 'mdi-shield-check',
@@ -376,11 +342,6 @@ const menuItems = [
         path: '/pas',
         icon: 'mdi-clipboard-list',
         badge: 'New'
-      },
-      {
-        name: 'Generate Referral/PA-Code',
-        path: '/pas/generate',
-        icon: 'mdi-qrcode'
       },
       {
         name: 'Manage Programmes/Services',
@@ -401,6 +362,21 @@ const menuItems = [
         name: 'Manage Clinical Services',
         path: '/pas/clinical',
         icon: 'mdi-medical-bag'
+      },
+      {
+        name: 'Case Categories',
+        path: '/case-categories',
+        icon: 'mdi-folder-multiple'
+      },
+      {
+        name: 'Service Categories',
+        path: '/service-categories',
+        icon: 'mdi-format-list-bulleted'
+      },
+      {
+        name: 'DO Facility Assignments',
+        path: '/do-facilities',
+        icon: 'mdi-hospital-marker'
       }
     ]
   },
@@ -482,13 +458,34 @@ const menuItems = [
 const userName = computed(() => authStore.userName);
 const userRoles = computed(() => authStore.userRoles);
 
+// Filter menu items based on user roles
+const filteredMenuItems = computed(() => {
+  return menuItems.map(item => {
+    if (item.children) {
+      const filteredChildren = item.children.filter(child => {
+        if (!child.roles) return true; // Show if no role restriction
+        return child.roles.some(role => authStore.hasRole(role));
+      });
+
+      return {
+        ...item,
+        children: filteredChildren
+      };
+    }
+
+    // For items without children, check role restriction
+    if (!item.roles) return item; // Show if no role restriction
+    return item.roles.some(role => authStore.hasRole(role)) ? item : null;
+  }).filter(item => item && (!item.children || item.children.length > 0));
+});
+
 const pageTitle = computed(() => {
   // Check main menu items
-  let currentItem = menuItems.find(item => item.path === route.path);
+  let currentItem = filteredMenuItems.value.find(item => item.path === route.path);
 
   // If not found, check submenu items
   if (!currentItem) {
-    for (const item of menuItems) {
+    for (const item of filteredMenuItems.value) {
       if (item.children) {
         currentItem = item.children.find(child => child.path === route.path);
         if (currentItem) break;

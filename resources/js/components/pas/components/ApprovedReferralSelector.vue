@@ -21,11 +21,11 @@
       class="tw-mb-4"
     >
       <div class="tw-flex tw-items-center">
-        <v-icon class="tw-mr-2">mdi-information</v-icon>
+        
         <div>
           <strong>No approved referrals found</strong>
           <p class="tw-text-sm tw-mt-1">
-            PA codes can only be generated for approved referrals. Please ensure the enrollee has approved referrals.
+            PA codes can only be generated for approved referrals to this facility. Please ensure there are approved referrals for the selected facility.
           </p>
         </div>
       </div>
@@ -135,7 +135,11 @@ import { useToast } from '../../../composables/useToast'
 const props = defineProps({
   enrollee: {
     type: Object,
-    required: true
+    default: null
+  },
+  facility: {
+    type: Object,
+    default: null
   },
   modelValue: {
     type: Object,
@@ -154,17 +158,24 @@ const selectedReferral = ref(props.modelValue)
 
 // Methods
 const loadApprovedReferrals = async () => {
-  if (!props.enrollee?.enrollee_id) return
-  
+  if (!props.facility?.id) return
+
   try {
     loading.value = true
-    const response = await pasAPI.getReferrals({
-      search: props.enrollee.enrollee_id,
+    const params = {
       status: 'approved',
-      limit: 10,
+      receiving_facility_id: props.facility.id,
+      limit: 50,
       sort: 'approved_at',
       order: 'desc'
-    })
+    }
+
+    // Add enrollee filter if provided
+    if (props.enrollee?.enrollee_id) {
+      params.search = props.enrollee.enrollee_id
+    }
+
+    const response = await pasAPI.getReferrals(params)
     
     if (response.data.success) {
       // Handle paginated response structure
@@ -184,13 +195,22 @@ const loadApprovedReferrals = async () => {
 
       console.log('Raw referrals data:', referrals);
 
-      // Filter to only show approved referrals for this enrollee
+      // Filter to only show approved referrals for this facility
       approvedReferrals.value = referrals
-        .filter(referral =>
-          referral.status === 'approved' &&
-          referral.nicare_number === props.enrollee.enrollee_id
-        )
-        .slice(0, 2) // Show only last 2 approved referrals
+        .filter(referral => {
+          // Must be approved
+          if (referral.status !== 'approved') return false;
+
+          // If enrollee is provided, filter by enrollee
+          if (props.enrollee?.enrollee_id) {
+            return referral.nicare_number === props.enrollee.enrollee_id ||
+                   referral.enrollee_id === props.enrollee.enrollee_id;
+          }
+
+          // Otherwise show all approved referrals for the facility
+          return true;
+        })
+        .slice(0, 20) // Show more referrals since we're filtering by facility
         .map(referral => ({
           ...referral,
           display_text: `${referral.referral_code} - ${referral.preliminary_diagnosis || 'No diagnosis'}`
@@ -239,12 +259,19 @@ const formatDate = (dateString) => {
 }
 
 // Watchers
-watch(() => props.enrollee, () => {
+watch(() => props.facility, () => {
   clearSelection()
-  if (props.enrollee?.enrollee_id) {
+  if (props.facility?.id) {
     loadApprovedReferrals()
   }
 }, { immediate: true })
+
+watch(() => props.enrollee, () => {
+  clearSelection()
+  if (props.facility?.id) {
+    loadApprovedReferrals()
+  }
+})
 
 watch(() => props.modelValue, (newValue) => {
   selectedReferral.value = newValue

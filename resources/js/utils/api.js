@@ -197,8 +197,12 @@ export const pasAPI = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   getPACode: (id) => api.get(`/v1/pas/pa-codes/${id}`),
+  getPACodeById: (id) => api.get(`/v1/pas/pa-codes/${id}`), // Alias for consistency
+  generatePACodeFromReferral: (referralId, data) => api.post(`/v1/pas/referrals/${referralId}/generate-pa-code`, data),
   markPACodeUsed: (id, data) => api.post(`/v1/pas/pa-codes/${id}/mark-used`, data),
+  markPACodeAsUsed: (id) => api.post(`/v1/pas/pa-codes/${id}/mark-used`), // Alias without data
   cancelPACode: (id) => api.post(`/v1/pas/pa-codes/${id}/cancel`),
+  generateUTN: (id) => api.post(`/v1/pas/pa-codes/${id}/generate-utn`),
   verifyPACode: (data) => api.post('/v1/pas/pa-codes/verify', data),
   getPACodeStatistics: () => api.get('/v1/pas/pa-codes-statistics'),
 };
@@ -256,6 +260,60 @@ export const feedbackAPI = {
   getMyFeedbacks: (params) => api.get('/v1/feedback/my-feedbacks', { params }),
   getEnrolleeComprehensiveData: (enrolleeId) => api.get(`/v1/feedback/enrollee/${enrolleeId}/comprehensive-data`),
   assignToOfficer: (id, data) => api.post(`/v1/feedback/${id}/assign`, data),
+};
+
+// Case Category Management API
+export const caseCategoryAPI = {
+  getAll: (params) => api.get('/v1/case-categories', { params }),
+  getById: (id) => api.get(`/v1/case-categories/${id}`),
+  create: (data) => api.post('/v1/case-categories', data),
+  update: (id, data) => api.put(`/v1/case-categories/${id}`, data),
+  delete: (id) => api.delete(`/v1/case-categories/${id}`),
+  toggleStatus: (id) => api.post(`/v1/case-categories/${id}/toggle-status`),
+};
+
+// Service Category Management API
+export const serviceCategoryAPI = {
+  getAll: (params) => api.get('/v1/service-categories', { params }),
+  getById: (id) => api.get(`/v1/service-categories/${id}`),
+  create: (data) => api.post('/v1/service-categories', data),
+  update: (id, data) => api.put(`/v1/service-categories/${id}`, data),
+  delete: (id) => api.delete(`/v1/service-categories/${id}`),
+  toggleStatus: (id) => api.post(`/v1/service-categories/${id}/toggle-status`),
+};
+// DOFacility Management API
+export const doFacilityAPI = {
+  getAll: (params) => api.get('/v1/do-facilities', { params }),
+  getById: (id) => api.get(`/v1/do-facilities/${id}`),
+  create: (data) => api.post('/v1/do-facilities', data),
+  update: (id, data) => api.put(`/v1/do-facilities/${id}`, data),
+  delete: (id) => api.delete(`/v1/do-facilities/${id}`),
+  getDeskOfficers: () => api.get('/v1/do-facilities/desk-officers'),
+  getFacilities: () => api.get('/v1/do-facilities/facilities'),
+  getUserFacilities: (userId) => api.get(`/v1/do-facilities/user/${userId}/facilities`),
+};
+
+export const doDashboardAPI = {
+  getOverview: () => api.get('/v1/do-dashboard/overview'),
+  getReferrals: (params) => api.get('/v1/do-dashboard/referrals', { params }),
+  getPACodes: (params) => api.get('/v1/do-dashboard/pa-codes', { params }),
+  validateUTN: (data) => api.post('/v1/do-dashboard/validate-utn', data),
+};
+
+export const departmentAPI = {
+  getAll: (params) => api.get('/v1/departments', { params }),
+  getById: (id) => api.get(`/v1/departments/${id}`),
+  create: (data) => api.post('/v1/departments', data),
+  update: (id, data) => api.put(`/v1/departments/${id}`, data),
+  delete: (id) => api.delete(`/v1/departments/${id}`),
+};
+
+export const designationAPI = {
+  getAll: (params) => api.get('/v1/designations', { params }),
+  getById: (id) => api.get(`/v1/designations/${id}`),
+  create: (data) => api.post('/v1/designations', data),
+  update: (id, data) => api.put(`/v1/designations/${id}`, data),
+  delete: (id) => api.delete(`/v1/designations/${id}`),
 };
 
 

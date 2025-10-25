@@ -8,22 +8,14 @@
           <p class="tw-text-gray-600 tw-mt-1">Manage referrals and PA codes for Fee-For-Service claims</p>
         </div>
         <div class="tw-flex tw-space-x-3">
-          <v-btn 
-            color="primary" 
-            variant="outlined" 
+          <v-btn
+            color="primary"
+            variant="outlined"
             prepend-icon="mdi-download"
             @click="exportData"
             class="tw-hover-lift tw-transition-all tw-duration-300"
           >
             Export
-          </v-btn>
-          <v-btn 
-            color="primary" 
-            prepend-icon="mdi-plus"
-            @click="showCreateReferralDialog = true"
-            class="tw-hover-lift tw-transition-all tw-duration-300 tw-shadow-lg"
-          >
-            New Request
           </v-btn>
         </div>
       </div>
@@ -76,6 +68,115 @@
               <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ emergencyCases }}</p>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Workflow Actions -->
+      <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6 tw-animate-slide-up tw-animate-stagger-1">
+        <div class="tw-mb-4">
+          <h2 class="tw-text-lg tw-font-semibold tw-text-gray-900 tw-mb-2">Quick Actions</h2>
+          <p class="tw-text-gray-600">Choose a workflow to get started with your healthcare authorization process</p>
+        </div>
+
+        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-3 tw-gap-6">
+          <!-- Create Referral -->
+          <v-card
+            class="tw-cursor-pointer tw-transition-all tw-duration-300 tw-hover:shadow-lg tw-hover:scale-105 tw-border tw-border-blue-200"
+            @click="$router.push('/pas/create-referral')"
+          >
+            <div class="tw-p-6 tw-text-center">
+              <div class="tw-mb-4">
+                <v-icon
+                  size="48"
+                  color="blue"
+                  class="tw-mb-2"
+                >
+                  mdi-file-document-plus
+                </v-icon>
+              </div>
+              <h3 class="tw-text-lg tw-font-semibold tw-text-gray-900 tw-mb-2">
+                Create Referral Request
+              </h3>
+              <p class="tw-text-gray-600 tw-mb-4 tw-text-sm">
+                Submit a new referral request for patient authorization to receive specialized care
+              </p>
+              <v-btn
+                color="blue"
+                variant="flat"
+                size="small"
+                class="tw-w-full"
+              >
+                <v-icon left size="16">mdi-plus</v-icon>
+                Start Referral
+              </v-btn>
+            </div>
+          </v-card>
+
+          <!-- Generate PA Code -->
+          <v-card
+            class="tw-cursor-pointer tw-transition-all tw-duration-300 tw-hover:shadow-lg tw-hover:scale-105 tw-border tw-border-green-200"
+            @click="$router.push('/pas/generate-pa-code')"
+          >
+            <div class="tw-p-6 tw-text-center">
+              <div class="tw-mb-4">
+                <v-icon
+                  size="48"
+                  color="green"
+                  class="tw-mb-2"
+                >
+                  mdi-qrcode
+                </v-icon>
+              </div>
+              <h3 class="tw-text-lg tw-font-semibold tw-text-gray-900 tw-mb-2">
+                Generate PA Code
+              </h3>
+              <p class="tw-text-gray-600 tw-mb-4 tw-text-sm">
+                Generate a Pre-Authorization code from an approved referral for service delivery
+              </p>
+              <v-btn
+                color="green"
+                variant="flat"
+                size="small"
+                class="tw-w-full"
+              >
+                <v-icon left size="16">mdi-qrcode</v-icon>
+                Generate Code
+              </v-btn>
+            </div>
+          </v-card>
+
+          <!-- Modify Referral -->
+          <v-card
+            class="tw-cursor-pointer tw-transition-all tw-duration-300 tw-hover:shadow-lg tw-hover:scale-105 tw-border tw-border-orange-200"
+            @click="$router.push('/pas/modify-referral')"
+          >
+            <div class="tw-p-6 tw-text-center">
+              <div class="tw-mb-4">
+                <v-icon
+                  size="48"
+                  color="orange"
+                  class="tw-mb-2"
+                >
+                  mdi-file-edit
+                </v-icon>
+              </div>
+              <h3 class="tw-text-lg tw-font-semibold tw-text-gray-900 tw-mb-2">
+                Modify Referral Service
+              </h3>
+              <p class="tw-text-gray-600 tw-mb-4 tw-text-sm">
+                Modify the service details of an existing pending referral request
+              </p>
+              <v-btn
+                color="orange"
+                variant="flat"
+                size="small"
+                class="tw-w-full"
+              >
+                <v-icon left size="16">mdi-pencil</v-icon>
+                Modify Referral
+              </v-btn>
+            </div>
+          </v-card>
         </div>
       </div>
 
@@ -294,12 +395,15 @@
 
 <script setup>
 import { ref, onMounted, computed, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../layout/AdminLayout.vue';
 import ReferralPACodeWizard from './ReferralPACodeWizard.vue';
 import { useToast } from '../../composables/useToast';
 import { pasAPI } from '../../utils/api.js';
 
 const { success, error } = useToast();
+const route = useRoute();
+const router = useRouter();
 
 // Reactive data
 const loading = ref(false);
@@ -389,19 +493,53 @@ const getStatusColor = (status) => {
 };
 
 const viewReferral = (item) => {
-  success(`Viewing referral: ${item.referral_code}`);
+  // Navigate to referral details page
+  if (item.referral_code) {
+    router.push(`/pas/referrals/${item.referral_code}`);
+  } else {
+    error('Referral code not found');
+  }
 };
 
 const editReferral = (item) => {
-  success(`Editing referral: ${item.referral_code}`);
+  // Navigate to modify referral page
+  // Note: The modify referral wizard will need to be enhanced to accept referral ID
+  // For now, navigate to the page and user can select the referral manually
+  router.push('/pas/modify-referral');
+  success(`Navigate to modify referral page for: ${item.referral_code}`);
 };
 
-const approveReferral = (item) => {
-  success(`Approved referral: ${item.referral_code}`);
+const approveReferral = async (item) => {
+  // Show confirmation dialog first
+  if (confirm(`Are you sure you want to approve referral ${item.referral_code}?`)) {
+    try {
+      loading.value = true;
+      const response = await pasAPI.approveReferral(item.id, {
+        comments: 'Approved from dashboard'
+      });
+
+      if (response.data.success) {
+        success(`Referral ${item.referral_code} approved successfully`);
+        // Reload referrals to update the status
+        loadReferrals();
+      } else {
+        error(response.data.message || 'Failed to approve referral');
+      }
+    } catch (err) {
+      console.error('Failed to approve referral:', err);
+      error('Failed to approve referral');
+    } finally {
+      loading.value = false;
+    }
+  }
 };
 
 const viewPACode = (item) => {
-  success(`Viewing PA Code: ${item.pa_code}`);
+  if (item.id) {
+    router.push(`/pas/pa-codes/${item.id}`);
+  } else {
+    error('PA Code ID not found');
+  }
 };
 
 const generateUTN = (item) => {
@@ -534,12 +672,27 @@ const loadPACodes = async () => {
       per_page: pagination.value.itemsPerPage
     };
 
+    console.log('Loading PA codes with params:', params);
     const response = await pasAPI.getPACodes(params);
+    console.log('PA codes response:', response.data);
+
     if (response.data.success) {
       const data = response.data.data;
-      paCodes.value = data.data || [];
-      pagination.value.totalItems = data.total || 0;
-      pagination.value.page = data.current_page || 1;
+      // Handle both paginated and non-paginated responses
+      if (data.data) {
+        // Paginated response
+        paCodes.value = data.data || [];
+        pagination.value.totalItems = data.total || 0;
+        pagination.value.page = data.current_page || 1;
+      } else {
+        // Non-paginated response
+        paCodes.value = data || [];
+        pagination.value.totalItems = data.length || 0;
+      }
+      console.log('PA codes loaded:', paCodes.value.length, 'items');
+    } else {
+      console.error('PA codes API returned error:', response.data.message);
+      error(response.data.message || 'Failed to load PA codes');
     }
   } catch (err) {
     console.error('Failed to load PA codes:', err);
@@ -587,8 +740,19 @@ watch([searchQuery, selectedStatus, selectedSeverity], () => {
 
 // Lifecycle
 onMounted(() => {
+  // Check for tab parameter in URL
+  if (route.query.tab && ['referrals', 'pa-codes', 'tracking'].includes(route.query.tab)) {
+    activeTab.value = route.query.tab;
+  }
+
   loadStatistics();
-  loadReferrals();
+
+  // Load data based on active tab
+  if (activeTab.value === 'referrals') {
+    loadReferrals();
+  } else if (activeTab.value === 'pa-codes') {
+    loadPACodes();
+  }
 });
 </script>
 

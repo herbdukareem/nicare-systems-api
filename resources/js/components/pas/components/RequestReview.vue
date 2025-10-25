@@ -3,10 +3,10 @@
     <!-- Request Summary -->
     <v-card>
       <v-card-title class="tw-flex tw-items-center">
-        <v-icon class="tw-mr-2" :color="requestType === 'referral' ? 'blue' : 'green'">
-          {{ requestType === 'referral' ? 'mdi-account-arrow-right' : 'mdi-qrcode' }}
+        <v-icon class="tw-mr-2" :color="getRequestTypeColor()">
+          {{ getRequestTypeIcon() }}
         </v-icon>
-        {{ requestType === 'referral' ? 'Referral' : 'PA Code' }} Request Summary
+        {{ getRequestTypeTitle() }} Summary
       </v-card-title>
       <v-card-text>
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-6">
@@ -38,8 +38,8 @@
             </div>
           </div>
 
-          <!-- Enrollee Information -->
-          <div>
+          <!-- Enrollee Information (not shown for modify referral) -->
+          <div v-if="requestType !== 'modify_referral'">
             <h4 class="tw-font-semibold tw-mb-3 tw-text-gray-900">Enrollee Information</h4>
             <div class="tw-space-y-2">
               <div class="tw-flex tw-items-center">
@@ -59,12 +59,45 @@
               </div>
             </div>
           </div>
+
+          <!-- Modify Referral Information -->
+          <div v-if="requestType === 'modify_referral' && selectedReferral">
+            <h4 class="tw-font-semibold tw-mb-3 tw-text-gray-900">Referral Information</h4>
+            <div class="tw-space-y-2">
+              <div class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-gray-500">mdi-account</v-icon>
+                <span class="tw-text-sm tw-text-gray-600">Patient:</span>
+                <span class="tw-ml-2 tw-font-medium">{{ selectedReferral.patient_name }}</span>
+              </div>
+              <div class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-gray-500">mdi-identifier</v-icon>
+                <span class="tw-text-sm tw-text-gray-600">NiCare Number:</span>
+                <span class="tw-ml-2 tw-font-medium">{{ selectedReferral.nicare_number }}</span>
+              </div>
+              <div class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-gray-500">mdi-file-document</v-icon>
+                <span class="tw-text-sm tw-text-gray-600">Referral Code:</span>
+                <span class="tw-ml-2 tw-font-medium">{{ selectedReferral.referral_code }}</span>
+              </div>
+              <div class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-gray-500">mdi-alert-circle</v-icon>
+                <span class="tw-text-sm tw-text-gray-600">Severity:</span>
+                <v-chip
+                  :color="getSeverityColor(selectedReferral.severity_level)"
+                  size="small"
+                  variant="flat"
+                >
+                  {{ selectedReferral.severity_level || 'Routine' }}
+                </v-chip>
+              </div>
+            </div>
+          </div>
         </div>
       </v-card-text>
     </v-card>
 
-    <!-- Selected Services -->
-    <v-card>
+    <!-- Selected Services (not shown for modify referral) -->
+    <v-card v-if="requestType !== 'modify_referral'">
       <v-card-title class="tw-flex tw-items-center tw-justify-between">
         <div class="tw-flex tw-items-center">
           <v-icon class="tw-mr-2">mdi-medical-bag</v-icon>
@@ -117,6 +150,67 @@
             </div>
           </div>
         </div>
+      </v-card-text>
+    </v-card>
+
+    <!-- Service Modification Summary (for modify referral requests only) -->
+    <v-card v-if="requestType === 'modify_referral' && selectedReferral && newService">
+      <v-card-title class="tw-flex tw-items-center">
+        <v-icon class="tw-mr-2" color="orange">mdi-swap-horizontal</v-icon>
+        Service Modification Summary
+      </v-card-title>
+      <v-card-text>
+        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-6">
+          <!-- Current Service -->
+          <div class="tw-bg-orange-50 tw-border tw-border-orange-200 tw-rounded-lg tw-p-4">
+            <h5 class="tw-font-semibold tw-text-orange-900 tw-mb-3">Current Service</h5>
+            <div class="tw-space-y-2">
+              <div class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-orange-600">mdi-medical-bag</v-icon>
+                <span class="tw-text-sm tw-font-medium">{{ selectedReferral.current_service }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- New Service -->
+          <div class="tw-bg-green-50 tw-border tw-border-green-200 tw-rounded-lg tw-p-4">
+            <h5 class="tw-font-semibold tw-text-green-900 tw-mb-3">New Service</h5>
+            <div class="tw-space-y-2">
+              <div class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-green-600">mdi-medical-bag</v-icon>
+                <span class="tw-text-sm tw-font-medium">{{ newService.service_description }}</span>
+              </div>
+              <div v-if="newService.service_category" class="tw-flex tw-items-center">
+                <v-icon size="16" class="tw-mr-2 tw-text-green-600">mdi-tag</v-icon>
+                <span class="tw-text-sm tw-text-gray-600">{{ newService.service_category }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Modification Reason -->
+        <div v-if="modificationReason" class="tw-mt-6">
+          <h5 class="tw-font-semibold tw-text-gray-900 tw-mb-2">Reason for Modification</h5>
+          <div class="tw-bg-gray-50 tw-border tw-border-gray-200 tw-rounded-lg tw-p-3">
+            <p class="tw-text-sm tw-text-gray-700">{{ modificationReason }}</p>
+          </div>
+        </div>
+
+        <!-- Important Note -->
+        <v-alert
+          type="info"
+          variant="tonal"
+          class="tw-mt-4"
+        >
+          <div class="tw-space-y-1">
+            <p class="tw-font-semibold">Important:</p>
+            <ul class="tw-list-disc tw-list-inside tw-space-y-1 tw-text-sm">
+              <li>The original referral code will be maintained</li>
+              <li>Modification history will be tracked for audit purposes</li>
+              <li>The patient will be notified of the service change</li>
+            </ul>
+          </div>
+        </v-alert>
       </v-card-text>
     </v-card>
 
@@ -380,6 +474,18 @@ const props = defineProps({
   loading: {
     type: Boolean,
     default: false
+  },
+  selectedReferral: {
+    type: Object,
+    default: null
+  },
+  newService: {
+    type: Object,
+    default: null
+  },
+  modificationReason: {
+    type: String,
+    default: ''
   }
 });
 
@@ -464,6 +570,16 @@ const submitRequest = async () => {
       error('Please select an approved referral for PA Code generation');
       return;
     }
+  } else if (props.requestType === 'modify_referral') {
+    // For modify referral requests, validate referral and service selection
+    if (!props.selectedReferral) {
+      error('Please select a referral to modify');
+      return;
+    }
+    if (!props.newService) {
+      error('Please select a new service for the referral');
+      return;
+    }
   } else {
     // For referral requests, validate clinical form
     if (!clinicalForm.value?.validate()) {
@@ -501,6 +617,13 @@ const submitRequest = async () => {
       validity_days: 30, // Integer, not string
       max_usage: 1, // Integer, not string
       issuer_comments: 'Generated from workflow'
+    };
+  } else if (props.requestType === 'modify_referral') {
+    // Modify referral request data
+    requestData = {
+      referral_id: props.selectedReferral.id,
+      new_service_id: props.newService.id,
+      modification_reason: props.modificationReason || 'Service modification requested'
     };
   } else {
     // Referral request data
@@ -544,6 +667,42 @@ const getLevelOfCareColor = (level) => {
     case 'Primary': return 'green';
     case 'Secondary': return 'orange';
     case 'Tertiary': return 'red';
+    default: return 'grey';
+  }
+};
+
+const getRequestTypeColor = () => {
+  switch (props.requestType) {
+    case 'referral': return 'blue';
+    case 'pa_code': return 'green';
+    case 'modify_referral': return 'orange';
+    default: return 'grey';
+  }
+};
+
+const getRequestTypeIcon = () => {
+  switch (props.requestType) {
+    case 'referral': return 'mdi-account-arrow-right';
+    case 'pa_code': return 'mdi-qrcode';
+    case 'modify_referral': return 'mdi-pencil-circle';
+    default: return 'mdi-help';
+  }
+};
+
+const getRequestTypeTitle = () => {
+  switch (props.requestType) {
+    case 'referral': return 'Referral Request';
+    case 'pa_code': return 'PA Code Request';
+    case 'modify_referral': return 'Modify Referral Request';
+    default: return 'Request';
+  }
+};
+
+const getSeverityColor = (severity) => {
+  switch (severity?.toLowerCase()) {
+    case 'emergency': return 'red';
+    case 'urgent': return 'orange';
+    case 'routine': return 'green';
     default: return 'grey';
   }
 };

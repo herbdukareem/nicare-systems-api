@@ -19,6 +19,7 @@ class AuthController extends Controller
     public function login(Request $request): JsonResponse
     {
         try {
+            Log::info('Login attempt: ' . $request->username);
             $validator = Validator::make($request->all(), [
                 'username' => 'required',
                 'password' => 'required',
@@ -33,7 +34,6 @@ class AuthController extends Controller
 
             // Find user by username or email
             $user = User::where('username', $request->username)
-                       ->orWhere('email', $request->username)
                        ->first();
 
             if (!$user || !Hash::check($request->password, $user->password)) {

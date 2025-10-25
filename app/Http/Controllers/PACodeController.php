@@ -21,11 +21,11 @@ class PACodeController extends Controller
             $query = PACode::with(['referral', 'issuedBy']);
 
             // Apply filters
-            if ($request->has('status')) {
+            if ($request->has('status') && !empty($request->status)) {
                 $query->where('status', $request->status);
             }
 
-            if ($request->has('search')) {
+            if ($request->has('search') && !empty($request->search)) {
                 $search = $request->search;
                 $query->where(function($q) use ($search) {
                     $q->where('pa_code', 'like', "%{$search}%")
@@ -104,7 +104,7 @@ class PACodeController extends Controller
                 'service_description' => $request->service_description,
                 'approved_amount' => $request->approved_amount,
                 'conditions' => $request->conditions,
-                'status' => 'active',
+                'status' => 1,
                 'issued_at' => now(),
                 'expires_at' => now()->addDays((int) $request->validity_days),
                 'usage_count' => 0,
@@ -257,6 +257,51 @@ class PACodeController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Generate UTN for existing PA code
+     */
+    public function generateUTN(PACode $paCode): JsonResponse
+    {
+        try {
+            if ($paCode->utn) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'UTN already exists for this PA code'
+                ], 400);
+            }
+
+            if ($paCode->status !== 1) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'UTN can only be generated for active PA codes'
+                ], 400);
+            }
+
+            DB::beginTransaction();
+
+            // Generate new UTN
+            $utn = PACode::generateUTN();
+            $paCode->update(['utn' => $utn]);
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'UTN generated successfully',
+                'data' => $paCode->fresh(['referral', 'issuedBy'])
+            ]);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate UTN',
                 'error' => $e->getMessage()
             ], 500);
         }

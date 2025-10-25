@@ -7,6 +7,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
+use Spatie\Permission\Traits\HasRoles;
 
 use Laravel\Sanctum\HasApiTokens;
 
@@ -17,7 +18,7 @@ use Laravel\Sanctum\HasApiTokens;
  */
 class User extends Authenticatable
 {
-       use HasApiTokens, HasFactory, Notifiable;
+       use HasApiTokens, HasFactory, Notifiable, HasRoles;
 
     protected $table = 'users';
 
@@ -71,6 +72,24 @@ class User extends Authenticatable
         return $this->roles()->with('permissions')->get()->flatMap(function ($role) {
             return $role->permissions;
         })->unique('id');
+    }
+
+    /**
+     * The facilities assigned to this user (for Desk Officers).
+     */
+    public function assignedFacilities()
+    {
+        return $this->hasMany(DOFacility::class);
+    }
+
+    /**
+     * Get facilities through the DOFacility pivot.
+     */
+    public function facilities()
+    {
+        return $this->belongsToMany(Facility::class, 'd_o_facilities', 'user_id', 'facility_id')
+                    ->withPivot('assigned_at')
+                    ->withTimestamps();
     }
 
     /**

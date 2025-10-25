@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
-use Maatwebsite\Excel\Concerns\WithValidation;
 
 class DrugsImport implements ToCollection, WithHeadingRow
 {
@@ -42,6 +41,18 @@ class DrugsImport implements ToCollection, WithHeadingRow
                 // Check for duplicate nicare_code
                 if (Drug::where('nicare_code', $row['nicare_code'])->exists()) {
                     $this->errors[] = "Row " . ($index + 2) . ": Drug with NiCare code '{$row['nicare_code']}' already exists";
+                    continue;
+                }
+
+                // Check for duplicate drug combination (name, dosage form, strength, presentation)
+                $existingDrug = Drug::where('drug_name', $row['drug_name'])
+                    ->where('drug_dosage_form', $row['drug_dosage_form'])
+                    ->where('drug_strength', $row['drug_strength'] ?? null)
+                    ->where('drug_presentation', $row['drug_presentation'])
+                    ->first();
+
+                if ($existingDrug) {
+                    $this->errors[] = "Row " . ($index + 2) . ": Drug with same name, dosage form, strength, and presentation already exists (NiCare Code: {$existingDrug->nicare_code})";
                     continue;
                 }
 
