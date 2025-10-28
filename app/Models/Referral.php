@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Referral extends Model
@@ -28,6 +29,16 @@ class Referral extends Model
     public function paCodes(): HasMany
     {
         return $this->hasMany(PACode::class);
+    }
+
+    public function claims(): HasManyThrough
+    {
+        return $this->hasManyThrough(
+            Claim::class,
+            PACode::class,
+            'referral_id',
+            'pa_code_id'
+        );
     }
 
     public function approvedBy(): BelongsTo

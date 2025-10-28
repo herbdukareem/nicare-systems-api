@@ -152,29 +152,82 @@ const rules = {
 // Methods
 const fetchReferrals = async () => {
   try {
-    const response = await fetch('/api/v1/referrals?status=approved', {
+    // Use DO Dashboard API endpoint to get referrals for assigned facilities
+    // Only approved referrals with validated UTN and no submitted claims
+    const response = await fetch('/api/v1/do-dashboard/referrals?status=approved', {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
       }
     })
     const data = await response.json()
-    referrals.value = data.data || []
+
+    if (data.success) {
+      // Filter referrals to only show those with validated UTN and no submitted claims
+      const filteredReferrals = (data.data?.data || []).filter(referral => {
+        // Must have validated UTN
+        if (!referral.utn_validated) return false
+
+        // Must not have any submitted claims
+        if (referral.claims_count && referral.claims_count > 0) return false
+
+        return true
+      })
+
+      referrals.value = filteredReferrals
+    } else {
+      console.error('Failed to fetch referrals:', data.message)
+      error({
+        summary: 'Error',
+        detail: 'Failed to load referrals',
+        life: 3000
+      })
+    }
   } catch (err) {
     console.error('Failed to fetch referrals:', err)
+    error({
+      summary: 'Error',
+      detail: 'Failed to load referrals',
+      life: 3000
+    })
   }
 }
 
 const fetchPACodes = async () => {
   try {
-    const response = await fetch('/api/v1/pa-codes?status=active', {
+    // Use DO Dashboard API endpoint to get PA codes for assigned facilities
+    // Only active PA codes with no submitted claims
+    const response = await fetch('/api/v1/do-dashboard/pa-codes?status=active', {
       headers: {
         'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
       }
     })
     const data = await response.json()
-    paCodes.value = data.data || []
+
+    if (data.success) {
+      // Filter PA codes to only show those with no submitted claims
+      const filteredPACodes = (data.data?.data || []).filter(paCode => {
+        // Must not have any submitted claims
+        if (paCode.claims_count && paCode.claims_count > 0) return false
+
+        return true
+      })
+
+      paCodes.value = filteredPACodes
+    } else {
+      console.error('Failed to fetch PA codes:', data.message)
+      error({
+        summary: 'Error',
+        detail: 'Failed to load PA codes',
+        life: 3000
+      })
+    }
   } catch (err) {
     console.error('Failed to fetch PA codes:', err)
+    error({
+      summary: 'Error',
+      detail: 'Failed to load PA codes',
+      life: 3000
+    })
   }
 }
 

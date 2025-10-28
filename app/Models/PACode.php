@@ -29,6 +29,11 @@ class PACode extends Model
         return $this->belongsTo(Referral::class);
     }
 
+    public function claims(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(Claim::class, 'pa_code_id');
+    }
+
     public function issuedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'issued_by');

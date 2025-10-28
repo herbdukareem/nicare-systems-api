@@ -120,12 +120,19 @@ class DODashboardController extends Controller
             $perPage = $request->get('per_page', 15);
             $referrals = $referralsQuery->with([
                 'referringFacility',
-                'receivingFacility', 
+                'receivingFacility',
                 'enrollee',
                 'service',
                 'approvedBy',
-                'utnValidatedBy'
+                'utnValidatedBy',
+                'paCodes'
             ])->paginate($perPage);
+
+            // Add claims count to each referral
+            $referrals->getCollection()->transform(function ($referral) {
+                $referral->claims_count = $referral->claims()->count();
+                return $referral;
+            });
 
             return response()->json([
                 'success' => true,
@@ -188,9 +195,15 @@ class DODashboardController extends Controller
             }
 
             $perPage = $request->get('per_page', 15);
-            $paCodes = $paCodesQuery->with(['referral', 'issuedBy'])
+            $paCodes = $paCodesQuery->with(['referral', 'issuedBy', 'claims'])
                                    ->orderBy('created_at', 'desc')
                                    ->paginate($perPage);
+
+            // Add claims count to each PA code
+            $paCodes->getCollection()->transform(function ($paCode) {
+                $paCode->claims_count = $paCode->claims()->count();
+                return $paCode;
+            });
 
             return response()->json([
                 'success' => true,
