@@ -12,9 +12,27 @@ export default defineConfig({
     vue(),
   ],
   resolve: {
-        alias: {
-            vue: "vue/dist/vue.esm-bundler.js",
-            '@':  path.resolve(__dirname, "resources"),
-        },
+    alias: {
+      vue: "vue/dist/vue.esm-bundler.js",
+      '@': path.resolve(__dirname, "resources"),
     },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: undefined,
+      },
+    },
+    minify: 'terser',
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      define: {
+        global: 'globalThis',
+      },
+      supported: {
+        bigint: false,
+      },
+    },
+  },
 })
