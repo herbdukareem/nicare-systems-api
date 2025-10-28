@@ -2,10 +2,8 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 use App\Models\Drug;
-use App\Models\Service;
 
 class DrugsSeeder extends Seeder
 {
@@ -122,7 +120,7 @@ class DrugsSeeder extends Seeder
         ];
 
         foreach ($services as $service) {
-            Service::create($service);
+            \App\Models\CaseRecord::create($service);
         }
     }
 }

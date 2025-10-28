@@ -7,7 +7,7 @@ use App\Models\User;
 use App\Models\Facility;
 use App\Models\DOFacility;
 use App\Models\DeskOfficer;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 use Illuminate\Support\Facades\Hash;
 
 class TestDeskOfficerSeeder extends Seeder

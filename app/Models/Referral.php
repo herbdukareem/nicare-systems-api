@@ -40,9 +40,9 @@ class Referral extends Model
         return $this->belongsTo(User::class, 'denied_by');
     }
 
-    public function service(): BelongsTo
+    public function caseRecord(): BelongsTo
     {
-        return $this->belongsTo(Service::class);
+        return $this->belongsTo(CaseRecord::class, 'case_id');
     }
 
     public function referringFacility(): BelongsTo

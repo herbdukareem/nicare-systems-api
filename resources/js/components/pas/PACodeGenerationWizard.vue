@@ -44,6 +44,7 @@
               <ServiceSelector
                 v-model="selectedServices"
                 :facility="selectedFacility"
+                request-type="pa_code"
                 :optional="true"
               />
             </div>

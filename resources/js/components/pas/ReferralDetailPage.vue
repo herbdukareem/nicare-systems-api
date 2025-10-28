@@ -47,6 +47,14 @@
             class="tw-hover-lift"
             @click="fetchReferral"
           >Refresh</v-btn>
+
+          <v-btn
+            color="info"
+            variant="outlined"
+            prepend-icon="mdi-card-account-details"
+            class="tw-hover-lift"
+            @click="showIDCardDialog = true"
+          >View ID Card</v-btn>
         </div>
       </div>
 
@@ -253,6 +261,79 @@
           </v-card-text>
         </v-card>
 
+        <!-- Supporting Documents -->
+        <v-card
+          v-if="referral.enrollee_id_card_path || referral.referral_letter_path || referral.passport_path"
+          class="tw-shadow-sm tw-rounded-2xl"
+        >
+          <v-card-title class="tw-bg-purple-50 tw-text-purple-800 tw-rounded-t-2xl">
+            <v-icon class="tw-mr-2">mdi-paperclip</v-icon> Supporting Documents
+          </v-card-title>
+          <v-card-text>
+            <div class="tw-space-y-4">
+              <div v-if="referral.enrollee_id_card_path" class="tw-flex tw-items-center tw-justify-between tw-p-3 tw-bg-gray-50 tw-rounded-lg">
+                <div class="tw-flex tw-items-center tw-gap-3">
+                  <v-icon color="primary" size="32">mdi-card-account-details</v-icon>
+                  <div>
+                    <div class="tw-font-semibold tw-text-gray-800">Enrollee ID Card/Slip</div>
+                    <div class="tw-text-sm tw-text-gray-600">{{ getFileName(referral.enrollee_id_card_path) }}</div>
+                  </div>
+                </div>
+                <v-btn
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                  :href="getDocumentUrl(referral.enrollee_id_card_path)"
+                  target="_blank"
+                >
+                  <v-icon left>mdi-download</v-icon>
+                  View/Download
+                </v-btn>
+              </div>
+
+              <div v-if="referral.referral_letter_path" class="tw-flex tw-items-center tw-justify-between tw-p-3 tw-bg-gray-50 tw-rounded-lg">
+                <div class="tw-flex tw-items-center tw-gap-3">
+                  <v-icon color="primary" size="32">mdi-file-document</v-icon>
+                  <div>
+                    <div class="tw-font-semibold tw-text-gray-800">Referral Letter/Slip</div>
+                    <div class="tw-text-sm tw-text-gray-600">{{ getFileName(referral.referral_letter_path) }}</div>
+                  </div>
+                </div>
+                <v-btn
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                  :href="getDocumentUrl(referral.referral_letter_path)"
+                  target="_blank"
+                >
+                  <v-icon left>mdi-download</v-icon>
+                  View/Download
+                </v-btn>
+              </div>
+
+              <div v-if="referral.passport_path" class="tw-flex tw-items-center tw-justify-between tw-p-3 tw-bg-gray-50 tw-rounded-lg">
+                <div class="tw-flex tw-items-center tw-gap-3">
+                  <v-icon color="primary" size="32">mdi-passport</v-icon>
+                  <div>
+                    <div class="tw-font-semibold tw-text-gray-800">Passport/Travel Document</div>
+                    <div class="tw-text-sm tw-text-gray-600">{{ getFileName(referral.passport_path) }}</div>
+                  </div>
+                </div>
+                <v-btn
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                  :href="getDocumentUrl(referral.passport_path)"
+                  target="_blank"
+                >
+                  <v-icon left>mdi-download</v-icon>
+                  View/Download
+                </v-btn>
+              </div>
+            </div>
+          </v-card-text>
+        </v-card>
+
         <!-- Timeline (simple) -->
         <v-card class="tw-shadow-sm tw-rounded-2xl">
           <v-card-title class="tw-bg-gray-50 tw-text-gray-800 tw-rounded-t-2xl">
@@ -357,6 +438,30 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- ID Card Dialog -->
+    <v-dialog v-model="showIDCardDialog" max-width="600px">
+      <v-card>
+        <v-card-title class="tw-bg-blue-50 tw-text-blue-800">
+          <v-icon class="tw-mr-2">mdi-card-account-details</v-icon>
+          Enrollee ID Card
+        </v-card-title>
+        <v-card-text class="tw-pt-6">
+          <EnrolleeIDCard
+            v-if="referral?.enrollee"
+            :enrollee="referral.enrollee"
+          />
+          <div v-else class="tw-text-center tw-py-8 tw-text-gray-600">
+            <v-icon size="48" class="tw-mb-2">mdi-alert-circle-outline</v-icon>
+            <p>Enrollee information not available</p>
+          </div>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="showIDCardDialog = false">Close</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
   </AdminLayout>
 </template>
 
@@ -364,6 +469,7 @@
 import { ref, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
+import EnrolleeIDCard from './components/EnrolleeIDCard.vue'
 import { pasAPI } from '../../utils/api.js'
 import { useToast } from '../../composables/useToast'
 
@@ -378,6 +484,7 @@ const processing = ref(null)
 const approveDialog = ref(false)
 const denyDialog = ref(false)
 const denyComments = ref('')
+const showIDCardDialog = ref(false)
 
 const printPage = () => {
   printReferralSlip()
@@ -703,6 +810,25 @@ const getSeverityIcon = (sev) => {
     case 'routine': return 'mdi-information'
     default: return 'mdi-help-circle-outline'
   }
+}
+
+const getDocumentUrl = (path) => {
+  if (!path) return '#'
+  // If the path is already a full URL, return it
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path
+  }
+  // Otherwise, construct the URL using the S3/Wasabi endpoint
+  const s3Endpoint = import.meta.env.VITE_AWS_ENDPOINT || 'https://s3.wasabisys.com'
+  const bucket = import.meta.env.VITE_AWS_BUCKET || 'nicare-documents'
+  return `${s3Endpoint}/${bucket}/${path}`
+}
+
+const getFileName = (path) => {
+  if (!path) return 'Document'
+  // Extract filename from path
+  const parts = path.split('/')
+  return parts[parts.length - 1] || 'Document'
 }
 
 const fetchReferral = async () => {

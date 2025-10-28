@@ -21,9 +21,9 @@
       <v-select
         v-model="selectedService"
         :items="availableServices"
-        item-title="service_description"
+        item-title="case_description"
         item-value="id"
-        label="New Referral Service *"
+        label="New Referral Case *"
         variant="outlined"
         density="comfortable"
         :loading="loadingServices"
@@ -32,9 +32,12 @@
       >
         <template #item="{ props, item }">
           <v-list-item v-bind="props">
-            <v-list-item-title>{{ item.raw.service_description }}</v-list-item-title>
-            <v-list-item-subtitle>{{ item.raw.service_category || 'General' }}</v-list-item-subtitle>
+            <v-list-item-title>{{ item.raw.case_description }}</v-list-item-title>
+            <v-list-item-subtitle>{{ item.raw.case_category || 'General' }}</v-list-item-subtitle>
           </v-list-item>
+        </template>
+        <template #selection="{ item }">
+          <span>{{ item.raw.case_description }}</span>
         </template>
       </v-select>
     </div>
@@ -104,7 +107,7 @@
 
 <script setup>
 import { ref, computed, watch, onMounted } from 'vue';
-import { serviceAPI } from '../../../utils/api.js';
+import { caseAPI } from '../../../utils/api.js';
 import { useToast } from '../../../composables/useToast';
 
 const { error } = useToast();
@@ -155,14 +158,14 @@ const loadServices = async () => {
 
     // Try to load from API first, fallback to mock data
     try {
-      const response = await serviceAPI.getAll({ per_page: 100 });
-      console.log('Services API response:', response.data);
+      const response = await caseAPI.getAll({ per_page: 100 });
+      console.log('Cases API response:', response.data);
 
       if (response.data.success && response.data.data) {
         // Handle both paginated and non-paginated responses
-        const servicesData = response.data.data.data || response.data.data;
-        availableServices.value = servicesData || [];
-        console.log('Loaded services:', availableServices.value.length);
+        const casesData = response.data.data.data || response.data.data;
+        availableServices.value = casesData || [];
+        console.log('Loaded cases:', availableServices.value.length);
         return;
       }
     } catch (apiError) {

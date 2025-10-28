@@ -10,7 +10,7 @@ use App\Models\Referral;
 use App\Models\PACode;
 use App\Models\Enrollee;
 use App\Models\DeskOfficer;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 use Illuminate\Support\Facades\Hash;
 
 class DOTestDataSeeder extends Seeder

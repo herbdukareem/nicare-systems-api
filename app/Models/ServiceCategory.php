@@ -37,10 +37,10 @@ class ServiceCategory extends Model
     }
 
     /**
-     * Get services for this category
+     * Get cases for this category
      */
-    public function services()
+    public function caseRecords()
     {
-        return $this->hasMany(Service::class, 'service_category_id');
+        return $this->hasMany(\App\Models\CaseRecord::class, 'case_category_id');
     }
 }

@@ -127,9 +127,16 @@ export const userAPI = {
   // Advanced features
   impersonate: (id) => api.post(`/v1/users/${id}/impersonate`),
   stopImpersonation: () => api.post('/v1/users/stop-impersonation'),
-  export: (params) => api.get('/v1/users/export', { params }),
+  // export: (params) => api.get('/v1/users/export', { params }),
+    async export (params = {}) {
+    return api.get('/cases/export', {
+      params,
+      responseType: 'blob'
+    })
+  },
   import: (formData) => api.post('/v1/users/import', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: { 'Content-Type': 'multipart/form-data' },
+    maxBodyLength: Infinity
   }),
   getActivityStats: (id) => api.get(`/v1/users/${id}/activity-stats`),
 };
@@ -215,7 +222,10 @@ export const drugAPI = {
   update: (id, data) => api.put(`/v1/drugs/${id}`, data),
   delete: (id) => api.delete(`/v1/drugs/${id}`),
   import: (formData) => api.post('/v1/drugs/import', formData, {
-    headers: { 'Content-Type': 'multipart/form-data' }
+    headers: {
+      'Content-Type': 'multipart/form-data',
+    },
+    timeout: 60000
   }),
   export: (params) => api.get('/v1/drugs-export', {
     params,
@@ -246,6 +256,62 @@ export const serviceAPI = {
   }),
   getStatistics: () => api.get('/v1/services-statistics'),
   getGroups: () => api.get('/v1/services-groups'),
+};
+
+// Case Management API
+export const caseAPI = {
+  getAll: (params) => api.get('/v1/cases', { params }),
+  getById: (id) => api.get(`/v1/cases/${id}`),
+  create: (data) => api.post('/v1/cases', data),
+  update: (id, data) => api.put(`/v1/cases/${id}`, data),
+  delete: (id) => api.delete(`/v1/cases/${id}`),
+  getStatistics: () => api.get('/v1/cases-statistics'),
+  getGroups: () => api.get('/v1/cases-groups'),
+  import: (formData) => api.post('/v1/cases/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  export: (params) => api.get('/v1/cases-export', {
+    params,
+    responseType: 'blob'
+  }),
+  downloadTemplate: () => api.get('/v1/cases-template', {
+    responseType: 'blob'
+  })
+};
+
+// Tariff Item Management API
+export const tariffItemAPI = {
+  getAll: (params) => api.get('/v1/tariff-items', { params }),
+  getById: (id) => api.get(`/v1/tariff-items/${id}`),
+  create: (data) => api.post('/v1/tariff-items', data),
+  update: (id, data) => api.put(`/v1/tariff-items/${id}`, data),
+  delete: (id) => api.delete(`/v1/tariff-items/${id}`),
+  getStatistics: () => api.get('/v1/tariff-items-statistics'),
+  import: (formData) => api.post('/v1/tariff-items/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data',
+       'X-Requested-With': 'XMLHttpRequest'
+     },
+    timeout: 60000
+  }),
+  export: (params) => api.get('/v1/tariff-items-export', {
+    params,
+    responseType: 'blob'
+  }),
+  downloadTemplate: () => api.get('/v1/tariff-items-template', {
+    responseType: 'blob'
+  })
+};
+
+// Service Type API
+export const serviceTypeAPI = {
+  getAll: (params) => api.get('/v1/service-types', { params }),
+  getById: (id) => api.get(`/v1/service-types/${id}`)
+};
+
+// Case Type API
+export const caseTypeAPI = {
+  getAll: (params) => api.get('/v1/case-types', { params }),
+  getById: (id) => api.get(`/v1/case-types/${id}`)
 };
 
 // Feedback Management API

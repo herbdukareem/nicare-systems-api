@@ -9,7 +9,7 @@
             size="2xl"
             variant="circle"
             icon-color="white"
-            class="tw-bg-blue-600 tw-mx-auto tw-shadow-xl"
+            class="bg-primary tw-mx-auto tw-shadow-xl"
           />
         </div>
 
@@ -24,7 +24,7 @@
           />
           <div
             v-else
-            class="tw-w-full tw-h-80 tw-bg-blue-200 tw-flex tw-items-center tw-justify-center tw-text-blue-600"
+            class="tw-w-full tw-h-80 bg-primary-200 tw-flex tw-items-center tw-justify-center tw-text-blue-600"
           >
             <div class="tw-text-center">
               <v-icon size="64" class="tw-mb-4">mdi-hospital-building</v-icon>
@@ -56,7 +56,7 @@ healthcare to all the people of Niger state
             size="xl"
             variant="circle"
             icon-color="white"
-            class="tw-bg-blue-600 tw-mx-auto tw-shadow-lg tw-mb-4"
+            class="bg-primary tw-mx-auto tw-shadow-lg tw-mb-4"
           />
           <h2 class="tw-text-2xl tw-font-bold tw-text-gray-800">NGSCHA Admin</h2>
         </div>
@@ -177,7 +177,7 @@ healthcare to all the people of Niger state</p>
     <!-- Forgot Password Dialog -->
     <v-dialog v-model="showForgotPassword" max-width="500">
       <v-card class="tw-rounded-xl">
-        <v-card-title class="tw-text-xl tw-font-semibold tw-bg-blue-50 tw-text-blue-800">
+        <v-card-title class="tw-text-xl tw-font-semibold bg-primary-50 tw-text-blue-800">
           <v-icon class="tw-mr-2">mdi-lock-reset</v-icon>
           Reset Password
         </v-card-title>

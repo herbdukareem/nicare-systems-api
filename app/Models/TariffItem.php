@@ -12,19 +12,15 @@ class TariffItem extends Model
 
     protected $fillable = [
         'case_id',
-        'service_category_id',
-        'service_code',
-        'description',
-        'unit_cost',
-        'default_qty',
-        'position',
+        'service_type_id',
+        'tariff_item',
+        'price',
+        'case_type_id',
         'status'
     ];
 
     protected $casts = [
-        'unit_cost' => 'decimal:2',
-        'default_qty' => 'integer',
-        'position' => 'integer',
+        'price' => 'decimal:2',
         'status' => 'boolean'
     ];
 
@@ -37,14 +33,6 @@ class TariffItem extends Model
     }
 
     /**
-     * Scope for ordering by position
-     */
-    public function scopeOrdered($query)
-    {
-        return $query->orderBy('position');
-    }
-
-    /**
      * Get the case category for this tariff item
      */
     public function caseCategory()
@@ -53,19 +41,18 @@ class TariffItem extends Model
     }
 
     /**
-     * Get the service category for this tariff item
+     * Get the service type for this tariff item
      */
-    public function serviceCategory()
+    public function serviceType()
     {
-        return $this->belongsTo(ServiceCategory::class, 'service_category_id');
+        return $this->belongsTo(ServiceType::class, 'service_type_id');
     }
 
     /**
-     * Calculate total cost based on quantity
+     * Get the case type for this tariff item
      */
-    public function calculateTotalCost(?int $quantity = null): float
+    public function caseType()
     {
-        $qty = $quantity ?? $this->default_qty;
-        return $this->unit_cost * $qty;
+        return $this->belongsTo(CaseType::class, 'case_type_id');
     }
 }

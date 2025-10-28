@@ -163,6 +163,19 @@ class ReferralController extends Controller
                 }
             }
 
+            if ($request->hasFile('passport')) {
+                $result = $this->fileUploadService->uploadPASDocument(
+                    $request->file('passport'),
+                    $referralCode,
+                    'passport'
+                );
+
+                if ($result['success']) {
+                    $referral->update(['passport_path' => $result['path']]);
+                    $uploadResults['passport'] = $result;
+                }
+            }
+
             DB::commit();
 
             return response()->json([

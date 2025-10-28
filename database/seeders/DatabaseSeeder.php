@@ -18,5 +18,7 @@ class DatabaseSeeder extends Seeder
         $this->call(FacilitySeeder::class);
         $this->call(ServiceCategorySeeder::class);
         $this->call(CaseCategorySeeder::class);
+        $this->call(CaseTypeSeeder::class);
+        $this->call(ServiceTypeSeeder::class);
     }
 }

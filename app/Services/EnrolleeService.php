@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Filters\EnrolleeFilter;
 use App\Models\Enrollee;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Database\Eloquent\ModelNotFoundException;
 
 /**
  * Class EnrolleeService
@@ -19,14 +18,16 @@ class EnrolleeService
      *
      * @param  array<string, mixed>  $filters
      * @param  int  $perPage
+     * @param  string  $sortBy
+     * @param  string  $sortDirection
      * @return LengthAwarePaginator
      */
-    public function paginate(array $filters = [], int $perPage = 15): LengthAwarePaginator
+    public function paginate(array $filters = [], int $perPage = 15, string $sortBy = 'created_at', string $sortDirection = 'desc'): LengthAwarePaginator
     {
         $query = Enrollee::query();
         $query = EnrolleeFilter::apply($query, $filters);
         return $query->with(['enrolleeType', 'facility', 'lga', 'ward', 'benefactor', 'fundingType'])
-            ->orderBy('created_at', 'desc')
+            ->orderBy($sortBy, $sortDirection)
             ->paginate($perPage);
     }
 

@@ -34,7 +34,7 @@ const vuetify = createVuetify({
       customTheme: {
         dark: false,
         colors: {
-          primary: '#2563eb',
+          primary: '#0885AB',
           secondary: '#64748b',
           accent: '#82B1FF',
           error: '#FF5252',

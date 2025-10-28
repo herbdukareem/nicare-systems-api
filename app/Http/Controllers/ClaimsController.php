@@ -8,6 +8,9 @@ use App\Models\ClaimTreatment;
 use App\Models\ClaimAuditLog;
 use App\Models\PACode;
 use App\Models\Facility;
+use App\Models\Referral;
+use App\Models\CaseRecord;
+use App\Models\TariffItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -373,6 +376,81 @@ class ClaimsController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to submit claim',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get available services/tariff items for a referral or PA code
+     * This restricts desk officers to only select services defined for the case
+     */
+    public function getServicesForReferralOrPACode(Request $request)
+    {
+        $validator = Validator::make($request->all(), [
+            'referral_id' => 'nullable|exists:referrals,id',
+            'pa_code_id' => 'nullable|exists:p_a_codes,id',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            $services = [];
+            $caseId = null;
+
+            // Get case ID from referral
+            if ($request->referral_id) {
+                $referral = Referral::find($request->referral_id);
+                if (!$referral) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Referral not found'
+                    ], 404);
+                }
+                $caseId = $referral->case_id;
+            }
+
+            // Get case ID from PA code
+            if ($request->pa_code_id) {
+                $paCode = PACode::find($request->pa_code_id);
+                if (!$paCode) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'PA Code not found'
+                    ], 404);
+                }
+                // Get the referral from PA code
+                $referral = $paCode->referral;
+                if ($referral) {
+                    $caseId = $referral->case_id;
+                }
+            }
+
+            // Get tariff items for the case
+            if ($caseId) {
+                $services = TariffItem::where('case_id', $caseId)
+                    ->where('status', true)
+                    ->select('id', 'case_id', 'tariff_item', 'price', 'service_type_id')
+                    ->get();
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $services,
+                'case_id' => $caseId,
+                'message' => $services->isEmpty() ? 'No services defined for this case' : 'Services retrieved successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve services',
                 'error' => $e->getMessage()
             ], 500);
         }

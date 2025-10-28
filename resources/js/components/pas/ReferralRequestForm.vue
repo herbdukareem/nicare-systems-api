@@ -249,6 +249,19 @@
                 :upload-progress="uploadProgress"
               />
             </div>
+
+            <div>
+              <label class="tw-block tw-text-sm tw-font-medium tw-text-gray-700 tw-mb-2">
+                Passport/Travel Document
+              </label>
+              <FileUpload
+                v-model="form.passport"
+                accept="image/*,.pdf"
+                :multiple="false"
+                :max-size="5 * 1024 * 1024"
+                :upload-progress="uploadProgress"
+              />
+            </div>
           </div>
         </v-card-text>
       </v-card>
@@ -355,7 +368,8 @@ const form = reactive({
   
   // Supporting Documents
   enrollee_id_card: [],
-  referral_letter: []
+  referral_letter: [],
+  passport: []
 });
 
 // Validation rules
@@ -413,7 +427,7 @@ const submitForm = async () => {
     // Add all form fields
     Object.keys(form).forEach(key => {
       if (form[key] !== null && form[key] !== '' && form[key] !== undefined) {
-        if (key === 'enrollee_id_card' || key === 'referral_letter') {
+        if (key === 'enrollee_id_card' || key === 'referral_letter' || key === 'passport') {
           // Handle file uploads
           if (form[key] && form[key].length > 0) {
             formData.append(key, form[key][0]);
@@ -432,15 +446,18 @@ const submitForm = async () => {
 
     if (response.data.success) {
       const referralData = response.data.data;
-      const referralCode = referralData.referral_code;
+      // The API returns { referral: {...}, uploads: {...} }
+      const referral = referralData.referral || referralData;
+      const referralCode = referral.referral_code;
 
       success(`Referral submitted successfully! Code: ${referralCode}`);
 
       // Emit the referral data with navigation info
       emit('submit', {
-        ...referralData,
+        ...referral,
         showSuccessDialog: true,
-        referralCode
+        referral_code: referralCode,
+        referralCode: referralCode // For backward compatibility
       });
 
       resetForm();

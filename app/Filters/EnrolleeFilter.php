@@ -25,6 +25,17 @@ class EnrolleeFilter
                 continue;
             }
             switch ($key) {
+                case 'search':
+                    $query->where(function($q) use ($value) {
+                        $q->where('first_name', 'like', "%{$value}%")
+                          ->orWhere('last_name', 'like', "%{$value}%")
+                          ->orWhere('middle_name', 'like', "%{$value}%")
+                          ->orWhere('enrollee_id', 'like', "%{$value}%")
+                          ->orWhere('nin', 'like', "%{$value}%")
+                          ->orWhere('phone', 'like', "%{$value}%")
+                          ->orWhere('email', 'like', "%{$value}%");
+                    });
+                    break;
                 case 'first_name':
                     $query->where('first_name', 'like', "%{$value}%");
                     break;
@@ -32,20 +43,40 @@ class EnrolleeFilter
                     $query->where('last_name', 'like', "%{$value}%");
                     break;
                 case 'status':
-                    // Accept either enum value or integer code
-                    $query->where('status', $value);
+                    // Accept either enum value or integer code, or array
+                    if (is_array($value)) {
+                        $query->whereIn('status', $value);
+                    } else {
+                        $query->where('status', $value);
+                    }
                     break;
                 case 'gender':
-                    $query->where('gender', $value);
+                    if (is_array($value)) {
+                        $query->whereIn('gender', $value);
+                    } else {
+                        $query->where('gender', $value);
+                    }
                     break;
                 case 'facility_id':
-                    $query->where('facility_id', $value);
+                    if (is_array($value)) {
+                        $query->whereIn('facility_id', $value);
+                    } else {
+                        $query->where('facility_id', $value);
+                    }
                     break;
                 case 'lga_id':
-                    $query->where('lga_id', $value);
+                    if (is_array($value)) {
+                        $query->whereIn('lga_id', $value);
+                    } else {
+                        $query->where('lga_id', $value);
+                    }
                     break;
                 case 'ward_id':
-                    $query->where('ward_id', $value);
+                    if (is_array($value)) {
+                        $query->whereIn('ward_id', $value);
+                    } else {
+                        $query->where('ward_id', $value);
+                    }
                     break;
                 case 'nin':
                     $query->where('nin', $value);
@@ -58,6 +89,31 @@ class EnrolleeFilter
                     break;
                 case 'date_of_birth_to':
                     $query->whereDate('date_of_birth', '<=', $value);
+                    break;
+                case 'enrollee_type_id':
+                    if (is_array($value)) {
+                        $query->whereIn('enrollee_type_id', $value);
+                    } else {
+                        $query->where('enrollee_type_id', $value);
+                    }
+                    break;
+                case 'date_from':
+                    $query->whereDate('created_at', '>=', $value);
+                    break;
+                case 'date_to':
+                    $query->whereDate('created_at', '<=', $value);
+                    break;
+                case 'approval_date_from':
+                    $query->whereDate('approval_date', '>=', $value);
+                    break;
+                case 'approval_date_to':
+                    $query->whereDate('approval_date', '<=', $value);
+                    break;
+                case 'age_from':
+                    $query->whereRaw('TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) >= ?', [$value]);
+                    break;
+                case 'age_to':
+                    $query->whereRaw('TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) <= ?', [$value]);
                     break;
             }
         }

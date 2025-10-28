@@ -7,7 +7,7 @@ use App\Models\Referral;
 use App\Models\PACode;
 use App\Models\Enrollee;
 use App\Models\Facility;
-use App\Models\Service;
+use App\Models\CaseRecord;
 use App\Services\FileUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -41,7 +41,7 @@ class PASWorkflowController extends Controller
                 'enrollee_id' => 'required|exists:enrollees,id',
                 'request_type' => 'required|in:referral,pa_code',
                 'services' => 'required|array|min:1',
-                'services.*.id' => 'required|exists:services,id',
+                'services.*.id' => 'required|exists:cases,id',
                 'receiving_facility_id' => 'required|exists:facilities,id',
                 'severity_level' => 'required|in:emergency,urgent,routine',
                 'presenting_complaints' => 'nullable|string',
@@ -158,6 +158,19 @@ class PASWorkflowController extends Controller
                 }
             }
 
+            if ($request->hasFile('passport')) {
+                $result = $this->fileUploadService->uploadPASDocument(
+                    $request->file('passport'),
+                    $referralCode,
+                    'passport'
+                );
+
+                if ($result['success']) {
+                    $referral->update(['passport_path' => $result['path']]);
+                    $uploadResults['passport'] = $result;
+                }
+            }
+
             // Auto-approve if it's for PA code generation
             if ($requestData['request_type'] === 'pa_code') {
                 $referral->approve(Auth::user(), 'Auto-approved for PA code generation');
@@ -201,7 +214,7 @@ class PASWorkflowController extends Controller
                 'facility_id' => 'required|exists:facilities,id',
                 'enrollee_id' => 'required|exists:enrollees,id',
                 'services' => 'required|array|min:1',
-                'services.*.id' => 'required|exists:services,id',
+                'services.*.id' => 'required|exists:cases,id',
                 'severity_level' => 'required|in:emergency,urgent,routine',
                 'presenting_complaints' => 'nullable|string',
                 'reasons_for_referral' => 'required|string',
@@ -245,9 +258,9 @@ class PASWorkflowController extends Controller
             $enrollee = Enrollee::findOrFail($requestData['enrollee_id']);
             $facility = Facility::findOrFail($requestData['facility_id']);
 
-            // Prepare service description
-            $services = Service::whereIn('id', collect($requestData['services'])->pluck('id'))->get();
-            $serviceDescription = $services->pluck('service_description')->join(', ');
+            // Prepare case description
+            $cases = CaseRecord::whereIn('id', collect($requestData['services'])->pluck('id'))->get();
+            $serviceDescription = $cases->pluck('case_description')->join(', ');
 
             // Create PA code record
             $paCodeRecord = PACode::create([

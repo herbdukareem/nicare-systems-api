@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
-import Ls from '@/js/utils/ls';
 
 // Components
 import LoginPage from '../components/auth/LoginPage.vue';
@@ -232,8 +231,13 @@ const routes = [
   {
     path: '/pas/programmes',
     name: 'pas-programmes',
-    component: () => import('../components/pas/ServicesManagementPage.vue'),
-    meta: { requiresAuth: true }
+    component: () => import('../components/pas/CasesManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Case Management',
+      description: 'Manage healthcare cases, pricing, and PA requirements',
+      breadcrumb: 'Case Management'
+    }
   },
   {
     path: '/pas/referrals/:referralCode',
@@ -268,6 +272,19 @@ const routes = [
       title: 'Drug Management',
       description: 'Manage drug formulary and pricing',
       breadcrumb: 'Drug Management'
+    }
+  },
+
+  // Tariff Item Management Routes
+  {
+    path: '/tariff-items',
+    name: 'tariff-items-management',
+    component: () => import('../components/pas/TariffItemManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Tariff Item Management',
+      description: 'Manage tariff items and pricing structure',
+      breadcrumb: 'Tariff Item Management'
     }
   },
   {
@@ -375,9 +392,8 @@ const routes = [
   {
     path: '/claims/submissions',
     name: 'claims-submissions',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Claim Submissions', subtitle: 'Submit and track claims', icon: 'mdi-upload' }
+    component: () => import('../components/claims/ClaimSubmissionPage.vue'),
+    meta: { requiresAuth: true, title: 'Submit Claim' }
   },
   {
     path: '/claims/history',
@@ -451,9 +467,12 @@ router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
 
   if (to.meta.requiresAuth) {
-    await authStore.initializeAuth();
+    // Only initialize if not already authenticated
+    if (!authStore.isAuthenticated && !authStore._initializing) {
+      await authStore.initializeAuth();
+    }
 
-    if (Ls.get('token') && authStore.isAuthenticated) {
+    if (authStore.isAuthenticated) {
       // Check role-based access
       if (to.meta.role) {
         if (!authStore.hasRole(to.meta.role)) {

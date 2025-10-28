@@ -37,8 +37,12 @@ use App\Http\Controllers\PACodeController;
 use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\V1\DrugController;
 use App\Http\Controllers\Api\V1\ServiceController;
+use App\Http\Controllers\Api\V1\CaseController;
 use App\Http\Controllers\Api\V1\CaseCategoryController;
 use App\Http\Controllers\Api\V1\ServiceCategoryController;
+use App\Http\Controllers\Api\V1\TariffItemController;
+use App\Http\Controllers\Api\V1\ServiceTypeController;
+use App\Http\Controllers\Api\V1\CaseTypeController;
 use App\Http\Controllers\Api\V1\DOFacilityController;
 use App\Http\Controllers\Api\V1\DODashboardController;
 use App\Http\Controllers\ClaimsController;
@@ -193,13 +197,32 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('drugs-template', [DrugController::class, 'downloadTemplate']);
     Route::get('drugs-statistics', [DrugController::class, 'statistics']);
 
-    // Service Management routes
+    // Service Management routes (deprecated - use cases instead)
     Route::apiResource('services', ServiceController::class);
     Route::post('services/import', [ServiceController::class, 'import']);
     Route::get('services-export', [ServiceController::class, 'export']);
     Route::get('services-template', [ServiceController::class, 'downloadTemplate']);
     Route::get('services-statistics', [ServiceController::class, 'statistics']);
     Route::get('services-groups', [ServiceController::class, 'getGroups']);
+
+    // Case Management routes
+    Route::apiResource('cases', CaseController::class);
+    Route::post('cases/import', [CaseController::class, 'import']);
+    Route::get('cases-export', [CaseController::class, 'export']);
+    Route::get('cases-template', [CaseController::class, 'downloadTemplate']);
+    Route::get('cases-statistics', [CaseController::class, 'statistics']);
+    Route::get('cases-groups', [CaseController::class, 'getGroups']);
+
+    // Tariff Item Management routes
+    Route::apiResource('tariff-items', TariffItemController::class);
+    Route::post('tariff-items/import', [TariffItemController::class, 'import']);
+    Route::get('tariff-items-export', [TariffItemController::class, 'export']);
+    Route::get('tariff-items-template', [TariffItemController::class, 'downloadTemplate']);
+    Route::get('tariff-items-statistics', [TariffItemController::class, 'statistics']);
+
+    // Service Type and Case Type routes
+    Route::apiResource('service-types', ServiceTypeController::class)->only(['index', 'show']);
+    Route::apiResource('case-types', CaseTypeController::class)->only(['index', 'show']);
 
     // Feedback Management
     Route::prefix('feedback')->group(function () {
@@ -282,6 +305,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1/pas')->group(function () {
         Route::get('{claim}', [ClaimsController::class, 'show']);
         Route::put('{claim}', [ClaimsController::class, 'update']);
         Route::post('{claim}/submit', [ClaimsController::class, 'submit']);
+        Route::get('services/for-referral-or-pacode', [ClaimsController::class, 'getServicesForReferralOrPACode']);
 
         // Doctor Review Routes
         Route::prefix('doctor')->group(function () {

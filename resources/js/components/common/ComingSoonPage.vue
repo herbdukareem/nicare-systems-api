@@ -21,7 +21,7 @@
           <p class="tw-text-gray-600">This module is under development and will be available soon.</p>
         </div>
         
-        <div class="tw-bg-blue-50 tw-rounded-lg tw-p-6 tw-mt-8">
+        <div class="tw-bg-primary-50 tw-rounded-lg tw-p-6 tw-mt-8">
           <v-icon size="48" color="blue" class="tw-mb-4">mdi-tools</v-icon>
           <h3 class="tw-text-lg tw-font-semibold tw-text-blue-800 tw-mb-2">Under Development</h3>
           <p class="tw-text-blue-600">

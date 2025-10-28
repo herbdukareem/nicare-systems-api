@@ -57,7 +57,7 @@ const breadcrumbMappings = {
   '/capitation/approval': [{ name: 'Capitation Module' }, { name: 'Capitation Approval' }],
   '/capitation/payments': [{ name: 'Capitation Module' }, { name: 'Capitation Payment/Invoices' }],
   '/pas/generate': [{ name: 'Pre-authorization System' }, { name: 'Generate Referral/PA-Code' }],
-  '/pas/programmes': [{ name: 'Pre-authorization System' }, { name: 'Manage Programmes/Services' }],
+  '/pas/programmes': [{ name: 'Pre-authorization System' }, { name: 'Manage Cases' }],
   '/pas/drugs': [{ name: 'Pre-authorization System' }, { name: 'Manage Drugs' }],
   '/pas/labs': [{ name: 'Pre-authorization System' }, { name: 'Manage Labs' }],
   '/pas/clinical': [{ name: 'Pre-authorization System' }, { name: 'Manage Clinical Services' }],

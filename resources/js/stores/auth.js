@@ -52,8 +52,9 @@ export const useAuthStore = defineStore('auth', {
           this.availableRoles = user.roles || [];
           this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
 
-          // Store token and current role in localStorage
+          // Store token, user data, and current role in localStorage
           localStorage.setItem('token', token);
+          localStorage.setItem('user', JSON.stringify(user));
           if (this.currentRole) {
             localStorage.setItem('currentRole', JSON.stringify(this.currentRole));
           }
@@ -68,6 +69,8 @@ export const useAuthStore = defineStore('auth', {
         this.token = null;
         this.isAuthenticated = false;
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
+        localStorage.removeItem('currentRole');
         throw error;
       } finally {
         this.loading = false;
@@ -87,6 +90,7 @@ export const useAuthStore = defineStore('auth', {
         this.currentRole = null;
         this.availableRoles = [];
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         localStorage.removeItem('currentRole');
       }
     },
@@ -99,9 +103,12 @@ export const useAuthStore = defineStore('auth', {
         console.log(response)
         // Expecting { success: true, data: { ...user } }
         if (response?.data?.success) {
-          
+
           this.user = response.data.data;
           this.isAuthenticated = true;
+
+          // Store user data in localStorage
+          localStorage.setItem('user', JSON.stringify(this.user));
 
           // Initialize role switching
           this.availableRoles = this.user.roles || [];
@@ -119,6 +126,11 @@ export const useAuthStore = defineStore('auth', {
             }
           } else {
             this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
+          }
+
+          // Update currentRole in localStorage if it changed
+          if (this.currentRole) {
+            localStorage.setItem('currentRole', JSON.stringify(this.currentRole));
           }
 
           return true; // ✅ success
@@ -166,12 +178,41 @@ export const useAuthStore = defineStore('auth', {
   this._initializing = true;
   try {
     const token = localStorage.getItem('token');
+    const savedUser = localStorage.getItem('user');
+
     if (token) {
       this.token = token;
 
+      // First, try to restore user from localStorage to avoid flicker
+      if (savedUser) {
+        try {
+          const user = JSON.parse(savedUser);
+          this.user = user;
+          this.isAuthenticated = true;
+          this.availableRoles = user.roles || [];
+
+          // Restore current role from localStorage
+          const savedRole = localStorage.getItem('currentRole');
+          if (savedRole) {
+            try {
+              const parsedRole = JSON.parse(savedRole);
+              const roleExists = this.availableRoles.find(role => role.id === parsedRole.id);
+              this.currentRole = roleExists || (this.availableRoles.length > 0 ? this.availableRoles[0] : null);
+            } catch {
+              this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
+            }
+          } else {
+            this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
+          }
+        } catch (error) {
+          console.error('Failed to parse saved user:', error);
+        }
+      }
+
+      // Then verify token is still valid by fetching fresh user data
       const ok = await this.fetchUser();
       if (!ok) {
-  
+
         // Token invalid or /user failed — clear quietly, no redirect here
         this.user = null;
         this.isAuthenticated = false;
@@ -180,6 +221,7 @@ export const useAuthStore = defineStore('auth', {
 
         this.token = null;
         localStorage.removeItem('token');
+        localStorage.removeItem('user');
         localStorage.removeItem('currentRole');
       }
     }

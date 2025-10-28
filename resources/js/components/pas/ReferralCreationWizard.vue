@@ -1,7 +1,7 @@
 <template>
   <div class="tw-max-w-6xl tw-mx-auto tw-p-6">
     <v-card class="tw-shadow-lg">
-      <v-card-title class="tw-bg-blue-600 tw-text-white tw-py-4">
+      <v-card-title class="bg-primary tw-text-white tw-py-4">
         <div class="tw-flex tw-items-center tw-space-x-3">
           <v-icon color="white" size="28">mdi-file-document-plus</v-icon>
           <span class="tw-text-xl tw-font-semibold">Create New Referral Request</span>
@@ -50,9 +50,10 @@
           <template v-slot:item.4>
             <div class="tw-p-4">
               <h3 class="tw-text-lg tw-font-semibold tw-mb-4">Services</h3>
-              <ServiceSelector 
+              <ServiceSelector
                 v-model="selectedServices"
                 :facility="selectedFacility"
+                request-type="referral"
                 :enrollee="selectedEnrollee"
               />
             </div>
@@ -121,7 +122,7 @@
         </v-card-title>
         <v-card-text class="tw-p-6 tw-text-center">
           <div class="tw-space-y-4">
-            <div class="tw-p-4 tw-bg-blue-50 tw-rounded-lg">
+            <div class="tw-p-4 bg-blue tw-rounded-lg">
               <h3 class="tw-font-semibold tw-text-blue-800 tw-mb-2">Referral Code</h3>
               <p class="tw-text-2xl tw-font-bold tw-text-blue-900">{{ submittedReferral?.referral_code || submittedReferral?.referralCode || 'Generated' }}</p>
             </div>

@@ -16,7 +16,7 @@
       ]"
     >
       <!-- Sidebar Header -->
-      <div class="tw-flex tw-items-center tw-justify-center tw-h-16 tw-bg-blue-600 tw-border-b tw-border-blue-700 tw-flex-shrink-0">
+      <div class="tw-flex tw-items-center tw-justify-center tw-h-16 tw-border-b tw-flex-shrink-0" style="background-color: #0885AB; border-color: #076d8f;">
         <div class="tw-flex tw-items-center tw-space-x-3">
           <Logo
             size="md"
@@ -39,16 +39,20 @@
               :class="[
                 'tw-group tw-flex tw-items-center tw-px-3 tw-py-2.5 tw-text-sm tw-font-medium tw-rounded-lg tw-transition-all tw-duration-300 tw-hover-slide-right',
                 $route.path === item.path
-                  ? 'tw-bg-blue-600 tw-text-white tw-shadow-md tw-animate-fade-in'
-                  : 'tw-text-gray-600 hover:tw-bg-blue-50 hover:tw-text-blue-700 hover:tw-shadow-sm'
+                  ? 'tw-text-white tw-shadow-md tw-animate-fade-in'
+                  : 'tw-text-gray-600 hover:tw-shadow-sm'
               ]"
+              :style="$route.path === item.path ? 'background-color: #0885AB;' : ''"
+              @mouseenter="$event.currentTarget.style.backgroundColor = $route.path !== item.path ? '#e0f2f7' : '#0885AB'"
+              @mouseleave="$event.currentTarget.style.backgroundColor = $route.path !== item.path ? '' : '#0885AB'"
             >
               <v-icon
                 :size="20"
                 :class="[
                   'tw-mr-3 tw-transition-all tw-duration-300',
-                  $route.path === item.path ? 'tw-text-white tw-drop-shadow-sm' : 'tw-text-gray-400 group-hover:tw-text-blue-500'
+                  $route.path === item.path ? 'tw-text-white tw-drop-shadow-sm' : 'tw-text-gray-400'
                 ]"
+                :style="$route.path !== item.path ? 'color: inherit;' : ''"
               >
                 {{ item.icon }}
               </v-icon>
@@ -58,9 +62,10 @@
                 :class="[
                   'tw-ml-auto tw-inline-flex tw-items-center tw-px-2 tw-py-1 tw-rounded-full tw-text-xs tw-font-medium tw-transition-all tw-duration-300',
                   $route.path === item.path
-                    ? 'tw-bg-white tw-text-blue-600'
-                    : 'tw-bg-blue-100 tw-text-blue-600 group-hover:tw-bg-blue-200'
+                    ? 'tw-bg-white'
+                    : ''
                 ]"
+                :style="$route.path === item.path ? 'color: #0885AB;' : 'background-color: #e0f2f7; color: #0885AB;'"
               >
                 {{ item.badge }}
               </span>
@@ -73,15 +78,18 @@
                 :class="[
                   'tw-group tw-flex tw-items-center tw-w-full tw-px-4 tw-py-3 tw-text-sm tw-font-medium tw-rounded-xl tw-transition-all tw-duration-300 tw-transform hover:tw-scale-105 tw-hover-glow',
                   isSubmenuActive(item) || expandedMenus.includes(item.name)
-                    ? 'tw-bg-blue-600 tw-text-white tw-shadow-lg tw-animate-bounce-in'
-                    : 'tw-text-gray-600 hover:tw-bg-blue-50 hover:tw-text-blue-700 hover:tw-shadow-md'
+                    ? 'tw-text-white tw-shadow-lg tw-animate-bounce-in'
+                    : 'tw-text-gray-600 hover:tw-shadow-md'
                 ]"
+                :style="isSubmenuActive(item) || expandedMenus.includes(item.name) ? 'background-color: #0885AB;' : ''"
+                @mouseenter="$event.currentTarget.style.backgroundColor = !(isSubmenuActive(item) || expandedMenus.includes(item.name)) ? '#e0f2f7' : '#0885AB'"
+                @mouseleave="$event.currentTarget.style.backgroundColor = !(isSubmenuActive(item) || expandedMenus.includes(item.name)) ? '' : '#0885AB'"
               >
                 <v-icon
                   :size="20"
                   :class="[
                     'tw-mr-3 tw-transition-all tw-duration-300',
-                    isSubmenuActive(item) || expandedMenus.includes(item.name) ? 'tw-text-white tw-drop-shadow-sm' : 'tw-text-gray-400 group-hover:tw-text-blue-500'
+                    isSubmenuActive(item) || expandedMenus.includes(item.name) ? 'tw-text-white tw-drop-shadow-sm' : 'tw-text-gray-400'
                   ]"
                 >
                   {{ item.icon }}
@@ -111,17 +119,18 @@
                   :class="[
                     'tw-group tw-flex tw-items-center tw-px-3 tw-py-2 tw-text-xs tw-rounded-md tw-transition-all tw-duration-300 tw-hover-slide-right',
                     $route.path === child.path
-                      ? 'tw-bg-blue-100 tw-text-blue-700 tw-font-medium tw-animate-fade-in'
+                      ? 'tw-font-medium tw-animate-fade-in'
                       : 'tw-text-gray-600 hover:tw-bg-gray-50 hover:tw-text-gray-900'
                   ]"
-                  :style="{ animationDelay: `${index * 0.1}s` }"
+                  :style="$route.path === child.path ? `background-color: #e0f2f7; color: #0885AB; animation-delay: ${index * 0.1}s;` : `animation-delay: ${index * 0.1}s;`"
                 >
                   <v-icon
                     :size="14"
                     :class="[
                       'tw-mr-2 tw-transition-all tw-duration-200',
-                      $route.path === child.path ? 'tw-text-blue-600' : 'tw-text-gray-400 group-hover:tw-text-gray-600'
+                      $route.path === child.path ? '' : 'tw-text-gray-400 group-hover:tw-text-gray-600'
                     ]"
+                    :style="$route.path === child.path ? 'color: #0885AB;' : ''"
                   >
                     {{ child.icon }}
                   </v-icon>
@@ -136,7 +145,7 @@
       <!-- User Info at Bottom -->
       <div class="tw-flex-shrink-0 tw-p-4 tw-border-t tw-border-gray-200 tw-bg-gray-50">
         <div class="tw-flex tw-items-center tw-space-x-3">
-          <v-avatar size="32" color="blue" class="tw-text-white tw-flex-shrink-0">
+          <v-avatar size="32" class="tw-text-white tw-flex-shrink-0" style="background-color: #0885AB;">
             <v-icon size="18">mdi-account</v-icon>
           </v-avatar>
           <div class="tw-flex-1 tw-min-w-0">
@@ -271,51 +280,51 @@ const menuItems = [
         icon: 'mdi-desk',
         roles: ['desk_officer'] // Only show to desk officers
       },
-      {
-        name: 'Premium Dashboard',
-        path: '/dashboard/premium',
-        icon: 'mdi-currency-usd'
-      },
-      {
-        name: 'Preauthorization Dashboard',
-        path: '/dashboard/preauth',
-        icon: 'mdi-shield-check'
-      }
+      // {
+      //   name: 'Premium Dashboard',
+      //   path: '/dashboard/premium',
+      //   icon: 'mdi-currency-usd'
+      // },
+      // {
+      //   name: 'Preauthorization Dashboard',
+      //   path: '/dashboard/preauth',
+      //   icon: 'mdi-shield-check'
+      // }
     ]
   },
-  {
-    name: 'Enrollment',
-    icon: 'mdi-account-plus',
-    children: [
-      {
-        name: 'Enrollees List',
-        path: '/enrollees',
-        icon: 'mdi-format-list-bulleted',
-        badge: '12.8k'
-      },
-       {
-        name: 'Pending Enrollee List',
-        path: '/enrollees/pending',
-        icon: 'mdi-format-list-bulleted',
-        badge: '12.8k'
-      },
-      {
-        name: 'Change of Facility',
-        path: '/enrollment/change-facility',
-        icon: 'mdi-hospital-marker'
-      },
-      {
-        name: 'ID Card Printing',
-        path: '/enrollment/id-cards',
-        icon: 'mdi-card-account-details'
-      },
-      {
-        name: 'Enrollment Phases',
-        path: '/enrollment/phases',
-        icon: 'mdi-timeline'
-      }
-    ]
-  },
+  // {
+  //   name: 'Enrollment',
+  //   icon: 'mdi-account-plus',
+  //   children: [
+  //     {
+  //       name: 'Enrollees List',
+  //       path: '/enrollees',
+  //       icon: 'mdi-format-list-bulleted',
+  //       badge: '12.8k'
+  //     },
+  //      {
+  //       name: 'Pending Enrollee List',
+  //       path: '/enrollees/pending',
+  //       icon: 'mdi-format-list-bulleted',
+  //       badge: '12.8k'
+  //     },
+  //     {
+  //       name: 'Change of Facility',
+  //       path: '/enrollment/change-facility',
+  //       icon: 'mdi-hospital-marker'
+  //     },
+  //     {
+  //       name: 'ID Card Printing',
+  //       path: '/enrollment/id-cards',
+  //       icon: 'mdi-card-account-details'
+  //     },
+  //     {
+  //       name: 'Enrollment Phases',
+  //       path: '/enrollment/phases',
+  //       icon: 'mdi-timeline'
+  //     }
+  //   ]
+  // },
   {
     name: 'User Management',
     icon: 'mdi-account-cog',
@@ -344,7 +353,7 @@ const menuItems = [
         badge: 'New'
       },
       {
-        name: 'Manage Programmes/Services',
+        name: 'Manage Cases',
         path: '/pas/programmes',
         icon: 'mdi-format-list-bulleted-type'
       },
@@ -359,9 +368,9 @@ const menuItems = [
         icon: 'mdi-test-tube'
       },
       {
-        name: 'Manage Clinical Services',
-        path: '/pas/clinical',
-        icon: 'mdi-medical-bag'
+        name: 'Manage Tariff Items',
+        path: '/tariff-items',
+        icon: 'mdi-receipt'
       },
       {
         name: 'Case Categories',
@@ -392,18 +401,18 @@ const menuItems = [
       },
     ]
    },
-   {
-    name: 'Task Management',
-    icon: 'mdi-clipboard-check',
-    children: [
-      {
-        name: 'Task Management',
-        path: '/task-management',
-        icon: 'mdi-clipboard-check',
-        badge: 'New'
-      },
-    ]
-   },
+  //  {
+  //   name: 'Task Management',
+  //   icon: 'mdi-clipboard-check',
+  //   children: [
+  //     {
+  //       name: 'Task Management',
+  //       path: '/task-management',
+  //       icon: 'mdi-clipboard-check',
+  //       badge: 'New'
+  //     },
+  //   ]
+  //  },
   {
     name: 'Claims Management',
     icon: 'mdi-file-document-multiple',
@@ -425,33 +434,33 @@ const menuItems = [
       }
     ]
   },
-  {
-    name: 'Settings',
-    icon: 'mdi-cog',
-    children: [
-      {
-        name: 'Manage Benefactors',
-        path: '/settings/benefactors',
-        icon: 'mdi-account-heart'
-      },
-      {
-        name: 'Facilities',
-        path: '/facilities',
-        icon: 'mdi-hospital-building',
-        badge: '342'
-      },
-      {
-        name: 'Manage Department',
-        path: '/settings/departments',
-        icon: 'mdi-office-building'
-      },
-      {
-        name: 'Manage Designation',
-        path: '/settings/designations',
-        icon: 'mdi-badge-account'
-      }
-    ]
-  }
+  // {
+  //   name: 'Settings',
+  //   icon: 'mdi-cog',
+  //   children: [
+  //     {
+  //       name: 'Manage Benefactors',
+  //       path: '/settings/benefactors',
+  //       icon: 'mdi-account-heart'
+  //     },
+  //     {
+  //       name: 'Facilities',
+  //       path: '/facilities',
+  //       icon: 'mdi-hospital-building',
+  //       badge: '342'
+  //     },
+  //     {
+  //       name: 'Manage Department',
+  //       path: '/settings/departments',
+  //       icon: 'mdi-office-building'
+  //     },
+  //     {
+  //       name: 'Manage Designation',
+  //       path: '/settings/designations',
+  //       icon: 'mdi-badge-account'
+  //     }
+  //   ]
+  // }
 ];
 
 // Computed properties

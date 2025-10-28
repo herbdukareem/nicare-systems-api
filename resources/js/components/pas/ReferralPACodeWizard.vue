@@ -28,6 +28,9 @@
                     <v-list-item-subtitle>{{ item.raw.hcp_code }} - {{ item.raw.level_of_care }}</v-list-item-subtitle>
                   </v-list-item>
                 </template>
+                <template #selection="{ item }">
+                  <span>{{ item.raw.name }}</span>
+                </template>
               </v-select>
               
               <!-- Selected Facility Details -->
@@ -377,7 +380,7 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { facilityAPI, pasAPI, serviceAPI } from '../../utils/api.js';
+import { facilityAPI, pasAPI, caseAPI } from '../../utils/api.js';
 import { useToast } from '../../composables/useToast';
 import ReferralRequestForm from './ReferralRequestForm.vue';
 
@@ -542,8 +545,8 @@ const loadPendingReferrals = async () => {
 const loadAvailableServices = async () => {
   try {
     servicesLoading.value = true;
-    const response = await serviceAPI.getAll({
-      status: 1, // Only active services
+    const response = await caseAPI.getAll({
+      status: 1, // Only active cases
       per_page: 1000
     });
 
@@ -555,13 +558,13 @@ const loadAvailableServices = async () => {
         {
           id: 1,
           nicare_code: 'NGSCHS/Card/S/001',
-          service_description: 'Cardiology Consultation',
+          case_description: 'Cardiology Consultation',
           price: 5000
         },
         {
           id: 2,
           nicare_code: 'NGSCHS/Orth/S/001',
-          service_description: 'Orthopedic Consultation',
+          case_description: 'Orthopedic Consultation',
           price: 4500
         }
       ];
