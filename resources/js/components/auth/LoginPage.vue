@@ -266,13 +266,20 @@ const handleLogin = async () => {
   loading.value = true;
 
   try {
-    await authStore.login({
+    const loginResponse = await authStore.login({
       username: form.username,
       password: form.password,
     });
 
     success('Login successful! Welcome back.');
-    router.push('/dashboard');
+
+    // Determine redirect based on user role
+    const userRoles = loginResponse.data.roles || [];
+    const isDeskOfficer = userRoles.includes('desk_officer');
+
+    // Redirect to appropriate dashboard
+    const redirectPath = isDeskOfficer ? '/do-dashboard' : '/dashboard';
+    router.push(redirectPath);
   } catch (err) {
     const response = err.response;
     if (response?.status === 422) {

@@ -91,33 +91,89 @@ class ClaimsController extends Controller
     }
 
     /**
+     * Validate that selected services are defined for the referral/PA code
+     */
+    private function validateServicesForReferralOrPACode($referralId, $paCodeId, $serviceIds)
+    {
+        $caseId = null;
+
+        // Get case ID from referral
+        if ($referralId) {
+            $referral = Referral::find($referralId);
+            if (!$referral) {
+                return ['valid' => false, 'message' => 'Referral not found'];
+            }
+            $caseId = $referral->case_id;
+        }
+
+        // Get case ID from PA code
+        if ($paCodeId) {
+            $paCode = PACode::find($paCodeId);
+            if (!$paCode) {
+                return ['valid' => false, 'message' => 'PA Code not found'];
+            }
+            $referral = $paCode->referral;
+            if ($referral) {
+                $caseId = $referral->case_id;
+            }
+        }
+
+        if (!$caseId) {
+            return ['valid' => false, 'message' => 'Could not determine case for referral/PA code'];
+        }
+
+        // Get all valid tariff items for this case
+        $validServiceIds = TariffItem::where('case_id', $caseId)
+            ->where('status', true)
+            ->pluck('id')
+            ->toArray();
+
+        // Check if all selected services are in the valid list
+        $invalidServices = array_diff($serviceIds, $validServiceIds);
+
+        if (!empty($invalidServices)) {
+            return [
+                'valid' => false,
+                'message' => 'Some selected services are not defined for this case. You may need to create a new PA code for those services.',
+                'invalid_services' => $invalidServices
+            ];
+        }
+
+        return ['valid' => true];
+    }
+
+    /**
      * Store a newly created claim
      */
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'nicare_number' => 'required|string',
-            'enrollee_name' => 'required|string',
-            'gender' => 'required|in:Male,Female',
-            'facility_id' => 'required|exists:facilities,id',
+            'referral_id' => 'nullable|exists:referrals,id',
+            'pa_code_id' => 'nullable|exists:p_a_codes,id',
+            'services' => 'required|array|min:1',
+            'services.*' => 'required|exists:tariff_items,id',
+            'nicare_number' => 'nullable|string',
+            'enrollee_name' => 'nullable|string',
+            'gender' => 'nullable|in:Male,Female',
+            'facility_id' => 'nullable|exists:facilities,id',
             'pa_code' => 'nullable|string|exists:pa_codes,pa_code',
-            'pa_request_type' => 'required|in:Initial,Follow-up,Amendment,Renewal',
-            'priority' => 'required|in:Routine,Urgent,Emergency',
-            'attending_physician_name' => 'required|string',
+            'pa_request_type' => 'nullable|in:Initial,Follow-up,Amendment,Renewal',
+            'priority' => 'nullable|in:Routine,Urgent,Emergency',
+            'attending_physician_name' => 'nullable|string',
             'attending_physician_license' => 'nullable|string',
             'attending_physician_specialization' => 'nullable|string',
-            'diagnoses' => 'required|array|min:1',
-            'diagnoses.*.type' => 'required|in:primary,secondary',
-            'diagnoses.*.icd_10_code' => 'required|string',
-            'diagnoses.*.icd_10_description' => 'required|string',
+            'diagnoses' => 'nullable|array',
+            'diagnoses.*.type' => 'nullable|in:primary,secondary',
+            'diagnoses.*.icd_10_code' => 'nullable|string',
+            'diagnoses.*.icd_10_description' => 'nullable|string',
             'diagnoses.*.illness_description' => 'nullable|string',
-            'treatments' => 'required|array|min:1',
-            'treatments.*.service_date' => 'required|date',
-            'treatments.*.service_type' => 'required|in:professional_service,hospital_stay,medication,consumable,laboratory,radiology,other',
-            'treatments.*.service_code' => 'required|string',
-            'treatments.*.service_description' => 'required|string',
-            'treatments.*.quantity' => 'required|integer|min:1',
-            'treatments.*.unit_price' => 'required|numeric|min:0',
+            'treatments' => 'nullable|array',
+            'treatments.*.service_date' => 'nullable|date',
+            'treatments.*.service_type' => 'nullable|in:professional_service,hospital_stay,medication,consumable,laboratory,radiology,other',
+            'treatments.*.service_code' => 'nullable|string',
+            'treatments.*.service_description' => 'nullable|string',
+            'treatments.*.quantity' => 'nullable|integer|min:1',
+            'treatments.*.unit_price' => 'nullable|numeric|min:0',
         ]);
 
         if ($validator->fails()) {
@@ -126,6 +182,23 @@ class ClaimsController extends Controller
                 'message' => 'Validation failed',
                 'errors' => $validator->errors()
             ], 422);
+        }
+
+        // Validate that selected services are defined for the referral/PA code
+        if ($request->referral_id || $request->pa_code_id) {
+            $serviceValidation = $this->validateServicesForReferralOrPACode(
+                $request->referral_id,
+                $request->pa_code_id,
+                $request->services ?? []
+            );
+
+            if (!$serviceValidation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $serviceValidation['message'],
+                    'invalid_services' => $serviceValidation['invalid_services'] ?? []
+                ], 422);
+            }
         }
 
         try {

@@ -118,6 +118,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useToast } from 'primevue/usetoast'
 import AdminLayout from '@/js/components/layout/AdminLayout.vue'
+import ClaimServiceSelector from '@/js/components/claims/ClaimServiceSelector.vue'
 import { formatPrice } from '@/js/utils/formatters'
 
 const router = useRouter()
@@ -127,12 +128,10 @@ const { success, error } = useToast()
 const formRef = ref(null)
 const formValid = ref(false)
 const submitting = ref(false)
-const loadingServices = ref(false)
 
 // Data
 const referrals = ref([])
 const paCodes = ref([])
-const availableServices = ref([])
 
 // Selected values
 const selectedReferralId = ref(null)
@@ -148,12 +147,7 @@ const rules = {
   }
 }
 
-// Computed
-const totalAmount = computed(() => {
-  return availableServices.value
-    .filter(s => selectedServices.value.includes(s.id))
-    .reduce((total, service) => total + (parseFloat(service.price) || 0), 0)
-})
+// Computed - totalAmount is now handled by ClaimServiceSelector component
 
 // Methods
 const fetchReferrals = async () => {
@@ -184,67 +178,25 @@ const fetchPACodes = async () => {
   }
 }
 
-const onReferralSelected = async () => {
+const onReferralSelected = () => {
   selectedPACodeId.value = null
   selectedServices.value = []
-  await fetchServices()
 }
 
-const onPACodeSelected = async () => {
+const onPACodeSelected = () => {
   selectedReferralId.value = null
   selectedServices.value = []
-  await fetchServices()
 }
 
-const fetchServices = async () => {
-  if (!selectedReferralId.value && !selectedPACodeId.value) {
-    availableServices.value = []
-    return
-  }
-
-  loadingServices.value = true
-  try {
-    const params = new URLSearchParams()
-    if (selectedReferralId.value) {
-      params.append('referral_id', selectedReferralId.value)
-    }
-    if (selectedPACodeId.value) {
-      params.append('pa_code_id', selectedPACodeId.value)
-    }
-
-    const response = await fetch(`/api/v1/claims/services/for-referral-or-pacode?${params}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-      }
-    })
-    const data = await response.json()
-    availableServices.value = data.data || []
-
-    if (availableServices.value.length === 0) {
-      error({
-        summary: 'No Services',
-        detail: 'No services are defined for this case. You may need to create a new PA code for additional services.',
-        life: 5000
-      })
-    }
-  } catch (err) {
-    console.error('Failed to fetch services:', err)
+const onServicesLoaded = (services) => {
+  // Services loaded from ClaimServiceSelector
+  if (services.length === 0) {
     error({
-      summary: 'Error',
-      detail: 'Failed to load services',
+      summary: 'No Services',
+      detail: 'No services are defined for this case. You may need to create a new PA code for additional services.',
       life: 5000
     })
-  } finally {
-    loadingServices.value = false
   }
-}
-
-const onServicesSelected = () => {
-  // Services selected
-}
-
-const getServiceLabel = (item) => {
-  return `${item.raw.tariff_item} (₦${formatPrice(item.raw.price || 0)})`
 }
 
 const submitClaim = async () => {
@@ -301,7 +253,6 @@ const resetForm = () => {
   selectedReferralId.value = null
   selectedPACodeId.value = null
   selectedServices.value = []
-  availableServices.value = []
   formRef.value?.resetValidation()
 }
 

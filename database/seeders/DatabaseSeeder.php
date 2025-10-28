@@ -20,5 +20,8 @@ class DatabaseSeeder extends Seeder
         $this->call(CaseCategorySeeder::class);
         $this->call(CaseTypeSeeder::class);
         $this->call(ServiceTypeSeeder::class);
+
+        // Create test desk officer for testing
+        $this->call(TestDeskOfficerSeeder::class);
     }
 }

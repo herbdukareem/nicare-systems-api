@@ -8,6 +8,8 @@ use App\Models\Facility;
 use App\Models\DOFacility;
 use App\Models\DeskOfficer;
 use App\Models\Role;
+use App\Models\Department;
+use App\Models\Designation;
 use Illuminate\Support\Facades\Hash;
 
 class TestDeskOfficerSeeder extends Seeder
@@ -17,6 +19,18 @@ class TestDeskOfficerSeeder extends Seeder
         // Get or create desk officer role
         $deskOfficerRole = Role::firstOrCreate(['name' => 'desk_officer']);
 
+        // Get or create department
+        $department = Department::firstOrCreate(
+            ['name' => 'Operations'],
+            ['description' => 'Operations Department', 'status' => 'active']
+        );
+
+        // Get or create designation
+        $designation = Designation::firstOrCreate(
+            ['title' => 'Desk Officer'],
+            ['department_id' => $department->id, 'description' => 'Desk Officer Role', 'status' => 'active']
+        );
+
         // Create a test desk officer
         $deskOfficer = DeskOfficer::firstOrCreate([
             'email' => 'test.do@ngscha.gov.ng',
@@ -24,8 +38,8 @@ class TestDeskOfficerSeeder extends Seeder
             'first_name' => 'Test',
             'last_name' => 'DeskOfficer',
             'phone' => '08012345678',
-            'department_id' => 1,
-            'designation_id' => 1,
+            'department_id' => $department->id,
+            'designation_id' => $designation->id,
             'status' => true,
         ]);
 
