@@ -96,14 +96,18 @@ export const useAuthStore = defineStore('auth', {
     },
 
    async fetchUser() {
-      if (!this.token) return false;
+      if (!this.token) {
+        console.warn('[Auth] fetchUser called without token');
+        return false;
+      }
 
       try {
+        console.log('[Auth] Fetching user data...');
         const response = await authAPI.getUser();
-        console.log(response)
+        console.log('[Auth] User fetch response:', response?.data);
+
         // Expecting { success: true, data: { ...user } }
         if (response?.data?.success) {
-
           this.user = response.data.data;
           this.isAuthenticated = true;
 
@@ -133,15 +137,20 @@ export const useAuthStore = defineStore('auth', {
             localStorage.setItem('currentRole', JSON.stringify(this.currentRole));
           }
 
+          console.log('[Auth] User authenticated successfully:', this.user.username);
           return true; // ✅ success
         }
 
         // Backend responded but not success
+        console.warn('[Auth] User fetch failed - backend returned success=false');
         this.isAuthenticated = false;
         return false;
       } catch (error) {
         // ❌ Do NOT logout here — just mark unauthenticated and let the caller decide
-        console.error('Failed to fetch user:', error);
+        console.error('[Auth] Failed to fetch user:', error.message || error);
+        if (error.response?.status === 401) {
+          console.warn('[Auth] Token appears to be invalid (401)');
+        }
         this.isAuthenticated = false;
         return false;
       }
@@ -173,14 +182,20 @@ export const useAuthStore = defineStore('auth', {
 
     // Initialize auth state from localStorage
    async initializeAuth() {
-  if (this._initializing) return;
+  if (this._initializing) {
+    console.log('[Auth] Already initializing, skipping...');
+    return;
+  }
 
   this._initializing = true;
+  console.log('[Auth] Initializing authentication...');
+
   try {
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
 
     if (token) {
+      console.log('[Auth] Token found in localStorage');
       this.token = token;
 
       // First, try to restore user from localStorage to avoid flicker
@@ -204,14 +219,17 @@ export const useAuthStore = defineStore('auth', {
           } else {
             this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
           }
+          console.log('[Auth] Restored user from localStorage:', user.username);
         } catch (error) {
-          console.error('Failed to parse saved user:', error);
+          console.error('[Auth] Failed to parse saved user:', error);
         }
       }
 
       // Then verify token is still valid by fetching fresh user data
+      console.log('[Auth] Verifying token validity...');
       const ok = await this.fetchUser();
       if (!ok) {
+        console.warn('[Auth] Token validation failed - clearing auth state');
 
         // Token invalid or /user failed — clear quietly, no redirect here
         this.user = null;
@@ -223,10 +241,17 @@ export const useAuthStore = defineStore('auth', {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('currentRole');
+      } else {
+        console.log('[Auth] Token validated successfully');
       }
+    } else {
+      console.log('[Auth] No token found in localStorage');
     }
+  } catch (error) {
+    console.error('[Auth] Error during initialization:', error);
   } finally {
     this._initializing = false;
+    console.log('[Auth] Initialization complete');
   }
 },
 

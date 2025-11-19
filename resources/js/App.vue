@@ -18,11 +18,7 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue';
-import { useAuthStore } from './stores/auth';
 import ToastContainer from './components/layout/ToastContainer.vue';
-
-const authStore = useAuthStore();
 
 // Route transition handlers
 const onEnter = (el) => {
@@ -42,10 +38,8 @@ const onLeave = (el) => {
   el.style.transform = 'translateY(-10px)';
 };
 
-onMounted(() => {
-  // Initialize authentication state on app load
-  authStore.initializeAuth();
-});
+// Note: Auth initialization is handled in app.js before mounting
+// to prevent logout-on-refresh flicker
 </script>
 
 <style>
