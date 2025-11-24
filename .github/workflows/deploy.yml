@@ -25,11 +25,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          # Vite requires 20.19+ or 22.12+
           node-version: '20.19.0'
           cache: 'npm'
-          # optional, but helps if lockfile is not in root
-          # cache-dependency-path: package-lock.json
 
       - name: Install PHP dependencies
         run: composer install --no-dev --optimize-autoloader
@@ -46,6 +43,7 @@ jobs:
           mkdir -p deployment
           tar -czf deployment/nicare-api-${{ github.sha }}.tar.gz \
             --exclude='.git' \
+            --exclude='./deployment' \
             --exclude='node_modules' \
             --exclude='.env.local' \
             --exclude='storage/logs/*' \
