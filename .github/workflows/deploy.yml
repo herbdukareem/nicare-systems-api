@@ -63,8 +63,8 @@ jobs:
       - name: Deploy application
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.CPANEL_SSH_HOST }}
-          port: ${{ secrets.CPANEL_SSH_PORT }}          # <— same port here
+          host: 199.250.205.212 # <— secrets.CPANEL_SSH_HOST 
+          port: 2222  #{{ secrets.CPANEL_SSH_PORT }}          # <— same port here
           username: ${{ secrets.CPANEL_SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
