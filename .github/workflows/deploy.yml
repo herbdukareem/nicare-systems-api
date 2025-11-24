@@ -1,4 +1,4 @@
-name: Deploy to Production
+name: Deploy NiCare API to Production
 
 on:
   push:
@@ -11,10 +11,13 @@ jobs:
     if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
-      - uses: actions/checkout@v4
+      # 1. Checkout code
+      - name: Checkout repository
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
+      # 2. Setup PHP
       - name: Setup PHP
         uses: shivammathur/setup-php@v2
         with:
@@ -22,22 +25,27 @@ jobs:
           extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, bcmath, soap, intl, gd, exif, iconv
           tools: composer:v2
 
+      # 3. Setup Node (Vite requires Node 20.19+)
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '20.19.0'
           cache: 'npm'
 
+      # 4. Install PHP dependencies
       - name: Install PHP dependencies
         run: composer install --no-dev --optimize-autoloader
 
+      # 5. Install Node dependencies
       - name: Install Node dependencies
         run: |
           npm ci --no-audit --prefer-offline
 
+      # 6. Build frontend assets
       - name: Build frontend assets
         run: npm run build
 
+      # 7. Create deployment package (tar.gz)
       - name: Create deployment package
         run: |
           mkdir -p deployment
@@ -45,35 +53,63 @@ jobs:
             --exclude='.git' \
             --exclude='./deployment' \
             --exclude='node_modules' \
+            --exclude='vendor' \
             --exclude='.env.local' \
             --exclude='storage/logs/*' \
             --exclude='bootstrap/cache/*' \
             .
 
-      - name: Upload to deployment server
+      # 8. Upload artifact for manual deployment (workaround)
+      #    You can download this from the GitHub Actions UI and upload/extract via cPanel.
+      - name: Upload deployment package as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nicare-api-package-${{ github.sha }}
+          path: deployment/nicare-api-${{ github.sha }}.tar.gz
+          if-no-files-found: error
+
+      # 9. (Optional) Upload package to server via SCP
+      #    This will ONLY run if you set secret REMOTE_DEPLOY_ENABLED="true".
+      - name: Upload to deployment server (SCP)
+        if: secrets.REMOTE_DEPLOY_ENABLED == 'true'
         uses: appleboy/scp-action@master
         with:
-          host: 199.250.205.212 #{{ secrets.CPANEL_SSH_HOST }}
-          port: 2222 #{{ secrets.CPANEL_SSH_PORT }}          # <— use port 2222
-          username: ${{ secrets.CPANEL_SSH_USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ secrets.CPANEL_SSH_HOST }}       # e.g. 199.250.205.212
+          port: ${{ secrets.CPANEL_SSH_PORT }}       # 2222
+          username: ${{ secrets.CPANEL_SSH_USERNAME }} # ngshia5
+          key: ${{ secrets.SSH_PRIVATE_KEY }}        # nicare_deploy private key
           source: "deployment/nicare-api-${{ github.sha }}.tar.gz"
           target: "/tmp"
+          debug: true
 
-      - name: Deploy application
+      # 10. (Optional) Deploy application on server via SSH
+      #     Also guarded by REMOTE_DEPLOY_ENABLED.
+      - name: Deploy application (SSH)
+        if: secrets.REMOTE_DEPLOY_ENABLED == 'true'
         uses: appleboy/ssh-action@master
         with:
-          host: 199.250.205.212 # <— secrets.CPANEL_SSH_HOST 
-          port: 2222  #{{ secrets.CPANEL_SSH_PORT }}          # <— same port here
+          host: ${{ secrets.CPANEL_SSH_HOST }}
+          port: ${{ secrets.CPANEL_SSH_PORT }}       # 2222
           username: ${{ secrets.CPANEL_SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
+          debug: true
           script: |
             DEPLOY_PATH="${{ secrets.CPANEL_DEPLOY_PATH }}"
+
             cd "$DEPLOY_PATH"
+
+            # Extract the uploaded archive
             tar -xzf /tmp/nicare-api-${{ github.sha }}.tar.gz -C .
+
+            # Install / optimize dependencies on the server
             composer install --no-dev --optimize-autoloader
+
             php artisan migrate --force
             php artisan cache:clear
             php artisan config:cache
             php artisan route:cache
             php artisan view:cache
+
+            # These may be no-ops on cPanel, but harmless if they fail
+            systemctl restart php-fpm || true
+            systemctl restart nginx || true
