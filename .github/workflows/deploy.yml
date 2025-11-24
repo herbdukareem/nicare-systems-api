@@ -53,8 +53,8 @@ jobs:
       - name: Upload to deployment server
         uses: appleboy/scp-action@master
         with:
-          host: ${{ secrets.CPANEL_SSH_HOST }}
-          port: ${{ secrets.CPANEL_SSH_PORT }}          # <— use port 2222
+          host: 199.250.205.212 #{{ secrets.CPANEL_SSH_HOST }}
+          port: 2222 #{{ secrets.CPANEL_SSH_PORT }}          # <— use port 2222
           username: ${{ secrets.CPANEL_SSH_USERNAME }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           source: "deployment/nicare-api-${{ github.sha }}.tar.gz"
