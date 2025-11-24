@@ -11,20 +11,17 @@ use App\Models\Role;
 use App\Models\Department;
 use App\Models\Designation;
 use Illuminate\Support\Facades\Hash;
-
 class TestDeskOfficerSeeder extends Seeder
 {
     public function run(): void
     {
         // Get or create desk officer role
         $deskOfficerRole = Role::firstOrCreate(['name' => 'desk_officer']);
-
         // Get or create department
         $department = Department::firstOrCreate(
             ['name' => 'Operations'],
             ['description' => 'Operations Department', 'status' => 'active']
         );
-
         // Get or create designation
         $designation = Designation::firstOrCreate(
             ['title' => 'Desk Officer'],
