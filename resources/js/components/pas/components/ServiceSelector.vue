@@ -314,5 +314,4 @@ onMounted(() => {
   loadCaseGroups();
 });
 </script>
-
 <!-- update selector -->
