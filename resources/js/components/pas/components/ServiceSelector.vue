@@ -18,7 +18,6 @@
         </div>
       </div>
     </v-alert>
-
     <!-- Cases Selection Section -->
     <v-card class="tw-mb-6">
       <v-card-title class="tw-bg-blue-50 tw-text-blue-800">
@@ -315,3 +314,5 @@ onMounted(() => {
   loadCaseGroups();
 });
 </script>
+
+<!-- update selector -->
