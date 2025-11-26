@@ -25,9 +25,11 @@
         <v-icon class="tw-mr-2">mdi-medical-bag</v-icon>
         Select Cases
       </v-card-title>
+       
       <v-card-text class="tw-pt-4">
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4 tw-mb-4">
           <!-- Filter by Case Group -->
+         
           <v-select
             v-model="selectedGroup"
             :items="caseGroups"
@@ -54,7 +56,7 @@
         <v-autocomplete
           v-model="selectedCaseIds"
           :items="filteredServices"
-          item-title="case_description"
+          item-title="service_description"
           item-value="id"
           label="Select Cases *"
           variant="outlined"
@@ -68,7 +70,7 @@
         >
           <template #item="{ props, item }">
             <v-list-item v-bind="props">
-              <v-list-item-title>{{ item.raw.case_description }}</v-list-item-title>
+              <!-- <v-list-item-title>{{ item.raw.service_description }}</v-list-item-title> -->
               <v-list-item-subtitle>
                 {{ item.raw.nicare_code }} - ₦{{ formatPrice(item.raw.price || 0) }}
               </v-list-item-subtitle>
@@ -79,7 +81,7 @@
             <v-chip
               v-bind="props"
               closable
-              :text="getChipLabel(item)"
+              :text="getChipLabel(item.raw.id)"
             />
           </template>
 
@@ -111,7 +113,7 @@
             <div class="tw-space-y-2">
               <div v-for="caseItem in selectedCasesData" :key="caseItem.id" class="tw-flex tw-items-center tw-justify-between tw-p-2 tw-bg-white tw-rounded tw-border tw-border-green-100">
                 <div>
-                  <p class="tw-font-medium tw-text-gray-900">{{ caseItem.case_description }}</p>
+                  <p class="tw-font-medium tw-text-gray-900">{{ caseItem.service_description }}</p>
                   <p class="tw-text-sm tw-text-gray-600">{{ caseItem.nicare_code }}</p>
                 </div>
                 <span class="tw-font-semibold tw-text-green-600">₦{{ formatPrice(caseItem.price || 0) }}</span>
@@ -208,7 +210,7 @@ const filteredServices = computed(() => {
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase();
     filtered = filtered.filter(service =>
-      service.case_description.toLowerCase().includes(query) ||
+      service.service_description.toLowerCase().includes(query) ||
       service.nicare_code.toLowerCase().includes(query)
     );
   }
@@ -289,9 +291,10 @@ const formatPrice = (price) => {
 const getChipLabel = (item) => {
   const service = services.value.find(s => s.id === item);
   if (service) {
-    const label = service.service_description || service.case_description;
+    const label = service.service_description || service.service_description;
     return `${label} (₦${formatPrice(service.price || 0)})`;
   }
+  console.log('Service not found:', item);
   return `Case #${item}`;
 };
 
