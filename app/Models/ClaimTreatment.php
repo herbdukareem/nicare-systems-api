@@ -15,6 +15,10 @@ class ClaimTreatment extends Model
         'claim_id',
         'service_date',
         'service_type',
+        // Simplified: item_type distinguishes bundle vs FFS
+        'item_type',
+        'pa_code_id',       // Required for FFS items
+        'tariff_item_id',   // Price lookup
         'service_code',
         'service_description',
         'quantity',
@@ -69,7 +73,27 @@ class ClaimTreatment extends Model
         return $this->hasMany(ClaimAttachment::class, 'treatment_id');
     }
 
+    // Simplified: Link to PA code for FFS items
+    public function paCode(): BelongsTo
+    {
+        return $this->belongsTo(PACode::class, 'pa_code_id');
+    }
+
+    public function tariffItem(): BelongsTo
+    {
+        return $this->belongsTo(TariffItem::class, 'tariff_item_id');
+    }
+
     // Scopes
+    public function scopeBundle($query)
+    {
+        return $query->where('item_type', 'bundle');
+    }
+
+    public function scopeFfs($query)
+    {
+        return $query->where('item_type', 'ffs');
+    }
     public function scopeByServiceType($query, $type)
     {
         return $query->where('service_type', $type);
@@ -96,7 +120,7 @@ class ClaimTreatment extends Model
     }
 
     // Methods
-    public function validateByDoctor(User $doctor, string $comments = null): void
+    public function validateByDoctor(User $doctor, ?string $comments = null): void
     {
         $this->update([
             'doctor_validated' => true,
@@ -108,7 +132,7 @@ class ClaimTreatment extends Model
         $this->logValidation('doctor_treatment_validated', $doctor, $comments);
     }
 
-    public function validateByPharmacist(User $pharmacist, string $comments = null): void
+    public function validateByPharmacist(User $pharmacist, ?string $comments = null): void
     {
         if ($this->service_type !== 'medication') {
             throw new \Exception('Only medications can be validated by pharmacists');
@@ -124,7 +148,7 @@ class ClaimTreatment extends Model
         $this->logValidation('pharmacist_treatment_validated', $pharmacist, $comments);
     }
 
-    public function validateTariff(float $tariffAmount, string $notes = null): void
+    public function validateTariff(float $tariffAmount, ?string $notes = null): void
     {
         $this->update([
             'tariff_validated' => true,
@@ -142,7 +166,29 @@ class ClaimTreatment extends Model
         return $this->service_type === 'medication';
     }
 
-    private function logValidation(string $action, User $user, string $comments = null): void
+    /**
+     * Check if this is an FFS item that requires a PA code
+     */
+    public function requiresPACode(): bool
+    {
+        return $this->item_type === 'ffs';
+    }
+
+    /**
+     * Check if this FFS item has a valid approved PA code
+     */
+    public function hasValidPA(): bool
+    {
+        if ($this->item_type !== 'ffs') {
+            return true; // Bundle items don't need PA
+        }
+
+        return $this->pa_code_id !== null &&
+               $this->paCode &&
+               in_array($this->paCode->status, ['active', 'used']);
+    }
+
+    private function logValidation(string $action, User $user, ?string $comments = null): void
     {
         ClaimAuditLog::create([
             'claim_id' => $this->claim_id,

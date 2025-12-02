@@ -5,8 +5,16 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Str;
 
+/**
+ * Simplified PACode Model
+ *
+ * Two types of PA codes:
+ * - bundle: Authorizes the bundle claim for the referral's principal diagnosis
+ * - ffs: Authorizes a specific FFS service during admission (requires admission_id)
+ */
 class PACode extends Model
 {
     use HasFactory;
@@ -17,7 +25,6 @@ class PACode extends Model
         'issued_at' => 'datetime',
         'expires_at' => 'datetime',
         'used_at' => 'datetime',
-        'claim_submitted_at' => 'datetime',
         'approved_amount' => 'decimal:2',
         'created_at' => 'datetime',
         'updated_at' => 'datetime'
@@ -29,9 +36,19 @@ class PACode extends Model
         return $this->belongsTo(Referral::class);
     }
 
-    public function claims(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function admission(): BelongsTo
+    {
+        return $this->belongsTo(Admission::class);
+    }
+
+    public function claims(): HasMany
     {
         return $this->hasMany(Claim::class, 'pa_code_id');
+    }
+
+    public function claimTreatments(): HasMany
+    {
+        return $this->hasMany(ClaimTreatment::class, 'pa_code_id');
     }
 
     public function issuedBy(): BelongsTo
@@ -44,6 +61,21 @@ class PACode extends Model
     {
         return $query->where('status', 'active')
                     ->where('expires_at', '>', now());
+    }
+
+    public function scopeBundle($query)
+    {
+        return $query->where('pa_type', 'bundle');
+    }
+
+    public function scopeFfs($query)
+    {
+        return $query->where('pa_type', 'ffs');
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->whereIn('status', ['active', 'used']);
     }
 
     public function scopeExpired($query)
@@ -71,6 +103,16 @@ class PACode extends Model
     public function getCanBeUsedAttribute(): bool
     {
         return $this->is_active && $this->usage_count < $this->max_usage;
+    }
+
+    public function getIsBundleAttribute(): bool
+    {
+        return $this->pa_type === 'bundle';
+    }
+
+    public function getIsFfsAttribute(): bool
+    {
+        return $this->pa_type === 'ffs';
     }
 
     // Methods

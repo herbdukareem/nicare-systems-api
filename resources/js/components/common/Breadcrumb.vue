@@ -64,6 +64,7 @@ const breadcrumbMappings = {
   '/case-categories': [{ name: 'Pre-authorization System' }, { name: 'Case Categories' }],
   '/service-categories': [{ name: 'Pre-authorization System' }, { name: 'Service Categories' }],
   '/do-facilities': [{ name: 'Pre-authorization System' }, { name: 'DO Facility Assignments' }],
+  '/document-requirements': [{ name: 'Pre-authorization System' }, { name: 'Document Requirements' }],
   '/claims/referrals': [{ name: 'Claims Management' }, { name: 'Manage Referrals' }],
   '/claims/submissions': [{ name: 'Claims Management' }, { name: 'Claim Submissions' }],
   '/claims/history': [{ name: 'Claims Management' }, { name: 'Claims History' }],

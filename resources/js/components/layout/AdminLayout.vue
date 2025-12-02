@@ -386,6 +386,11 @@ const menuItems = [
         name: 'DO Facility Assignments',
         path: '/do-facilities',
         icon: 'mdi-hospital-marker'
+      },
+      {
+        name: 'Document Requirements',
+        path: '/document-requirements',
+        icon: 'mdi-file-document-check'
       }
     ]
   },
@@ -431,6 +436,28 @@ const menuItems = [
         name: 'Claims History',
         path: '/claims/history',
         icon: 'mdi-history'
+      }
+    ]
+  },
+  {
+    name: 'Claims Automation',
+    icon: 'mdi-robot',
+    children: [
+      {
+        name: 'Admission Management',
+        path: '/claims/automation/admissions',
+        icon: 'mdi-hospital-building',
+        badge: 'New'
+      },
+      {
+        name: 'Claims Processing',
+        path: '/claims/automation/process',
+        icon: 'mdi-cog-transfer'
+      },
+      {
+        name: 'Bundle Management',
+        path: '/claims/automation/bundles',
+        icon: 'mdi-package-variant-closed'
       }
     ]
   },

@@ -382,8 +382,56 @@ export const designationAPI = {
   delete: (id) => api.delete(`/v1/designations/${id}`),
 };
 
+// Claims Automation API - Hybrid Bundle/FFS Payment Model
+export const claimsAutomationAPI = {
+  // Admission Management
+  createAdmission: (data) => api.post('/v1/pas/claims/automation/admissions', data),
+  dischargePatient: (admissionId, data) => api.post(`/v1/pas/claims/automation/admissions/${admissionId}/discharge`, data),
+  getAdmissionHistory: (params) => api.get('/v1/pas/claims/automation/admissions/history', { params }),
 
+  // Claim Processing
+  processClaim: (claimId) => api.post(`/v1/pas/claims/automation/${claimId}/process`),
+  getClaimPreview: (claimId) => api.get(`/v1/pas/claims/automation/${claimId}/preview`),
+  validateClaim: (claimId) => api.post(`/v1/pas/claims/automation/${claimId}/validate`),
+  classifyTreatments: (claimId) => api.post(`/v1/pas/claims/automation/${claimId}/classify`),
+  buildSections: (claimId) => api.post(`/v1/pas/claims/automation/${claimId}/build-sections`),
 
+  // Diagnosis Management
+  addDiagnosis: (claimId, data) => api.post(`/v1/pas/claims/automation/${claimId}/diagnoses`, data),
 
+  // PA Code Management
+  detectMissingPAs: (claimId) => api.get(`/v1/pas/claims/automation/${claimId}/missing-pas`),
+
+  // Treatment Management
+  convertToFFS: (treatmentId, data) => api.post(`/v1/pas/claims/automation/treatments/${treatmentId}/convert-to-ffs`, data),
+
+  // Compliance Alerts
+  getComplianceAlerts: (claimId) => api.get(`/v1/pas/claims/automation/${claimId}/alerts`),
+  resolveAlert: (alertId, data) => api.post(`/v1/pas/claims/automation/alerts/${alertId}/resolve`, data),
+  overrideAlert: (alertId, data) => api.post(`/v1/pas/claims/automation/alerts/${alertId}/override`, data),
+};
+
+// Bundle Management API
+export const bundleAPI = {
+  getAll: (params) => api.get('/v1/bundles', { params }),
+  getById: (id) => api.get(`/v1/bundles/${id}`),
+  findByDiagnosis: (diagnosisCode) => api.get('/v1/bundles/find-by-diagnosis', { params: { diagnosis_code: diagnosisCode } }),
+  create: (data) => api.post('/v1/bundles', data),
+  update: (id, data) => api.put(`/v1/bundles/${id}`, data),
+  delete: (id) => api.delete(`/v1/bundles/${id}`),
+};
+
+// Document Requirements API
+export const documentRequirementAPI = {
+  getAll: (params) => api.get('/v1/document-requirements', { params }),
+  getById: (id) => api.get(`/v1/document-requirements/${id}`),
+  create: (data) => api.post('/v1/document-requirements', data),
+  update: (id, data) => api.put(`/v1/document-requirements/${id}`, data),
+  delete: (id) => api.delete(`/v1/document-requirements/${id}`),
+  forReferral: () => api.get('/v1/document-requirements/for-referral'),
+  forPACode: () => api.get('/v1/document-requirements/for-pa-code'),
+  toggleStatus: (id) => api.post(`/v1/document-requirements/${id}/toggle-status`),
+  reorder: (items) => api.post('/v1/document-requirements/reorder', { items }),
+};
 
 export default api;

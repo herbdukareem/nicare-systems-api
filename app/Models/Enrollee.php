@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use App\Enums\Status;
 
@@ -12,6 +13,7 @@ use App\Enums\Status;
  */
 class Enrollee extends Model
 {
+    use HasFactory;
 
 
     /**

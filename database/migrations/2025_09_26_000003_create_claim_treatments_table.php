@@ -26,7 +26,7 @@ return new class extends Migration
                 'radiology',
                 'other'
             ]);
-            $table->string('service_code');
+            $table->string('service_code')->nullable();
             $table->text('service_description');
             $table->integer('quantity')->default(1);
             $table->decimal('unit_price', 10, 2);

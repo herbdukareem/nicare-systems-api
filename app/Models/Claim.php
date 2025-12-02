@@ -40,6 +40,11 @@ class Claim extends Model
         'total_amount_claimed',
         'total_amount_approved',
         'total_amount_paid',
+        // Simplified: Link claim to admission (which links to UTN)
+        'admission_id',
+        'bundle_amount',
+        'ffs_amount',
+        // End simplified fields
         'submitted_at',
         'submitted_by',
         'doctor_reviewed_at',
@@ -67,6 +72,8 @@ class Claim extends Model
         'total_amount_claimed' => 'decimal:2',
         'total_amount_approved' => 'decimal:2',
         'total_amount_paid' => 'decimal:2',
+        'bundle_amount' => 'decimal:2',
+        'ffs_amount' => 'decimal:2',
         'submitted_at' => 'datetime',
         'doctor_reviewed_at' => 'datetime',
         'pharmacist_reviewed_at' => 'datetime',
@@ -135,6 +142,28 @@ class Claim extends Model
     public function auditLogs(): HasMany
     {
         return $this->hasMany(ClaimAuditLog::class);
+    }
+
+    // Simplified: Link to admission (which links to UTN via referral)
+    public function admission(): BelongsTo
+    {
+        return $this->belongsTo(Admission::class);
+    }
+
+    /**
+     * Get bundle treatments (covered by bundle tariff)
+     */
+    public function bundleTreatments(): HasMany
+    {
+        return $this->hasMany(ClaimTreatment::class)->where('item_type', 'bundle');
+    }
+
+    /**
+     * Get FFS treatments (require PA code)
+     */
+    public function ffsTreatments(): HasMany
+    {
+        return $this->hasMany(ClaimTreatment::class)->where('item_type', 'ffs');
     }
 
     // Scopes

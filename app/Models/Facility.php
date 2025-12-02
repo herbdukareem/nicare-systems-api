@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 /**
@@ -11,6 +12,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Facility extends Model
 {
+    use HasFactory;
     /**
      * The table associated with the model.
      *
@@ -19,24 +21,11 @@ class Facility extends Model
     protected $table = 'facilities';
 
     /**
-     * Mass assignable attributes.
+     * The attributes that are mass assignable.
      *
      * @var array<int, string>
      */
-    protected $fillable = [
-        'hcp_code',
-        'name',
-        'ownership',
-        'level_of_care',
-        'address',
-        'phone',
-        'email',
-        'lga_id',
-        'ward_id',
-        'capacity',
-        'status',
-        'account_detail_id',
-    ];
+    protected $guarded = ['id'];
 
     /**
      * Facility belongs to an LGA.
@@ -88,6 +77,12 @@ class Facility extends Model
         return $this->hasMany(Enrollee::class);
     }
 
+    // facility capacity to count from enrollee model
+    public function getFacilityCapacityAttribute()
+    {
+        return $this->enrollees()->count();
+    }
+
     /**
      * Scope to filter by level of care
      */
@@ -125,4 +120,7 @@ class Facility extends Model
     {
         return ['Primary', 'Secondary', 'Tertiary'];
     }
+
+    // appends
+    protected $appends = ['facility_capacity'];
 }

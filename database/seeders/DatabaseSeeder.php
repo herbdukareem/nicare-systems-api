@@ -23,5 +23,11 @@ class DatabaseSeeder extends Seeder
 
         // Create test desk officer for testing
         $this->call(TestDeskOfficerSeeder::class);
+
+        // Claims Automation bundles and test data
+        $this->call(ClaimsAutomationSeeder::class);
+
+        // Document requirements for referral and PA code requests
+        $this->call(DocumentRequirementSeeder::class);
     }
 }

@@ -107,7 +107,7 @@
                 {{ facility.status ? 'Active' : 'Inactive' }}
               </v-chip>
               <span class="tw-text-xs tw-text-gray-500">
-                Capacity: {{ facility.capacity || 'N/A' }}
+                Capacity: {{ facility.capacity || '' }}
               </span>
             </div>
           </div>

@@ -381,6 +381,19 @@ const routes = [
     }
   },
 
+  // Document Requirements Management Routes
+  {
+    path: '/document-requirements',
+    name: 'document-requirements-management',
+    component: () => import('../components/pas/DocumentRequirementsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Document Requirements',
+      description: 'Manage document requirements for referrals and PA codes',
+      breadcrumb: 'Document Requirements'
+    }
+  },
+
   // Claims Routes
   {
     path: '/claims/referrals',
@@ -401,6 +414,63 @@ const routes = [
     component: () => import('../components/common/ComingSoonPage.vue'),
     meta: { requiresAuth: true },
     props: { title: 'Claims History', subtitle: 'View claims history and reports', icon: 'mdi-history' }
+  },
+
+  // Claims Automation Routes (Bundle/FFS Hybrid Payment Model)
+  {
+    path: '/claims/automation/admissions',
+    name: 'claims-automation-admissions',
+    component: () => import('../components/claims/automation/AdmissionManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Admission Management',
+      description: 'Manage patient admissions for episode-of-care tracking',
+      breadcrumb: 'Admission Management'
+    }
+  },
+  {
+    path: '/claims/automation/admissions/:id',
+    name: 'claims-automation-admission-detail',
+    component: () => import('../components/claims/automation/AdmissionDetailPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Admission Details',
+      description: 'View admission details and linked claims',
+      breadcrumb: 'Admission Details'
+    }
+  },
+  {
+    path: '/claims/automation/process',
+    name: 'claims-automation-process',
+    component: () => import('../components/claims/automation/ClaimsProcessingPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Claims Processing',
+      description: 'Process claims with bundle classification and FFS top-ups',
+      breadcrumb: 'Claims Processing'
+    }
+  },
+  {
+    path: '/claims/automation/process/:id',
+    name: 'claims-automation-process-claim',
+    component: () => import('../components/claims/automation/ClaimsProcessingPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Process Claim',
+      description: 'Process and build claim sections',
+      breadcrumb: 'Process Claim'
+    }
+  },
+  {
+    path: '/claims/automation/bundles',
+    name: 'claims-automation-bundles',
+    component: () => import('../components/claims/automation/BundleManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Bundle Management',
+      description: 'Manage bundle tariffs and configurations',
+      breadcrumb: 'Bundle Management'
+    }
   },
 
   // Facilities

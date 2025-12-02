@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Models\Staff;
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -23,6 +24,15 @@ class UserFactory extends Factory
      */
     public function definition(): array
     {
+        // Create a Staff record for the polymorphic relationship
+        $staff = Staff::create([
+            'first_name' => fake()->firstName(),
+            'last_name' => fake()->lastName(),
+            'email' => fake()->unique()->safeEmail(),
+            'phone' => fake()->phoneNumber(),
+            'status' => 1,
+        ]);
+
         return [
             'name' => fake()->name(),
             'email' => fake()->unique()->safeEmail(),
@@ -31,8 +41,8 @@ class UserFactory extends Factory
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
             'status' => 1,
-            'userable_type' => null,
-            'userable_id' => null,
+            'userable_type' => 'App\\Models\\Staff',
+            'userable_id' => $staff->id,
         ];
     }
 

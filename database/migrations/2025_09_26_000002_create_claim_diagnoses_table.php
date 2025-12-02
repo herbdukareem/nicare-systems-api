@@ -16,7 +16,7 @@ return new class extends Migration
             $table->unsignedBigInteger('claim_id');
             
             // Diagnosis Information
-            $table->enum('type', ['primary', 'secondary']);
+            $table->enum('type', ['primary', 'secondary', 'complication']);
             $table->string('icd_10_code');
             $table->string('icd_10_description');
             $table->text('illness_description')->nullable();

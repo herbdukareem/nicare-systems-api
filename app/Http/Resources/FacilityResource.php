@@ -25,7 +25,7 @@ class FacilityResource extends JsonResource
             'email' => $this->email,
             'lga' => new LgaResource($this->whenLoaded('lga')),
             'ward' => new WardResource($this->whenLoaded('ward')),
-            'capacity' => $this->capacity,
+            'capacity' => $this->facility_capacity,
             'status' => $this->status,
             'account_detail' => new AccountDetailResource($this->whenLoaded('accountDetail')),
             'created_at' => $this->created_at,

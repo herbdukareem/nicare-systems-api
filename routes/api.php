@@ -45,6 +45,7 @@ use App\Http\Controllers\Api\V1\ServiceTypeController;
 use App\Http\Controllers\Api\V1\CaseTypeController;
 use App\Http\Controllers\Api\V1\DOFacilityController;
 use App\Http\Controllers\Api\V1\DODashboardController;
+use App\Http\Controllers\Api\V1\DocumentRequirementController;
 use App\Http\Controllers\ClaimsController;
 use App\Http\Controllers\DoctorReviewController;
 use App\Http\Controllers\PharmacistReviewController;
@@ -224,6 +225,19 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::apiResource('service-types', ServiceTypeController::class)->only(['index', 'show']);
     Route::apiResource('case-types', CaseTypeController::class)->only(['index', 'show']);
 
+    // Document Requirements Management
+    Route::prefix('document-requirements')->group(function () {
+        Route::get('/', [DocumentRequirementController::class, 'index']);
+        Route::get('/for-referral', [DocumentRequirementController::class, 'forReferral']);
+        Route::get('/for-pa-code', [DocumentRequirementController::class, 'forPACode']);
+        Route::post('/', [DocumentRequirementController::class, 'store']);
+        Route::get('/{documentRequirement}', [DocumentRequirementController::class, 'show']);
+        Route::put('/{documentRequirement}', [DocumentRequirementController::class, 'update']);
+        Route::delete('/{documentRequirement}', [DocumentRequirementController::class, 'destroy']);
+        Route::post('/{documentRequirement}/toggle-status', [DocumentRequirementController::class, 'toggleStatus']);
+        Route::post('/reorder', [DocumentRequirementController::class, 'reorder']);
+    });
+
     // Feedback Management
     Route::prefix('feedback')->group(function () {
         Route::get('/', [FeedbackController::class, 'index']);
@@ -344,7 +358,36 @@ Route::middleware(['auth:sanctum'])->prefix('v1/pas')->group(function () {
             Route::get('pending', [ClaimsReviewController::class, 'pendingApproval']);
             Route::post('{claim}/approve', [ClaimsReviewController::class, 'approveClaim']);
         });
+
+        // Claims Automation Routes
+        Route::prefix('automation')->group(function () {
+            // Admission Management
+            Route::post('admissions', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'createAdmission']);
+            Route::post('admissions/{admission}/discharge', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'dischargePatient']);
+            Route::get('admissions/history', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'getAdmissionHistory']);
+
+            // Claim Processing
+            Route::post('{claim}/process', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'processClaim']);
+            Route::get('{claim}/preview', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'getClaimPreview']);
+            Route::post('{claim}/validate', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'validateClaim']);
+            Route::post('{claim}/classify', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'classifyTreatments']);
+            Route::post('{claim}/build-sections', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'buildSections']);
+
+            // Diagnosis Management
+            Route::post('{claim}/diagnoses', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'addDiagnosis']);
+
+            // PA Code Management
+            Route::get('{claim}/missing-pas', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'detectMissingPAs']);
+
+            // Treatment Management
+            Route::post('treatments/{treatment}/convert-to-ffs', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'convertToFFS']);
+
+            // Compliance Alerts
+            Route::get('{claim}/alerts', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'getComplianceAlerts']);
+            Route::post('alerts/{alert}/resolve', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'resolveAlert']);
+            Route::post('alerts/{alert}/override', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'overrideAlert']);
+        });
     });
 
-   
+
 });

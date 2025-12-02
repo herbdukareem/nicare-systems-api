@@ -32,7 +32,7 @@ return new class extends Migration
             $table->text('conditions')->nullable();
 
             // Validity and Status
-            $table->enum('status', ['active', 'used', 'expired', 'cancelled'])->default('active');
+            $table->enum('status', ['pending', 'active', 'used', 'expired', 'cancelled'])->default('pending');
             $table->timestamp('issued_at');
             $table->timestamp('expires_at');
             $table->timestamp('used_at')->nullable();
