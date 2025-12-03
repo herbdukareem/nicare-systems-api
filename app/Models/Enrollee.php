@@ -165,8 +165,8 @@ protected $guarded = ['id'];
     /**
      * Enrollee has many referrals
      */
-    public function referrals()
-    {
+ 
+    public function referrals() {
         return $this->hasMany(Referral::class);
     }
 

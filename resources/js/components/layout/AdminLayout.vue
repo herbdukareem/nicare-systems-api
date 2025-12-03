@@ -195,6 +195,19 @@
 
           <!-- Header actions -->
           <div class="tw-flex tw-items-center tw-space-x-4">
+            <!-- Module Switcher -->
+            <v-select
+              v-model="selectedModule"
+              :items="moduleOptions"
+              item-title="label"
+              item-value="value"
+              variant="outlined"
+              density="compact"
+              hide-details
+              class="tw-w-48 tw-hidden md:tw-block"
+              label="Module"
+            />
+
             <!-- Role Switcher -->
             <RoleSwitcher />
 
@@ -243,252 +256,216 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch, onMounted } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
+import { useUiStore } from '../../stores/ui';
 import { useToast } from '../../composables/useToast';
 import RoleSwitcher from '../common/RoleSwitcher.vue';
 import Breadcrumb from '../common/Breadcrumb.vue';
 import Logo from '../common/Logo.vue';
 
-// Reactive data
+// Reactive data and stores
 
 const router = useRouter();
 const route = useRoute();
 const authStore = useAuthStore();
+const uiStore = useUiStore();
 const { success } = useToast();
 
 const sidebarOpen = ref(false);
 const logoutLoading = ref(false);
-const expandedMenus = ref(['Dashboard', 'Enrollment']); // Dashboard and Enrollment expanded by default
+const expandedMenus = ref(['Dashboard']); // Dashboard expanded by default
 
-// Menu items with new grouping structure
-const menuItems = [
-  {
-    name: 'Dashboard',
-    icon: 'mdi-view-dashboard',
-    children: [
-      {
-        name: 'Enrollee Dashboard',
-        path: '/dashboard',
-        icon: 'mdi-account-group',
-        roles: ['admin', 'doctor', 'pharmacist', 'reviewer', 'confirmer', 'approver'] // Hide from desk officers
-      },
-      {
-        name: 'DO Dashboard',
-        path: '/do-dashboard',
-        icon: 'mdi-desk',
-        roles: ['desk_officer'] // Only show to desk officers
-      },
-      // {
-      //   name: 'Premium Dashboard',
-      //   path: '/dashboard/premium',
-      //   icon: 'mdi-currency-usd'
-      // },
-      // {
-      //   name: 'Preauthorization Dashboard',
-      //   path: '/dashboard/preauth',
-      //   icon: 'mdi-shield-check'
-      // }
-    ]
-  },
-  // {
-  //   name: 'Enrollment',
-  //   icon: 'mdi-account-plus',
-  //   children: [
-  //     {
-  //       name: 'Enrollees List',
-  //       path: '/enrollees',
-  //       icon: 'mdi-format-list-bulleted',
-  //       badge: '12.8k'
-  //     },
-  //      {
-  //       name: 'Pending Enrollee List',
-  //       path: '/enrollees/pending',
-  //       icon: 'mdi-format-list-bulleted',
-  //       badge: '12.8k'
-  //     },
-  //     {
-  //       name: 'Change of Facility',
-  //       path: '/enrollment/change-facility',
-  //       icon: 'mdi-hospital-marker'
-  //     },
-  //     {
-  //       name: 'ID Card Printing',
-  //       path: '/enrollment/id-cards',
-  //       icon: 'mdi-card-account-details'
-  //     },
-  //     {
-  //       name: 'Enrollment Phases',
-  //       path: '/enrollment/phases',
-  //       icon: 'mdi-timeline'
-  //     }
-  //   ]
-  // },
-  {
-    name: 'User Management',
-    icon: 'mdi-account-cog',
-    children: [
-      {
-        name: 'Users',
-        path: '/settings/users',
-        icon: 'mdi-account-multiple'
-      },
-      {
-        name: 'Roles & Permissions',
-        path: '/settings/roles',
-        icon: 'mdi-shield-account'
-      }
-    ]
-  },
-  
-  {
-    name: 'Pre-authorization System (PAS)',
-    icon: 'mdi-shield-check',
-    children: [
-      {
-        name: 'PAS Management',
-        path: '/pas',
-        icon: 'mdi-clipboard-list',
-        badge: 'New'
-      },
-      {
-        name: 'Manage Cases',
-        path: '/pas/programmes',
-        icon: 'mdi-format-list-bulleted-type'
-      },
-      {
-        name: 'Manage Drugs',
-        path: '/pas/drugs',
-        icon: 'mdi-pill'
-      },
-      {
-        name: 'Manage Labs',
-        path: '/pas/labs',
-        icon: 'mdi-test-tube'
-      },
-      {
-        name: 'Manage Tariff Items',
-        path: '/tariff-items',
-        icon: 'mdi-receipt'
-      },
-      {
-        name: 'Case Categories',
-        path: '/case-categories',
-        icon: 'mdi-folder-multiple'
-      },
-      {
-        name: 'Service Categories',
-        path: '/service-categories',
-        icon: 'mdi-format-list-bulleted'
-      },
-      {
-        name: 'DO Facility Assignments',
-        path: '/do-facilities',
-        icon: 'mdi-hospital-marker'
-      },
-      {
-        name: 'Document Requirements',
-        path: '/document-requirements',
-        icon: 'mdi-file-document-check'
-      }
-    ]
-  },
-   {
-    name: 'Referrals and PA Codes Feedback',
-    icon: 'mdi-shield-check',
-    children: [
-      {
-        name: 'Feedback',
-        path: '/feedback',
-        icon: 'mdi-clipboard-list',
-        badge: 'New'
-      },
-    ]
-   },
-  //  {
-  //   name: 'Task Management',
-  //   icon: 'mdi-clipboard-check',
-  //   children: [
-  //     {
-  //       name: 'Task Management',
-  //       path: '/task-management',
-  //       icon: 'mdi-clipboard-check',
-  //       badge: 'New'
-  //     },
-  //   ]
-  //  },
-  {
-    name: 'Claims Management',
-    icon: 'mdi-file-document-multiple',
-    children: [
-      {
-        name: 'Manage Referrals',
-        path: '/claims/referrals',
-        icon: 'mdi-account-arrow-right'
-      },
-      {
-        name: 'Claim Submissions',
-        path: '/claims/submissions',
-        icon: 'mdi-upload'
-      },
-      {
-        name: 'Claims History',
-        path: '/claims/history',
-        icon: 'mdi-history'
-      }
-    ]
-  },
-  {
-    name: 'Claims Automation',
-    icon: 'mdi-robot',
-    children: [
-      {
-        name: 'Admission Management',
-        path: '/claims/automation/admissions',
-        icon: 'mdi-hospital-building',
-        badge: 'New'
-      },
-      {
-        name: 'Claims Processing',
-        path: '/claims/automation/process',
-        icon: 'mdi-cog-transfer'
-      },
-      {
-        name: 'Bundle Management',
-        path: '/claims/automation/bundles',
-        icon: 'mdi-package-variant-closed'
-      }
-    ]
-  },
-  // {
-  //   name: 'Settings',
-  //   icon: 'mdi-cog',
-  //   children: [
-  //     {
-  //       name: 'Manage Benefactors',
-  //       path: '/settings/benefactors',
-  //       icon: 'mdi-account-heart'
-  //     },
-  //     {
-  //       name: 'Facilities',
-  //       path: '/facilities',
-  //       icon: 'mdi-hospital-building',
-  //       badge: '342'
-  //     },
-  //     {
-  //       name: 'Manage Department',
-  //       path: '/settings/departments',
-  //       icon: 'mdi-office-building'
-  //     },
-  //     {
-  //       name: 'Manage Designation',
-  //       path: '/settings/designations',
-  //       icon: 'mdi-badge-account'
-  //     }
-  //   ]
-  // }
+// --- Menu definitions grouped by module ---
+const dashboardMenu = {
+  name: 'Dashboard',
+  icon: 'mdi-view-dashboard',
+  children: [
+    {
+      name: 'Enrollee Dashboard',
+      path: '/dashboard',
+      icon: 'mdi-account-group',
+      roles: ['admin', 'doctor', 'pharmacist', 'reviewer', 'confirmer', 'approver'],
+    },
+    {
+      name: 'DO Dashboard',
+      path: '/do-dashboard',
+      icon: 'mdi-desk',
+      roles: ['desk_officer'],
+    },
+  ],
+};
+
+const userManagementMenu = {
+  name: 'User Management',
+  icon: 'mdi-account-cog',
+  children: [
+    {
+      name: 'Users',
+      path: '/settings/users',
+      icon: 'mdi-account-multiple',
+    },
+    {
+      name: 'Roles & Permissions',
+      path: '/settings/roles',
+      icon: 'mdi-shield-account',
+    },
+  ],
+};
+
+const pasMenu = {
+  name: 'Pre-authorization System (PAS)',
+  icon: 'mdi-shield-check',
+  children: [
+    {
+      name: 'PAS Management',
+      path: '/pas',
+      icon: 'mdi-clipboard-list',
+      badge: 'New',
+    },
+    {
+      name: 'Manage Cases',
+      path: '/pas/programmes',
+      icon: 'mdi-format-list-bulleted-type',
+    },
+    {
+      name: 'Manage Drugs',
+      path: '/pas/drugs',
+      icon: 'mdi-pill',
+    },
+    {
+      name: 'Manage Labs',
+      path: '/pas/labs',
+      icon: 'mdi-test-tube',
+    },
+    {
+      name: 'Manage Tariff Items',
+      path: '/tariff-items',
+      icon: 'mdi-receipt',
+    },
+    {
+      name: 'Case Categories',
+      path: '/case-categories',
+      icon: 'mdi-folder-multiple',
+    },
+    {
+      name: 'Service Categories',
+      path: '/service-categories',
+      icon: 'mdi-format-list-bulleted',
+    },
+    {
+      name: 'DO Facility Assignments',
+      path: '/do-facilities',
+      icon: 'mdi-hospital-marker',
+    },
+    {
+      name: 'Document Requirements',
+      path: '/document-requirements',
+      icon: 'mdi-file-document-check',
+    },
+  ],
+};
+
+const pasFeedbackMenu = {
+  name: 'Referrals and PA Codes Feedback',
+  icon: 'mdi-shield-check',
+  children: [
+    {
+      name: 'Feedback',
+      path: '/feedback',
+      icon: 'mdi-clipboard-list',
+      badge: 'New',
+    },
+  ],
+};
+
+const claimsMenu = {
+  name: 'Claims Management',
+  icon: 'mdi-file-document-multiple',
+  children: [
+    {
+      name: 'Manage Referrals',
+      path: '/claims/referrals',
+      icon: 'mdi-account-arrow-right',
+    },
+    {
+      name: 'Claim Submissions',
+      path: '/claims/submissions',
+      icon: 'mdi-upload',
+    },
+    {
+      name: 'Claims History',
+      path: '/claims/history',
+      icon: 'mdi-history',
+    },
+  ],
+};
+
+const claimsAutomationMenu = {
+  name: 'Claims Automation',
+  icon: 'mdi-robot',
+  children: [
+    {
+      name: 'Admission Management',
+      path: '/claims/automation/admissions',
+      icon: 'mdi-hospital-building',
+      badge: 'New',
+    },
+    {
+      name: 'Claims Processing',
+      path: '/claims/automation/process',
+      icon: 'mdi-cog-transfer',
+    },
+    {
+      name: 'Bundle Management',
+      path: '/claims/automation/bundles',
+      icon: 'mdi-package-variant-closed',
+    },
+  ],
+};
+
+// Module -> menu mapping
+// Note: Dashboard is shared across modules so users can always return to key overviews.
+const moduleMenus = {
+	  general: [dashboardMenu, userManagementMenu],
+	  pas: [dashboardMenu, pasMenu, pasFeedbackMenu],
+	  claims: [dashboardMenu, claimsMenu],
+	  automation: [dashboardMenu, claimsAutomationMenu],
+	};
+
+// Module switcher options
+const moduleOptions = [
+  { value: 'general', label: 'Core & Admin' },
+  { value: 'pas', label: 'Pre-Authorization (PAS)' },
+  { value: 'claims', label: 'Claims' },
+  { value: 'automation', label: 'Claims Automation' },
 ];
+
+const selectedModule = computed({
+  get: () => uiStore.currentModule,
+  set: (value) => {
+    uiStore.setModule(value);
+    switch (value) {
+      case 'pas':
+        router.push('/pas');
+        break;
+      case 'claims':
+        router.push('/claims/submissions');
+        break;
+      case 'automation':
+        router.push('/claims/automation/admissions');
+        break;
+      default:
+        router.push('/dashboard');
+        break;
+    }
+  },
+});
+
+const activeModuleMenuItems = computed(
+  () => moduleMenus[uiStore.currentModule] || moduleMenus.general,
+);
 
 // Computed properties
 const userName = computed(() => authStore.userName);
@@ -496,23 +473,25 @@ const userRoles = computed(() => authStore.userRoles);
 
 // Filter menu items based on user roles
 const filteredMenuItems = computed(() => {
-  return menuItems.map(item => {
-    if (item.children) {
-      const filteredChildren = item.children.filter(child => {
-        if (!child.roles) return true; // Show if no role restriction
-        return child.roles.some(role => authStore.hasRole(role));
-      });
+  return activeModuleMenuItems.value
+    .map((item) => {
+      if (item.children) {
+        const filteredChildren = item.children.filter((child) => {
+          if (!child.roles) return true; // Show if no role restriction
+          return child.roles.some((role) => authStore.hasRole(role));
+        });
 
-      return {
-        ...item,
-        children: filteredChildren
-      };
-    }
+        return {
+          ...item,
+          children: filteredChildren,
+        };
+      }
 
-    // For items without children, check role restriction
-    if (!item.roles) return item; // Show if no role restriction
-    return item.roles.some(role => authStore.hasRole(role)) ? item : null;
-  }).filter(item => item && (!item.children || item.children.length > 0));
+      // For items without children, check role restriction
+      if (!item.roles) return item; // Show if no role restriction
+      return item.roles.some((role) => authStore.hasRole(role)) ? item : null;
+    })
+    .filter((item) => item && (!item.children || item.children.length > 0));
 });
 
 const pageTitle = computed(() => {
@@ -544,8 +523,9 @@ const toggleSubmenu = (menuName) => {
 
 const isSubmenuActive = (item) => {
   if (!item.children) return false;
-  return item.children.some(child => route.path === child.path);
+  return item.children.some((child) => route.path === child.path);
 };
+
 const handleLogout = async () => {
   logoutLoading.value = true;
   try {
@@ -558,6 +538,39 @@ const handleLogout = async () => {
     logoutLoading.value = false;
   }
 };
+
+// Map current route path to a module so deep links show the correct sidebar
+const getModuleForPath = (path) => {
+  if (path.startsWith('/claims/automation')) return 'automation';
+  if (path.startsWith('/claims')) return 'claims';
+
+  if (
+    path.startsWith('/pas') ||
+    path.startsWith('/tariff-items') ||
+    path.startsWith('/case-categories') ||
+    path.startsWith('/service-categories') ||
+    path.startsWith('/do-facilities') ||
+    path.startsWith('/document-requirements') ||
+    path.startsWith('/feedback')
+  ) {
+    return 'pas';
+  }
+
+  return 'general';
+};
+
+onMounted(() => {
+  const module = getModuleForPath(route.path);
+  uiStore.setModule(module);
+});
+
+watch(
+  () => route.path,
+  (newPath) => {
+    const module = getModuleForPath(newPath);
+    uiStore.setModule(module);
+  },
+);
 
 // Close sidebar on route change (mobile)
 router.afterEach(() => {

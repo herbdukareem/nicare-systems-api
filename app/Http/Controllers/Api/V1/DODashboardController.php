@@ -395,12 +395,32 @@ class DODashboardController extends Controller
             $query->where('severity_level', $request->severity_level);
         }
 
-        if ($request->has('search')) {
+        if ($request->has('search') && !empty($request->search)) {
             $search = $request->search;
+
             $query->where(function ($q) use ($search) {
+                // Match by referral code
                 $q->where('referral_code', 'like', "%{$search}%")
-                  ->orWhere('nicare_number', 'like', "%{$search}%")
-                  ->orWhere('enrollee_full_name', 'like', "%{$search}%");
+
+                  // Match by enrollee NiCare number or name via relationship
+                  ->orWhereHas('enrollee', function ($enrolleeQuery) use ($search) {
+                      $enrolleeQuery->where('enrollee_id', 'like', "%{$search}%")
+                          ->orWhere('first_name', 'like', "%{$search}%")
+                          ->orWhere('middle_name', 'like', "%{$search}%")
+                          ->orWhere('last_name', 'like', "%{$search}%");
+                  })
+
+                  // Match by referring facility
+                  ->orWhereHas('referringFacility', function ($facilityQuery) use ($search) {
+                      $facilityQuery->where('name', 'like', "%{$search}%")
+                          ->orWhere('hcp_code', 'like', "%{$search}%");
+                  })
+
+                  // Match by receiving facility
+                  ->orWhereHas('receivingFacility', function ($facilityQuery) use ($search) {
+                      $facilityQuery->where('name', 'like', "%{$search}%")
+                          ->orWhere('hcp_code', 'like', "%{$search}%");
+                  });
             });
         }
 

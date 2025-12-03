@@ -212,6 +212,9 @@ export const pasAPI = {
   generateUTN: (id) => api.post(`/v1/pas/pa-codes/${id}/generate-utn`),
   verifyPACode: (data) => api.post('/v1/pas/pa-codes/verify', data),
   getPACodeStatistics: () => api.get('/v1/pas/pa-codes-statistics'),
+
+  // UTN Validation APIs
+  validateUTN: (referralId, data) => api.post(`/v1/pas/referrals/${referralId}/validate-utn`, data),
 };
 
 // Drug Management API
@@ -380,6 +383,20 @@ export const designationAPI = {
   create: (data) => api.post('/v1/designations', data),
   update: (id, data) => api.put(`/v1/designations/${id}`, data),
   delete: (id) => api.delete(`/v1/designations/${id}`),
+};
+
+// Claims Management API (core claim submission & lifecycle)
+export const claimsAPI = {
+  getAll: (params) => api.get('/v1/pas/claims', { params }),
+  getById: (id) => api.get(`/v1/pas/claims/${id}`),
+  create: (data) => api.post('/v1/pas/claims', data),
+  update: (id, data) => api.put(`/v1/pas/claims/${id}`, data),
+  submit: (id) => api.post(`/v1/pas/claims/${id}/submit`),
+  getServicesForReferralOrPACode: (params) =>
+    api.get('/v1/pas/claims/services/for-referral-or-pacode', { params }),
+  getClaims: (params) => api.get('/v1/pas/claims', { params }),
+  approveClaim: (id, data) => api.post(`/v1/pas/claims/${id}/approve`, data),
+  rejectClaim: (id, data) => api.post(`/v1/pas/claims/${id}/reject`, data),
 };
 
 // Claims Automation API - Hybrid Bundle/FFS Payment Model

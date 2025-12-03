@@ -218,6 +218,28 @@ const routes = [
     }
   },
   {
+    path: '/pas/validate-utn',
+    name: 'pas-validate-utn',
+    component: () => import('../components/pas/UTNValidationPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'UTN Validation',
+      description: 'Validate Unique Transaction Numbers for referrals',
+      breadcrumb: 'UTN Validation'
+    }
+  },
+  {
+    path: '/pas/request-pa-code',
+    name: 'pas-request-pa-code',
+    component: () => import('../components/pas/PACodeRequestPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Request PA Code',
+      description: 'Request Pre-Authorization codes for services outside bundle',
+      breadcrumb: 'Request PA Code'
+    }
+  },
+  {
     path: '/pas/generate',
     name: 'pas-generate',
     component: () => import('../components/pas/CreateReferralPAPage.vue'),
@@ -407,6 +429,17 @@ const routes = [
     name: 'claims-submissions',
     component: () => import('../components/claims/ClaimSubmissionPage.vue'),
     meta: { requiresAuth: true, title: 'Submit Claim' }
+  },
+  {
+    path: '/claims/review',
+    name: 'claims-review',
+    component: () => import('../components/claims/ClaimsReviewPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Review Claims',
+      description: 'Review and approve submitted claims',
+      breadcrumb: 'Review Claims'
+    }
   },
   {
     path: '/claims/history',
