@@ -2,6 +2,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 /**
  * Class Referral
@@ -9,12 +10,15 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Referral extends Model
 {
+    use HasFactory;
+
     protected $guarded = ['id'];
     protected $table = 'referrals';
     
     protected $casts = [
         'request_date' => 'datetime',
         'approval_date' => 'datetime',
+        'requested_services' => 'array',
     ];
 
     /**

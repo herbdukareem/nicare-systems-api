@@ -34,8 +34,8 @@ class CasesImport implements ToCollection, WithHeadingRow
 
                 // Validate row data
                 $validator = Validator::make($rowData, [
-                    'nicare_code' => 'required|string|max:255',
-                    'case_description' => 'required|string|max:500',
+                    'case_name' => 'required|string|max:255',
+                    'service_description' => 'required|string|max:500',
                     'level_of_care' => 'required|in:Primary,Secondary,Tertiary',
                     'price' => 'required|numeric|min:0|max:999999999',
                     'group' => 'required|string|max:255',
@@ -49,12 +49,6 @@ class CasesImport implements ToCollection, WithHeadingRow
                     continue;
                 }
 
-                // Check for duplicate nicare_code
-                if (CaseRecord::where('nicare_code', $rowData['nicare_code'])->exists()) {
-                    $this->errors[] = "Row " . ($index + 2) . ": Case with NiCare code '{$rowData['nicare_code']}' already exists";
-                    continue;
-                }
-
                 // Validate price is a valid number
                 if (!is_numeric($rowData['price']) || $rowData['price'] < 0) {
                     $this->errors[] = "Row " . ($index + 2) . ": Price must be a positive number";
@@ -65,13 +59,20 @@ class CasesImport implements ToCollection, WithHeadingRow
                 $paRequired = $this->convertToBoolean($rowData['pa_required'] ?? 'No');
                 $referable = $this->convertToBoolean($rowData['referable'] ?? 'Yes');
 
+                // Generate NiCare code automatically
+                $nicareCode = CaseRecord::generateNiCareCode(
+                    $rowData['case_name'],
+                    $rowData['level_of_care']
+                );
+
                 // Resolve case category id (by explicit value, by name, or by group mapping; fallback to 'Medical')
                 $caseCategoryId = $this->resolveCaseCategoryId($rowData);
 
                 // Create case record
                 CaseRecord::create([
-                    'nicare_code' => $rowData['nicare_code'],
-                    'case_description' => $rowData['case_description'],
+                    'case_name' => $rowData['case_name'],
+                    'nicare_code' => $nicareCode,
+                    'service_description' => $rowData['service_description'],
                     'level_of_care' => $rowData['level_of_care'],
                     'price' => (float) $rowData['price'],
                     'group' => $rowData['group'],
@@ -128,6 +129,11 @@ class CasesImport implements ToCollection, WithHeadingRow
     private function normalizeRowKeys(array $row): array
     {
         $normalized = $row;
+
+        // Map case_description to service_description
+        if (isset($normalized['case_description']) && !isset($normalized['service_description'])) {
+            $normalized['service_description'] = $normalized['case_description'];
+        }
 
         if (!array_key_exists('price', $normalized)) {
             foreach ($normalized as $key => $value) {

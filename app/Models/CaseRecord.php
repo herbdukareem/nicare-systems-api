@@ -10,9 +10,9 @@ class CaseRecord extends Model
 {
     use HasFactory, SoftDeletes;
 
-    protected $table = 'cases';
+    protected $table = 'case_records';
 
-    protected $guarded = [ ];
+    protected $guarded = ['id'];
 
     protected $casts = [
         'price' => 'decimal:2',
@@ -47,6 +47,86 @@ class CaseRecord extends Model
     const GROUP_INTERNAL_MEDICINE = 'INTERNAL MEDICINE (PRV)';
 
     /**
+     * Generate NiCare code based on case name and level of care
+     * Format: NGSCHA/ABBREVIATION/LEVEL_LETTER/SERIAL
+     * Example: NGSCHA/GC/P/0001
+     */
+    public static function generateNiCareCode(string $caseName, string $levelOfCare): string
+    {
+        // Generate abbreviation from case name
+        $abbreviation = self::generateAbbreviation($caseName);
+
+        // Get first letter of level of care
+        $levelLetter = strtoupper(substr($levelOfCare, 0, 1)); // P, S, or T
+
+        // Get the next serial number for this combination
+        $serial = self::getNextSerial($abbreviation, $levelLetter);
+
+        // Format: NGSCHA/ABBREVIATION/LEVEL/SERIAL
+        return sprintf('NGSCHA/%s/%s/%04d', $abbreviation, $levelLetter, $serial);
+    }
+
+    /**
+     * Generate abbreviation from case name
+     * Takes first letter of each word, max 5 characters
+     */
+    private static function generateAbbreviation(string $caseName): string
+    {
+        // Remove special characters and extra spaces
+        $cleaned = preg_replace('/[^a-zA-Z0-9\s]/', '', $caseName);
+        $cleaned = preg_replace('/\s+/', ' ', trim($cleaned));
+
+        // Split into words
+        $words = explode(' ', $cleaned);
+
+        // Take first letter of each word
+        $abbreviation = '';
+        foreach ($words as $word) {
+            if (!empty($word)) {
+                $abbreviation .= strtoupper(substr($word, 0, 1));
+            }
+        }
+
+        // If abbreviation is too long, take first 5 characters
+        if (strlen($abbreviation) > 5) {
+            $abbreviation = substr($abbreviation, 0, 5);
+        }
+
+        // If abbreviation is empty or too short, use first letters of case name
+        if (strlen($abbreviation) < 2) {
+            $abbreviation = strtoupper(substr(str_replace(' ', '', $caseName), 0, 3));
+        }
+
+        return $abbreviation;
+    }
+
+    /**
+     * Get next serial number for the given abbreviation and level
+     */
+    private static function getNextSerial(string $abbreviation, string $levelLetter): int
+    {
+        // Find the highest serial number for this combination
+        $pattern = "NGSCHA/{$abbreviation}/{$levelLetter}/%";
+
+        $lastRecord = self::where('nicare_code', 'LIKE', $pattern)
+            ->orderBy('nicare_code', 'desc')
+            ->first();
+
+        if (!$lastRecord) {
+            return 1;
+        }
+
+        // Extract serial number from the code
+        $parts = explode('/', $lastRecord->nicare_code);
+        if (count($parts) === 4) {
+            $lastSerial = intval($parts[3]);
+            return $lastSerial + 1;
+        }
+
+        return 1;
+    }
+
+    /**
      * Get the user who created this case record
      */
     public function creator()
@@ -76,6 +156,15 @@ class CaseRecord extends Model
     public function caseCategoryRelation()
     {
         return $this->belongsTo(CaseCategory::class, 'case_category_id');
+    }
+
+    /**
+     * Get the polymorphic detail model (DrugDetail, LaboratoryDetail, or ProfessionalServiceDetail)
+     * This allows a case record to have specialized details based on its type
+     */
+    public function detail()
+    {
+        return $this->morphTo();
     }
 
     /**

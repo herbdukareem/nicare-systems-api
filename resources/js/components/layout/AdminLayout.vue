@@ -425,6 +425,49 @@ const claimsAutomationMenu = {
   ],
 };
 
+const managementMenu = {
+  name: 'Management Module',
+  icon: 'mdi-cog-outline',
+  children: [
+    {
+      name: 'Management Dashboard',
+      path: '/management',
+      icon: 'mdi-view-dashboard-outline',
+      badge: 'New',
+    },
+    {
+      name: 'Drugs Management',
+      path: '/management/drugs',
+      icon: 'mdi-pill',
+    },
+    {
+      name: 'Laboratories',
+      path: '/management/laboratories',
+      icon: 'mdi-test-tube',
+    },
+    {
+      name: 'Professional Services',
+      path: '/management/professional-services',
+      icon: 'mdi-medical-bag',
+    },
+    {
+      name: 'Bundle Services',
+      path: '/management/bundle-services',
+      icon: 'mdi-package-variant',
+    },
+    {
+      name: 'Bundle Components',
+      path: '/management/bundle-components',
+      icon: 'mdi-puzzle',
+    },
+    {
+      name: 'Case Management',
+      path: '/management/cases',
+      icon: 'mdi-file-document-multiple-outline',
+    },
+  ],
+};
+
 // Module -> menu mapping
 // Note: Dashboard is shared across modules so users can always return to key overviews.
 const moduleMenus = {
@@ -432,6 +475,7 @@ const moduleMenus = {
 	  pas: [dashboardMenu, pasMenu, pasFeedbackMenu],
 	  claims: [dashboardMenu, claimsMenu],
 	  automation: [dashboardMenu, claimsAutomationMenu],
+	  management: [dashboardMenu, managementMenu],
 	};
 
 // Module switcher options
@@ -440,6 +484,7 @@ const moduleOptions = [
   { value: 'pas', label: 'Pre-Authorization (PAS)' },
   { value: 'claims', label: 'Claims' },
   { value: 'automation', label: 'Claims Automation' },
+  { value: 'management', label: 'Management' },
 ];
 
 const selectedModule = computed({
@@ -451,10 +496,13 @@ const selectedModule = computed({
         router.push('/pas');
         break;
       case 'claims':
-        router.push('/claims/submissions');
+        router.push('/claims');
         break;
       case 'automation':
-        router.push('/claims/automation/admissions');
+        router.push('/claims/automation');
+        break;
+      case 'management':
+        router.push('/management');
         break;
       default:
         router.push('/dashboard');
@@ -543,6 +591,7 @@ const handleLogout = async () => {
 const getModuleForPath = (path) => {
   if (path.startsWith('/claims/automation')) return 'automation';
   if (path.startsWith('/claims')) return 'claims';
+  if (path.startsWith('/management')) return 'management';
 
   if (
     path.startsWith('/pas') ||

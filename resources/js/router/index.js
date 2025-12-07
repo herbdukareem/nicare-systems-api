@@ -4,8 +4,6 @@ import { useAuthStore } from '../stores/auth';
 // Components
 import LoginPage from '../components/auth/LoginPage.vue';
 import Dashboard from '../components/dashboard/Dashboard.vue';
-import PremiumDashboard from '../components/dashboard/PremiumDashboard.vue';
-import PreAuthDashboard from '../components/dashboard/PreAuthDashboard.vue';
 import EnrolleesPage from '../components/enrollees/EnrolleesPage.vue';
 import EnrolleeProfilePage from '../components/enrollees/EnrolleeProfilePage.vue';
 import FacilitiesPage from '../components/facilities/FacilitiesPage.vue';
@@ -35,41 +33,6 @@ const routes = [
       breadcrumb: 'Dashboard'
     },
   },
-  {
-    path: '/do-dashboard',
-    name: 'do-dashboard',
-    component: () => import('../components/do/DODashboardPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Desk Officer Dashboard',
-      description: 'Manage referrals and PA codes for assigned facilities',
-      breadcrumb: 'DO Dashboard',
-      role: 'desk_officer'
-    },
-  },
-  {
-    path: '/dashboard/premium',
-    name: 'dashboard-premium',
-    component: PremiumDashboard,
-    meta: {
-      requiresAuth: true,
-      title: 'Premium Dashboard',
-      description: 'Premium collection and payment tracking',
-      breadcrumb: 'Premium Dashboard'
-    },
-  },
-  {
-    path: '/dashboard/preauth',
-    name: 'dashboard-preauth',
-    component: PreAuthDashboard,
-    meta: {
-      requiresAuth: true,
-      title: 'Preauthorization Dashboard',
-      description: 'Preauthorization requests and approvals',
-      breadcrumb: 'Preauth Dashboard'
-    },
-  },
-
   // Enrollment Routes
   {
     path: '/enrollees',
@@ -171,155 +134,6 @@ const routes = [
     meta: { requiresAuth: true },
     props: { title: 'Capitation Payment/Invoices', subtitle: 'Manage payments and invoices', icon: 'mdi-receipt' }
   },
-
-  // PAS Routes
-  {
-    path: '/pas',
-    name: 'pas-management',
-    component: () => import('../components/pas/PASManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Pre-Authorisation System',
-      description: 'Manage referrals and PA codes for Fee-For-Service claims',
-      breadcrumb: 'PAS Management'
-    },
-  },
-  {
-    path: '/pas/create-referral',
-    name: 'pas-create-referral',
-    component: () => import('../components/pas/ReferralCreationWizard.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Create Referral Request',
-      description: 'Submit a new referral request for patient authorization',
-      breadcrumb: 'Create Referral'
-    }
-  },
-  {
-    path: '/pas/generate-pa-code',
-    name: 'pas-generate-pa-code',
-    component: () => import('../components/pas/PACodeGenerationWizard.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Generate PA Code',
-      description: 'Generate a Pre-Authorization code from approved referral',
-      breadcrumb: 'Generate PA Code'
-    }
-  },
-  {
-    path: '/pas/modify-referral',
-    name: 'pas-modify-referral',
-    component: () => import('../components/pas/ModifyReferralWizard.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Modify Referral Service',
-      description: 'Modify the service details of an existing referral',
-      breadcrumb: 'Modify Referral'
-    }
-  },
-  {
-    path: '/pas/validate-utn',
-    name: 'pas-validate-utn',
-    component: () => import('../components/pas/UTNValidationPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'UTN Validation',
-      description: 'Validate Unique Transaction Numbers for referrals',
-      breadcrumb: 'UTN Validation'
-    }
-  },
-  {
-    path: '/pas/request-pa-code',
-    name: 'pas-request-pa-code',
-    component: () => import('../components/pas/PACodeRequestPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Request PA Code',
-      description: 'Request Pre-Authorization codes for services outside bundle',
-      breadcrumb: 'Request PA Code'
-    }
-  },
-  {
-    path: '/pas/generate',
-    name: 'pas-generate',
-    component: () => import('../components/pas/CreateReferralPAPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Create Referral/PA Code (Legacy)',
-      description: 'Legacy unified workflow - use separate workflows instead',
-      breadcrumb: 'Create Referral/PA Code'
-    }
-  },
-  {
-    path: '/pas/programmes',
-    name: 'pas-programmes',
-    component: () => import('../components/pas/CasesManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Case Management',
-      description: 'Manage healthcare cases, pricing, and PA requirements',
-      breadcrumb: 'Case Management'
-    }
-  },
-  {
-    path: '/pas/referrals/:referralCode',
-    name: 'pas-referral-detail',
-    component: () => import('../components/pas/ReferralDetailPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Referral Details',
-      description: 'View referral information and status',
-      breadcrumb: 'Referral Details'
-    }
-  },
-  {
-    path: '/pas/pa-codes/:paCodeId',
-    name: 'pas-pa-code-detail',
-    component: () => import('../components/pas/PACodeDetailPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'PA Code Details',
-      description: 'View PA code information and status',
-      breadcrumb: 'PA Code Details'
-    }
-  },
-
-  // Drug Management Routes
-  {
-    path: '/drugs',
-    name: 'drugs-management',
-    component: () => import('../components/pas/DrugsManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Drug Management',
-      description: 'Manage drug formulary and pricing',
-      breadcrumb: 'Drug Management'
-    }
-  },
-
-  // Tariff Item Management Routes
-  {
-    path: '/tariff-items',
-    name: 'tariff-items-management',
-    component: () => import('../components/pas/TariffItemManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Tariff Item Management',
-      description: 'Manage tariff items and pricing structure',
-      breadcrumb: 'Tariff Item Management'
-    }
-  },
-  {
-    path: '/drugs/:drugId',
-    name: 'drug-detail',
-    component: () => import('../components/pas/DrugDetailPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Drug Details',
-      description: 'View drug information and details',
-      breadcrumb: 'Drug Details'
-    }
-  },
   {
     path: '/feedback',
     name: 'feedback-management',
@@ -343,76 +157,78 @@ const routes = [
     }
   },
  
-  {
-    path: '/pas/drugs',
-    name: 'pas-drugs',
-    component: () => import('../components/pas/DrugsManagementPage.vue'),
-    meta: { requiresAuth: true }
-  },
-  {
-    path: '/pas/labs',
-    name: 'pas-labs',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Manage Labs', subtitle: 'Manage laboratory services', icon: 'mdi-test-tube' }
-  },
-  {
-    path: '/pas/clinical',
-    name: 'pas-clinical',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Manage Clinical Services', subtitle: 'Manage clinical services', icon: 'mdi-medical-bag' }
-  },
 
-  // Case Category Management Routes
+  // Pre-Authorization (PAS) Module Dashboard
   {
-    path: '/case-categories',
-    name: 'case-categories-management',
-    component: () => import('../components/pas/CaseCategoryManagementPage.vue'),
+    path: '/pas',
+    name: 'pas-dashboard',
+    component: () => import('../components/pas/PASDashboard.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Case Categories',
-      description: 'Manage medical case categories',
-      breadcrumb: 'Case Categories'
+      title: 'Pre-Authorization System',
+      description: 'Manage pre-authorizations, referrals, and PA codes',
+      breadcrumb: 'PAS Dashboard'
     }
   },
-
-  // Service Category Management Routes
-  {
-    path: '/service-categories',
-    name: 'service-categories-management',
-    component: () => import('../components/pas/ServiceCategoryManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Service Categories',
-      description: 'Manage healthcare service categories',
-      breadcrumb: 'Service Categories'
-    }
-  },
-
-  // DOFacility Management Routes
-  {
-    path: '/do-facilities',
-    name: 'do-facilities-management',
-    component: () => import('../components/pas/DOFacilityManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Desk Officer Facility Assignments',
-      description: 'Assign facilities to desk officers',
-      breadcrumb: 'DO Facility Assignments'
-    }
-  },
-
-  // Document Requirements Management Routes
   {
     path: '/document-requirements',
     name: 'document-requirements-management',
     component: () => import('../components/pas/DocumentRequirementsPage.vue'),
     meta: {
       requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'claims_officer'],
       title: 'Document Requirements',
       description: 'Manage document requirements for referrals and PA codes',
       breadcrumb: 'Document Requirements'
+    }
+  },
+  {
+    path: '/pas/fu-pa-request',
+    name: 'fu-pa-code-request',
+    component: () => import('../components/pas/FUPACodeRequestPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['facility_admin', 'facility_user', 'Super Admin'],
+      title: 'Request FU-PA Code',
+      description: 'Request Follow-Up PA Code for FFS services',
+      breadcrumb: 'FU-PA Code Request'
+    }
+  },
+  {
+    path: '/pas/fu-pa-approval',
+    name: 'fu-pa-code-approval',
+    component: () => import('../components/pas/FUPACodeApprovalPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'claims_officer'],
+      title: 'FU-PA Code Approval',
+      description: 'Approve or reject FU-PA Code requests',
+      breadcrumb: 'FU-PA Code Approval'
+    }
+  },
+  {
+    path: '/pas/referral-management',
+    name: 'referral-management',
+    component: () => import('../components/pas/ReferralManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'claims_officer'],
+      title: 'Referral Management',
+      description: 'View, approve, reject, and print referrals',
+      breadcrumb: 'Referral Management'
+    }
+  },
+
+  // Claims Module Dashboard
+  {
+    path: '/claims',
+    name: 'claims-dashboard',
+    component: () => import('../components/claims/ClaimsDashboard.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Claims Module',
+      description: 'Manage referrals, claims submission, and review',
+      breadcrumb: 'Claims Dashboard'
     }
   },
 
@@ -420,15 +236,37 @@ const routes = [
   {
     path: '/claims/referrals',
     name: 'claims-referrals',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Manage Referrals', subtitle: 'Manage patient referrals', icon: 'mdi-account-arrow-right' }
+    component: () => import('../components/claims/ReferralSubmissionPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'claims_officer'],
+      title: 'Submit Referral to Pre-Authorization System (PAS)',
+      description: 'Submit referrals on behalf of primary facilities to PAS',
+      breadcrumb: 'Submit Referral to PAS'
+    }
+  },
+  {
+    path: '/claims/referral-request',
+    name: 'claims-referral-request',
+    component: () => import('../components/claims/ReferralRequestPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['primary_facility', 'facility_admin', 'admin', 'Super Admin'],
+      title: 'Referral Request to Pre-Authorization System (PAS)',
+      description: 'Submit referral requests for your facility to PAS',
+      breadcrumb: 'Referral Request to PAS'
+    }
   },
   {
     path: '/claims/submissions',
     name: 'claims-submissions',
     component: () => import('../components/claims/ClaimSubmissionPage.vue'),
-    meta: { requiresAuth: true, title: 'Submit Claim' }
+    meta: {
+      requiresAuth: true,
+      title: 'Submit Claim',
+      description: 'Submit a new claim',
+      breadcrumb: 'Submit Claim'
+    }
   },
   {
     path: '/claims/review',
@@ -519,6 +357,96 @@ const routes = [
     },
   },
 
+  // Management Module Dashboard
+  {
+    path: '/management',
+    name: 'management-dashboard',
+    component: () => import('../components/management/ManagementDashboard.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      title: 'Management Module',
+      description: 'Manage tariff items, bundles, and system configurations',
+      breadcrumb: 'Management Dashboard'
+    }
+  },
+
+  // Management Routes (Master Data)
+  // Note: Drug, Lab, Professional Service, Radiology, Consultation, and Consumable management
+  // is now handled through the unified Case Management page with polymorphic details
+  {
+    path: '/management/drugs',
+    name: 'management-drugs',
+    component: () => import('../components/management/DrugsManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      title: 'Drugs Management',
+      description: 'Manage drug tariff items and pricing',
+      breadcrumb: 'Drugs Management'
+    }
+  },
+  {
+    path: '/management/laboratories',
+    name: 'management-laboratories',
+    component: () => import('../components/management/LaboratoriesManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      title: 'Laboratories Management',
+      description: 'Manage laboratory test tariff items',
+      breadcrumb: 'Laboratories Management'
+    }
+  },
+  {
+    path: '/management/professional-services',
+    name: 'management-professional-services',
+    component: () => import('../components/management/ProfessionalServicesManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      title: 'Professional Services Management',
+      description: 'Manage professional services (consultations, procedures)',
+      breadcrumb: 'Professional Services Management'
+    }
+  },
+  {
+    path: '/management/bundle-services',
+    name: 'management-bundle-services',
+    component: () => import('../components/management/BundleServicesManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      title: 'Bundle Services Management',
+      description: 'Manage service bundles and configurations',
+      breadcrumb: 'Bundle Services Management'
+    }
+  },
+  {
+    path: '/management/bundle-components',
+    name: 'management-bundle-components',
+    component: () => import('../components/management/BundleComponentsManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      title: 'Bundle Components Management',
+      description: 'Manage components within service bundles',
+      breadcrumb: 'Bundle Components Management'
+    }
+  },
+  {
+    path: '/management/cases',
+    name: 'management-cases',
+    component: () => import('../components/management/CaseManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      title: 'Case Management',
+      description: 'Manage case records and service tariffs',
+      breadcrumb: 'Case Management'
+    }
+  },
+
   // Settings Routes
   {
     path: '/settings/users',
@@ -576,10 +504,15 @@ router.beforeEach(async (to, _from, next) => {
     }
 
     if (authStore.isAuthenticated) {
-      // Check role-based access
-      if (to.meta.role) {
-        if (!authStore.hasRole(to.meta.role)) {
-          // User doesn't have required role, redirect to appropriate dashboard
+      // Check role-based access (supports both single role and array of roles)
+      const requiredRoles = to.meta.roles || (to.meta.role ? [to.meta.role] : null);
+
+      if (requiredRoles && requiredRoles.length > 0) {
+        // Check if user has at least one of the required roles
+        const hasRequiredRole = requiredRoles.some(role => authStore.hasRole(role));
+
+        if (!hasRequiredRole) {
+          // User doesn't have any of the required roles, redirect to appropriate dashboard
           const userRole = authStore.userRoles[0]?.name;
           if (userRole === 'desk_officer') {
             next({ path: '/do-dashboard', replace: true });

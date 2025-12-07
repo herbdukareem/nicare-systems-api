@@ -213,4 +213,12 @@ protected $guarded = ['id'];
 
         return $this->date_of_birth->age;
     }
+
+    // full name
+    public function getFullNameAttribute()
+    {
+        return trim($this->first_name . ' ' . $this->middle_name . ' ' . $this->last_name);
+    }
+
+    protected $appends = ['age', 'full_name'];
 }

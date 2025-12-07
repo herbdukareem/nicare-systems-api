@@ -16,18 +16,15 @@ class DatabaseSeeder extends Seeder
         $this->call(AdminUserSeeder::class);
         $this->call(RolesAndPermissionsSeeder::class);
         $this->call(FacilitySeeder::class);
-        $this->call(ServiceCategorySeeder::class);
-        $this->call(CaseCategorySeeder::class);
         $this->call(CaseTypeSeeder::class);
-        $this->call(ServiceTypeSeeder::class);
 
         // Create test desk officer for testing
         $this->call(TestDeskOfficerSeeder::class);
 
-        // Claims Automation bundles and test data
-        $this->call(ClaimsAutomationSeeder::class);
-
         // Document requirements for referral and PA code requests
         $this->call(DocumentRequirementSeeder::class);
+
+        // --class=CaseRecordsWithDetailsSeeder
+        $this->call(CaseRecordsWithDetailsSeeder::class);
     }
 }

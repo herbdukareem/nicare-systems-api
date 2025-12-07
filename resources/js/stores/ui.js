@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 
-const MODULE_KEYS = ['general', 'pas', 'claims', 'automation'];
+const MODULE_KEYS = ['general', 'pas', 'claims', 'automation', 'management'];
 
 export const useUiStore = defineStore('ui', {
   state: () => ({

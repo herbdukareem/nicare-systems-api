@@ -19,7 +19,6 @@ use App\Http\Controllers\Api\V1\PremiumController;
 use App\Http\Controllers\Api\V1\FundingTypeController;
 use App\Http\Controllers\Api\V1\BenefactorController;
 use App\Http\Controllers\Api\V1\FeedbackController;
-use App\Http\Controllers\Api\V1\PASWorkflowController;
 use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\ProjectController;
 use App\Http\Controllers\Api\V1\TaskCategoryController;
@@ -32,24 +31,25 @@ use App\Http\Controllers\Api\V1\AuditTrailController;
 use App\Http\Controllers\Api\V1\DepartmentController;
 use App\Http\Controllers\Api\V1\DesignationController;
 use App\Http\Controllers\Api\V1\StaffController;
-use App\Http\Controllers\ReferralController;
-use App\Http\Controllers\PACodeController;
 use App\Http\Controllers\Api\SecurityController;
 use App\Http\Controllers\Api\V1\DrugController;
-use App\Http\Controllers\Api\V1\ServiceController;
+use App\Http\Controllers\Api\V1\DrugDetailController;
+use App\Http\Controllers\Api\V1\LaboratoryDetailController;
+use App\Http\Controllers\Api\V1\ProfessionalServiceDetailController;
 use App\Http\Controllers\Api\V1\CaseController;
-use App\Http\Controllers\Api\V1\CaseCategoryController;
-use App\Http\Controllers\Api\V1\ServiceCategoryController;
-use App\Http\Controllers\Api\V1\TariffItemController;
-use App\Http\Controllers\Api\V1\ServiceTypeController;
+use App\Http\Controllers\Api\V1\ReferralController;
+use App\Http\Controllers\Api\V1\ServiceBundleController;
+use App\Http\Controllers\Api\V1\BundleComponentController;
+
 use App\Http\Controllers\Api\V1\CaseTypeController;
 use App\Http\Controllers\Api\V1\DOFacilityController;
 use App\Http\Controllers\Api\V1\DODashboardController;
 use App\Http\Controllers\Api\V1\DocumentRequirementController;
-use App\Http\Controllers\ClaimsController;
-use App\Http\Controllers\DoctorReviewController;
-use App\Http\Controllers\PharmacistReviewController;
-use App\Http\Controllers\ClaimsReviewController;
+use App\Http\Controllers\Api\AdmissionController;
+use App\Http\Controllers\Api\ClaimController;
+use App\Http\Controllers\Api\ClaimLineController;
+use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\ReportingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -90,15 +90,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard/status-options', [DashboardController::class, 'getStatusOptions']);
 });
 
-Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
+Route::middleware('auth:sanctum')->group(function () {
 
-     // Case Categories Management
-    Route::apiResource('case-categories', CaseCategoryController::class);
-    Route::post('case-categories/{id}/toggle-status', [CaseCategoryController::class, 'toggleStatus']);
-
-    // Service Categories Management
-    Route::apiResource('service-categories', ServiceCategoryController::class);
-    Route::post('service-categories/{id}/toggle-status', [ServiceCategoryController::class, 'toggleStatus']);
 
     // DOFacility Management - Specific routes must come before apiResource
     Route::get('do-facilities/desk-officers', [DOFacilityController::class, 'getDeskOfficers']);
@@ -175,8 +168,12 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('enrollee-types', EnrolleeTypeController::class);
     Route::apiResource('banks', BankController::class);
-    Route::apiResource('facilities', FacilityController::class);
+    // Route::apiResource('facilities', FacilityController::class);
+    Route::get('facilities', [FacilityController::class, 'index']);
     Route::get('facilities/{facility}/enrollees', [FacilityController::class, 'enrollees']);
+    Route::apiResource('referrals', ReferralController::class)->only(['index', 'store', 'show']);
+    Route::post('referrals/{referral}/approve', [ReferralController::class, 'approve']);
+    Route::post('referrals/{referral}/reject', [ReferralController::class, 'reject']);
     Route::apiResource('premiums', PremiumController::class);
     Route::apiResource('funding-types', FundingTypeController::class);
     Route::apiResource('benefactors', BenefactorController::class);
@@ -191,20 +188,31 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::apiResource('designations', DesignationController::class);
     Route::apiResource('staff', StaffController::class);
 
-    // Drug Management routes
+    // Drug Management routes (Legacy - will be deprecated)
     Route::apiResource('drugs', DrugController::class);
     Route::post('drugs/import', [DrugController::class, 'import']);
     Route::get('drugs-export', [DrugController::class, 'export']);
     Route::get('drugs-template', [DrugController::class, 'downloadTemplate']);
     Route::get('drugs-statistics', [DrugController::class, 'statistics']);
 
-    // Service Management routes (deprecated - use cases instead)
-    Route::apiResource('services', ServiceController::class);
-    Route::post('services/import', [ServiceController::class, 'import']);
-    Route::get('services-export', [ServiceController::class, 'export']);
-    Route::get('services-template', [ServiceController::class, 'downloadTemplate']);
-    Route::get('services-statistics', [ServiceController::class, 'statistics']);
-    Route::get('services-groups', [ServiceController::class, 'getGroups']);
+    // Drug Detail Management routes (New polymorphic model)
+    Route::apiResource('drug-details', DrugDetailController::class);
+    Route::get('drug-details-statistics', [DrugDetailController::class, 'statistics']);
+    Route::get('drug-dosage-forms', [DrugDetailController::class, 'dosageForms']);
+    Route::get('drug-routes', [DrugDetailController::class, 'routes']);
+
+    // Laboratory Detail Management routes (New polymorphic model)
+    Route::apiResource('laboratory-details', LaboratoryDetailController::class);
+    Route::get('laboratory-details-statistics', [LaboratoryDetailController::class, 'statistics']);
+    Route::get('laboratory-specimen-types', [LaboratoryDetailController::class, 'specimenTypes']);
+    Route::get('laboratory-test-categories', [LaboratoryDetailController::class, 'testCategories']);
+
+    // Professional Service Detail Management routes (New polymorphic model)
+    Route::apiResource('professional-service-details', ProfessionalServiceDetailController::class);
+    Route::get('professional-service-details-statistics', [ProfessionalServiceDetailController::class, 'statistics']);
+    Route::get('professional-service-specialties', [ProfessionalServiceDetailController::class, 'specialties']);
+    Route::get('professional-service-provider-types', [ProfessionalServiceDetailController::class, 'providerTypes']);
+    Route::get('professional-service-anesthesia-types', [ProfessionalServiceDetailController::class, 'anesthesiaTypes']);
 
     // Case Management routes
     Route::apiResource('cases', CaseController::class);
@@ -214,15 +222,16 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
     Route::get('cases-statistics', [CaseController::class, 'statistics']);
     Route::get('cases-groups', [CaseController::class, 'getGroups']);
 
-    // Tariff Item Management routes
-    Route::apiResource('tariff-items', TariffItemController::class);
-    Route::post('tariff-items/import', [TariffItemController::class, 'import']);
-    Route::get('tariff-items-export', [TariffItemController::class, 'export']);
-    Route::get('tariff-items-template', [TariffItemController::class, 'downloadTemplate']);
-    Route::get('tariff-items-statistics', [TariffItemController::class, 'statistics']);
+    // Service Bundle Management routes
+    Route::apiResource('service-bundles', ServiceBundleController::class);
+    Route::get('service-bundles-statistics', [ServiceBundleController::class, 'statistics']);
+
+    // Bundle Component Management routes
+    Route::apiResource('bundle-components', BundleComponentController::class);
+    Route::post('bundle-components/bulk', [BundleComponentController::class, 'bulkStore']);
+    Route::get('bundle-components-statistics', [BundleComponentController::class, 'statistics']);
 
     // Service Type and Case Type routes
-    Route::apiResource('service-types', ServiceTypeController::class)->only(['index', 'show']);
     Route::apiResource('case-types', CaseTypeController::class)->only(['index', 'show']);
 
     // Document Requirements Management
@@ -236,6 +245,56 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
         Route::delete('/{documentRequirement}', [DocumentRequirementController::class, 'destroy']);
         Route::post('/{documentRequirement}/toggle-status', [DocumentRequirementController::class, 'toggleStatus']);
         Route::post('/reorder', [DocumentRequirementController::class, 'reorder']);
+    });
+
+    // Claims Automation Routes
+    Route::prefix('claims-automation')->group(function () {
+        // Admission Management
+        Route::prefix('admissions')->group(function () {
+            Route::post('/', [AdmissionController::class, 'store']);
+            Route::get('/{admission}', [AdmissionController::class, 'show']);
+            Route::get('/enrollee/{enrolleeId}', [AdmissionController::class, 'getActiveAdmission']);
+            Route::post('/{admission}/discharge', [AdmissionController::class, 'discharge']);
+            Route::get('/check/{referralId}', [AdmissionController::class, 'checkAdmissionEligibility']);
+        });
+
+        // Claim Management
+        Route::prefix('claims')->group(function () {
+            Route::get('/', [ClaimController::class, 'index']);
+            Route::post('/', [ClaimController::class, 'store']);
+            Route::get('/{claim}', [ClaimController::class, 'show']);
+            Route::post('/{claim}/submit', [ClaimController::class, 'submit']);
+            Route::post('/{claim}/validate', [ClaimController::class, 'validate']);
+            Route::post('/{claim}/approve', [ClaimController::class, 'approve']);
+            Route::post('/{claim}/reject', [ClaimController::class, 'reject']);
+            Route::get('/{claim}/summary', [ClaimController::class, 'summary']);
+
+            // Claim Lines
+            Route::post('/{claim}/lines/bundle', [ClaimLineController::class, 'addBundleTreatment']);
+            Route::post('/{claim}/lines/ffs', [ClaimLineController::class, 'addFFSTreatment']);
+            Route::get('/{claim}/classification', [ClaimLineController::class, 'getClassification']);
+        });
+
+        // Claim Line Management
+        Route::prefix('claim-lines')->group(function () {
+            Route::get('/{claimLine}', [ClaimLineController::class, 'show']);
+            Route::delete('/{claimLine}', [ClaimLineController::class, 'destroy']);
+        });
+
+        // Payment Management
+        Route::prefix('payments')->group(function () {
+            Route::get('/calculate/{claim}', [PaymentController::class, 'calculate']);
+            Route::post('/process', [PaymentController::class, 'process']);
+            Route::get('/track/{claim}', [PaymentController::class, 'track']);
+            Route::get('/facility/{facilityId}/summary', [PaymentController::class, 'facilityPaymentSummary']);
+        });
+
+        // Reporting
+        Route::prefix('reports')->group(function () {
+            Route::get('/claims', [ReportingController::class, 'claimsReport']);
+            Route::get('/payments', [ReportingController::class, 'paymentReport']);
+            Route::get('/compliance', [ReportingController::class, 'complianceReport']);
+        });
     });
 
     // Feedback Management
@@ -275,30 +334,8 @@ Route::prefix('v1')->middleware('auth:sanctum')->group(function () {
 });
 
 // PAS (Pre-Authorization System) routes (outside v1 group)
-Route::middleware(['auth:sanctum'])->prefix('v1/pas')->group(function () {
-    // Referral routes
-    Route::get('referrals', [ReferralController::class, 'index']);
-    Route::post('referrals', [ReferralController::class, 'store']);
-    Route::get('referrals/{referral}', [ReferralController::class, 'show']);
-    Route::post('referrals/{referral}/approve', [ReferralController::class, 'approve']);
-    Route::post('referrals/{referral}/deny', [ReferralController::class, 'deny']);
-    Route::get('referrals/pending/{facility}', [ReferralController::class, 'getPendingByFacility']);
-    Route::put('referrals/{referral}/modify', [ReferralController::class, 'modifyService']);
-    Route::get('referrals-statistics', [ReferralController::class, 'statistics']);
-
-    // PA Code routes
-    Route::get('pa-codes', [PACodeController::class, 'index']);
-    Route::post('referrals/{referral}/generate-pa-code', [PACodeController::class, 'generateFromReferral']);
-    Route::get('pa-codes/{paCode}', [PACodeController::class, 'show']);
-    Route::post('pa-codes/{paCode}/generate-utn', [PACodeController::class, 'generateUTN']);
-    Route::post('pa-codes/{paCode}/mark-used', [PACodeController::class, 'markAsUsed']);
-    Route::post('pa-codes/{paCode}/cancel', [PACodeController::class, 'cancel']);
-    Route::post('pa-codes/verify', [PACodeController::class, 'verify']);
-    Route::get('pa-codes-statistics', [PACodeController::class, 'statistics']);
-
-    // Workflow routes (new simplified API)
-    Route::post('workflow/referral', [PASWorkflowController::class, 'createReferral']);
-    Route::post('workflow/pa-code', [PASWorkflowController::class, 'generatePACode']);
+Route::middleware(['auth:sanctum'])->prefix('pas')->group(function () {
+    
 
     // Security routes
     Route::prefix('security')->group(function () {
@@ -311,83 +348,7 @@ Route::middleware(['auth:sanctum'])->prefix('v1/pas')->group(function () {
         Route::post('sessions/revoke', [SecurityController::class, 'revokeSessions']);
     });
 
-    // Claims Management System Routes
-    Route::prefix('claims')->group(function () {
-        // General Claims Routes
-        Route::get('/', [ClaimsController::class, 'index']);
-        Route::post('/', [ClaimsController::class, 'store']);
-        Route::get('{claim}', [ClaimsController::class, 'show']);
-        Route::put('{claim}', [ClaimsController::class, 'update']);
-        Route::post('{claim}/submit', [ClaimsController::class, 'submit']);
-        Route::get('services/for-referral-or-pacode', [ClaimsController::class, 'getServicesForReferralOrPACode']);
-
-        // Doctor Review Routes
-        Route::prefix('doctor')->group(function () {
-            Route::get('pending', [DoctorReviewController::class, 'pendingReview']);
-            Route::get('reviewed', [DoctorReviewController::class, 'reviewedClaims']);
-            Route::post('diagnoses/{diagnosis}/validate', [DoctorReviewController::class, 'validateDiagnosis']);
-            Route::post('treatments/{treatment}/validate', [DoctorReviewController::class, 'validateTreatment']);
-            Route::post('{claim}/approve', [DoctorReviewController::class, 'approveClaim']);
-            Route::post('{claim}/reject', [DoctorReviewController::class, 'rejectClaim']);
-            Route::get('statistics', [DoctorReviewController::class, 'statistics']);
-        });
-
-        // Pharmacist Review Routes
-        Route::prefix('pharmacist')->group(function () {
-            Route::get('pending', [PharmacistReviewController::class, 'pendingReview']);
-            Route::get('reviewed', [PharmacistReviewController::class, 'reviewedClaims']);
-            Route::get('{claim}/medications', [PharmacistReviewController::class, 'getClaimMedications']);
-            Route::post('medications/{treatment}/validate', [PharmacistReviewController::class, 'validateMedication']);
-            Route::post('{claim}/approve', [PharmacistReviewController::class, 'approveClaim']);
-            Route::post('{claim}/reject', [PharmacistReviewController::class, 'rejectClaim']);
-            Route::get('statistics', [PharmacistReviewController::class, 'statistics']);
-        });
-
-        // Claims Review Routes (Reviewer, Confirmer, Approver)
-        Route::prefix('review')->group(function () {
-            Route::get('pending', [ClaimsReviewController::class, 'pendingReview']);
-            Route::post('{claim}/review', [ClaimsReviewController::class, 'reviewClaim']);
-        });
-
-        Route::prefix('confirm')->group(function () {
-            Route::get('pending', [ClaimsReviewController::class, 'pendingConfirmation']);
-            Route::post('{claim}/confirm', [ClaimsReviewController::class, 'confirmClaim']);
-        });
-
-        Route::prefix('approve')->group(function () {
-            Route::get('pending', [ClaimsReviewController::class, 'pendingApproval']);
-            Route::post('{claim}/approve', [ClaimsReviewController::class, 'approveClaim']);
-        });
-
-        // Claims Automation Routes
-        Route::prefix('automation')->group(function () {
-            // Admission Management
-            Route::post('admissions', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'createAdmission']);
-            Route::post('admissions/{admission}/discharge', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'dischargePatient']);
-            Route::get('admissions/history', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'getAdmissionHistory']);
-
-            // Claim Processing
-            Route::post('{claim}/process', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'processClaim']);
-            Route::get('{claim}/preview', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'getClaimPreview']);
-            Route::post('{claim}/validate', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'validateClaim']);
-            Route::post('{claim}/classify', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'classifyTreatments']);
-            Route::post('{claim}/build-sections', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'buildSections']);
-
-            // Diagnosis Management
-            Route::post('{claim}/diagnoses', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'addDiagnosis']);
-
-            // PA Code Management
-            Route::get('{claim}/missing-pas', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'detectMissingPAs']);
-
-            // Treatment Management
-            Route::post('treatments/{treatment}/convert-to-ffs', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'convertToFFS']);
-
-            // Compliance Alerts
-            Route::get('{claim}/alerts', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'getComplianceAlerts']);
-            Route::post('alerts/{alert}/resolve', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'resolveAlert']);
-            Route::post('alerts/{alert}/override', [\App\Http\Controllers\Api\V1\ClaimsAutomationController::class, 'overrideAlert']);
-        });
-    });
+   
 
 
 });

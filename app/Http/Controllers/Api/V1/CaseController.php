@@ -3,12 +3,18 @@
 namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
-use App\Models\CaseGroup;
+use App\Models\DrugDetail;
+use App\Models\LaboratoryDetail;
+use App\Models\ProfessionalServiceDetail;
+use App\Models\RadiologyDetail;
+use App\Models\ConsultationDetail;
+use App\Models\ConsumableDetail;
 use App\Services\CaseService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\CasesImport;
 use App\Exports\CasesExport;
@@ -29,7 +35,7 @@ class CaseController extends Controller
     {
         try {
             $filters = $request->only([
-                'search', 'status', 'level_of_care', 'group', 'pa_required', 'referable',
+                'search', 'status', 'level_of_care', 'group', 'detail_type', 'exclude_groups', 'pa_required', 'referable',
                 'sort_by', 'sort_direction', 'per_page', 'page'
             ]);
 
@@ -37,7 +43,11 @@ class CaseController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $cases
+                'data' => $cases->items(),
+                'total' => $cases->total(),
+                'current_page' => $cases->currentPage(),
+                'per_page' => $cases->perPage(),
+                'last_page' => $cases->lastPage()
             ]);
 
         } catch (\Exception $e) {
@@ -56,14 +66,15 @@ class CaseController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'nicare_code' => 'required|string|max:255|unique:cases,nicare_code',
-                'case_description' => 'required|string',
+                'case_name' => 'required|string|max:255',
+                'service_description' => 'required|string',
                 'level_of_care' => 'required|in:Primary,Secondary,Tertiary',
                 'price' => 'required|numeric|min:0',
-                'case_group_id' => 'required|exists:case_groups,id',
                 'pa_required' => 'boolean',
                 'referable' => 'boolean',
-                'status' => 'boolean'
+                'status' => 'boolean',
+                'detail_type' => 'nullable|in:drug,laboratory,professional_service,radiology,consultation,consumable',
+                'detail_data' => 'nullable|array'
             ]);
 
             if ($validator->fails()) {
@@ -74,22 +85,42 @@ class CaseController extends Controller
                 ], 422);
             }
 
-            //get group
-            $group = CaseGroup::find($request->input('case_group_id'));
+            DB::beginTransaction();
+          
 
-            $caseData = $request->all();
+            $caseData = $request->except(['detail_type', 'detail_data']);
             $caseData['created_by'] = Auth::id();
-            $caseData['group'] = $group->name;
+           
+
+            // Generate NiCare code automatically
+            $caseData['nicare_code'] = \App\Models\CaseRecord::generateNiCareCode(
+                $request->case_name,
+                $request->level_of_care
+            );
+
+           
 
             $caseRecord = \App\Models\CaseRecord::create($caseData);
+
+            // Handle polymorphic detail if provided
+            if ($request->has('detail_type') && $request->has('detail_data')) {
+                $detail = $this->createDetail($request->detail_type, $request->detail_data);
+                if ($detail) {
+                    $caseRecord->detail()->associate($detail);
+                    $caseRecord->save();
+                }
+            }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Case created successfully',
-                'data' => $caseRecord->load(['creator', 'updater'])
+                'data' => $caseRecord->load(['creator', 'updater', 'detail'])
             ], 201);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create case',
@@ -104,7 +135,7 @@ class CaseController extends Controller
     public function show(\App\Models\CaseRecord $caseRecord): JsonResponse
     {
         try {
-            $caseRecord->load(['creator', 'updater']);
+            $caseRecord->load(['creator', 'updater', 'detail']);
 
             return response()->json([
                 'success' => true,
@@ -127,14 +158,16 @@ class CaseController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'nicare_code' => 'required|string|max:255|unique:cases,nicare_code,' . $caseRecord->id,
-                'case_description' => 'required|string',
+                'case_name' => 'required|string|max:255',
+                'service_description' => 'required|string',
                 'level_of_care' => 'required|in:Primary,Secondary,Tertiary',
                 'price' => 'required|numeric|min:0',
-                'group' => 'required|string|max:255',
+                'case_group_id' => 'nullable|exists:case_groups,id',
                 'pa_required' => 'boolean',
                 'referable' => 'boolean',
-                'status' => 'boolean'
+                'status' => 'boolean',
+                'detail_type' => 'nullable|in:drug,laboratory,professional_service,radiology,consultation,consumable',
+                'detail_data' => 'nullable|array'
             ]);
 
             if ($validator->fails()) {
@@ -145,18 +178,60 @@ class CaseController extends Controller
                 ], 422);
             }
 
-            $caseData = $request->all();
+            DB::beginTransaction();
+
+            $caseData = $request->except(['detail_type', 'detail_data']);
             $caseData['updated_by'] = Auth::id();
+            $caseData['nicare_code'] = $caseRecord->nicare_code;
+
+            // Regenerate NiCare code if case name or level of care changed
+            if ($request->has('case_name') || $request->has('level_of_care')) {
+                $caseName = $request->case_name ?? $caseRecord->case_name;
+                $levelOfCare = $request->level_of_care ?? $caseRecord->level_of_care;
+
+                $caseData['nicare_code'] = \App\Models\CaseRecord::generateNiCareCode(
+                    $caseName,
+                    $levelOfCare
+                );
+            }
+
 
             $caseRecord->update($caseData);
+
+            // Handle polymorphic detail update
+            if ($request->has('detail_type')) {
+                // Delete old detail if exists
+                if ($caseRecord->detail) {
+                    $caseRecord->detail->delete();
+                }
+
+                // Create new detail if data provided
+                 if ($request->has('detail_data') && !empty($request->detail_data)) {
+                        $detail = $this->createDetail($request->detail_type, $request->detail_data);
+                        if ($detail) {
+                            // Update polymorphic relationship directly
+                            $caseRecord->detail_id = $detail->id;
+                            $caseRecord->detail_type = get_class($detail);
+                            $caseRecord->save();
+                        }
+                    } else {
+                        // Clear the polymorphic relationship
+                        $caseRecord->detail_id = null;
+                        $caseRecord->detail_type = null;
+                        $caseRecord->save();
+                    }
+            }
+
+            DB::commit();
 
             return response()->json([
                 'success' => true,
                 'message' => 'Case updated successfully',
-                'data' => $caseRecord->fresh(['creator', 'updater'])
+                'data' => $caseRecord->fresh(['creator', 'updater', 'detail'])
             ]);
 
         } catch (\Exception $e) {
+            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to update case',
@@ -279,10 +354,11 @@ class CaseController extends Controller
     /**
      * Get case statistics
      */
-    public function statistics(): JsonResponse
+    public function statistics(Request $request): JsonResponse
     {
         try {
-            $stats = $this->caseService->getStatistics();
+            $filters = $request->only(['group', 'exclude_groups']);
+            $stats = $this->caseService->getStatistics($filters);
 
             return response()->json([
                 'success' => true,
@@ -337,6 +413,39 @@ class CaseController extends Controller
                 'message' => 'Failed to fetch case groups',
                 'error' => $e->getMessage()
             ], 500);
+        }
+    }
+
+    /**
+     * Create a polymorphic detail model based on type
+     *
+     * @param string $type The type of detail (drug, laboratory, professional_service, radiology, consultation, consumable)
+     * @param array $data The detail data
+     * @return Model|null The created detail model or null
+     */
+    private function createDetail(string $type, array $data)
+    {
+        switch ($type) {
+            case 'drug':
+                return DrugDetail::create($data);
+
+            case 'laboratory':
+                return LaboratoryDetail::create($data);
+
+            case 'professional_service':
+                return ProfessionalServiceDetail::create($data);
+
+            case 'radiology':
+                return RadiologyDetail::create($data);
+
+            case 'consultation':
+                return ConsultationDetail::create($data);
+
+            case 'consumable':
+                return ConsumableDetail::create($data);
+
+            default:
+                return null;
         }
     }
 }

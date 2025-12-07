@@ -30,8 +30,8 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
             // Return sample data for template with only import fields
             return collect([
                 (object) [
-                    'nicare_code' => 'NGSCHS/GCons/P/0001',
-                    'case_description' => 'General Consultation - Primary Level',
+                    'case_name' => 'General Consultation',
+                    'service_description' => 'General Consultation - Primary Level',
                     'level_of_care' => 'Primary',
                     'price' => 1000.00,
                     'group' => 'GENERAL CONSULTATION',
@@ -39,8 +39,8 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
                     'referable' => 'Yes'
                 ],
                 (object) [
-                    'nicare_code' => 'NGSCHS/Paed/S/0001',
-                    'case_description' => 'Paediatric Consultation - Secondary Level',
+                    'case_name' => 'Paediatric Consultation',
+                    'service_description' => 'Paediatric Consultation - Secondary Level',
                     'level_of_care' => 'Secondary',
                     'price' => 2000.00,
                     'group' => 'PAEDIATRICS',
@@ -48,8 +48,8 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
                     'referable' => 'Yes'
                 ],
                 (object) [
-                    'nicare_code' => 'NGSCHS/IM/T/0001',
-                    'case_description' => 'Internal Medicine - Tertiary Level',
+                    'case_name' => 'Internal Medicine',
+                    'service_description' => 'Internal Medicine - Tertiary Level',
                     'level_of_care' => 'Tertiary',
                     'price' => 5000.00,
                     'group' => 'INTERNAL MEDICINE (PRV)',
@@ -88,8 +88,8 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
     {
         if ($this->isTemplate) {
             return [
-                'NiCare Code *',
-                'Case Description *',
+                'Case Name *',
+                'Service Description *',
                 'Level of Care *',
                 'Price (₦) *',
                 'Group *',
@@ -99,8 +99,9 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
         }
 
         return [
+            'Case Name',
             'NiCare Code',
-            'Case Description',
+            'Service Description',
             'Level of Care',
             'Price (₦)',
             'Group',
@@ -120,8 +121,8 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
         if ($this->isTemplate) {
             // For template, return as-is since we already have Yes/No strings
             return [
-                $case->nicare_code,
-                $case->case_description,
+                $case->case_name,
+                $case->service_description,
                 $case->level_of_care,
                 $case->price,
                 $case->group,
@@ -131,8 +132,9 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
         }
 
         return [
+            $case->case_name ?? '',
             $case->nicare_code,
-            $case->case_description,
+            $case->service_description ?? $case->case_description ?? '',
             $case->level_of_care,
             number_format($case->price, 2),
             $case->group,
