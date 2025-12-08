@@ -12,6 +12,38 @@ use App\Models\Referral;
 class PACodeController extends Controller
 {
     /**
+     * Get all PA codes with filters.
+     */
+    public function index(Request $request)
+    {
+        $query = PACode::with(['enrollee', 'facility', 'referral', 'serviceBundle']);
+
+        // Filter by type
+        if ($request->has('type')) {
+            $query->where('type', $request->type);
+        }
+
+        // Filter by status
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $paCodes = $query->latest()->get();
+
+        return response()->json(['data' => $paCodes]);
+    }
+
+    /**
+     * Get a single PA code with all relationships.
+     */
+    public function show(PACode $paCode)
+    {
+        $paCode->load(['enrollee', 'facility', 'referral', 'serviceBundle']);
+
+        return response()->json(['data' => $paCode]);
+    }
+
+    /**
      * Handles POST /v1/pas/pa-codes: Creates a new PA request.
      */
     public function store(Request $request) // Use RequestPACodeRequest for real validation
@@ -20,9 +52,13 @@ class PACodeController extends Controller
             'enrollee_id' => 'required|exists:enrollees,id',
             'facility_id' => 'required|exists:facilities,id',
             'is_complication_pa' => 'boolean',
-            'requested_items' => 'required|array',
-            'justification' => 'required_if:is_complication_pa,true|string|max:1000',
+            'requested_items' => 'nullable|array',
+            'justification' => 'required|string|max:1000',
             'referral_id' => 'required|exists:referrals,id',
+            'service_selection_type' => ['required', 'in:bundle,direct'],
+            'service_bundle_id' => ['nullable', 'required_if:service_selection_type,bundle', 'exists:service_bundles,id'],
+            'case_record_ids' => ['nullable', 'required_if:service_selection_type,direct', 'array'],
+            'case_record_ids.*' => ['exists:case_records,id'],
         ]);
         
 
@@ -64,11 +100,15 @@ class PACodeController extends Controller
             'type' => $paType,
             'status' => 'PENDING',
             'justification' => $request->justification,
-            'requested_services' => $request->requested_items,
+            'requested_services' => $request->requested_items ?? [],
+            'service_selection_type' => $request->service_selection_type,
+            'service_bundle_id' => $request->service_bundle_id,
+            'case_record_ids' => $request->case_record_ids,
         ]);
 
+        $paCode->load(['enrollee', 'facility', 'referral', 'serviceBundle']);
 
-        return response()->json($paCode, 201);
+        return response()->json(['data' => $paCode], 201);
     }
     
     /**
@@ -76,7 +116,32 @@ class PACodeController extends Controller
      */
     public function approve(PACode $paCode)
     {
-        $paCode->update(['status' => 'APPROVED']);
-        return response()->json(['message' => 'PA code approved.', 'pa_code' => $paCode]);
+        $paCode->update([
+            'status' => 'APPROVED',
+            'approval_date' => now(),
+        ]);
+
+        $paCode->load(['enrollee', 'facility', 'referral', 'serviceBundle']);
+
+        return response()->json(['message' => 'PA code approved successfully.', 'data' => $paCode]);
+    }
+
+    /**
+     * Handles POST /v1/pas/pa-codes/{id}/reject: Rejects a PA.
+     */
+    public function reject(Request $request, PACode $paCode)
+    {
+        $request->validate([
+            'rejection_reason' => 'required|string|max:1000',
+        ]);
+
+        $paCode->update([
+            'status' => 'REJECTED',
+            'rejection_reason' => $request->rejection_reason,
+        ]);
+
+        $paCode->load(['enrollee', 'facility', 'referral', 'serviceBundle']);
+
+        return response()->json(['message' => 'PA code rejected successfully.', 'data' => $paCode]);
     }
 }

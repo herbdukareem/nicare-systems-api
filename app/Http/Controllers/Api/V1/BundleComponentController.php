@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class BundleComponentController extends Controller
 {
@@ -78,27 +79,47 @@ class BundleComponentController extends Controller
                 ], 422);
             }
 
-            // Check for duplicate component
+            // Check for duplicate component (both service_bundle_id and case_record_id must match)
             $exists = BundleComponent::where('service_bundle_id', $request->service_bundle_id)
                 ->where('case_record_id', $request->case_record_id)
                 ->exists();
 
+            Log::info('Duplicate check', [
+                'service_bundle_id' => $request->service_bundle_id,
+                'case_record_id' => $request->case_record_id,
+                'exists' => $exists
+            ]);
+
             if ($exists) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'This component already exists in the bundle'
+                    'message' => 'This case record is already added to this bundle. Each case record can only be added once per bundle.'
                 ], 422);
             }
 
-            $component = BundleComponent::create($request->all());
+            $component = BundleComponent::create([
+                'service_bundle_id' => $request->service_bundle_id,
+                'case_record_id' => $request->case_record_id,
+                'item_type' => $request->item_type,
+                'max_quantity' => $request->max_quantity
+            ]);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Bundle component created successfully',
-                'data' => $component->load(['serviceBundle', 'caseRecord'])
+                'data' => $component->load(['serviceBundle.caseRecord', 'caseRecord'])
             ], 201);
 
         } catch (\Exception $e) {
+            // Check if it's a duplicate entry error
+            Log::error('Bundle component creation error: ' . $e->getMessage());
+            if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This case record is already added to this bundle. Each case record can only be added once per bundle.'
+                ], 422);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to create bundle component',
@@ -153,7 +174,7 @@ class BundleComponentController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Bundle component updated successfully',
-                'data' => $bundleComponent->load(['serviceBundle', 'caseRecord'])
+                'data' => $bundleComponent->load(['serviceBundle.caseRecord', 'caseRecord'])
             ]);
 
         } catch (\Exception $e) {
@@ -239,6 +260,15 @@ class BundleComponentController extends Controller
 
         } catch (\Exception $e) {
             DB::rollBack();
+
+            // Check if it's a duplicate entry error
+            if (strpos($e->getMessage(), 'Duplicate entry') !== false) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'One or more case records are already added to this bundle. Each case record can only be added once per bundle.'
+                ], 422);
+            }
+
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to bulk create components',

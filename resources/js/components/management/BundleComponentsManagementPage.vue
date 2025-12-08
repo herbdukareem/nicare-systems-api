@@ -57,10 +57,10 @@
                     v-model="bundleFilter"
                     label="Filter by Bundle"
                     :items="bundles"
-                    item-title="name"
+                    item-title="description"
                     item-value="id"
                     clearable
-                    outlined
+                    variant="outlined"
                     dense
                     @update:model-value="loadComponents"
                   />
@@ -71,7 +71,7 @@
                     label="Item Type"
                     :items="itemTypes"
                     clearable
-                    outlined
+                    variant="outlined"
                     dense
                     @update:model-value="loadComponents"
                   />
@@ -82,7 +82,7 @@
                     label="Search..."
                     prepend-inner-icon="mdi-magnify"
                     clearable
-                    outlined
+                    variant="outlined"
                     dense
                     @input="debouncedSearch"
                   />
@@ -96,7 +96,7 @@
               </v-row>
               <v-row>
                 <v-col cols="12" class="d-flex justify-end gap-2">
-                  <v-btn color="primary" @click="showCreateDialog = true">
+                  <v-btn color="primary" @click="openCreateDialog">
                     <v-icon left>mdi-plus</v-icon>
                     Add Component
                   </v-btn>
@@ -131,8 +131,8 @@
               >
                 <template v-slot:item.service_bundle="{ item }">
                   <div>
-                    <div class="font-weight-medium">{{ item.service_bundle?.name }}</div>
-                    <div class="text-caption text-grey">{{ item.service_bundle?.code }}</div>
+                    <div class="font-weight-medium">{{ item.service_bundle?.description }}</div>
+                    <!-- <div class="text-caption text-grey">{{ item.service_bundle?. }}</div> -->
                   </div>
                 </template>
 
@@ -143,15 +143,7 @@
                   </div>
                 </template>
 
-                <template v-slot:item.item_type="{ item }">
-                  <v-chip
-                    :color="getItemTypeColor(item.item_type)"
-                    text-color="white"
-                    size="small"
-                  >
-                    {{ item.item_type }}
-                  </v-chip>
-                </template>
+               
 
                 <template v-slot:item.max_quantity="{ item }">
                   <v-chip color="info" variant="outlined" size="small">
@@ -188,29 +180,32 @@
     </v-container>
 
     <!-- Create/Edit Dialog -->
-    <v-dialog v-model="showCreateDialog" max-width="700px" persistent>
+    <v-dialog v-model="showCreateDialog" max-width="600px" persistent>
       <v-card>
         <v-card-title class="bg-primary text-white">
-          <span>{{ editMode ? 'Edit Component' : 'Add New Component' }}</span>
+          <span>{{ editMode ? 'Edit Component' : 'Add Component to Bundle' }}</span>
         </v-card-title>
         <v-card-text class="pt-4">
           <v-form ref="componentForm">
             <v-row>
+         
               <v-col cols="12">
                 <v-autocomplete
                   v-model="formData.service_bundle_id"
                   label="Service Bundle *"
                   :items="bundles"
-                  item-title="name"
+                  item-title="description"
                   item-value="id"
                   :rules="[v => !!v || 'Service bundle is required']"
-                  outlined
-                  dense
+                  variant="outlined"
+                  density="comfortable"
                 >
                   <template v-slot:item="{ props, item }">
                     <v-list-item v-bind="props">
-                      <template v-slot:title>{{ item.raw.name }}</template>
-                      <template v-slot:subtitle>{{ item.raw.code }} - ₦{{ Number(item.raw.fixed_price).toLocaleString() }}</template>
+                      <template v-slot:title>{{ item.raw.description }}</template>
+                      <template v-slot:subtitle>
+                        ₦{{ Number(item.raw.fixed_price).toLocaleString() }}
+                      </template>
                     </v-list-item>
                   </template>
                 </v-autocomplete>
@@ -218,25 +213,18 @@
             </v-row>
 
             <v-row>
-              <v-col cols="12" md="6">
+              <v-col cols="12" md="12">
+            
                 <v-select
-                  v-model="formData.item_type"
-                  label="Item Type *"
-                  :items="itemTypes"
-                  :rules="[v => !!v || 'Item type is required']"
-                  outlined
-                  dense
-                  @update:model-value="onItemTypeChange"
-                />
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  v-model.number="formData.max_quantity"
-                  label="Max Quantity *"
-                  type="number"
-                  :rules="[v => !!v || 'Max quantity is required', v => v > 0 || 'Must be greater than 0']"
-                  outlined
-                  dense
+                  v-model="caseTypeFilter"
+                  label="Filter by Case Type"
+                  :items="caseTypes"
+                  item-title="text"
+                  item-value="value"
+                  variant="outlined"
+                  density="comfortable"
+                  @update:model-value="loadCaseRecords"
+                  clearable
                 />
               </v-col>
             </v-row>
@@ -245,31 +233,50 @@
               <v-col cols="12">
                 <v-autocomplete
                   v-model="formData.case_record_id"
-                  label="Service/Drug/Lab Item *"
-                  :items="caseRecords"
+                  label="Case Record / Service *"
+                  :items="availableCaseRecords"
                   item-title="service_description"
                   item-value="id"
-                  :rules="[v => !!v || 'Item is required']"
                   :loading="loadingCaseRecords"
-                  outlined
-                  dense
+                  :rules="[v => !!v || 'Case record is required']"
+                  variant="outlined"
+                  density="comfortable"
+                  clearable
+                  :hint="formData.service_bundle_id ? `${availableCaseRecords.length} available (${addedCaseRecordIds.length} already added)` : 'Select a bundle first'"
+                  persistent-hint
                 >
                   <template v-slot:item="{ props, item }">
                     <v-list-item v-bind="props">
                       <template v-slot:title>{{ item.raw.service_description }}</template>
-                      <template v-slot:subtitle>{{ item.raw.nicare_code }} - ₦{{ Number(item.raw.price).toLocaleString() }}</template>
+                      <template v-slot:subtitle>
+                        {{ item.raw.nicare_code }} | {{ item.raw.case_name }}
+                      </template>
                     </v-list-item>
                   </template>
                 </v-autocomplete>
+              </v-col>
+            </v-row>
+
+            <v-row>
+              <v-col cols="12">
+                <v-text-field
+                  v-model.number="formData.max_quantity"
+                  label="Maximum Quantity *"
+                  type="number"
+                  :rules="[v => !!v || 'Max quantity is required', v => v > 0 || 'Must be greater than 0']"
+                  variant="outlined"
+                  density="comfortable"
+                  hint="Maximum quantity covered by the bundle's fixed price"
+                />
               </v-col>
             </v-row>
           </v-form>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn @click="closeDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="saveComponent" :loading="saving">
-            {{ editMode ? 'Update' : 'Create' }}
+          <v-btn variant="text" @click="closeDialog">Cancel</v-btn>
+          <v-btn color="primary" variant="elevated" @click="saveComponent" :loading="saving">
+            {{ editMode ? 'Update Component' : 'Add Component' }}
           </v-btn>
         </v-card-actions>
       </v-card>
@@ -289,10 +296,10 @@
                   v-model="bulkFormData.service_bundle_id"
                   label="Service Bundle *"
                   :items="bundles"
-                  item-title="name"
+                  item-title="description"
                   item-value="id"
                   :rules="[v => !!v || 'Service bundle is required']"
-                  outlined
+                     variant="outlined"
                   dense
                 />
               </v-col>
@@ -305,7 +312,7 @@
                   label="Item Type *"
                   :items="itemTypes"
                   :rules="[v => !!v || 'Item type is required']"
-                  outlined
+                     variant="outlined"
                   dense
                   @update:model-value="onBulkItemTypeChange"
                 />
@@ -324,7 +331,7 @@
                   :loading="loadingCaseRecords"
                   multiple
                   chips
-                  outlined
+                  variant="outlined"
                   dense
                 >
                   <template v-slot:chip="{ props, item }">
@@ -343,7 +350,7 @@
                   label="Default Max Quantity for All *"
                   type="number"
                   :rules="[v => !!v || 'Default max quantity is required', v => v > 0 || 'Must be greater than 0']"
-                  outlined
+                     variant="outlined"
                   dense
                 />
               </v-col>
@@ -385,12 +392,14 @@
 
 <script setup>
 import AdminLayout from '../layout/AdminLayout.vue';
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
+import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import api from '../../utils/api';
 import { debounce } from 'lodash';
 
 const { showSuccess, showError } = useToast();
+const route = useRoute();
 
 // Reactive state
 const loading = ref(false);
@@ -417,8 +426,8 @@ const componentToDelete = ref(null);
 const formData = ref({
   service_bundle_id: null,
   case_record_id: null,
-  max_quantity: 1,
   item_type: '',
+  max_quantity: 1,
 });
 
 const bulkFormData = ref({
@@ -428,10 +437,34 @@ const bulkFormData = ref({
   default_max_quantity: 1,
 });
 
+const caseTypeFilter = ref('');
+const caseTypes = ref([
+  { value: '', text: 'All Types' },
+  { value: 'DRUG', text: 'Drug' },
+  { value: 'LABORATORY', text: 'Laboratory' },
+  { value: 'PROFESSIONAL_SERVICE', text: 'Professional Service' },
+  { value: 'RADIOLOGY', text: 'Radiology' },
+  { value: 'CONSULTATION', text: 'Consultation' },
+  { value: 'CONSUMABLE', text: 'Consumable' }
+]);
+
+// Get already added case record IDs for the selected bundle
+const addedCaseRecordIds = computed(() => {
+  if (!formData.value.service_bundle_id) return [];
+  return components.value
+    .filter(c => c.service_bundle_id === formData.value.service_bundle_id)
+    .map(c => c.case_record_id);
+});
+
+// Filter available case records to exclude already added ones (except when editing)
+const availableCaseRecords = computed(() => {
+  if (editMode.value) return caseRecords.value;
+  return caseRecords.value.filter(cr => !addedCaseRecordIds.value.includes(cr.id));
+});
+
 const headers = [
   { title: 'Bundle', key: 'service_bundle', sortable: true },
   { title: 'Item', key: 'case_record', sortable: true },
-  { title: 'Item Type', key: 'item_type', sortable: true },
   { title: 'Max Quantity', key: 'max_quantity', sortable: true },
   { title: 'Actions', key: 'actions', sortable: false },
 ];
@@ -439,12 +472,24 @@ const headers = [
 const itemTypes = ['LAB', 'DRUG', 'CONSULTATION', 'PROCEDURE', 'IMAGING', 'OTHER'];
 
 onMounted(async () => {
+  await loadBundles();
+  applyRouteBundle();
   await Promise.all([
     loadComponents(),
-    loadBundles(),
     loadStatistics(),
   ]);
 });
+
+// Sync bundle filter from route (e.g., "Manage Components" button)
+const applyRouteBundle = () => {
+  const bundleId = route.query.bundle_id;
+  if (!bundleId) return;
+
+  const parsed = Number(bundleId);
+  bundleFilter.value = parsed;
+  formData.value.service_bundle_id = parsed;
+  bulkFormData.value.service_bundle_id = parsed;
+};
 
 // Load components with pagination and filters
 const loadComponents = async (options = {}) => {
@@ -458,7 +503,7 @@ const loadComponents = async (options = {}) => {
       item_type: itemTypeFilter.value,
     };
 
-    const response = await api.get('/api/bundle-components', { params });
+    const response = await api.get('/bundle-components', { params });
     components.value = response.data.data || response.data;
     totalItems.value = response.data.total || components.value.length;
   } catch (err) {
@@ -471,27 +516,25 @@ const loadComponents = async (options = {}) => {
 // Load bundles
 const loadBundles = async () => {
   try {
-    const response = await api.get('/api/service-bundles');
+    const response = await api.get('/service-bundles');
     bundles.value = response.data.data || response.data;
   } catch (err) {
     console.error('Failed to load bundles', err);
   }
 };
 
-// Load case records based on item type
-const loadCaseRecords = async (itemType) => {
+// Load case records with optional case type filter
+const loadCaseRecords = async () => {
   loadingCaseRecords.value = true;
   try {
     const params = {};
 
-    // Filter by group based on item type
-    if (itemType === 'LAB') {
-      params.group = 'LABS';
-    } else if (itemType === 'DRUG') {
-      params.group = 'DRUGS';
+    // Filter by case type if selected
+    if (caseTypeFilter.value && caseTypeFilter.value !== '') {
+      params.detail_type = caseTypeFilter.value.toLocaleLowerCase();
     }
 
-    const response = await api.get('/api/cases', { params });
+    const response = await api.get('/cases', { params });
     caseRecords.value = response.data.data || response.data;
   } catch (err) {
     console.error('Failed to load case records', err);
@@ -503,7 +546,7 @@ const loadCaseRecords = async (itemType) => {
 // Load statistics
 const loadStatistics = async () => {
   try {
-    const response = await api.get('/api/bundle-components/statistics');
+    const response = await api.get('/bundle-components/statistics');
     statistics.value = response.data.data || response.data;
   } catch (err) {
     console.error('Failed to load statistics', err);
@@ -528,6 +571,20 @@ const resetFilters = () => {
   loadComponents();
 };
 
+// Open create dialog
+const openCreateDialog = async () => {
+  await loadCaseRecords();
+  showCreateDialog.value = true;
+};
+
+// Keep form bundle selections in sync with current filter (when not editing)
+watch(bundleFilter, (val) => {
+  if (!editMode.value) {
+    formData.value.service_bundle_id = val;
+  }
+  bulkFormData.value.service_bundle_id = val;
+});
+
 // Get item type color
 const getItemTypeColor = (itemType) => {
   const colors = {
@@ -541,35 +598,46 @@ const getItemTypeColor = (itemType) => {
   return colors[itemType] || 'grey';
 };
 
-// On item type change
-const onItemTypeChange = (itemType) => {
-  formData.value.case_record_id = null;
-  caseRecords.value = [];
-  if (itemType) {
-    loadCaseRecords(itemType);
-  }
-};
-
-// On bulk item type change
-const onBulkItemTypeChange = (itemType) => {
-  bulkFormData.value.selected_items = [];
-  caseRecords.value = [];
-  if (itemType) {
-    loadCaseRecords(itemType);
-  }
-};
-
-
 // Edit component
 const editComponent = (component) => {
   editMode.value = true;
   formData.value = { ...component };
-  // Load case records for the item type
-  if (component.item_type) {
-    loadCaseRecords(component.item_type);
-  }
   showCreateDialog.value = true;
 };
+// case type from detail_type
+const getCaseType = (detail_type) => {
+  console.log('detail_type:', detail_type);
+
+  let case_type = null;
+
+  switch (detail_type) {
+    case 'App\\Models\\DrugDetail':
+      case_type = 'drug';
+      break;
+
+    case 'App\\Models\\RadiologyDetail':
+      case_type = 'radiology';
+      break;
+
+    case 'App\\Models\\ConsultationDetail':
+        case_type = 'consultation';
+      break;
+    case 'App\\Models\\ConsumableDetail':
+        case_type = 'consumable';
+      break;
+    case 'App\\Models\\LaboratoryDetail':
+      case_type = 'laboratory';
+      break;
+
+    default:
+      case_type = detail_type;
+      break;
+  }
+
+  console.log('case_type:', case_type);
+  return case_type;
+};
+
 
 // Save component (create or update)
 const saveComponent = async () => {
@@ -579,12 +647,15 @@ const saveComponent = async () => {
   }
 
   saving.value = true;
+  // add item_type to formData.value from case records
+  const caseRecord = caseRecords.value.find(c => c.id === formData.value.case_record_id);
+  formData.value.item_type = getCaseType(caseRecord?.detail_type) || 'OTHER';
   try {
     if (editMode.value) {
-      await api.put(`/api/bundle-components/${formData.value.id}`, formData.value);
+      await api.put(`/bundle-components/${formData.value.id}`, formData.value);
       showSuccess('Component updated successfully');
     } else {
-      await api.post('/api/bundle-components', formData.value);
+      await api.post('/bundle-components', formData.value);
       showSuccess('Component created successfully');
     }
     closeDialog();
@@ -615,7 +686,7 @@ const bulkAddComponents = async () => {
       })),
     };
 
-    await api.post('/api/bundle-components/bulk', payload);
+    await api.post('/bundle-components/bulk', payload);
     showSuccess(`${bulkFormData.value.selected_items.length} components added successfully`);
     closeBulkDialog();
     await Promise.all([loadComponents(), loadStatistics()]);
@@ -634,10 +705,9 @@ const closeDialog = () => {
   formData.value = {
     service_bundle_id: null,
     case_record_id: null,
-    max_quantity: 1,
     item_type: '',
+    max_quantity: 1,
   };
-  caseRecords.value = [];
 };
 
 // Close bulk dialog
@@ -662,7 +732,7 @@ const confirmDelete = (component) => {
 const deleteComponent = async () => {
   deleting.value = true;
   try {
-    await api.delete(`/api/bundle-components/${componentToDelete.value.id}`);
+    await api.delete(`/bundle-components/${componentToDelete.value.id}`);
     showSuccess('Component deleted successfully');
     showDeleteDialog.value = false;
     componentToDelete.value = null;
@@ -683,7 +753,7 @@ const exportComponents = async () => {
       item_type: itemTypeFilter.value,
     };
 
-    const response = await api.get('/api/bundle-components-export', {
+    const response = await api.get('/bundle-components-export', {
       params,
       responseType: 'blob'
     });
@@ -706,4 +776,3 @@ const exportComponents = async () => {
   padding: 20px 0;
 }
 </style>
-

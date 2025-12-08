@@ -296,7 +296,7 @@
           </v-card-text>
         </v-card>
 
-        <!-- Step 3: Select FFS Services -->
+        <!-- Step 3: Service Selection (Optional) -->
         <v-card
           v-if="selectedReferral && claimCheckStatus === 'none'"
           class="mb-6"
@@ -304,122 +304,106 @@
         >
           <v-card-title class="bg-grey-lighten-4 d-flex align-center py-4">
             <v-chip color="primary" variant="flat" class="mr-3">3</v-chip>
-            <span class="text-h6">Select FFS Services</span>
+            <span class="text-h6">Service Selection (Optional)</span>
           </v-card-title>
 
           <v-card-text class="pa-6">
-            <v-alert
-              v-if="requestedServices.length === 0"
-              type="warning"
-              variant="outlined"
-              class="mb-6"
-            >
-              <div class="d-flex align-start">
-                <v-icon class="mr-3" size="24" color="warning">mdi-alert</v-icon>
-                <div>
-                  <div class="font-weight-bold mb-1">No Services Added</div>
-                  <p class="mb-0">Add at least one FFS service/tariff item to be authorized.</p>
-                </div>
-              </div>
+            <v-alert type="info" density="compact" class="mb-4">
+              Select a service bundle (single) or multiple direct services for this FU-PA Code request.
             </v-alert>
 
-            <!-- Services Table -->
-            <v-table class="services-table mb-4" v-if="requestedServices.length > 0">
-              <thead>
-                <tr>
-                  <th class="text-left" style="width: 5%">#</th>
-                  <th class="text-left" style="width: 50%">Service / Tariff Item</th>
-                  <th class="text-center" style="width: 15%">Quantity</th>
-                  <th class="text-center" style="width: 15%">Unit Price</th>
-                  <th class="text-center" style="width: 10%">Total</th>
-                  <th class="text-center" style="width: 5%">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(service, index) in requestedServices" :key="index">
-                  <td class="text-center font-weight-bold">{{ index + 1 }}</td>
-                  <td>
-                    <v-autocomplete
-                      v-model="service.case_record_id"
-                      :items="caseRecords"
-                      item-title="service_description"
-                      item-value="id"
-                      variant="outlined"
-                      density="comfortable"
-                      placeholder="Search and select service..."
-                      @update:model-value="onServiceSelected(index, $event)"
-                      :loading="loadingServices"
-                      clearable
-                      hide-details
-                    >
-                      <template v-slot:item="{ item, props }">
-                        <v-list-item v-bind="props" class="px-4 py-2">
-                          <v-list-item-title class="font-weight-medium">
-                            {{ item.raw.service_description }}
-                          </v-list-item-title>
-                          <v-list-item-subtitle class="mt-1">
-                            <v-chip size="x-small" color="primary" variant="outlined" class="mr-2">
-                              {{ item.raw.nicare_code }}
-                            </v-chip>
-                            <span class="font-weight-medium">₦{{ formatCurrency(item.raw.price) }}</span>
-                          </v-list-item-subtitle>
-                        </v-list-item>
-                      </template>
-                    </v-autocomplete>
-                  </td>
-                  <td class="text-center">
-                    <v-text-field
-                      v-model.number="service.quantity"
-                      type="number"
-                      min="1"
-                      variant="outlined"
-                      density="comfortable"
-                      hide-details
-                      class="centered-input"
-                    />
-                  </td>
-                  <td class="text-center font-weight-medium">
-                    ₦{{ formatCurrency(service.price) }}
-                  </td>
-                  <td class="text-center font-weight-bold text-primary">
-                    ₦{{ formatCurrency(service.price * service.quantity) }}
-                  </td>
-                  <td class="text-center">
-                    <v-btn
-                      icon
-                      variant="text"
-                      size="small"
-                      color="error"
-                      @click="removeService(index)"
-                    >
-                      <v-icon>mdi-delete</v-icon>
-                    </v-btn>
-                  </td>
-                </tr>
-              </tbody>
-              <tfoot>
-                <tr class="bg-grey-lighten-4">
-                  <td colspan="4" class="text-right font-weight-bold text-h6 py-3">
-                    Total Estimated Cost:
-                  </td>
-                  <td class="text-center font-weight-bold text-h6 text-primary py-3">
-                    ₦{{ formatCurrency(totalEstimatedCost) }}
-                  </td>
-                  <td></td>
-                </tr>
-              </tfoot>
-            </v-table>
+            <v-row>
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="formData.service_selection_type"
+                  label="Service Selection Type *"
+                  :items="serviceSelectionTypes"
+                  item-title="text"
+                  item-value="value"
+                  variant="outlined"
+                  density="comfortable"
+                  clearable
+                  @update:model-value="onServiceTypeChange"
+                  :rules="[v => !!v || 'Service selection type is required']"
+                />
+              </v-col>
+            </v-row>
 
-            <v-btn
-              color="primary"
-              variant="outlined"
-              size="large"
-              @click="addService"
-              class="mt-2"
-            >
-              <v-icon start>mdi-plus-circle</v-icon>
-              Add FFS Service
-            </v-btn>
+            <!-- Bundle Service Selection (Single) -->
+            <v-row v-if="formData.service_selection_type === 'bundle'">
+              <v-col cols="12">
+                <v-autocomplete
+                  v-model="formData.service_bundle_id"
+                  label="Select Service Bundle *"
+                  :items="serviceBundles"
+                  item-title="display_name"
+                  item-value="id"
+                  variant="outlined"
+                  density="comfortable"
+                  :loading="loadingBundles"
+                  :rules="[v => !!v || 'Service bundle is required']"
+                >
+                  <template v-slot:item="{ item, props }">
+                    <v-list-item v-bind="props">
+                      <template v-slot:prepend>
+                        <v-icon color="primary">mdi-package-variant</v-icon>
+                      </template>
+                      <v-list-item-subtitle class="mt-1">
+                        <div class="text-caption">
+                          <v-icon size="12">mdi-barcode</v-icon> {{ item.raw.code }} |
+                          <v-icon size="12">mdi-currency-ngn</v-icon> ₦{{ Number(item.raw.fixed_price).toLocaleString() }}
+                          <span v-if="item.raw.diagnosis_icd10"> | <v-icon size="12">mdi-medical-bag</v-icon> {{ item.raw.diagnosis_icd10 }}</span>
+                        </div>
+                      </v-list-item-subtitle>
+                    </v-list-item>
+                  </template>
+                </v-autocomplete>
+              </v-col>
+            </v-row>
+
+            <!-- Direct Service Selection (Multiple) -->
+            <v-row v-if="formData.service_selection_type === 'direct'">
+              <v-col cols="12">
+                <v-autocomplete
+                  v-model="formData.case_record_ids"
+                  label="Select Direct Services * (Multiple allowed)"
+                  :items="caseRecords"
+                  item-title="display_name"
+                  item-value="id"
+                  variant="outlined"
+                  density="comfortable"
+                  :loading="loadingCaseRecords"
+                  multiple
+                  chips
+                  closable-chips
+                  :rules="[v => (v && v.length > 0) || 'At least one service is required']"
+                >
+                  <template v-slot:item="{ item, props }">
+                    <v-list-item v-bind="props">
+                      <template v-slot:prepend>
+                        <v-icon :color="getCaseRecordColor(item.raw.detail_type)">{{ getCaseRecordIcon(item.raw.detail_type) }}</v-icon>
+                      </template>
+                      <v-list-item-subtitle class="mt-1">
+                        <div class="text-caption">
+                          <v-icon size="12">mdi-barcode</v-icon> {{ item.raw.nicare_code }} |
+                          <v-chip size="x-small" :color="getCaseRecordColor(item.raw.detail_type)" variant="flat">{{ getCaseTypeLabel(item.raw.detail_type) }}</v-chip>
+                        </div>
+                      </v-list-item-subtitle>
+                    </v-list-item>
+                  </template>
+                  <template v-slot:chip="{ item, props }">
+                    <v-chip
+                      v-bind="props"
+                      :color="getCaseRecordColor(item.raw.detail_type)"
+                      closable
+                    >
+                      <v-icon start :icon="getCaseRecordIcon(item.raw.detail_type)"></v-icon>
+                      {{ item.raw.case_name }}
+                    </v-chip>
+                  </template>
+                </v-autocomplete>
+              </v-col>
+            </v-row>
           </v-card-text>
         </v-card>
 
@@ -584,42 +568,52 @@ const loadingServices = ref(false);
 const claimCheckStatus = ref(null); // 'checking', 'exists', 'none'
 const existingClaim = ref(null);
 
-const requestedServices = ref([]);
+const serviceBundles = ref([]);
+const loadingBundles = ref(false);
+const loadingCaseRecords = ref(false);
+
+const serviceSelectionTypes = [
+  { value: 'bundle', text: 'Bundle Service (Package)' },
+  { value: 'direct', text: 'Direct Service (Single Item)' },
+];
 
 const formData = ref({
   referral_id: null,
   enrollee_id: null,
   facility_id: null,
-  is_complication_pa: true, // FFS is always a complication/top-up PA
+  is_complication_pa: true,
   clinical_justification: '',
   diagnosis_update: '',
-  requested_items: [],
+  service_selection_type: null,
+  service_bundle_id: null,
+  case_record_ids: [], // Array for multiple direct services
 });
 
 // Computed properties
-const totalEstimatedCost = computed(() => {
-  return requestedServices.value.reduce((total, service) => {
-    return total + (service.price * service.quantity);
-  }, 0);
-});
-
 const canSubmit = computed(() => {
-  return selectedReferral.value
-    && claimCheckStatus.value === 'none'
-    && requestedServices.value.length > 0
-    && formData.value.clinical_justification
-    && !submitting.value;
+  if (!selectedReferral.value || claimCheckStatus.value !== 'none' || !formData.value.clinical_justification || submitting.value) {
+    return false;
+  }
+
+  // Must have service selection type
+  if (!formData.value.service_selection_type) {
+    return false;
+  }
+
+  // If bundle, must have bundle selected
+  if (formData.value.service_selection_type === 'bundle' && !formData.value.service_bundle_id) {
+    return false;
+  }
+
+  // If direct, must have at least one service selected
+  if (formData.value.service_selection_type === 'direct' && (!formData.value.case_record_ids || formData.value.case_record_ids.length === 0)) {
+    return false;
+  }
+
+  return true;
 });
 
 // Helper functions
-const formatCurrency = (value) => {
-  if (!value) return '0.00';
-  return parseFloat(value).toLocaleString('en-NG', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
-  });
-};
-
 const getClaimStatusColor = (status) => {
   const colors = {
     'DRAFT': 'grey',
@@ -656,20 +650,90 @@ const fetchApprovedReferrals = async () => {
 // Fetch case records (services) - only services that require PA
 const fetchCaseRecords = async () => {
   loadingServices.value = true;
+  loadingCaseRecords.value = true;
   try {
     const response = await api.get('/cases', {
       params: {
-        pa_required: true, // Only fetch services that require PA
+        // pa_required: true, // Only fetch services that require PA
         status: 'active'
       }
     });
-    caseRecords.value = response.data.data || response.data;
+    const records = response.data.data || response.data;
+    caseRecords.value = records.map(record => ({
+      ...record,
+      display_name: `${record.case_name} (${record.nicare_code})`,
+      service_description: `${record.case_name} - ${record.nicare_code}`
+    }));
   } catch (err) {
     showError('Failed to load services');
     console.error(err);
   } finally {
     loadingServices.value = false;
+    loadingCaseRecords.value = false;
   }
+};
+
+// Fetch service bundles
+const fetchServiceBundles = async () => {
+  loadingBundles.value = true;
+  try {
+    const response = await api.get('/service-bundles', {
+      params: { status: 'active' }
+    });
+    serviceBundles.value = (response.data.data || response.data).map(bundle => ({
+      ...bundle,
+      display_name: `${bundle.description || bundle.name} - ₦${Number(bundle.fixed_price).toLocaleString()}`
+    }));
+  } catch (err) {
+    showError('Failed to load service bundles');
+  } finally {
+    loadingBundles.value = false;
+  }
+};
+
+// Handle service type change
+const onServiceTypeChange = () => {
+  formData.value.service_bundle_id = null;
+  formData.value.case_record_ids = [];
+};
+
+// Get case record icon
+const getCaseRecordIcon = (detailType) => {
+  const iconMap = {
+    'App\\Models\\DrugDetail': 'mdi-pill',
+    'App\\Models\\LaboratoryDetail': 'mdi-flask',
+    'App\\Models\\ProfessionalServiceDetail': 'mdi-stethoscope',
+    'App\\Models\\RadiologyDetail': 'mdi-radioactive',
+    'App\\Models\\ConsultationDetail': 'mdi-doctor',
+    'App\\Models\\ConsumableDetail': 'mdi-package-variant-closed',
+  };
+  return iconMap[detailType] || 'mdi-medical-bag';
+};
+
+// Get case record color
+const getCaseRecordColor = (detailType) => {
+  const colorMap = {
+    'App\\Models\\DrugDetail': 'blue',
+    'App\\Models\\LaboratoryDetail': 'purple',
+    'App\\Models\\ProfessionalServiceDetail': 'green',
+    'App\\Models\\RadiologyDetail': 'orange',
+    'App\\Models\\ConsultationDetail': 'teal',
+    'App\\Models\\ConsumableDetail': 'brown',
+  };
+  return colorMap[detailType] || 'grey';
+};
+
+// Get case type label
+const getCaseTypeLabel = (detailType) => {
+  const labelMap = {
+    'App\\Models\\DrugDetail': 'Drug',
+    'App\\Models\\LaboratoryDetail': 'Laboratory',
+    'App\\Models\\ProfessionalServiceDetail': 'Professional Service',
+    'App\\Models\\RadiologyDetail': 'Radiology',
+    'App\\Models\\ConsultationDetail': 'Consultation',
+    'App\\Models\\ConsumableDetail': 'Consumable',
+  };
+  return labelMap[detailType] || 'Service';
 };
 
 // Check if claim exists for referral
@@ -771,37 +835,12 @@ const loadReferralDetails = async () => {
   }
 };
 
-// Service management
-const addService = () => {
-  requestedServices.value.push({
-    case_record_id: null,
-    quantity: 1,
-    price: 0,
-  });
-};
-
-const removeService = (index) => {
-  requestedServices.value.splice(index, 1);
-};
-
-const onServiceSelected = (index, caseRecordId) => {
-  const caseRecord = caseRecords.value.find(c => c.id === caseRecordId);
-  if (caseRecord) {
-    requestedServices.value[index].price = caseRecord.price || 0;
-  }
-};
-
 // Handle form submission
 const handleSubmission = async () => {
   // Validate form
   const { valid } = await requestForm.value?.validate();
   if (!valid) {
     showError('Please fill in all required fields');
-    return;
-  }
-
-  if (requestedServices.value.length === 0) {
-    showError('Please add at least one FFS service');
     return;
   }
 
@@ -821,13 +860,13 @@ const handleSubmission = async () => {
       is_complication_pa: true,
       justification: formData.value.clinical_justification,
       diagnosis_update: formData.value.diagnosis_update,
-      requested_items: requestedServices.value.map(s => ({
-        case_record_id: s.case_record_id,
-        quantity: s.quantity,
-      })),
+      service_selection_type: formData.value.service_selection_type,
+      service_bundle_id: formData.value.service_bundle_id,
+      case_record_ids: formData.value.case_record_ids, // Array of direct service IDs
+      requested_items: [], // No FFS items anymore
     };
 
-    const response = await api.post('/api/pas/pa-codes', payload);
+    const response = await api.post('/pas/pa-codes', payload);
     createdPACode.value = response.data.data || response.data;
 
     showSuccess(`FU-PA Code request submitted successfully! Code: ${createdPACode.value.code}`);
@@ -851,7 +890,6 @@ const resetForm = () => {
   enrolleeDetails.value = null;
   claimCheckStatus.value = null;
   existingClaim.value = null;
-  requestedServices.value = [];
   formData.value = {
     referral_id: null,
     enrollee_id: null,
@@ -859,7 +897,9 @@ const resetForm = () => {
     is_complication_pa: true,
     clinical_justification: '',
     diagnosis_update: '',
-    requested_items: [],
+    service_selection_type: null,
+    service_bundle_id: null,
+    case_record_ids: [],
   };
   createdPACode.value = null;
 
@@ -872,6 +912,7 @@ onMounted(async () => {
   await Promise.all([
     fetchApprovedReferrals(),
     fetchCaseRecords(),
+    fetchServiceBundles(),
   ]);
 });
 </script>

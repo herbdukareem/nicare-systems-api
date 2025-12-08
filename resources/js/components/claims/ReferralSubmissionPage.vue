@@ -71,7 +71,7 @@
                                 :items="primaryFacilities"
                                 item-title="name"
                                 item-value="id"
-                                outlined
+                                variant="outlined"
                                 required
                                 :rules="[v => !!v || 'Referring facility is required']"
                                 :loading="loadingFacilities"
@@ -95,7 +95,7 @@
                                 :items="enrollees"
                                 item-title="full_name"
                                 item-value="id"
-                                outlined
+                                 variant="outlined"
                                 required
                                 :rules="[v => !!v || 'Enrollee is required']"
                                 :loading="loadingEnrollees"
@@ -126,7 +126,7 @@
                                 :items="secondaryFacilities"
                                 item-title="name"
                                 item-value="id"
-                                outlined
+                                 variant="outlined"
                                 required
                                 :rules="[v => !!v || 'Receiving facility is required']"
                                 :loading="loadingFacilities"
@@ -165,7 +165,7 @@
                                 v-model="formData.presenting_complains"
                                 label="Presenting Complaints *"
                                 :rules="[v => !!v || 'Presenting complaints are required']"
-                                outlined
+                                 variant="outlined"
                                 hint="Chief complaints of the patient"
                               />
                             </v-col>
@@ -174,7 +174,7 @@
                                 v-model="formData.preliminary_diagnosis"
                                 label="Preliminary Diagnosis (ICD-10 Code) *"
                                 :rules="[v => !!v || 'Diagnosis is required']"
-                                outlined
+                                 variant="outlined"
                                 hint="Enter ICD-10 code or diagnosis text"
                               />
                             </v-col>
@@ -187,7 +187,7 @@
                                 :items="severityLevels"
                                 label="Severity Level *"
                                 :rules="[v => !!v || 'Severity level is required']"
-                                outlined
+                                 variant="outlined"
                                 hint="Routine, Urgent/Expedited, or Emergency"
                               />
                             </v-col>
@@ -196,7 +196,7 @@
                                 v-model="formData.reasons_for_referral"
                                 label="Reasons for Referral *"
                                 :rules="[v => !!v || 'Reasons for referral are required']"
-                                outlined
+                                 variant="outlined"
                                 rows="3"
                                 hint="Why is this referral necessary?"
                               />
@@ -209,7 +209,7 @@
                                 v-model="formData.treatments_given"
                                 label="Treatments Given *"
                                 :rules="[v => !!v || 'Treatments given are required']"
-                                outlined
+                                 variant="outlined"
                                 rows="3"
                                 hint="What treatments have been administered?"
                               />
@@ -219,7 +219,7 @@
                                 v-model="formData.investigations_done"
                                 label="Investigations Done *"
                                 :rules="[v => !!v || 'Investigations done are required']"
-                                outlined
+                                 variant="outlined"
                                 rows="3"
                                 hint="Lab tests, imaging, etc."
                               />
@@ -232,7 +232,7 @@
                                 v-model="formData.examination_findings"
                                 label="Examination Findings *"
                                 :rules="[v => !!v || 'Examination findings are required']"
-                                outlined
+                                 variant="outlined"
                                 rows="3"
                                 hint="Physical examination results"
                               />
@@ -241,7 +241,7 @@
                               <v-textarea
                                 v-model="formData.medical_history"
                                 label="Medical History"
-                                outlined
+                                 variant="outlined"
                                 rows="3"
                                 hint="Past medical history (optional)"
                               />
@@ -253,10 +253,100 @@
                               <v-textarea
                                 v-model="formData.medication_history"
                                 label="Medication History"
-                                outlined
+                                 variant="outlined"
                                 rows="2"
                                 hint="Current medications (optional)"
                               />
+                            </v-col>
+                          </v-row>
+
+                          <!-- Service Selection Section -->
+                          <v-divider class="my-4"></v-divider>
+                          <h4 class="mb-3">Service Selection (Optional)</h4>
+                          <v-alert type="info" density="compact" class="mb-4">
+                            You can optionally pre-select services for this referral. This helps with claim processing later.
+                          </v-alert>
+
+                          <v-row>
+                            <v-col cols="12" md="6">
+                              <v-select
+                                v-model="formData.service_selection_type"
+                                label="Service Selection Type"
+                                :items="serviceSelectionTypes"
+                                item-title="text"
+                                item-value="value"
+                                variant="outlined"
+                                density="comfortable"
+                                clearable
+                                hint="Choose how to specify services for this referral"
+                                persistent-hint
+                                @update:model-value="onServiceTypeChange"
+                              />
+                            </v-col>
+                          </v-row>
+
+                          <!-- Bundle Service Selection -->
+                          <v-row v-if="formData.service_selection_type === 'bundle'">
+                            <v-col cols="12">
+                              <v-autocomplete
+                                v-model="formData.service_bundle_id"
+                                label="Select Service Bundle *"
+                                :items="serviceBundles"
+                                item-title="display_name"
+                                item-value="id"
+                                variant="outlined"
+                                density="comfortable"
+                                :loading="loadingBundles"
+                                :rules="formData.service_selection_type === 'bundle' ? [v => !!v || 'Service bundle is required'] : []"
+                                clearable
+                                hint="Select a pre-defined service bundle"
+                                persistent-hint
+                              >
+                                <template v-slot:item="{ item, props }">
+                                  <v-list-item v-bind="props">
+                                    <template v-slot:prepend>
+                                      <v-icon>mdi-package-variant</v-icon>
+                                    </template>
+                                    <!-- <v-list-item-title>{{ item.raw.description }}</v-list-item-title> -->
+                                    <v-list-item-subtitle>
+                                      {{ item.raw.description }} | ₦{{ Number(item.raw.fixed_price).toLocaleString() }}
+                                      <span v-if="item.raw.diagnosis_icd10"> | ICD-10: {{ item.raw.diagnosis_icd10 }}</span>
+                                    </v-list-item-subtitle>
+                                  </v-list-item>
+                                </template>
+                              </v-autocomplete>
+                            </v-col>
+                          </v-row>
+
+                          <!-- Direct Service Selection -->
+                          <v-row v-if="formData.service_selection_type === 'direct'">
+                            <v-col cols="12">
+                              <v-autocomplete
+                                v-model="formData.case_record_id"
+                                label="Select Direct Service *"
+                                :items="caseRecords"
+                                item-title="display_name"
+                                item-value="id"
+                                variant="outlined"
+                                density="comfortable"
+                                :loading="loadingCaseRecords"
+                                :rules="formData.service_selection_type === 'direct' ? [v => !!v || 'Service is required'] : []"
+                                clearable
+                                hint="Select a single service/treatment"
+                                persistent-hint
+                              >
+                                <template v-slot:item="{ item, props }">
+                                  <v-list-item v-bind="props">
+                                    <template v-slot:prepend>
+                                      <v-icon>{{ getCaseRecordIcon(item.raw.detail_type) }}</v-icon>
+                                    </template>
+                                    <v-list-item-title>{{ item.raw.case_name }}</v-list-item-title>
+                                    <v-list-item-subtitle>
+                                      {{ item.raw.nicare_code }} | {{ item.raw.detail_type }}
+                                    </v-list-item-subtitle>
+                                  </v-list-item>
+                                </template>
+                              </v-autocomplete>
                             </v-col>
                           </v-row>
                         </v-card-text>
@@ -287,7 +377,7 @@
                                 v-model="formData.referring_person_name"
                                 label="Referring Person Name *"
                                 :rules="[v => !!v || 'Referring person name is required']"
-                                outlined
+                                 variant="outlined"
                                 hint="Name of the referring medical personnel"
                               />
                             </v-col>
@@ -296,7 +386,7 @@
                                 v-model="formData.referring_person_specialisation"
                                 label="Specialisation *"
                                 :rules="[v => !!v || 'Specialisation is required']"
-                                outlined
+                                 variant="outlined"
                                 hint="e.g., General Medicine, Pediatrics"
                               />
                             </v-col>
@@ -308,7 +398,7 @@
                                 v-model="formData.referring_person_cadre"
                                 label="Cadre *"
                                 :rules="[v => !!v || 'Cadre is required']"
-                                outlined
+                                 variant="outlined"
                                 hint="e.g., Doctor, Nurse, Medical Officer"
                               />
                             </v-col>
@@ -320,7 +410,7 @@
                               <v-text-field
                                 v-model="formData.contact_person_name"
                                 label="Contact Person Name"
-                                outlined
+                                 variant="outlined"
                                 hint="Optional contact person"
                               />
                             </v-col>
@@ -328,7 +418,7 @@
                               <v-text-field
                                 v-model="formData.contact_person_phone"
                                 label="Contact Phone"
-                                outlined
+                                 variant="outlined"
                                 hint="Phone number for follow-up"
                               />
                             </v-col>
@@ -337,7 +427,7 @@
                                 v-model="formData.contact_person_email"
                                 label="Contact Email"
                                 type="email"
-                                outlined
+                                 variant="outlined"
                                 hint="Email for notifications"
                               />
                             </v-col>
@@ -363,83 +453,9 @@
                     <v-card flat>
                       <v-card-text>
                         <h3 class="mb-4">Review & Submit</h3>
-
-                        <!-- Requested Services (PA Items) -->
-                        <h4 class="mt-4 mb-2">Requested Services (PA Items) <span class="text-caption">(optional)</span></h4>
-                        <v-alert
-                            v-if="requestedServices.length === 0"
-                            type="info"
-                            class="mb-4"
-                        >
-                          You can skip services now and add them later, or request at least one tariff item for PA.
+                        <v-alert type="info" density="compact" class="mb-4">
+                          Please review all information before submitting the referral.
                         </v-alert>
-
-                        <v-table density="compact" class="mb-4">
-                            <thead>
-                                <tr>
-                                    <th style="width: 60%">Service / Tariff Item</th>
-                                    <th class="text-center" style="width: 15%">Quantity</th>
-                                    <th class="text-center" style="width: 15%">Price</th>
-                                    <th class="text-center" style="width: 10%">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr v-for="(service, index) in requestedServices" :key="index">
-                                    <td>
-                                        <v-autocomplete
-                                            v-model="service.case_record_id"
-                                            :items="caseRecords"
-                                            item-title="service_description"
-                                            item-value="id"
-                                            variant="underlined"
-                                            density="compact"
-                                            :rules="[v => !!v || 'Required']"
-                                            @update:modelValue="onServiceSelected(index, $event)"
-                                            :loading="loadingServices"
-                                            hint="Search service"
-                                            clearable
-                                        >
-                                          <template v-slot:item="{ item, props }">
-                                            <v-list-item v-bind="props">
-                                              <v-list-item-title>{{ item.raw.service_description }}</v-list-item-title>
-                                              <v-list-item-subtitle>{{ item.raw.nicare_code }} | ₦{{ item.raw.price }}</v-list-item-subtitle>
-                                            </v-list-item>
-                                          </template>
-                                        </v-autocomplete>
-                                    </td>
-                                    <td class="text-center">
-                                        <v-text-field
-                                            v-model.number="service.quantity"
-                                            type="number"
-                                            min="1"
-                                            variant="underlined"
-                                            density="compact"
-                                            :rules="[v => v >= 1 || 'Min 1']"
-                                        />
-                                    </td>
-                                    <td class="text-center">
-                                        <span class="font-weight-medium">₦{{ service.price || 0 }}</span>
-                                    </td>
-                                    <td class="text-center">
-                                        <v-btn
-                                            icon
-                                            variant="plain"
-                                            size="small"
-                                            color="error"
-                                            @click="removeService(index)"
-                                            title="Remove service"
-                                        >
-                                            <v-icon>mdi-delete</v-icon>
-                                        </v-btn>
-                                    </td>
-                                </tr>
-                            </tbody>
-                        </v-table>
-
-                        <v-btn color="success" @click="addService" class="mb-4">
-                            <v-icon left>mdi-plus</v-icon>
-                            Add Service Request
-                        </v-btn>
                       </v-card-text>
                       <v-card-actions>
                         <v-btn @click="prevStep">
@@ -541,17 +557,23 @@ const currentStep = ref(1);
 const facilities = ref([]);
 const enrollees = ref([]);
 const caseRecords = ref([]);
+const serviceBundles = ref([]);
 const loadingFacilities = ref(false);
 const loadingEnrollees = ref(false);
-const loadingServices = ref(false);
+const loadingBundles = ref(false);
+const loadingCaseRecords = ref(false);
 
-const requestedServices = ref([]);
 const showSuccessDialog = ref(false);
 
 const severityLevels = [
   { title: 'Routine', value: 'Routine' },
   { title: 'Urgent/Expedited', value: 'Urgent/Expidited' },
   { title: 'Emergency', value: 'Emergency' },
+];
+
+const serviceSelectionTypes = [
+  { value: 'bundle', text: 'Bundle Service (Package)' },
+  { value: 'direct', text: 'Direct Service (Single Item)' },
 ];
 
 const formData = ref({
@@ -573,6 +595,9 @@ const formData = ref({
   contact_person_name: '',
   contact_person_phone: '',
   contact_person_email: '',
+  service_selection_type: null,
+  service_bundle_id: null,
+  case_record_id: null,
 });
 
 // Computed properties for filtering facilities
@@ -587,6 +612,7 @@ const secondaryFacilities = computed(() => {
 onMounted(async () => {
   await Promise.all([
     fetchFacilities(),
+    fetchServiceBundles(),
     fetchCaseRecords(),
   ]);
 });
@@ -635,41 +661,58 @@ const onReferringFacilityChange = (facilityId) => {
   }
 };
 
+// Fetch service bundles
+const fetchServiceBundles = async () => {
+  loadingBundles.value = true;
+  try {
+    const response = await api.get('/service-bundles', {
+      params: { status: 'active' }
+    });
+    serviceBundles.value = (response.data.data || response.data).map(bundle => ({
+      ...bundle,
+      display_name: `${bundle.description} - ₦${Number(bundle.fixed_price).toLocaleString()}`
+    }));
+  } catch (err) {
+    showError('Failed to load service bundles');
+  } finally {
+    loadingBundles.value = false;
+  }
+};
+
 // Fetch case records (services)
 const fetchCaseRecords = async () => {
-  loadingServices.value = true;
+  loadingCaseRecords.value = true;
   try {
     const response = await api.get('/cases');
-    caseRecords.value = response.data.data || response.data;
+    caseRecords.value = (response.data.data || response.data).map(record => ({
+      ...record,
+      display_name: `${record.case_name} (${record.nicare_code})`
+    }));
   } catch (err) {
     showError('Failed to load services');
   } finally {
-    loadingServices.value = false;
+    loadingCaseRecords.value = false;
   }
 };
 
-// Add service to requested services
-const addService = () => {
-  requestedServices.value.push({
-    case_record_id: null,
-    quantity: 1,
-    price: 0,
-  });
+// Handle service selection type change
+const onServiceTypeChange = (type) => {
+  // Clear selections when type changes
+  formData.value.service_bundle_id = null;
+  formData.value.case_record_id = null;
 };
 
-// Remove service from requested services
-const removeService = (index) => {
-  requestedServices.value.splice(index, 1);
-};
-
-// Handle service selection
-const onServiceSelected = (index, caseRecordId) => {
-  if (!caseRecordId) return;
-
-  const caseRecord = caseRecords.value.find(c => c.id === caseRecordId);
-  if (caseRecord) {
-    requestedServices.value[index].price = caseRecord.price;
-  }
+// Get icon for case record type
+const getCaseRecordIcon = (detailType) => {
+  const iconMap = {
+    'App\\Models\\DrugDetail': 'mdi-pill',
+    'App\\Models\\LaboratoryDetail': 'mdi-flask',
+    'App\\Models\\ProfessionalServiceDetail': 'mdi-stethoscope',
+    'App\\Models\\RadiologyDetail': 'mdi-radioactive',
+    'App\\Models\\ConsultationDetail': 'mdi-doctor',
+    'App\\Models\\ConsumableDetail': 'mdi-package-variant-closed',
+  };
+  return iconMap[detailType] || 'mdi-medical-bag';
 };
 
 // Stepper navigation
@@ -730,10 +773,6 @@ const handleSubmission = async () => {
   try {
     const payload = {
       ...formData.value,
-      requested_services: requestedServices.value.map(s => ({
-        case_record_id: s.case_record_id,
-        quantity: s.quantity,
-      })),
     };
 
     const response = await api.post('/referrals', payload);

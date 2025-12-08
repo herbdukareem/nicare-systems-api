@@ -157,7 +157,7 @@ class ClaimController extends Controller
      * Validate a claim
      * POST /api/claims/{id}/validate
      */
-    public function validate(Claim $claim): JsonResponse
+    public function validateClaim(Claim $claim): JsonResponse
     {
         try {
             $alerts = $this->claimProcessingService->validateClaim($claim);

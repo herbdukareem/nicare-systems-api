@@ -50,6 +50,7 @@ use App\Http\Controllers\Api\ClaimController;
 use App\Http\Controllers\Api\ClaimLineController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\ReportingController;
+use App\Http\Controllers\PAS\PACodeController;
 
 /*
 |--------------------------------------------------------------------------
@@ -264,7 +265,7 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::post('/', [ClaimController::class, 'store']);
             Route::get('/{claim}', [ClaimController::class, 'show']);
             Route::post('/{claim}/submit', [ClaimController::class, 'submit']);
-            Route::post('/{claim}/validate', [ClaimController::class, 'validate']);
+            Route::post('/{claim}/validate', [ClaimController::class, 'validateClaim']);
             Route::post('/{claim}/approve', [ClaimController::class, 'approve']);
             Route::post('/{claim}/reject', [ClaimController::class, 'reject']);
             Route::get('/{claim}/summary', [ClaimController::class, 'summary']);
@@ -333,9 +334,13 @@ Route::middleware('auth:sanctum')->group(function () {
 
 });
 
-// PAS (Pre-Authorization System) routes (outside v1 group)
+// PAS (Pre-Authorization System) routes
 Route::middleware(['auth:sanctum'])->prefix('pas')->group(function () {
-    
+
+    // PA Code Management
+    Route::apiResource('pa-codes', PACodeController::class)->only(['index', 'store', 'show']);
+    Route::post('pa-codes/{paCode}/approve', [PACodeController::class, 'approve']);
+    Route::post('pa-codes/{paCode}/reject', [PACodeController::class, 'reject']);
 
     // Security routes
     Route::prefix('security')->group(function () {
@@ -348,7 +353,7 @@ Route::middleware(['auth:sanctum'])->prefix('pas')->group(function () {
         Route::post('sessions/revoke', [SecurityController::class, 'revokeSessions']);
     });
 
-   
+
 
 
 });

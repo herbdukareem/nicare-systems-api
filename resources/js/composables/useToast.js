@@ -38,6 +38,13 @@ export function useToast() {
   const warning = (message, duration = 6000) => addToast(message, 'warning', duration);
   const info = (message, duration = 5000) => addToast(message, 'info', duration);
 
+  // Legacy aliases used across components
+  const showSuccess = success;
+  const showError = error;
+  const showWarning = warning;
+  const showInfo = info;
+  const warn = warning;
+
   return {
     toasts,
     addToast,
@@ -46,5 +53,10 @@ export function useToast() {
     error,
     warning,
     info,
+    showSuccess,
+    showError,
+    showWarning,
+    showInfo,
+    warn,
   };
 }

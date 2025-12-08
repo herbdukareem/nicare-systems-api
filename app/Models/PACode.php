@@ -11,6 +11,7 @@ class PACode extends Model
 
     protected $casts = [
         'requested_services' => 'array',
+        'case_record_ids' => 'array',
     ];
 
     // Constants for PA Types
@@ -47,5 +48,26 @@ class PACode extends Model
     public function referral()
     {
         return $this->belongsTo(Referral::class);
+    }
+
+    /**
+     * PA Code belongs to a Service Bundle (optional).
+     */
+    public function serviceBundle()
+    {
+        return $this->belongsTo(ServiceBundle::class, 'service_bundle_id');
+    }
+
+    /**
+     * PA Code has many Case Records (for direct service selection).
+     * This is a custom accessor since we store IDs in JSON.
+     */
+    public function caseRecords()
+    {
+        if (empty($this->case_record_ids)) {
+            return collect([]);
+        }
+
+        return CaseRecord::whereIn('id', $this->case_record_ids)->get();
     }
 }

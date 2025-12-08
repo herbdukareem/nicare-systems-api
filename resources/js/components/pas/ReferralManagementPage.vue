@@ -255,6 +255,340 @@
         </v-row>
       </v-container>
 
+      <!-- Referral Details Dialog -->
+      <v-dialog v-model="detailsDialog" max-width="1200" scrollable>
+        <v-card>
+          <v-card-title class="bg-primary text-white d-flex align-center pa-4">
+            <v-icon left class="mr-2">mdi-file-document-check</v-icon>
+            <span class="text-h6">Referral Details</span>
+            <v-spacer></v-spacer>
+            <v-btn icon variant="text" @click="detailsDialog = false" color="white">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
+          </v-card-title>
+
+          <v-card-text class="pa-0">
+            <v-container fluid v-if="selectedReferral">
+              <!-- Header Info -->
+              <v-row class="bg-grey-lighten-4 pa-4">
+                <v-col cols="12" md="3">
+                  <div class="detail-item">
+                    <div class="text-caption text-grey">Referral Code</div>
+                    <div class="text-h6 font-weight-bold">{{ selectedReferral.referral_code }}</div>
+                  </div>
+                </v-col>
+                <v-col cols="12" md="3">
+                  <div class="detail-item">
+                    <div class="text-caption text-grey">UTN</div>
+                    <v-chip color="indigo" variant="flat" class="mt-1">{{ selectedReferral.utn }}</v-chip>
+                  </div>
+                </v-col>
+                <v-col cols="12" md="3">
+                  <div class="detail-item">
+                    <div class="text-caption text-grey">Status</div>
+                    <v-chip :color="getStatusColor(selectedReferral.status)" variant="flat" class="mt-1">
+                      <v-icon left size="small">{{ getStatusIcon(selectedReferral.status) }}</v-icon>
+                      {{ selectedReferral.status }}
+                    </v-chip>
+                  </div>
+                </v-col>
+                <v-col cols="12" md="3">
+                  <div class="detail-item">
+                    <div class="text-caption text-grey">Severity Level</div>
+                    <v-chip :color="getSeverityColor(selectedReferral.severity_level)" variant="flat" class="mt-1">
+                      {{ selectedReferral.severity_level }}
+                    </v-chip>
+                  </div>
+                </v-col>
+              </v-row>
+
+              <v-divider></v-divider>
+
+              <!-- Patient Information -->
+              <v-row class="pa-4">
+                <v-col cols="12">
+                  <h3 class="text-h6 mb-3">
+                    <v-icon color="primary" class="mr-2">mdi-account</v-icon>
+                    Patient Information
+                  </h3>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-list density="compact">
+                    <v-list-item>
+                      <template v-slot:prepend>
+                        <v-icon color="grey">mdi-account-circle</v-icon>
+                      </template>
+                      <v-list-item-title class="font-weight-medium">Full Name</v-list-item-title>
+                      <v-list-item-subtitle>{{ selectedReferral.enrollee?.first_name }} {{ selectedReferral.enrollee?.last_name }}</v-list-item-subtitle>
+                    </v-list-item>
+                    <v-list-item>
+                      <template v-slot:prepend>
+                        <v-icon color="grey">mdi-card-account-details</v-icon>
+                      </template>
+                      <v-list-item-title class="font-weight-medium">Enrollee ID</v-list-item-title>
+                      <v-list-item-subtitle>{{ selectedReferral.enrollee?.enrollee_id }}</v-list-item-subtitle>
+                    </v-list-item>
+                  </v-list>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-list density="compact">
+                    <v-list-item>
+                      <template v-slot:prepend>
+                        <v-icon color="grey">mdi-phone</v-icon>
+                      </template>
+                      <v-list-item-title class="font-weight-medium">Phone Number</v-list-item-title>
+                      <v-list-item-subtitle>{{ selectedReferral.enrollee?.phone_number || 'N/A' }}</v-list-item-subtitle>
+                    </v-list-item>
+                    <v-list-item>
+                      <template v-slot:prepend>
+                        <v-icon color="grey">mdi-email</v-icon>
+                      </template>
+                      <v-list-item-title class="font-weight-medium">Email</v-list-item-title>
+                      <v-list-item-subtitle>{{ selectedReferral.enrollee?.email || 'N/A' }}</v-list-item-subtitle>
+                    </v-list-item>
+                  </v-list>
+                </v-col>
+              </v-row>
+
+              <v-divider></v-divider>
+
+              <!-- Facility Information -->
+              <v-row class="pa-4">
+                <v-col cols="12">
+                  <h3 class="text-h6 mb-3">
+                    <v-icon color="primary" class="mr-2">mdi-hospital-building</v-icon>
+                    Facility Information
+                  </h3>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-card variant="outlined">
+                    <v-card-title class="bg-blue-lighten-5 text-subtitle-1">
+                      <v-icon left color="blue">mdi-hospital-marker</v-icon>
+                      Referring Facility
+                    </v-card-title>
+                    <v-card-text>
+                      <div class="font-weight-bold text-body-1 mb-1">{{ selectedReferral.referring_facility?.name }}</div>
+                      <div class="text-caption text-grey">{{ selectedReferral.referring_facility?.type }} Facility</div>
+                      <div class="text-caption text-grey mt-1">{{ selectedReferral.referring_facility?.address }}</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-card variant="outlined">
+                    <v-card-title class="bg-green-lighten-5 text-subtitle-1">
+                      <v-icon left color="green">mdi-hospital</v-icon>
+                      Receiving Facility
+                    </v-card-title>
+                    <v-card-text>
+                      <div class="font-weight-bold text-body-1 mb-1">{{ selectedReferral.receiving_facility?.name }}</div>
+                      <div class="text-caption text-grey">{{ selectedReferral.receiving_facility?.type }} Facility</div>
+                      <div class="text-caption text-grey mt-1">{{ selectedReferral.receiving_facility?.address }}</div>
+                    </v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
+
+              <v-divider></v-divider>
+
+              <!-- Clinical Information -->
+              <v-row class="pa-4">
+                <v-col cols="12">
+                  <h3 class="text-h6 mb-3">
+                    <v-icon color="primary" class="mr-2">mdi-stethoscope</v-icon>
+                    Clinical Information
+                  </h3>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-card variant="outlined" class="mb-3">
+                    <v-card-subtitle class="font-weight-bold">Presenting Complaints</v-card-subtitle>
+                    <v-card-text>{{ selectedReferral.presenting_complains || 'N/A' }}</v-card-text>
+                  </v-card>
+                  <v-card variant="outlined" class="mb-3">
+                    <v-card-subtitle class="font-weight-bold">Preliminary Diagnosis</v-card-subtitle>
+                    <v-card-text>{{ selectedReferral.preliminary_diagnosis || 'N/A' }}</v-card-text>
+                  </v-card>
+                  <v-card variant="outlined" class="mb-3">
+                    <v-card-subtitle class="font-weight-bold">Examination Findings</v-card-subtitle>
+                    <v-card-text>{{ selectedReferral.examination_findings || 'N/A' }}</v-card-text>
+                  </v-card>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-card variant="outlined" class="mb-3">
+                    <v-card-subtitle class="font-weight-bold">Reasons for Referral</v-card-subtitle>
+                    <v-card-text>{{ selectedReferral.reasons_for_referral || 'N/A' }}</v-card-text>
+                  </v-card>
+                  <v-card variant="outlined" class="mb-3">
+                    <v-card-subtitle class="font-weight-bold">Treatments Given</v-card-subtitle>
+                    <v-card-text>{{ selectedReferral.treatments_given || 'N/A' }}</v-card-text>
+                  </v-card>
+                  <v-card variant="outlined" class="mb-3">
+                    <v-card-subtitle class="font-weight-bold">Investigations Done</v-card-subtitle>
+                    <v-card-text>{{ selectedReferral.investigations_done || 'N/A' }}</v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
+
+              <v-divider></v-divider>
+
+              <!-- Service Selection -->
+              <v-row class="pa-4" v-if="selectedReferral.service_selection_type">
+                <v-col cols="12">
+                  <h3 class="text-h6 mb-3">
+                    <v-icon color="primary" class="mr-2">mdi-medical-bag</v-icon>
+                    Service Selection
+                  </h3>
+                </v-col>
+                <v-col cols="12">
+                  <v-alert
+                    :type="selectedReferral.service_selection_type === 'bundle' ? 'info' : 'success'"
+                    variant="tonal"
+                    density="compact"
+                  >
+                    <div class="d-flex align-center">
+                      <v-icon left>{{ selectedReferral.service_selection_type === 'bundle' ? 'mdi-package-variant' : 'mdi-medical-bag' }}</v-icon>
+                      <div>
+                        <div class="font-weight-bold">
+                          {{ selectedReferral.service_selection_type === 'bundle' ? 'Bundle Service Selected' : 'Direct Service Selected' }}
+                        </div>
+                        <div v-if="selectedReferral.service_bundle" class="mt-2">
+                          <div class="text-subtitle-2">{{ selectedReferral.service_bundle.description || selectedReferral.service_bundle.name }}</div>
+                          <div class="text-caption">Code: {{ selectedReferral.service_bundle.code }} | Price: ₦{{ Number(selectedReferral.service_bundle.fixed_price).toLocaleString() }}</div>
+                          <div class="text-caption" v-if="selectedReferral.service_bundle.diagnosis_icd10">ICD-10: {{ selectedReferral.service_bundle.diagnosis_icd10 }}</div>
+                        </div>
+                        <div v-if="selectedReferral.case_record" class="mt-2">
+                          <div class="text-subtitle-2">{{ selectedReferral.case_record.case_name }}</div>
+                          <div class="text-caption">NiCare Code: {{ selectedReferral.case_record.nicare_code }}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </v-alert>
+                </v-col>
+              </v-row>
+
+              <v-divider v-if="selectedReferral.service_selection_type"></v-divider>
+
+              <!-- Referring Person Information -->
+              <v-row class="pa-4">
+                <v-col cols="12">
+                  <h3 class="text-h6 mb-3">
+                    <v-icon color="primary" class="mr-2">mdi-doctor</v-icon>
+                    Referring Person
+                  </h3>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <v-list density="compact">
+                    <v-list-item>
+                      <template v-slot:prepend>
+                        <v-icon color="grey">mdi-account-tie</v-icon>
+                      </template>
+                      <v-list-item-title class="font-weight-medium">Name</v-list-item-title>
+                      <v-list-item-subtitle>{{ selectedReferral.referring_person_name || 'N/A' }}</v-list-item-subtitle>
+                    </v-list-item>
+                  </v-list>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <v-list density="compact">
+                    <v-list-item>
+                      <template v-slot:prepend>
+                        <v-icon color="grey">mdi-briefcase</v-icon>
+                      </template>
+                      <v-list-item-title class="font-weight-medium">Specialisation</v-list-item-title>
+                      <v-list-item-subtitle>{{ selectedReferral.referring_person_specialisation || 'N/A' }}</v-list-item-subtitle>
+                    </v-list-item>
+                  </v-list>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <v-list density="compact">
+                    <v-list-item>
+                      <template v-slot:prepend>
+                        <v-icon color="grey">mdi-badge-account</v-icon>
+                      </template>
+                      <v-list-item-title class="font-weight-medium">Cadre</v-list-item-title>
+                      <v-list-item-subtitle>{{ selectedReferral.referring_person_cadre || 'N/A' }}</v-list-item-subtitle>
+                    </v-list-item>
+                  </v-list>
+                </v-col>
+              </v-row>
+
+              <v-divider></v-divider>
+
+              <!-- Additional Information -->
+              <v-row class="pa-4">
+                <v-col cols="12">
+                  <h3 class="text-h6 mb-3">
+                    <v-icon color="primary" class="mr-2">mdi-information</v-icon>
+                    Additional Information
+                  </h3>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-card variant="outlined" class="mb-3">
+                    <v-card-subtitle class="font-weight-bold">Medical History</v-card-subtitle>
+                    <v-card-text>{{ selectedReferral.medical_history || 'N/A' }}</v-card-text>
+                  </v-card>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-card variant="outlined" class="mb-3">
+                    <v-card-subtitle class="font-weight-bold">Medication History</v-card-subtitle>
+                    <v-card-text>{{ selectedReferral.medication_history || 'N/A' }}</v-card-text>
+                  </v-card>
+                </v-col>
+              </v-row>
+
+              <v-divider></v-divider>
+
+              <!-- Timestamps -->
+              <v-row class="pa-4 bg-grey-lighten-5">
+                <v-col cols="12" md="4">
+                  <div class="text-caption text-grey">Request Date</div>
+                  <div class="font-weight-medium">{{ formatDate(selectedReferral.request_date) }}</div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-caption text-grey">Created At</div>
+                  <div class="font-weight-medium">{{ formatDate(selectedReferral.created_at) }}</div>
+                </v-col>
+                <v-col cols="12" md="4">
+                  <div class="text-caption text-grey">Last Updated</div>
+                  <div class="font-weight-medium">{{ formatDate(selectedReferral.updated_at) }}</div>
+                </v-col>
+              </v-row>
+            </v-container>
+          </v-card-text>
+
+          <v-divider></v-divider>
+
+          <v-card-actions class="pa-4">
+            <v-btn
+              color="purple"
+              variant="elevated"
+              @click="printReferralSlip(selectedReferral)"
+            >
+              <v-icon left>mdi-printer</v-icon>
+              Print Slip
+            </v-btn>
+            <v-spacer></v-spacer>
+            <v-btn
+              v-if="selectedReferral?.status === 'PENDING'"
+              color="error"
+              variant="outlined"
+              @click="openRejectDialogFromDetails"
+            >
+              <v-icon left>mdi-close-circle</v-icon>
+              Reject
+            </v-btn>
+            <v-btn
+              v-if="selectedReferral?.status === 'PENDING'"
+              color="success"
+              variant="elevated"
+              @click="approveReferralFromDetails"
+            >
+              <v-icon left>mdi-check-circle</v-icon>
+              Approve
+            </v-btn>
+            <v-btn variant="outlined" @click="detailsDialog = false">Close</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+
       <!-- Reject Dialog -->
       <v-dialog v-model="rejectDialog" max-width="500">
         <v-card>
@@ -304,6 +638,7 @@ const searchQuery = ref('');
 const statusFilter = ref(null);
 const severityFilter = ref(null);
 const dateFilter = ref(null);
+const detailsDialog = ref(false);
 const rejectDialog = ref(false);
 const selectedReferral = ref(null);
 const rejectionReason = ref('');
@@ -386,10 +721,18 @@ const getServiceName = (caseRecordId) => {
   return caseRecord ? caseRecord.service_description : 'Unknown Service';
 };
 
-const viewDetails = (referral) => {
-  selectedReferral.value = referral;
-  // Open a simple alert or navigate to details page
-  alert(`Viewing details for ${referral.referral_code}`);
+const viewDetails = async (referral) => {
+  loading.value = true;
+  try {
+    // Fetch full referral details with relationships
+    const response = await api.get(`/referrals/${referral.id}`);
+    selectedReferral.value = response.data.data || response.data;
+    detailsDialog.value = true;
+  } catch (err) {
+    showError('Failed to load referral details');
+  } finally {
+    loading.value = false;
+  }
 };
 
 const approveReferral = async (referral) => {
@@ -416,6 +759,16 @@ const openRejectDialog = (referral) => {
   rejectDialog.value = true;
 };
 
+const openRejectDialogFromDetails = () => {
+  detailsDialog.value = false;
+  rejectDialog.value = true;
+};
+
+const approveReferralFromDetails = async () => {
+  detailsDialog.value = false;
+  await approveReferral(selectedReferral.value);
+};
+
 const confirmReject = async () => {
   if (!rejectionReason.value) {
     showError('Please provide a rejection reason');
@@ -429,6 +782,7 @@ const confirmReject = async () => {
     });
     showSuccess(`Referral ${selectedReferral.value.referral_code} rejected`);
     rejectDialog.value = false;
+    rejectionReason.value = '';
     await fetchReferrals();
   } catch (err) {
     const message = err.response?.data?.message || 'Failed to reject referral';
@@ -844,11 +1198,10 @@ onMounted(async () => {
 .page-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
-  background: linear-gradient(135deg, #0885AB 0%, #066a87 100%);
+  align-items: center;;
   padding: 24px;
   border-radius: 12px;
-  color: white;
+  color: var(--primary);
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
@@ -865,7 +1218,7 @@ onMounted(async () => {
 }
 
 .header-text h1 {
-  color: white;
+  color: var(--primary);
 }
 
 .header-text p {

@@ -67,15 +67,15 @@ class ReferralController extends BaseController
             'contact_person_name' => ['nullable', 'string'],
             'contact_person_phone' => ['nullable', 'string'],
             'contact_person_email' => ['nullable', 'email'],
-            'requested_services' => ['nullable', 'array'],
-            'requested_services.*.case_record_id' => ['required_with:requested_services', 'integer'],
-            'requested_services.*.quantity' => ['nullable', 'integer', 'min:1'],
+            'service_selection_type' => ['nullable', 'in:bundle,direct'],
+            'service_bundle_id' => ['nullable', 'required_if:service_selection_type,bundle', 'exists:service_bundles,id'],
+            'case_record_id' => ['nullable', 'required_if:service_selection_type,direct', 'exists:case_records,id'],
         ]);
 
         $referral = $this->service->create($validated);
 
         return $this->sendResponse(
-            new ReferralResource($referral->load(['enrollee', 'referringFacility', 'receivingFacility'])),
+            new ReferralResource($referral->load(['enrollee', 'referringFacility', 'receivingFacility', 'serviceBundle', 'caseRecord'])),
             'Referral created successfully',
             201
         );
@@ -86,7 +86,7 @@ class ReferralController extends BaseController
      */
     public function show(\App\Models\Referral $referral)
     {
-        $referral->load(['enrollee', 'referringFacility', 'receivingFacility']);
+        $referral->load(['enrollee', 'referringFacility', 'receivingFacility', 'serviceBundle', 'caseRecord']);
 
         return $this->sendResponse(
             new ReferralResource($referral),

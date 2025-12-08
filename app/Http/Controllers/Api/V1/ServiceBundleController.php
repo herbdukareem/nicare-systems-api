@@ -17,15 +17,18 @@ class ServiceBundleController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = ServiceBundle::with('components.caseRecord');
+            $query = ServiceBundle::with(['caseRecord', 'components.caseRecord']);
 
             // Apply search filter
             if ($request->has('search') && $request->search) {
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
-                    $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('code', 'like', "%{$search}%")
-                      ->orWhere('diagnosis_icd10', 'like', "%{$search}%");
+                    $q->where('description', 'like', "%{$search}%")
+                      ->orWhere('diagnosis_icd10', 'like', "%{$search}%")
+                      ->orWhereHas('caseRecord', function ($cq) use ($search) {
+                          $cq->where('case_name', 'like', "%{$search}%")
+                             ->orWhere('nicare_code', 'like', "%{$search}%");
+                      });
                 });
             }
 
@@ -68,11 +71,10 @@ class ServiceBundleController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'code' => 'required|string|max:50|unique:service_bundles,code',
-                'name' => 'required|string|max:255|unique:service_bundles,name',
-                'diagnosis_icd10' => 'required|string|max:20',
+                'case_record_id' => 'required|exists:case_records,id',
+                'description' => 'required|string',
                 'fixed_price' => 'required|numeric|min:0',
-                'description' => 'nullable|string',
+                'diagnosis_icd10' => 'nullable|string|max:20',
                 'is_active' => 'boolean'
             ]);
 
@@ -89,7 +91,7 @@ class ServiceBundleController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Service bundle created successfully',
-                'data' => $bundle->load('components.caseRecord')
+                'data' => $bundle->load(['caseRecord', 'components.caseRecord'])
             ], 201);
 
         } catch (\Exception $e) {
@@ -109,7 +111,7 @@ class ServiceBundleController extends Controller
         try {
             return response()->json([
                 'success' => true,
-                'data' => $serviceBundle->load('components.caseRecord')
+                'data' => $serviceBundle->load(['caseRecord', 'components.caseRecord'])
             ]);
 
         } catch (\Exception $e) {
@@ -128,11 +130,10 @@ class ServiceBundleController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'code' => 'required|string|max:50|unique:service_bundles,code,' . $serviceBundle->id,
-                'name' => 'required|string|max:255|unique:service_bundles,name,' . $serviceBundle->id,
-                'diagnosis_icd10' => 'required|string|max:20',
+                'case_record_id' => 'required|exists:case_records,id',
+                'description' => 'required|string',
                 'fixed_price' => 'required|numeric|min:0',
-                'description' => 'nullable|string',
+                'diagnosis_icd10' => 'nullable|string|max:20',
                 'is_active' => 'boolean'
             ]);
 
@@ -149,7 +150,7 @@ class ServiceBundleController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Service bundle updated successfully',
-                'data' => $serviceBundle->load('components.caseRecord')
+                'data' => $serviceBundle->load(['caseRecord', 'components.caseRecord'])
             ]);
 
         } catch (\Exception $e) {

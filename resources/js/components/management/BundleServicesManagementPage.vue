@@ -93,7 +93,7 @@
               </v-row>
               <v-row>
                 <v-col cols="12" class="d-flex justify-end gap-2">
-                  <v-btn color="primary" @click="showCreateDialog = true">
+                  <v-btn color="primary" @click="openAddDialog">
                     <v-icon left>mdi-plus</v-icon>
                     Add Bundle
                   </v-btn>
@@ -195,7 +195,7 @@
     </v-container>
 
     <!-- Create/Edit Dialog -->
-    <v-dialog v-model="showCreateDialog" max-width="800px" persistent>
+    <v-dialog v-model="showCreateDialog" max-width="700px" persistent>
       <v-card>
         <v-card-title class="bg-primary text-white">
           <span>{{ editMode ? 'Edit Bundle' : 'Add New Bundle' }}</span>
@@ -203,24 +203,28 @@
         <v-card-text class="pt-4">
           <v-form ref="bundleForm">
             <v-row>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  v-model="formData.code"
-                  label="Bundle Code *"
-                  :rules="[v => !!v || 'Bundle code is required']"
-                  outlined
-                  dense
-                  hint="e.g., MAL-001"
-                />
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  v-model="formData.name"
-                  label="Bundle Name *"
-                  :rules="[v => !!v || 'Bundle name is required']"
-                  outlined
-                  dense
-                />
+              <v-col cols="12">
+                <v-autocomplete
+                  v-model="formData.case_record_id"
+                  label="Select Case Record (Service/Item) *"
+                  :items="caseRecords"
+                  item-title="case_name"
+                  item-value="id"
+                  :rules="[v => !!v || 'Case record is required']"
+                  :loading="loadingCaseRecords"
+                  variant="outlined"
+                  density="comfortable"
+                  @update:model-value="onCaseRecordSelected"
+                >
+                  <template v-slot:item="{ props, item }">
+                    <v-list-item v-bind="props">
+                      <template v-slot:title>{{ item.raw.case_name }}</template>
+                      <template v-slot:subtitle>
+                        {{ item.raw.nicare_code }} | {{ item.raw.level_of_care }}
+                      </template>
+                    </v-list-item>
+                  </template>
+                </v-autocomplete>
               </v-col>
             </v-row>
 
@@ -228,10 +232,12 @@
               <v-col cols="12">
                 <v-textarea
                   v-model="formData.description"
-                  label="Description"
-                  outlined
-                  dense
+                  label="Bundle Description *"
+                  :rules="[v => !!v || 'Description is required']"
+                  variant="outlined"
+                  density="comfortable"
                   rows="3"
+                  hint="Describe what this bundle covers"
                 />
               </v-col>
             </v-row>
@@ -239,23 +245,23 @@
             <v-row>
               <v-col cols="12" md="6">
                 <v-text-field
-                  v-model="formData.diagnosis_icd10"
-                  label="Principal ICD-10 Diagnosis *"
-                  :rules="[v => !!v || 'ICD-10 code is required']"
-                  outlined
-                  dense
-                  hint="e.g., A00.0 for Cholera"
+                  v-model.number="formData.fixed_price"
+                  label="Fixed Bundle Price (₦) *"
+                  type="number"
+                  :rules="[v => !!v || 'Fixed price is required', v => v > 0 || 'Price must be greater than 0']"
+                  variant="outlined"
+                  density="comfortable"
+                  prefix="₦"
+                  hint="Total fixed price for this bundle"
                 />
               </v-col>
               <v-col cols="12" md="6">
                 <v-text-field
-                  v-model.number="formData.fixed_price"
-                  label="Fixed Price (₦) *"
-                  type="number"
-                  :rules="[v => !!v || 'Fixed price is required', v => v > 0 || 'Price must be greater than 0']"
-                  outlined
-                  dense
-                  prefix="₦"
+                  v-model="formData.diagnosis_icd10"
+                  label="ICD-10 Diagnosis Code (Optional)"
+                  variant="outlined"
+                  density="comfortable"
+                  hint="e.g., A00.0 for Cholera"
                 />
               </v-col>
             </v-row>
@@ -267,8 +273,8 @@
                   label="Status *"
                   :items="[{ title: 'Active', value: 1 }, { title: 'Inactive', value: 0 }]"
                   :rules="[v => v !== null || 'Status is required']"
-                  outlined
-                  dense
+                  variant="outlined"
+                  density="comfortable"
                 />
               </v-col>
             </v-row>
@@ -420,8 +426,10 @@ const saving = ref(false);
 const deleting = ref(false);
 const importing = ref(false);
 const loadingComponents = ref(false);
+const loadingCaseRecords = ref(false);
 const bundles = ref([]);
 const bundleComponents = ref([]);
+const caseRecords = ref([]);
 const statistics = ref({});
 const totalItems = ref(0);
 const searchQuery = ref('');
@@ -439,8 +447,7 @@ const selectedBundle = ref(null);
 const importFile = ref(null);
 
 const formData = ref({
-  code: '',
-  name: '',
+  case_record_id: null,
   description: '',
   diagnosis_icd10: '',
   fixed_price: 0,
@@ -487,7 +494,7 @@ const loadBundles = async (options = {}) => {
       diagnosis_icd10: diagnosisFilter.value,
     };
 
-    const response = await api.get('/api/service-bundles', { params });
+    const response = await api.get('/service-bundles', { params });
     bundles.value = response.data.data || response.data;
     totalItems.value = response.data.total || bundles.value.length;
   } catch (err) {
@@ -500,10 +507,25 @@ const loadBundles = async (options = {}) => {
 // Load statistics
 const loadStatistics = async () => {
   try {
-    const response = await api.get('/api/service-bundles/statistics');
+    const response = await api.get('/service-bundles/statistics');
     statistics.value = response.data.data || response.data;
   } catch (err) {
     console.error('Failed to load statistics', err);
+  }
+};
+
+// Load case records for selection
+const loadCaseRecords = async () => {
+  loadingCaseRecords.value = true;
+  try {
+    const response = await api.get('/cases', {
+      params: { per_page: 1000 } // Load all case records
+    });
+    caseRecords.value = response.data.data || response.data;
+  } catch (err) {
+    showError('Failed to load case records');
+  } finally {
+    loadingCaseRecords.value = false;
   }
 };
 
@@ -511,7 +533,7 @@ const loadStatistics = async () => {
 const loadBundleComponents = async (bundleId) => {
   loadingComponents.value = true;
   try {
-    const response = await api.get(`/api/bundle-components`, {
+    const response = await api.get(`/bundle-components`, {
       params: { service_bundle_id: bundleId }
     });
     bundleComponents.value = response.data.data || response.data;
@@ -569,8 +591,27 @@ const navigateToComponents = () => {
 };
 
 
+// Open add dialog
+const openAddDialog = async () => {
+  await loadCaseRecords();
+  editMode.value = false;
+  showCreateDialog.value = true;
+};
+
+// Handle case record selection
+const onCaseRecordSelected = (caseRecordId) => {
+  const selectedCase = caseRecords.value.find(c => c.id === caseRecordId);
+  if (selectedCase) {
+    // Auto-populate description if empty
+    if (!formData.value.description) {
+      formData.value.description = `Bundle for ${selectedCase.case_name}`;
+    }
+  }
+};
+
 // Edit bundle
-const editBundle = (bundle) => {
+const editBundle = async (bundle) => {
+  await loadCaseRecords();
   editMode.value = true;
   formData.value = { ...bundle };
   showCreateDialog.value = true;
@@ -586,10 +627,10 @@ const saveBundle = async () => {
   saving.value = true;
   try {
     if (editMode.value) {
-      await api.put(`/api/service-bundles/${formData.value.id}`, formData.value);
+      await api.put(`/service-bundles/${formData.value.id}`, formData.value);
       showSuccess('Bundle updated successfully');
     } else {
-      await api.post('/api/service-bundles', formData.value);
+      await api.post('/service-bundles', formData.value);
       showSuccess('Bundle created successfully');
     }
     closeDialog();
@@ -607,8 +648,7 @@ const closeDialog = () => {
   showCreateDialog.value = false;
   editMode.value = false;
   formData.value = {
-    code: '',
-    name: '',
+    case_record_id: null,
     description: '',
     diagnosis_icd10: '',
     fixed_price: 0,
@@ -626,7 +666,7 @@ const confirmDelete = (bundle) => {
 const deleteBundle = async () => {
   deleting.value = true;
   try {
-    await api.delete(`/api/service-bundles/${bundleToDelete.value.id}`);
+    await api.delete(`/service-bundles/${bundleToDelete.value.id}`);
     showSuccess('Bundle deleted successfully');
     showDeleteDialog.value = false;
     bundleToDelete.value = null;
@@ -647,7 +687,7 @@ const exportBundles = async () => {
       diagnosis_icd10: diagnosisFilter.value,
     };
 
-    const response = await api.get('/api/service-bundles-export', {
+    const response = await api.get('/service-bundles-export', {
       params,
       responseType: 'blob'
     });
@@ -667,7 +707,7 @@ const exportBundles = async () => {
 // Download template
 const downloadTemplate = async () => {
   try {
-    const response = await api.get('/api/service-bundles/download-template', {
+    const response = await api.get('/service-bundles/download-template', {
       responseType: 'blob'
     });
     const url = window.URL.createObjectURL(new Blob([response.data]));
@@ -695,7 +735,7 @@ const importBundles = async () => {
     const formDataObj = new FormData();
     formDataObj.append('file', importFile.value);
 
-    await api.post('/api/service-bundles/import', formDataObj, {
+    await api.post('/service-bundles/import', formDataObj, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
 

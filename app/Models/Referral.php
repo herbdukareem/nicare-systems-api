@@ -46,6 +46,22 @@ class Referral extends Model
     }
 
     /**
+     * Referral may have a selected service bundle.
+     */
+    public function serviceBundle()
+    {
+        return $this->belongsTo(ServiceBundle::class, 'service_bundle_id');
+    }
+
+    /**
+     * Referral may have a selected direct service (case record).
+     */
+    public function caseRecord()
+    {
+        return $this->belongsTo(CaseRecord::class, 'case_record_id');
+    }
+
+    /**
      * A Referral PA can have multiple Follow-up PA Codes.
      */
     public function paCodes()

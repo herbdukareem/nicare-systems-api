@@ -34,6 +34,9 @@ class ReferralResource extends JsonResource
             'contact_person_name' => $this->contact_person_name,
             'contact_person_phone' => $this->contact_person_phone,
             'contact_person_email' => $this->contact_person_email,
+            'service_selection_type' => $this->service_selection_type,
+            'service_bundle_id' => $this->service_bundle_id,
+            'case_record_id' => $this->case_record_id,
             'requested_services' => $this->requested_services ?? [],
             'request_date' => $this->request_date,
             'approval_date' => $this->approval_date,
@@ -42,6 +45,24 @@ class ReferralResource extends JsonResource
             'enrollee' => new EnrolleeResource($this->whenLoaded('enrollee')),
             'referring_facility' => new FacilityResource($this->whenLoaded('referringFacility')),
             'receiving_facility' => new FacilityResource($this->whenLoaded('receivingFacility')),
+            'service_bundle' => $this->whenLoaded('serviceBundle', function () {
+                return [
+                    'id' => $this->serviceBundle->id,
+                    'code' => $this->serviceBundle->code,
+                    'name' => $this->serviceBundle->name,
+                    'description' => $this->serviceBundle->description,
+                    'fixed_price' => $this->serviceBundle->fixed_price,
+                    'diagnosis_icd10' => $this->serviceBundle->diagnosis_icd10,
+                ];
+            }),
+            'case_record' => $this->whenLoaded('caseRecord', function () {
+                return [
+                    'id' => $this->caseRecord->id,
+                    'nicare_code' => $this->caseRecord->nicare_code,
+                    'case_name' => $this->caseRecord->case_name,
+                    'detail_type' => $this->caseRecord->detail_type,
+                ];
+            }),
         ];
     }
 }
