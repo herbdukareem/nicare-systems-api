@@ -17,7 +17,7 @@ class UserService
      */
     public function paginate(array $filters = [], int $perPage = 15, string $sortBy = 'created_at', string $sortDirection = 'desc'): LengthAwarePaginator
     {
-        $query = User::with('roles');
+        $query = User::with('roles', 'currentRole');
 
         // Apply filters
         if (!empty($filters['search'])) {
@@ -25,7 +25,8 @@ class UserService
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
                   ->orWhere('email', 'like', "%{$search}%")
-                  ->orWhere('username', 'like', "%{$search}%");
+                  ->orWhere('username', 'like', "%{$search}%")
+                  ->orWhere('phone', 'like', "%{$search}%");
             });
         }
 
@@ -37,8 +38,19 @@ class UserService
             $query->where('email', 'like', "%{$filters['email']}%");
         }
 
+        if (!empty($filters['username'])) {
+            $query->where('username', 'like', "%{$filters['username']}%");
+        }
+
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
+        }
+
+        // Filter by role
+        if (!empty($filters['role'])) {
+            $query->whereHas('roles', function($q) use ($filters) {
+                $q->where('roles.id', $filters['role']);
+            });
         }
 
         // Apply sorting

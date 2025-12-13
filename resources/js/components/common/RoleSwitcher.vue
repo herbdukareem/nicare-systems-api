@@ -67,10 +67,10 @@
             </v-icon>
           </template>
           <v-list-item-title class="tw-text-sm">
-            {{ role.name }}
+            {{ role.label || role.name }}
           </v-list-item-title>
           <v-list-item-subtitle class="tw-text-xs">
-            {{ getPermissionCount(role) }} permissions
+            {{ role.modules?.length ? role.modules.join(', ') : getPermissionCount(role) + ' permissions' }}
           </v-list-item-subtitle>
           <template v-slot:append v-if="currentRole?.id === role.id">
             <v-icon color="primary" size="16">mdi-check</v-icon>
@@ -158,12 +158,17 @@ const getPermissionCount = (role) => {
   return role.permissions?.length || 0;
 };
 
-const switchRole = (role) => {
+const switchRole = async (role) => {
   try {
-    authStore.switchRole(role);
-    lastSwitchedRole.value = role.name;
+    await authStore.switchRole(role.id);
+    lastSwitchedRole.value = role.label || role.name;
     showRoleChangeNotification.value = true;
-    success(`Switched to ${role.name} role`);
+    success(`Switched to ${role.label || role.name} role`);
+
+    // Reload page to refresh module access
+    setTimeout(() => {
+      window.location.reload();
+    }, 1000);
   } catch (error) {
     console.error('Failed to switch role:', error);
   }

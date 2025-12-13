@@ -3,7 +3,7 @@
 namespace App\Services\ClaimsAutomation;
 
 use App\Models\Admission;
-use App\Models\Bundle;
+use App\Models\ServiceBundle;
 use App\Models\Referral;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use InvalidArgumentException;
@@ -32,8 +32,10 @@ class AdmissionService
             throw new ModelNotFoundException("Referral not found");
         }
 
+       
+
         // Check referral is approved
-        if ($referral->status !== 'approved') {
+        if (strtolower($referral->status) !== 'approved') {
             throw new InvalidArgumentException(
                 "Cannot create admission: Referral must be approved. Current status: {$referral->status}"
             );
@@ -57,13 +59,13 @@ class AdmissionService
             );
         }
 
+     
+
         // Auto-match bundle from principal diagnosis ICD-10 code
         $icd10Code = $data['principal_diagnosis_icd10'] ?? null;
         $bundle = null;
 
-        if ($icd10Code) {
-            $bundle = Bundle::findByDiagnosis($icd10Code, $referral->receivingFacility->level_of_care ?? null);
-        }
+       
 
         // Create admission
         $admission = new Admission([
@@ -71,7 +73,7 @@ class AdmissionService
             'enrollee_id' => $referral->enrollee_id,
             'nicare_number' => $referral->enrollee->enrollee_id,
             'facility_id' => $referral->receiving_facility_id,
-            'bundle_id' => $bundle?->id,
+            'service_bundle_id' => $referral->service_bundle_id,
             'principal_diagnosis_icd10' => $icd10Code,
             'principal_diagnosis_description' => $data['principal_diagnosis_description'] ?? null,
             'admission_date' => $data['admission_date'] ?? now(),

@@ -9,6 +9,11 @@ class ClaimLine extends Model
     protected $guarded = ['id'];
     protected $table = 'claim_lines';
 
+    protected $casts = [
+        'unit_price' => 'decimal:2',
+        'line_total' => 'decimal:2',
+    ];
+
     /**
      * Claim Line belongs to a Claim.
      */
@@ -31,5 +36,21 @@ class ClaimLine extends Model
     public function paCode()
     {
         return $this->belongsTo(PACode::class);
+    }
+
+    /**
+     * Claim Line belongs to a Drug (when service_type is 'drug').
+     */
+    public function drug()
+    {
+        return $this->belongsTo(Drug::class);
+    }
+
+    /**
+     * Claim Line belongs to a ServiceBundle (when tariff_type is 'BUNDLE').
+     */
+    public function serviceBundle()
+    {
+        return $this->belongsTo(ServiceBundle::class, 'bundle_id');
     }
 }

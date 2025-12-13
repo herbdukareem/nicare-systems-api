@@ -1,6 +1,7 @@
 <template>
-  <div class="claim-submission-page">
-    <v-container>
+  <AdminLayout>
+    <div class="claim-submission-page">
+      <v-container>
       <v-row>
         <v-col cols="12">
           <v-card>
@@ -433,7 +434,8 @@
         </v-col>
       </v-row>
     </v-container>
-  </div>
+    </div>
+  </AdminLayout>
 </template>
 
 <script setup>
@@ -442,6 +444,7 @@ import { useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useClaimsAPI } from '../../composables/useClaimsAPI';
 import api from '../../utils/api';
+import AdminLayout from '../layout/AdminLayout.vue';
 
 const router = useRouter();
 const { showSuccess, showError } = useToast();

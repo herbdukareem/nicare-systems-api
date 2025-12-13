@@ -21,6 +21,7 @@
       </div>
 
       <v-container fluid>
+        <div v-if="!createdPACode">
         <!-- Step 1: Select Approved Referral -->
         <v-card class="mb-6" elevation="1">
           <v-card-title class="bg-grey-lighten-4 d-flex align-center py-4">
@@ -486,6 +487,8 @@
           </v-card-text>
         </v-card>
 
+        </div>
+
         <!-- Success Message -->
         <v-card
           v-if="createdPACode"
@@ -549,7 +552,7 @@ import AdminLayout from '../layout/AdminLayout.vue';
 import api from '@/js/utils/api';
 import { useToast } from '@/js/composables/useToast';
 
-const { success: showSuccess, error: showError, info: showInfo } = useToast();
+const { success: showSuccess, error: showError, info: showInfo, warning: showWarning } = useToast();
 
 // Reactive state
 const submitting = ref(false);
@@ -581,6 +584,7 @@ const formData = ref({
   referral_id: null,
   enrollee_id: null,
   facility_id: null,
+  admission_id: null, // Active admission ID
   is_complication_pa: true,
   clinical_justification: '',
   diagnosis_update: '',
@@ -594,6 +598,8 @@ const canSubmit = computed(() => {
   if (!selectedReferral.value || claimCheckStatus.value !== 'none' || !formData.value.clinical_justification || submitting.value) {
     return false;
   }
+
+ 
 
   // Must have service selection type
   if (!formData.value.service_selection_type) {
@@ -742,7 +748,7 @@ const checkClaimExists = async (referralId) => {
   existingClaim.value = null;
 
   try {
-    const response = await api.get('/api/claims-automation/claims', {
+    const response = await api.get('/claims-automation/claims', {
       params: { referral_id: referralId }
     });
 
@@ -824,6 +830,28 @@ const loadReferralDetails = async () => {
       await loadEnrolleeDetails(referral.enrollee_id);
     }
 
+    // Fetch active admission for this referral
+    try {
+      const admissionResponse = await api.get('/claims-automation/admissions', {
+        params: {
+          referral_id: referral.id,
+          status: 'active'
+        }
+      });
+
+      const admissions = admissionResponse.data.data?.data || admissionResponse.data.data || admissionResponse.data;
+
+      if (admissions && Array.isArray(admissions) && admissions.length > 0) {
+        formData.value.admission_id = admissions[0].id;
+      } else if (admissions && !Array.isArray(admissions) && admissions.id) {
+        formData.value.admission_id = admissions.id;
+      } 
+    } catch (admissionErr) {
+      console.error('Failed to fetch admission:', admissionErr);
+      formData.value.admission_id = null;
+      showWarning('Could not verify active admission. Patient must be admitted before requesting FU-PA code.');
+    }
+
     // Check if claim exists
     await checkClaimExists(referral.id);
 
@@ -857,6 +885,7 @@ const handleSubmission = async () => {
       referral_id: formData.value.referral_id,
       enrollee_id: formData.value.enrollee_id,
       facility_id: formData.value.facility_id,
+      admission_id: formData.value.admission_id, // Active admission ID
       is_complication_pa: true,
       justification: formData.value.clinical_justification,
       diagnosis_update: formData.value.diagnosis_update,
@@ -894,6 +923,7 @@ const resetForm = () => {
     referral_id: null,
     enrollee_id: null,
     facility_id: null,
+    admission_id: null,
     is_complication_pa: true,
     clinical_justification: '',
     diagnosis_update: '',

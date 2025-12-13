@@ -12,7 +12,7 @@ export const useClaimsAPI = () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await api.get('/api/v1/referrals', { params: filters });
+      const response = await api.get('/referrals', { params: filters });
       claimsStore.setReferrals(response.data.data || response.data);
       return response.data;
     } catch (err) {
@@ -28,7 +28,7 @@ export const useClaimsAPI = () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await api.post('/api/v1/referrals', data);
+      const response = await api.post('/referrals', data);
       claimsStore.addReferral(response.data.data || response.data);
       return response.data;
     } catch (err) {
@@ -44,7 +44,7 @@ export const useClaimsAPI = () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await api.get(`/api/v1/referrals/${id}`);
+      const response = await api.get(`/referrals/${id}`);
       claimsStore.setCurrentReferral(response.data.data || response.data);
       return response.data;
     } catch (err) {
@@ -60,7 +60,7 @@ export const useClaimsAPI = () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await api.get('/api/v1/claims', { params: filters });
+      const response = await api.get('/claims', { params: filters });
       claimsStore.setClaims(response.data.data || response.data);
       return response.data;
     } catch (err) {
@@ -76,7 +76,7 @@ export const useClaimsAPI = () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await api.post('/api/v1/claims', data);
+      const response = await api.post('/claims', data);
       claimsStore.addClaim(response.data.data || response.data);
       return response.data;
     } catch (err) {
@@ -92,7 +92,7 @@ export const useClaimsAPI = () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await api.get(`/api/v1/claims/${id}`);
+      const response = await api.get(`/claims/${id}`);
       claimsStore.setCurrentClaim(response.data.data || response.data);
       return response.data;
     } catch (err) {
@@ -107,7 +107,7 @@ export const useClaimsAPI = () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await api.put(`/api/v1/claims/${id}`, data);
+      const response = await api.put(`/claims/${id}`, data);
       claimsStore.updateClaim(id, response.data.data || response.data);
       return response.data;
     } catch (err) {
@@ -123,7 +123,7 @@ export const useClaimsAPI = () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await api.get('/api/v1/admissions', { params: filters });
+      const response = await api.get('/claims-automation/admissions', { params: filters });
       claimsStore.setAdmissions(response.data.data || response.data);
       return response.data;
     } catch (err) {
@@ -138,7 +138,7 @@ export const useClaimsAPI = () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await api.post('/api/v1/admissions', data);
+      const response = await api.post('/claims-automation/admissions', data);
       claimsStore.addAdmission(response.data.data || response.data);
       return response.data;
     } catch (err) {

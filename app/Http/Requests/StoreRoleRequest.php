@@ -22,9 +22,11 @@ class StoreRoleRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'name' => ['required', 'string', 'max:255', 'unique:roles,name', 'regex:/^[a-z_]+$/'],
+            'name' => ['required', 'string', 'max:255', 'unique:roles,name'],
             'label' => ['required', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'modules' => ['nullable', 'array'],
+            'modules.*' => ['string', 'in:general,pas,claims,automation,management'],
             'permissions' => ['nullable', 'array'],
             'permissions.*' => ['exists:permissions,id'],
         ];
@@ -38,7 +40,6 @@ class StoreRoleRequest extends FormRequest
         return [
             'name.required' => 'The role name is required.',
             'name.unique' => 'This role name already exists.',
-            'name.regex' => 'Role name must contain only lowercase letters and underscores.',
             'label.required' => 'The role label is required.',
             'permissions.*.exists' => 'One or more selected permissions do not exist.',
         ];

@@ -8,6 +8,7 @@ use App\Services\ClaimsAutomation\ClaimProcessingService;
 use App\Services\ClaimValidationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class ClaimController extends Controller
 {
@@ -29,13 +30,11 @@ class ClaimController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Claim::with(['admission.referral', 'enrollee', 'facility', 'lineItems']);
+            $query = Claim::with(['referral', 'admission', 'enrollee', 'facility', 'lineItems']);
 
-            // Filter by referral_id (through admission)
+            // Filter by referral_id (direct relationship)
             if ($request->filled('referral_id')) {
-                $query->whereHas('admission', function ($q) use ($request) {
-                    $q->where('referral_id', $request->referral_id);
-                });
+                $query->where('referral_id', $request->referral_id);
             }
 
             // Filter by admission_id
@@ -90,32 +89,156 @@ class ClaimController extends Controller
     }
 
     /**
-     * Create a new claim from an admission
-     * POST /api/claims
+     * Create a new claim with optional admission and FFS line items
+     * POST /api/claims-automation/claims
+     *
+     * Supports:
+     * - Bundle-only claims (admission with bundle, no FFS)
+     * - FFS-only claims (no admission, or admission without bundle)
+     * - Bundle + FFS claims (admission with bundle + FFS line items)
      */
     public function store(Request $request): JsonResponse
     {
         try {
+            // Validate request
             $validated = $request->validate([
-                'admission_id' => 'required|integer|exists:admissions,id',
-                'claim_date' => 'required|date',
+                'referral_id' => 'required|integer|exists:referrals,id',
+                'admission_id' => 'nullable|integer|exists:admissions,id',
+                'claim_date' => 'nullable|date',
+                'line_items' => 'nullable|array',
+                'line_items.*.pa_code_id' => 'required|integer|exists:pa_codes,id',
+                'line_items.*.service_description' => 'required|string',
+                'line_items.*.quantity' => 'required|integer|min:1',
+                'line_items.*.unit_price' => 'required|numeric|min:0',
+                'line_items.*.total_price' => 'required|numeric|min:0',
             ]);
 
-            $claim = $this->claimProcessingService->createClaim(
-                $validated['admission_id'],
-                $validated
-            );
+            // 1. Validate UTN
+            $utnValidation = $this->validationService->validateUTN($validated['referral_id']);
+            if (!$utnValidation['valid']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $utnValidation['message'],
+                ], 400);
+            }
 
+            $referral = $utnValidation['referral'];
+
+            // 2. Check for duplicate claim
+            $duplicateCheck = $this->validationService->checkDuplicateClaim($validated['referral_id']);
+            if ($duplicateCheck['exists']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'A claim has already been submitted for this referral (UTN: ' . $referral->utn . ')',
+                    'existing_claim' => $duplicateCheck['claim'],
+                ], 400);
+            }
+
+            // 3. Get admission if provided (optional)
+            $admission = null;
+            $bundleAmount = 0;
+            if ($validated['admission_id']) {
+                $admission = \App\Models\Admission::with('serviceBundle')->find($validated['admission_id']);
+
+                // Validate admission belongs to the same referral
+                if ($admission->referral_id !== $validated['referral_id']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Admission does not belong to the selected referral',
+                    ], 400);
+                }
+
+                // Get bundle amount if admission has a service bundle
+                if ($admission->service_bundle_id && $admission->serviceBundle) {
+                    $bundleAmount = $admission->serviceBundle->fixed_price;
+                }
+            }
+
+            // 4. Validate PA codes for FFS line items
+            $lineItems = $validated['line_items'] ?? [];
+            $paCodeIds = array_column($lineItems, 'pa_code_id');
+
+            if (!empty($paCodeIds)) {
+                $paValidation = $this->validationService->validatePACodes($paCodeIds, $validated['referral_id']);
+                if (!$paValidation['valid']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => $paValidation['message'],
+                    ], 400);
+                }
+            }
+
+            // 5. Calculate totals
+            $totals = $this->validationService->calculateClaimTotals($bundleAmount, $lineItems);
+
+            // 6. Validate at least one amount is present
+            if ($totals['total_amount'] <= 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Claim must have at least one of: bundle amount or FFS line items',
+                ], 400);
+            }
+
+            // 7. Create claim in transaction
+            DB::beginTransaction();
+            try {
+                $claim = Claim::create([
+                    'referral_id' => $validated['referral_id'],
+                    'admission_id' => $validated['admission_id'],
+                    'enrollee_id' => $referral->enrollee_id,
+                    'facility_id' => $referral->receiving_facility_id,
+                    'claim_number' => Claim::generateClaimNumber(),
+                    'utn' => $referral->utn,
+                    'bundle_amount' => $totals['bundle_amount'],
+                    'ffs_amount' => $totals['ffs_amount'],
+                    'total_amount' => $totals['total_amount'],
+                    'total_amount_claimed' => $totals['total_amount'],
+                    'status' => 'SUBMITTED',
+                    'claim_date' => $validated['claim_date'] ?? now(),
+                    'service_date' => $admission ? $admission->admission_date : now(),
+                    'submitted_at' => now(),
+                    'submitted_by' => auth()->id() ?? null,
+                ]);
+
+                // 8. Create claim line items
+                foreach ($lineItems as $lineItem) {
+                    \App\Models\ClaimLine::create([
+                        'claim_id' => $claim->id,
+                        'pa_code_id' => $lineItem['pa_code_id'],
+                        'service_description' => $lineItem['service_description'],
+                        'quantity' => $lineItem['quantity'],
+                        'unit_price' => $lineItem['unit_price'],
+                        'line_total' => $lineItem['total_price'],
+                        'tariff_type' => 'FFS',
+                        'service_type' => 'service',
+                        'reporting_type' => 'FFS_TOP_UP',
+                    ]);
+                }
+
+                DB::commit();
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Claim submitted successfully',
+                    'data' => $claim->load(['referral', 'admission', 'enrollee', 'facility', 'lineItems.paCode']),
+                ], 201);
+
+            } catch (\Exception $e) {
+                DB::rollBack();
+                throw $e;
+            }
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
-                'success' => true,
-                'message' => 'Claim created successfully',
-                'data' => $claim->load(['admission', 'enrollee', 'facility', 'lineItems']),
-            ], 201);
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
-            ], 400);
+                'message' => 'Failed to create claim: ' . $e->getMessage(),
+            ], 500);
         }
     }
 

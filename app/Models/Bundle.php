@@ -17,15 +17,22 @@ class Bundle extends Model
 {
     use HasFactory;
 
+    protected $table = 'service_bundles';
+
     protected $fillable = [
         'bundle_code',
         'bundle_name',
+        'name',
         'description',
         'case_category_id',
+        'case_record_id',
         'icd10_code',           // ICD-10 code that triggers this bundle
+        'diagnosis_icd10',      // Alternative column name
         'bundle_tariff',        // Fixed price for the bundle
+        'fixed_price',          // Alternative column name
         'level_of_care',
         'status',
+        'is_active',            // Alternative column name
         'effective_from',
         'effective_to',
         'created_by',
@@ -33,7 +40,9 @@ class Bundle extends Model
 
     protected $casts = [
         'bundle_tariff' => 'decimal:2',
+        'fixed_price' => 'decimal:2',
         'status' => 'boolean',
+        'is_active' => 'boolean',
         'effective_from' => 'date',
         'effective_to' => 'date',
     ];
@@ -57,7 +66,8 @@ class Bundle extends Model
     // Helper Methods
     public function isActive(): bool
     {
-        if (!$this->status) {
+        $active = $this->is_active ?? $this->status ?? false;
+        if (!$active) {
             return false;
         }
 
@@ -80,11 +90,12 @@ class Bundle extends Model
      */
     public function matchesDiagnosis(string $icdCode): bool
     {
-        if (!$this->icd10_code) {
+        $diagnosisCode = $this->diagnosis_icd10 ?? $this->icd10_code;
+        if (!$diagnosisCode) {
             return false;
         }
-        return str_starts_with($icdCode, $this->icd10_code) ||
-               $this->icd10_code === $icdCode;
+        return str_starts_with($icdCode, $diagnosisCode) ||
+               $diagnosisCode === $icdCode;
     }
 
     /**
@@ -92,24 +103,26 @@ class Bundle extends Model
      */
     public static function findByDiagnosis(string $icdCode, ?string $levelOfCare = null): ?self
     {
-        $query = self::where('status', true)
+        $query = self::where('is_active', true)
             ->where(function ($q) use ($icdCode) {
-                $q->where('icd10_code', $icdCode)
-                  ->orWhereRaw("? LIKE CONCAT(icd10_code, '%')", [$icdCode]);
+                $q->where('diagnosis_icd10', $icdCode)
+                  ->orWhereRaw("? LIKE CONCAT(diagnosis_icd10, '%')", [$icdCode]);
             });
 
         if ($levelOfCare) {
             $query->where('level_of_care', $levelOfCare);
         }
 
-        // Check effective dates
-        $query->where(function ($q) {
-            $q->whereNull('effective_from')
-              ->orWhere('effective_from', '<=', now());
-        })->where(function ($q) {
-            $q->whereNull('effective_to')
-              ->orWhere('effective_to', '>=', now());
-        });
+        // Check effective dates (only if columns exist in the table)
+        // Note: service_bundles table doesn't have effective_from/effective_to columns
+        // So we skip this check for now
+        // $query->where(function ($q) {
+        //     $q->whereNull('effective_from')
+        //       ->orWhere('effective_from', '<=', now());
+        // })->where(function ($q) {
+        //     $q->whereNull('effective_to')
+        //       ->orWhere('effective_to', '>=', now());
+        // });
 
         return $query->first();
     }
@@ -117,15 +130,17 @@ class Bundle extends Model
     // Scopes
     public function scopeActive($query)
     {
-        return $query->where('status', true)
-            ->where(function ($q) {
-                $q->whereNull('effective_from')
-                  ->orWhere('effective_from', '<=', now());
-            })
-            ->where(function ($q) {
-                $q->whereNull('effective_to')
-                  ->orWhere('effective_to', '>=', now());
-            });
+        return $query->where('is_active', true);
+        // Note: service_bundles table doesn't have effective_from/effective_to columns
+        // If you add them later, uncomment the following:
+        // ->where(function ($q) {
+        //     $q->whereNull('effective_from')
+        //       ->orWhere('effective_from', '<=', now());
+        // })
+        // ->where(function ($q) {
+        //     $q->whereNull('effective_to')
+        //       ->orWhere('effective_to', '>=', now());
+        // });
     }
 }
 

@@ -6,17 +6,52 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use App\Models\PACode;
 use App\Models\Facility;
-use App\Models\PACode\RequestPACodeRequest; // Assumed Form Request for validation
 use App\Models\Referral;
+use App\Services\FileUploadService;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Validator;
 
 class PACodeController extends Controller
 {
+    protected $fileUploadService;
+
+    public function __construct(FileUploadService $fileUploadService)
+    {
+        $this->fileUploadService = $fileUploadService;
+    }
     /**
      * Get all PA codes with filters.
      */
     public function index(Request $request)
     {
-        $query = PACode::with(['enrollee', 'facility', 'referral', 'serviceBundle']);
+        $query = PACode::with(['enrollee', 'facility', 'referral', 'serviceBundle', 'admission']);
+
+        // Filter by facility (for facility users)
+        if ($request->has('facility_requested') && $request->facility_requested) {
+            $user = auth()->user();
+            //Eager load assignedFacilities
+            $user->load('assignedFacilities');
+            $userFacility = $user->assignedFacilities->first() ?? null;
+            if (!$userFacility) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User is not associated with any facility or facility is primary',
+                    'data' => []
+                ], 403);
+            }
+            
+
+            $facility = Facility::find($userFacility->facility_id);
+             if (!$facility || $facility->is_primary) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User is not associated with any facility or facility is primary',
+                    'data' => []
+                ], 403);
+            }
+
+            $query->where('facility_id', $facility->id);
+        }
 
         // Filter by type
         if ($request->has('type')) {
@@ -28,9 +63,27 @@ class PACodeController extends Controller
             $query->where('status', $request->status);
         }
 
+        // Search functionality
+        if ($request->has('search') && $request->search) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('code', 'like', "%{$search}%")
+                  ->orWhereHas('enrollee', function ($eq) use ($search) {
+                      $eq->where('full_name', 'like', "%{$search}%")
+                         ->orWhere('enrollee_id', 'like', "%{$search}%");
+                  })
+                  ->orWhereHas('referral', function ($rq) use ($search) {
+                      $rq->where('utn', 'like', "%{$search}%");
+                  });
+            });
+        }
+
         $paCodes = $query->latest()->get();
 
-        return response()->json(['data' => $paCodes]);
+        return response()->json([
+            'success' => true,
+            'data' => $paCodes
+        ]);
     }
 
     /**
@@ -38,7 +91,7 @@ class PACodeController extends Controller
      */
     public function show(PACode $paCode)
     {
-        $paCode->load(['enrollee', 'facility', 'referral', 'serviceBundle']);
+        $paCode->load(['enrollee', 'facility', 'referral', 'admission', 'serviceBundle']);
 
         return response()->json(['data' => $paCode]);
     }
@@ -48,67 +101,144 @@ class PACodeController extends Controller
      */
     public function store(Request $request) // Use RequestPACodeRequest for real validation
     {
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'enrollee_id' => 'required|exists:enrollees,id',
             'facility_id' => 'required|exists:facilities,id',
             'is_complication_pa' => 'boolean',
-            'requested_items' => 'nullable|array',
+            'requested_items' => 'nullable|json',
             'justification' => 'required|string|max:1000',
+            'diagnosis_update' => 'nullable|string|max:1000',
             'referral_id' => 'required|exists:referrals,id',
-            'service_selection_type' => ['required', 'in:bundle,direct'],
+            'admission_id' => 'nullable|exists:admissions,id',
+            'service_selection_type' => ['nullable', 'in:bundle,direct'],
             'service_bundle_id' => ['nullable', 'required_if:service_selection_type,bundle', 'exists:service_bundles,id'],
-            'case_record_ids' => ['nullable', 'required_if:service_selection_type,direct', 'array'],
-            'case_record_ids.*' => ['exists:case_records,id'],
-        ]);
-        
-
-        // 1. POLICY CHECK: MUST have an approved Referral PA (RR) first.
-        $referral = Referral::find($request->referral_id);
-        if (!$referral || $referral->status !== 'APPROVED') {
-             return response()->json([
-                'message' => 'PA Code request denied. A valid, approved Referral Pre-Authorisation (RR) is required before issuing a Follow-up PA Code.',
-            ], 403); 
-        }
-
-        // 2. Existing Bundle Check (from previous logic)
-        // Check for existing primary PA logic here (preventing double bundling)
-        
-        $paType = $request->is_complication_pa ? PACode::TYPE_FFS_TOP_UP : PACode::TYPE_BUNDLE;
-
-      
-
-        // --- Core Policy Check: Prevent double bundle PA for the same episode ---
-        $hasPrimaryPa = PACode::where('enrollee_id', $request->enrollee_id)
-                                ->where('type', PACode::TYPE_BUNDLE)
-                                ->where('status', 'APPROVED')
-                                ->exists();
-
-        if ($paType === PACode::TYPE_BUNDLE && $hasPrimaryPa) {
-             return response()->json(['message' => 'A primary bundle PA is already approved for this enrollee episode.'], 409);
-        }
-        
-        // Ensure FFS top-up PA is not requested without a primary PA
-        if ($paType === PACode::TYPE_FFS_TOP_UP && !$hasPrimaryPa) {
-             return response()->json(['message' => 'Cannot request FFS Top-Up PA without an existing primary Bundle PA.'], 403);
-        }
-
-        $paCode = PACode::create([
-            'enrollee_id' => $request->enrollee_id,
-            'facility_id' => $request->facility_id,
-            'referral_id' => $request->referral_id,
-            'code' => 'PA-' . strtoupper(bin2hex(random_bytes(3))), // Generates a unique code like PA-A5F8B9
-            'type' => $paType,
-            'status' => 'PENDING',
-            'justification' => $request->justification,
-            'requested_services' => $request->requested_items ?? [],
-            'service_selection_type' => $request->service_selection_type,
-            'service_bundle_id' => $request->service_bundle_id,
-            'case_record_ids' => $request->case_record_ids,
+            'case_record_ids' => ['nullable', 'required_if:service_selection_type,direct', 'json'],
+            'documents.*' => 'nullable|file|max:10240', // Max 10MB per file
         ]);
 
-        $paCode->load(['enrollee', 'facility', 'referral', 'serviceBundle']);
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
 
-        return response()->json(['data' => $paCode], 201);
+        try {
+            DB::beginTransaction();
+
+            // 1. POLICY CHECK: MUST have an approved Referral PA (RR) first.
+            $referral = Referral::find($request->referral_id);
+            if (!$referral || $referral->status !== 'APPROVED') {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'PA Code request denied. A valid, approved Referral Pre-Authorisation (RR) is required before issuing a Follow-up PA Code.',
+                ], 403);
+            }
+
+            // 2. Determine PA type based on service selection type
+            $paType = $request->service_selection_type === 'bundle'
+                ? PACode::TYPE_BUNDLE
+                : PACode::TYPE_FFS_TOP_UP;
+
+            // 3. Check if there's an active admission for this referral (optional now)
+            $admission = null;
+            if ($request->admission_id) {
+                $admission = \App\Models\Admission::find($request->admission_id);
+            } else {
+                $admission = \App\Models\Admission::where('referral_id', $request->referral_id)
+                              ->where('status', 'active')
+                              ->first();
+            }
+
+            // 4. Prevent duplicate bundle PA for the same episode (referral-specific)
+            if ($paType === PACode::TYPE_BUNDLE) {
+                $existingBundlePA = PACode::where('referral_id', $request->referral_id)
+                                          ->where('type', PACode::TYPE_BUNDLE)
+                                          ->where('status', 'APPROVED')
+                                          ->exists();
+
+                if ($existingBundlePA) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'A bundle PA is already approved for this episode. Only one bundle PA is allowed per referral/admission.',
+                    ], 409);
+                }
+            }
+
+            // Parse JSON fields
+            $requestedItems = $request->requested_items ? json_decode($request->requested_items, true) : [];
+            $caseRecordIds = $request->case_record_ids ? json_decode($request->case_record_ids, true) : null;
+
+            $paCode = PACode::create([
+                'enrollee_id' => $request->enrollee_id,
+                'facility_id' => $request->facility_id,
+                'referral_id' => $request->referral_id,
+                'admission_id' => $admission?->id, // Link to active admission (optional)
+                'code' => 'PA-' . strtoupper(bin2hex(random_bytes(3))), // Generates a unique code like PA-A5F8B9
+                'type' => $paType,
+                'status' => 'PENDING',
+                'justification' => $request->justification,
+                'diagnosis_update' => $request->diagnosis_update,
+                'requested_services' => $requestedItems,
+                'service_selection_type' => $request->service_selection_type,
+                'service_bundle_id' => $request->service_bundle_id,
+                'case_record_ids' => $caseRecordIds,
+            ]);
+
+            // Handle document uploads
+            if ($request->hasFile('documents')) {
+                foreach ($request->file('documents') as $docType => $file) {
+                    // Upload file to local storage
+                    $uploadResult = $this->fileUploadService->uploadPASDocument(
+                        $file,
+                        $paCode->code,
+                        $docType
+                    );
+
+                    if ($uploadResult['success']) {
+                        // Find the document requirement
+                        $docRequirement = \App\Models\DocumentRequirement::where('document_type', $docType)
+                            ->where('request_type', 'pa_code')
+                            ->first();
+
+                        // Create document record
+                        \App\Models\PACodeDocument::create([
+                            'pa_code_id' => $paCode->id,
+                            'document_requirement_id' => $docRequirement?->id,
+                            'document_type' => $docType,
+                            'file_name' => $uploadResult['filename'],
+                            'file_path' => $uploadResult['path'],
+                            'file_type' => $file->getClientOriginalExtension(),
+                            'file_size' => $file->getSize(),
+                            'mime_type' => $file->getMimeType(),
+                            'original_filename' => $uploadResult['original_name'],
+                            'uploaded_by' => $request->user()?->id,
+                            'is_required' => $docRequirement?->is_required ?? false,
+                        ]);
+                    }
+                }
+            }
+
+            DB::commit();
+
+            $paCode->load(['enrollee', 'facility', 'referral', 'admission', 'serviceBundle', 'documents']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'FU-PA Code request submitted successfully',
+                'data' => $paCode
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to submit FU-PA Code request',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
     
     /**
@@ -121,7 +251,7 @@ class PACodeController extends Controller
             'approval_date' => now(),
         ]);
 
-        $paCode->load(['enrollee', 'facility', 'referral', 'serviceBundle']);
+        $paCode->load(['enrollee', 'facility', 'referral', 'admission', 'serviceBundle']);
 
         return response()->json(['message' => 'PA code approved successfully.', 'data' => $paCode]);
     }
@@ -140,7 +270,7 @@ class PACodeController extends Controller
             'rejection_reason' => $request->rejection_reason,
         ]);
 
-        $paCode->load(['enrollee', 'facility', 'referral', 'serviceBundle']);
+        $paCode->load(['enrollee', 'facility', 'referral', 'admission', 'serviceBundle']);
 
         return response()->json(['message' => 'PA code rejected successfully.', 'data' => $paCode]);
     }

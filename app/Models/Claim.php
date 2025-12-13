@@ -6,7 +6,6 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOneThrough;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Claim extends Model
@@ -43,7 +42,7 @@ class Claim extends Model
     }
 
     /**
-     * Claim belongs to an Admission.
+     * Claim belongs to an Admission (OPTIONAL - can be null for FFS-only claims).
      */
     public function admission(): BelongsTo
     {
@@ -51,18 +50,11 @@ class Claim extends Model
     }
 
     /**
-     * Get the referral through the admission.
+     * Claim belongs to a Referral (REQUIRED - all claims must be linked to a referral with validated UTN).
      */
-    public function referral(): HasOneThrough
+    public function referral(): BelongsTo
     {
-        return $this->hasOneThrough(
-            Referral::class,
-            Admission::class,
-            'id', // Foreign key on admissions table
-            'id', // Foreign key on referrals table
-            'admission_id', // Local key on claims table
-            'referral_id' // Local key on admissions table
-        );
+        return $this->belongsTo(Referral::class);
     }
 
     /**

@@ -24,9 +24,12 @@ class UpdateRoleRequest extends FormRequest
         $roleId = $this->route('role')->id ?? $this->route('role');
 
         return [
-            'name' => ['sometimes', 'string', 'max:255', 'unique:roles,name,' . $roleId, 'regex:/^[a-z_]+$/'],
+            // 'name' => ['sometimes', 'string', 'max:255', 'unique:roles,name,' . $roleId, 'regex:/^[a-z_]+$/'],
+            'name' => ['sometimes', 'string', 'max:255', 'unique:roles,name,' . $roleId],
             'label' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
+            'modules' => ['sometimes', 'array'],
+            'modules.*' => ['string', 'in:general,pas,claims,automation,management'],
             'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['exists:permissions,id'],
         ];
@@ -39,7 +42,7 @@ class UpdateRoleRequest extends FormRequest
     {
         return [
             'name.unique' => 'This role name already exists.',
-            'name.regex' => 'Role name must contain only lowercase letters and underscores.',
+            // 'name.regex' => 'Role name must contain only lowercase letters and underscores.',
             'permissions.*.exists' => 'One or more selected permissions do not exist.',
         ];
     }

@@ -18,6 +18,62 @@ class AdmissionController extends Controller
     }
 
     /**
+     * Get all admissions with filters
+     * GET /api/admissions
+     */
+    public function index(Request $request): JsonResponse
+    {
+        try {
+            $query = Admission::with(['referral', 'serviceBundle', 'enrollee', 'facility', 'paCodes']);
+
+            // Filter by facility
+            if ($request->has('facility_id')) {
+                $query->where('facility_id', $request->facility_id);
+            }
+
+            // Filter by status
+            if ($request->has('status')) {
+                $query->where('status', $request->status);
+            }
+
+            // filter by referral id
+            if ($request->has('referral_id')) {
+                $query->where('referral_id', $request->referral_id);
+            }
+
+            // Filter by enrollee
+            if ($request->has('enrollee_id')) {
+                $query->where('enrollee_id', $request->enrollee_id);
+            }
+
+            // Search by admission code or enrollee name
+            if ($request->has('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('admission_code', 'like', "%{$search}%")
+                      ->orWhere('nicare_number', 'like', "%{$search}%")
+                      ->orWhereHas('enrollee', function ($eq) use ($search) {
+                          $eq->where('first_name', 'like', "%{$search}%")
+                             ->orWhere('last_name', 'like', "%{$search}%");
+                      });
+                });
+            }
+
+            $admissions = $query->latest()->paginate($request->per_page ?? 15);
+
+            return response()->json([
+                'success' => true,
+                'data' => $admissions,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
      * Create a new admission from a referral
      * POST /api/admissions
      */
@@ -39,7 +95,7 @@ class AdmissionController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Admission created successfully',
-                'data' => $admission->load(['referral', 'bundle', 'enrollee', 'facility']),
+                'data' => $admission->load(['referral', 'serviceBundle', 'enrollee', 'facility']),
             ], 201);
         } catch (\Exception $e) {
             return response()->json([

@@ -4,8 +4,10 @@ namespace App\Services\ClaimsAutomation;
 
 use App\Models\Admission;
 use App\Models\Claim;
+use App\Models\ClaimLine;
 use App\Services\ClaimValidationService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\DB;
 use InvalidArgumentException;
 
 /**
@@ -46,10 +48,14 @@ class ClaimProcessingService
             throw new InvalidArgumentException("Claim already exists for this admission");
         }
 
+        // Get UTN from admission's referral
+        $utn = $admission->referral?->utn;
+
         $claim = new Claim([
             'admission_id' => $admissionId,
             'enrollee_id' => $admission->enrollee_id,
             'facility_id' => $admission->facility_id,
+            'utn' => $utn, // Denormalized for faster lookups
             'status' => 'DRAFT',
             'claim_date' => $data['claim_date'] ?? now(),
             'submitted_by' => auth()->id(),
@@ -61,8 +67,101 @@ class ClaimProcessingService
     }
 
     /**
+     * Create a new claim from an admission with line items
+     *
+     * @param int $admissionId
+     * @param string $claimDate
+     * @param array $lineItems
+     * @return Claim
+     * @throws ModelNotFoundException
+     * @throws InvalidArgumentException
+     */
+    public function createClaimWithLineItems(int $admissionId, string $claimDate, array $lineItems): Claim
+    {
+        $admission = Admission::find($admissionId);
+        if (!$admission) {
+            throw new ModelNotFoundException("Admission not found");
+        }
+
+        if ($admission->status !== 'discharged') {
+            throw new InvalidArgumentException("Admission must be discharged to create a claim");
+        }
+
+        // Check no claim exists for this admission
+        if ($admission->claim) {
+            throw new InvalidArgumentException("Claim already exists for this admission");
+        }
+
+        // Get UTN from admission's referral
+        $utn = $admission->referral?->utn;
+
+        if (!$utn) {
+            throw new InvalidArgumentException("Admission must have a valid UTN");
+        }
+
+        // Validate UTN is validated
+        if (!$admission->referral->utn_validated) {
+            throw new InvalidArgumentException("UTN must be validated before creating a claim");
+        }
+
+        // Use transaction to ensure atomicity
+        return DB::transaction(function () use ($admission, $utn, $claimDate, $lineItems) {
+            // Create the claim
+            $claim = new Claim([
+                'admission_id' => $admission->id,
+                'enrollee_id' => $admission->enrollee_id,
+                'facility_id' => $admission->facility_id,
+                'utn' => $utn,
+                'status' => 'DRAFT',
+                'claim_date' => $claimDate,
+                'claim_number' => 'CLM-' . strtoupper(uniqid()),
+                'submitted_by' => auth()->id(),
+            ]);
+
+            $claim->save();
+
+            // Create line items
+            $bundleAmount = 0;
+            $ffsAmount = 0;
+
+            foreach ($lineItems as $lineItem) {
+                $lineTotal = (float) $lineItem['line_total'];
+
+                ClaimLine::create([
+                    'claim_id' => $claim->id,
+                    'pa_code_id' => $lineItem['pa_code_id'],
+                    'tariff_type' => $lineItem['tariff_type'],
+                    'service_type' => $lineItem['service_type'],
+                    'service_description' => $lineItem['service_description'],
+                    'quantity' => $lineItem['quantity'],
+                    'unit_price' => $lineItem['unit_price'],
+                    'line_total' => $lineTotal,
+                    'reporting_type' => $lineItem['reporting_type'],
+                    'reported_diagnosis_code' => $lineItem['reported_diagnosis_code'] ?? null,
+                ]);
+
+                // Accumulate amounts
+                if ($lineItem['tariff_type'] === 'BUNDLE') {
+                    $bundleAmount += $lineTotal;
+                } else {
+                    $ffsAmount += $lineTotal;
+                }
+            }
+
+            // Update claim totals
+            $claim->update([
+                'bundle_amount' => $bundleAmount,
+                'ffs_amount' => $ffsAmount,
+                'total_amount_claimed' => $bundleAmount + $ffsAmount,
+            ]);
+
+            return $claim->fresh(['lineItems', 'admission', 'enrollee', 'facility']);
+        });
+    }
+
+    /**
      * Submit a claim for review
-     * 
+     *
      * @param Claim $claim
      * @return Claim
      * @throws InvalidArgumentException

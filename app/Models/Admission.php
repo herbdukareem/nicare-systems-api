@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\Relations\MorphTo;
 
 /**
  * Simplified Admission Model
@@ -25,7 +26,7 @@ class Admission extends Model
         'enrollee_id',
         'nicare_number',
         'facility_id',
-        'bundle_id',            // Auto-matched from principal diagnosis
+        'service_bundle_id',    // Auto-matched from principal diagnosis
         'principal_diagnosis_icd10',
         'principal_diagnosis_description',
         'admission_date',
@@ -36,6 +37,8 @@ class Admission extends Model
         'discharge_summary',
         'discharged_by',
         'created_by',
+        'serviceable_type',
+        'serviceable_id',
     ];
 
     protected $casts = [
@@ -55,7 +58,7 @@ class Admission extends Model
             // Enforce: referral must be approved and UTN validated
             if ($admission->referral_id) {
                 $referral = Referral::find($admission->referral_id);
-                if (!$referral || $referral->status !== 'approved' || !$referral->utn_validated) {
+                if (!$referral || strtolower($referral->status) !== 'approved' || !$referral->utn_validated) {
                     throw new \InvalidArgumentException(
                         'Cannot create admission: Referral must be approved and UTN validated'
                     );
@@ -64,6 +67,15 @@ class Admission extends Model
         });
     }
 
+    // serviceable relationship
+    public function serviceable()
+    {
+        return $this->morphTo();
+    }
+
+    /**
+     * Generate unique admission code
+     */
     public static function generateAdmissionCode(): string
     {
         $prefix = 'ADM';
@@ -88,9 +100,9 @@ class Admission extends Model
         return $this->belongsTo(Referral::class);
     }
 
-    public function bundle(): BelongsTo
+    public function serviceBundle(): BelongsTo
     {
-        return $this->belongsTo(Bundle::class);
+        return $this->belongsTo(ServiceBundle::class, 'service_bundle_id');
     }
 
     public function paCodes(): HasMany

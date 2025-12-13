@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { authAPI } from '../utils/api';
+import { authAPI, userAPI } from '../utils/api';
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
@@ -18,6 +18,16 @@ export const useAuthStore = defineStore('auth', {
     userRoles: (state) => state.user?.roles || [],
     getUserAvailableRoles: (state) => state.availableRoles || [],
     getUserCurrentRole: (state) => state.currentRole,
+
+    // New getter: currentRole - returns the currently active role
+    currentRole: (state) => state.currentRole || (state.user?.current_role) || null,
+
+    // New getter: availableModules - returns modules for current role
+    availableModules: (state) => {
+      const role = state.currentRole || state.user?.current_role;
+      return role?.modules || [];
+    },
+
     currentRolePermissions: (state) => {
       if (!state.currentRole) return [];
       return state.currentRole.permissions || [];
@@ -256,13 +266,35 @@ export const useAuthStore = defineStore('auth', {
 },
 
     // Role switching methods
-    switchRole(role) {
-      if (!this.availableRoles.find(r => r.id === role.id)) {
-        throw new Error('Role not available for this user');
-      }
+    async switchRole(roleId) {
+      try {
+        // Find the role in available roles
+        const role = this.availableRoles.find(r => r.id === roleId);
+        if (!role) {
+          throw new Error('Role not available for this user');
+        }
 
-      this.currentRole = role;
-      localStorage.setItem('currentRole', JSON.stringify(role));
+        // Call backend API to update current_role_id
+        if (this.user?.id) {
+          await userAPI.switchRole(this.user.id, roleId);
+        }
+
+        // Update local state
+        this.currentRole = role;
+        localStorage.setItem('currentRole', JSON.stringify(role));
+
+        // Update user object if it has current_role_id
+        if (this.user) {
+          this.user.current_role_id = roleId;
+          this.user.current_role = role;
+          localStorage.setItem('user', JSON.stringify(this.user));
+        }
+
+        return true;
+      } catch (error) {
+        console.error('[Auth] Failed to switch role:', error);
+        throw error;
+      }
     },
 
     resetToAllRoles() {

@@ -37,10 +37,11 @@ class ReferralService
             'contact_person_email' => $data['contact_person_email'] ?? null,
             'service_selection_type' => $data['service_selection_type'] ?? null,
             'service_bundle_id' => $data['service_bundle_id'] ?? null,
-            'case_record_id' => $data['case_record_id'] ?? null,
+            'case_record_ids' => $data['case_record_ids'] ?? [],
             'status' => $data['status'] ?? 'PENDING',
             'utn' => $data['utn'] ?? $this->generateUTN(),
             'referral_code' => $data['referral_code'] ?? $this->generateReferralCode(),
+            'valid_until' => now()->addMonths(3),
             'request_date' => now(),
             'created_by' => Auth::id(),
         ];

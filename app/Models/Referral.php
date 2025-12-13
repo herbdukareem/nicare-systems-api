@@ -14,11 +14,13 @@ class Referral extends Model
 
     protected $guarded = ['id'];
     protected $table = 'referrals';
-    
+
     protected $casts = [
         'request_date' => 'datetime',
         'approval_date' => 'datetime',
+        'valid_until' => 'datetime',
         'requested_services' => 'array',
+        'case_record_ids' => 'array',
     ];
 
     /**
@@ -62,10 +64,58 @@ class Referral extends Model
     }
 
     /**
+     * Referral can have multiple direct service selections stored as IDs.
+     */
+    public function caseRecords()
+    {
+        if (empty($this->case_record_ids)) {
+            return collect([]);
+        }
+
+        return CaseRecord::whereIn('id', $this->case_record_ids)->get();
+    }
+
+    /**
      * A Referral PA can have multiple Follow-up PA Codes.
      */
     public function paCodes()
     {
         return $this->hasMany(PACode::class);
+    }
+
+    /**
+     * Referral has many uploaded documents.
+     */
+    public function documents()
+    {
+        return $this->hasMany(ReferralDocument::class);
+    }
+
+    /**
+     * Referral has many admissions.
+     */
+    public function admissions()
+    {
+        return $this->hasMany(Admission::class);
+    }
+
+    /**
+     * Referral has many claims.
+     */
+    public function claims()
+    {
+        return $this->hasMany(Claim::class);
+    }
+
+    /**
+     * Check if the referral UTN has passed its validity period.
+     */
+    public function isExpired(): bool
+    {
+        if (!$this->valid_until) {
+            return false;
+        }
+
+        return now()->greaterThan($this->valid_until);
     }
 }

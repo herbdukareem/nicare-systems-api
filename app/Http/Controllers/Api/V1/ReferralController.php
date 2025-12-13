@@ -69,13 +69,15 @@ class ReferralController extends BaseController
             'contact_person_email' => ['nullable', 'email'],
             'service_selection_type' => ['nullable', 'in:bundle,direct'],
             'service_bundle_id' => ['nullable', 'required_if:service_selection_type,bundle', 'exists:service_bundles,id'],
-            'case_record_id' => ['nullable', 'required_if:service_selection_type,direct', 'exists:case_records,id'],
+            // 'case_record_id' => ['nullable', 'required_if:service_selection_type,direct', 'exists:case_records,id'],
+            'case_record_ids' => ['nullable', 'required_if:service_selection_type,direct', 'array'],
+            'case_record_ids.*' => ['exists:case_records,id'],
         ]);
 
         $referral = $this->service->create($validated);
 
         return $this->sendResponse(
-            new ReferralResource($referral->load(['enrollee', 'referringFacility', 'receivingFacility', 'serviceBundle', 'caseRecord'])),
+            new ReferralResource($referral->load(['enrollee', 'referringFacility', 'receivingFacility', 'serviceBundle'])),
             'Referral created successfully',
             201
         );
@@ -86,7 +88,7 @@ class ReferralController extends BaseController
      */
     public function show(\App\Models\Referral $referral)
     {
-        $referral->load(['enrollee', 'referringFacility', 'receivingFacility', 'serviceBundle', 'caseRecord']);
+        $referral->load(['enrollee', 'referringFacility', 'receivingFacility', 'serviceBundle']);
 
         return $this->sendResponse(
             new ReferralResource($referral),
@@ -107,6 +109,24 @@ class ReferralController extends BaseController
             'status' => 'APPROVED',
             'approval_date' => now(),
         ]);
+
+        // Auto-create PA code if referral has service bundle selected
+        if ($referral->service_bundle_id) {
+            \App\Models\PACode::create([
+                'enrollee_id' => $referral->enrollee_id,
+                'facility_id' => $referral->receiving_facility_id,
+                'referral_id' => $referral->id,
+                'admission_id' => null, // Will be linked when admission is created
+                'code' => 'PA-REF-' . $referral->id,
+                'type' => \App\Models\PACode::TYPE_BUNDLE,
+                'status' => 'APPROVED',
+                'justification' => 'Auto-generated from approved referral with service bundle',
+                'requested_services' => [],
+                'service_selection_type' => 'bundle',
+                'service_bundle_id' => $referral->service_bundle_id,
+                'case_record_ids' => null,
+            ]);
+        }
 
         return $this->sendResponse(
             new ReferralResource($referral->fresh(['enrollee', 'referringFacility', 'receivingFacility'])),

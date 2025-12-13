@@ -74,7 +74,7 @@
           <h2 class="text-h6 mb-4">Quick Actions</h2>
         </v-col>
 
-        <v-col cols="12" md="6" lg="4" v-for="card in navigationCards" :key="card.route">
+        <v-col cols="12" md="6" lg="4" v-for="card in filteredNavigationCards" :key="card.route">
           <v-card
             class="navigation-card"
             hover
@@ -110,13 +110,15 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from '@/js/composables/useToast';
+import { useAuthStore } from '@/js/stores/auth';
 import api from '@/js/utils/api';
 import AdminLayout from '../layout/AdminLayout.vue';
 
 const router = useRouter();
+const authStore = useAuthStore();
 const { error: showError } = useToast();
 
 const statistics = ref({
@@ -135,20 +137,7 @@ const navigationCards = ref([
     route: '/claims/referrals',
     badge: 'Admin Only',
     badgeColor: 'primary',
-  },
-  {
-    title: 'Referral Request to PAS',
-    description: 'Submit referral requests for your facility to Pre-Authorization System',
-    icon: 'mdi-file-send',
-    color: 'info',
-    route: '/claims/referral-request',
-  },
-  {
-    title: 'Submit Claim',
-    description: 'Submit a new claim for processing',
-    icon: 'mdi-file-document-plus',
-    color: 'success',
-    route: '/claims/submissions',
+    roles: ['admin', 'Super Admin', 'claims_officer'],
   },
   {
     title: 'Review Claims',
@@ -156,6 +145,7 @@ const navigationCards = ref([
     icon: 'mdi-file-check',
     color: 'warning',
     route: '/claims/review',
+    roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'],
   },
   {
     title: 'Claims History',
@@ -179,6 +169,21 @@ const navigationCards = ref([
     route: '/claims/automation/process',
   },
 ]);
+
+// Filter navigation cards based on user roles
+const filteredNavigationCards = computed(() => {
+  const userRoles = authStore.userRoles.map(role => role.name);
+
+  return navigationCards.value.filter(card => {
+    // If card has no role restrictions, show it to everyone
+    if (!card.roles || card.roles.length === 0) {
+      return true;
+    }
+
+    // Check if user has any of the required roles
+    return card.roles.some(role => userRoles.includes(role));
+  });
+});
 
 onMounted(async () => {
   await loadStatistics();

@@ -82,17 +82,17 @@ class DOFacilityController extends Controller
                 'facility_id' => 'required|exists:facilities,id',
             ]);
 
-            // Check if user has desk_officer role
+            // Check if user has desk_officer, facility_admin, or facility_user role
             $user = User::with('roles')->find($validated['user_id']);
-            if (!$user->hasRole('desk_officer')) {
+            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User must have Desk Officer role to be assigned to facilities',
+                    'message' => 'User must have facility role to be assigned to facilities',
                     'errors' => ['user_id' => ['Selected user is not a Desk Officer']]
                 ], 422);
             }
 
-            // Check if assignment already exists
+            // Check if assignment already exists and consider deleted_at
             $existingAssignment = DOFacility::where('user_id', $validated['user_id'])
                                           ->where('facility_id', $validated['facility_id'])
                                           ->first();
@@ -168,12 +168,12 @@ class DOFacilityController extends Controller
                 'facility_id' => 'required|exists:facilities,id',
             ]);
 
-            // Check if user has desk_officer role
+            // Check if user has desk_officer, facility_admin, or facility_user role
             $user = User::with('roles')->find($validated['user_id']);
-            if (!$user->hasRole('desk_officer')) {
+            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User must have Desk Officer role to be assigned to facilities',
+                    'message' => 'User must have facility role to be assigned to facilities',
                     'errors' => ['user_id' => ['Selected user is not a Desk Officer']]
                 ], 422);
             }
@@ -239,13 +239,13 @@ class DOFacilityController extends Controller
     }
 
     /**
-     * Get all desk officers (users with desk_officer role).
+     * Get all desk officers (users with desk_officer, facility_admin, or facility_user roles).
      */
     public function getDeskOfficers()
     {
         try {
             $deskOfficers = User::whereHas('roles', function ($query) {
-                $query->where('name', 'desk_officer');
+                $query->whereIn('name', ['desk_officer', 'facility_admin', 'facility_user']);
             })->with('roles')->get();
 
             return response()->json([

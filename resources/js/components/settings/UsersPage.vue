@@ -24,7 +24,7 @@
             <div class="tw-ml-4">
               <p class="tw-text-sm tw-font-medium tw-text-gray-600">Total Users</p>
               <p class="tw-text-2xl tw-font-bold tw-text-gray-900">
-                {{ users.length.toLocaleString() }}
+                {{ (stats.total || 0).toLocaleString() }}
               </p>
             </div>
           </div>
@@ -589,6 +589,7 @@ const selectedRoles = ref([])
 const selectedUsers = ref([]) // array of IDs
 const itemsPerPage = ref(15)
 const currentPage = ref(1)
+const totalItems = ref(0)
 const users = ref([])
 const roles = ref([])
 const departments = ref([])
@@ -596,6 +597,12 @@ const designations = ref([])
 const validationErrors = ref({})
 const importFile = ref(null)
 const importing = ref(false)
+const stats = ref({
+  total: 0,
+  active: 0,
+  pending: 0,
+  suspended: 0,
+})
 
 /** sticky helper */
 const stickyRef = ref(null)
@@ -651,60 +658,57 @@ const headers = [
 const roleOptions = computed(() => roles.value.map(r => ({ title: r.label || r.name, value: r.id })))
 const departmentOptions = computed(() => departments.value.map(d => ({ name: d.name, id: d.id })))
 const designationOptions = computed(() => designations.value.map(d => ({ title: d.title, id: d.id })))
-const filteredUsers = computed(() => {
-  // local filtering for client mode (fast and robust)
-  let list = [...users.value]
 
-  if (filters.value.search) {
-    const q = filters.value.search.toLowerCase()
-    list = list.filter(u =>
-      (u.name || '').toLowerCase().includes(q) ||
-      (u.email || '').toLowerCase().includes(q) ||
-      (u.username || '').toLowerCase().includes(q) ||
-      (u.phone || '').toLowerCase().includes(q)
-    )
-  }
-  if (filters.value.status !== null && filters.value.status !== undefined) {
-    list = list.filter(u => u.status === filters.value.status)
-  }
-  if (filters.value.role) {
-    const roleId = filters.value.role
-    list = list.filter(u => (u.roles || []).some(r => (r.id ?? r) === roleId))
-  }
-  return list
+// Server-side pagination - no client-side filtering needed
+const filteredUsers = computed(() => users.value)
+
+const pageStart = computed(() => {
+  if (totalItems.value === 0) return 0
+  return ((currentPage.value - 1) * itemsPerPage.value) + 1
 })
-const pageStart = computed(() => (filteredUsers.value.length ? ((currentPage.value - 1) * itemsPerPage.value) + 1 : 0))
-const pageEnd = computed(() => Math.min(currentPage.value * itemsPerPage.value, filteredUsers.value.length))
+const pageEnd = computed(() => Math.min(currentPage.value * itemsPerPage.value, totalItems.value))
+const totalPages = computed(() => Math.ceil(totalItems.value / itemsPerPage.value))
 
-/** counts */
-const activeUsersCount = computed(() => users.value.filter(u => u.status === 1).length)
-const pendingUsersCount = computed(() => users.value.filter(u => u.status === 0).length)
-const suspendedUsersCount = computed(() => users.value.filter(u => u.status === 2).length)
+/** counts from API stats */
+const activeUsersCount = computed(() => stats.value.active || 0)
+const pendingUsersCount = computed(() => stats.value.pending || 0)
+const suspendedUsersCount = computed(() => stats.value.suspended || 0)
 
 /** api */
 const fetchUsers = async () => {
   try {
     loading.value = true
-    // We still pass params (useful when you later switch back to server mode),
-    // but we render client-side with the full array.
+    // Server-side pagination and filtering
     const params = {
       page: currentPage.value,
       per_page: itemsPerPage.value,
       search: filters.value.search,
       status: filters.value.status,
       role: filters.value.role,
+      sort_by: 'created_at',
+      sort_direction: 'desc',
     }
     const res = await userAPI.getAll(params)
 
-    // Robust parsing for your sample: { success, message, data: [...] }
+    // Parse response: { success, message, data: { data: [...], meta: {...}, stats: {...} } }
     const payload = res?.data ?? res ?? {}
-    const list =
-      Array.isArray(payload.data)                      ? payload.data :
-      (payload.data && Array.isArray(payload.data.data)) ? payload.data.data :
-      Array.isArray(payload.items)                     ? payload.items :
-      Array.isArray(payload)                           ? payload : []
+    const responseData = payload.data ?? payload
+
+    // Extract users array
+    const list = Array.isArray(responseData.data) ? responseData.data :
+                 Array.isArray(responseData) ? responseData : []
 
     users.value = list
+
+    // Extract pagination metadata
+    if (responseData.meta) {
+      totalItems.value = responseData.meta.total || list.length
+    }
+
+    // Extract stats if available
+    if (responseData.stats) {
+      stats.value = responseData.stats
+    }
   } catch (e) {
     error('Failed to fetch users')
     console.error(e)
@@ -987,9 +991,24 @@ const formatDate = (d) => {
 }
 
 /** watchers */
+// Watch filters and trigger API call
 watch([() => filters.value.role, () => filters.value.status, () => filters.value.search], () => {
   currentPage.value = 1
+  fetchUsers()
 })
+
+// Watch page changes
+watch(currentPage, () => {
+  fetchUsers()
+})
+
+// Watch items per page
+watch(itemsPerPage, () => {
+  currentPage.value = 1
+  fetchUsers()
+})
+
+// Debounce search input
 let searchDebounce
 watch(searchQuery, (val) => {
   clearTimeout(searchDebounce)

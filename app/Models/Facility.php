@@ -59,6 +59,13 @@ class Facility extends Model
         return $this->hasMany(DOFacility::class);
     }
 
+    // determine if it's primary by the type
+    public function getIsPrimaryAttribute()
+    {
+        return $this->type === 'Primary';
+    }
+    
+
     /**
      * Get desk officers through the DOFacility pivot.
      */
@@ -122,5 +129,5 @@ class Facility extends Model
     }
 
     // appends
-    protected $appends = ['facility_capacity'];
+    protected $appends = ['facility_capacity', 'is_primary'];
 }

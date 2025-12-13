@@ -62,19 +62,19 @@ export const authAPI = {
 };
 
 export const enrolleeAPI = {
-  getAll: (params) => api.get('/v1/enrollees', { params }),
-  getById: (id) => api.get(`/v1/enrollees/${id}`),
-  create: (data) => api.post('/v1/enrollees', data),
-  update: (id, data) => api.put(`/v1/enrollees/${id}`, data),
-  delete: (id) => api.delete(`/v1/enrollees/${id}`),
-  getStatsByFacility: (facilityId) => api.get(`/v1/enrollees/stats/facility/${facilityId}`),
-  getActivity: (id) => api.get(`/v1/enrollees/${id}/activity`),
-  getMedicalSummary: (id) => api.get(`/v1/enrollees/${id}/medical-summary`),
-  exportExcel: (params) => api.get('/v1/enrollees-export', {
+  getAll: (params) => api.get('/enrollees', { params }),
+  getById: (id) => api.get(`/enrollees/${id}`),
+  create: (data) => api.post('/enrollees', data),
+  update: (id, data) => api.put(`/enrollees/${id}`, data),
+  delete: (id) => api.delete(`/enrollees/${id}`),
+  getStatsByFacility: (facilityId) => api.get(`/enrollees/stats/facility/${facilityId}`),
+  getActivity: (id) => api.get(`/enrollees/${id}/activity`),
+  getMedicalSummary: (id) => api.get(`/enrollees/${id}/medical-summary`),
+  exportExcel: (params) => api.get('/enrollees-export', {
     params,
     responseType: 'blob'
   }),
-  exportPdf: (id) => api.get(`/v1/enrollees/${id}/export-pdf`, {
+  exportPdf: (id) => api.get(`/enrollees/${id}/export-pdf`, {
     responseType: 'blob'
   }),
 };
@@ -85,91 +85,93 @@ export const dashboardAPI = {
   getFacilityStats: () => api.get('/dashboard/facility-stats'),
   getChartData: () => api.get('/dashboard/chart-data'),
   getRecentActivities: () => api.get('/dashboard/recent-activities'),
-  getLgas: () => api.get('/v1/lgas'),
-  getBenefactors: () => api.get('/v1/benefactors'),
+  getLgas: () => api.get('/lgas'),
+  getBenefactors: () => api.get('/benefactors'),
 };
 
 export const facilityAPI = {
-  getAll: (params) => api.get('/v1/facilities', { params }),
-  getById: (id) => api.get(`/v1/facilities/${id}`),
-  create: (data) => api.post('/v1/facilities', data),
-  update: (id, data) => api.put(`/v1/facilities/${id}`, data),
-  delete: (id) => api.delete(`/v1/facilities/${id}`),
-  getEnrollees: (id, params) => api.get(`/v1/facilities/${id}/enrollees`, { params }),
+  getAll: (params) => api.get('/facilities', { params }),
+  getById: (id) => api.get(`/facilities/${id}`),
+  create: (data) => api.post('/facilities', data),
+  update: (id, data) => api.put(`/facilities/${id}`, data),
+  delete: (id) => api.delete(`/facilities/${id}`),
+  getEnrollees: (id, params) => api.get(`/facilities/${id}/enrollees`, { params }),
 };
 
 export const lgaAPI = {
-  getAll: (params) => api.get('/v1/lgas', { params }),
-  getById: (id) => api.get(`/v1/lgas/${id}`),
+  getAll: (params) => api.get('/lgas', { params }),
+  getById: (id) => api.get(`/lgas/${id}`),
 };
 
 export const userAPI = {
-  getAll: (params) => api.get('/v1/users', { params }),
-  getById: (id) => api.get(`/v1/users/${id}`),
-  create: (data) => api.post('/v1/users', data),
-  update: (id, data) => api.put(`/v1/users/${id}`, data),
-  delete: (id) => api.delete(`/v1/users/${id}`),
-  syncRoles: (id, roles) => api.post(`/v1/users/${id}/roles`, { roles }),
-  getWithRoles: (params) => api.get('/v1/users-with-roles', { params }),
-  getProfile: (id) => api.get(`/v1/users/${id}/profile`),
-  updatePassword: (id, data) => api.patch(`/v1/users/${id}/password`, data),
-  toggleStatus: (id) => api.patch(`/v1/users/${id}/toggle-status`),
-  bulkUpdateStatus: (data) => api.post('/v1/users/bulk-update-status', data),
-  bulkDelete: (data) => api.delete('/v1/users/bulk-delete', { data }),
+  getAll: (params) => api.get('/users', { params }),
+  getById: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+  syncRoles: (id, roles) => api.post(`/users/${id}/roles`, { roles }),
+  switchRole: (id, roleId) => api.post(`/users/${id}/switch-role`, { role_id: roleId }),
+  getAvailableModules: () => api.get('/users/available-modules'),
+  getWithRoles: (params) => api.get('/users-with-roles', { params }),
+  getProfile: (id) => api.get(`/users/${id}/profile`),
+  updatePassword: (id, data) => api.patch(`/users/${id}/password`, data),
+  toggleStatus: (id) => api.patch(`/users/${id}/toggle-status`),
+  bulkUpdateStatus: (data) => api.post('/users/bulk-update-status', data),
+  bulkDelete: (data) => api.delete('/users/bulk-delete', { data }),
   // Profile management
-  getActivities: (id, params) => api.get(`/v1/users/${id}/activities`, { params }),
-  updateRoles: (id, data) => api.post(`/v1/users/${id}/roles`, data),
-  uploadAvatar: (id, formData) => api.post(`/v1/users/${id}/avatar`, formData, {
+  getActivities: (id, params) => api.get(`/users/${id}/activities`, { params }),
+  updateRoles: (id, data) => api.post(`/users/${id}/roles`, data),
+  uploadAvatar: (id, formData) => api.post(`/users/${id}/avatar`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  toggle2FA: (id) => api.patch(`/v1/users/${id}/toggle-2fa`),
-  revokeAllSessions: (id) => api.post(`/v1/users/${id}/revoke-sessions`),
+  toggle2FA: (id) => api.patch(`/users/${id}/toggle-2fa`),
+  revokeAllSessions: (id) => api.post(`/users/${id}/revoke-sessions`),
   // Advanced features
-  impersonate: (id) => api.post(`/v1/users/${id}/impersonate`),
-  stopImpersonation: () => api.post('/v1/users/stop-impersonation'),
-  // export: (params) => api.get('/v1/users/export', { params }),
+  impersonate: (id) => api.post(`/users/${id}/impersonate`),
+  stopImpersonation: () => api.post('/users/stop-impersonation'),
+  // export: (params) => api.get('/users/export', { params }),
     async export (params = {}) {
     return api.get('/cases/export', {
       params,
       responseType: 'blob'
     })
   },
-  import: (formData) => api.post('/v1/users/import', formData, {
+  import: (formData) => api.post('/users/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     maxBodyLength: Infinity
   }),
-  getActivityStats: (id) => api.get(`/v1/users/${id}/activity-stats`),
+  getActivityStats: (id) => api.get(`/users/${id}/activity-stats`),
 };
 
 export const benefactorAPI = {
-  getAll: (params) => api.get('/v1/benefactors', { params }),
-  getById: (id) => api.get(`/v1/benefactors/${id}`),
-  create: (data) => api.post('/v1/benefactors', data),
-  update: (id, data) => api.put(`/v1/benefactors/${id}`, data),
-  delete: (id) => api.delete(`/v1/benefactors/${id}`),
+  getAll: (params) => api.get('/benefactors', { params }),
+  getById: (id) => api.get(`/benefactors/${id}`),
+  create: (data) => api.post('/benefactors', data),
+  update: (id, data) => api.put(`/benefactors/${id}`, data),
+  delete: (id) => api.delete(`/benefactors/${id}`),
 };
 
 export const roleAPI = {
-  getAll: (params) => api.get('/v1/roles', { params }),
-  getById: (id) => api.get(`/v1/roles/${id}`),
-  create: (data) => api.post('/v1/roles', data),
-  update: (id, data) => api.put(`/v1/roles/${id}`, data),
-  delete: (id) => api.delete(`/v1/roles/${id}`),
-  syncPermissions: (id, permissions) => api.post(`/v1/roles/${id}/permissions`, { permissions }),
-  getWithUserCounts: () => api.get('/v1/roles-with-user-counts'),
-  clone: (id, data) => api.post(`/v1/roles/${id}/clone`, data),
-  bulkDelete: (data) => api.delete('/v1/roles/bulk-delete', { data }),
+  getAll: (params) => api.get('/roles', { params }),
+  getById: (id) => api.get(`/roles/${id}`),
+  create: (data) => api.post('/roles', data),
+  update: (id, data) => api.put(`/roles/${id}`, data),
+  delete: (id) => api.delete(`/roles/${id}`),
+  syncPermissions: (id, permissions) => api.post(`/roles/${id}/permissions`, { permissions }),
+  getWithUserCounts: () => api.get('/roles-with-user-counts'),
+  clone: (id, data) => api.post(`/roles/${id}/clone`, data),
+  bulkDelete: (data) => api.delete('/roles/bulk-delete', { data }),
 };
 
 export const permissionAPI = {
-  getAll: (params) => api.get('/v1/permissions', { params }),
-  getById: (id) => api.get(`/v1/permissions/${id}`),
-  create: (data) => api.post('/v1/permissions', data),
-  update: (id, data) => api.put(`/v1/permissions/${id}`, data),
-  delete: (id) => api.delete(`/v1/permissions/${id}`),
-  getByCategory: () => api.get('/v1/permissions/by-category'),
-  bulkCreate: (data) => api.post('/v1/permissions/bulk-create', data),
-  bulkDelete: (data) => api.delete('/v1/permissions/bulk-delete', { data }),
+  getAll: (params) => api.get('/permissions', { params }),
+  getById: (id) => api.get(`/permissions/${id}`),
+  create: (data) => api.post('/permissions', data),
+  update: (id, data) => api.put(`/permissions/${id}`, data),
+  delete: (id) => api.delete(`/permissions/${id}`),
+  getByCategory: () => api.get('/permissions/by-category'),
+  bulkCreate: (data) => api.post('/permissions/bulk-create', data),
+  bulkDelete: (data) => api.delete('/permissions/bulk-delete', { data }),
 };
 
 export const securityAPI = {
@@ -185,270 +187,270 @@ export const securityAPI = {
 // PAS (Pre-Authorization System) API
 export const pasAPI = {
   // Referral APIs
-  getReferrals: (params) => api.get('/v1/pas/referrals', { params }),
-  createReferral: (data) => api.post('/v1/pas/workflow/referral', data, {
+  getReferrals: (params) => api.get('/pas/referrals', { params }),
+  createReferral: (data) => api.post('/pas/workflow/referral', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  getReferral: (id) => api.get(`/v1/pas/referrals/${id}`),
-  getReferralByCode: (code) => api.get(`/v1/pas/referrals`, { params: { search: code } }),
-  approveReferral: (id, data) => api.post(`/v1/pas/referrals/${id}/approve`, data),
-  denyReferral: (id, data) => api.post(`/v1/pas/referrals/${id}/deny`, data),
-  generatePACodeFromReferral: (referralId, data) => api.post(`/v1/pas/referrals/${referralId}/generate-pa-code`, data),
-  getReferralStatistics: () => api.get('/v1/pas/referrals-statistics'),
-  getPendingReferralsByFacility: (facilityId) => api.get(`/v1/pas/referrals/pending/${facilityId}`),
-  modifyReferral: (referralId, data) => api.put(`/v1/pas/referrals/${referralId}/modify`, data),
+  getReferral: (id) => api.get(`/pas/referrals/${id}`),
+  getReferralByCode: (code) => api.get(`/pas/referrals`, { params: { search: code } }),
+  approveReferral: (id, data) => api.post(`/pas/referrals/${id}/approve`, data),
+  denyReferral: (id, data) => api.post(`/pas/referrals/${id}/deny`, data),
+  generatePACodeFromReferral: (referralId, data) => api.post(`/pas/referrals/${referralId}/generate-pa-code`, data),
+  getReferralStatistics: () => api.get('/pas/referrals-statistics'),
+  getPendingReferralsByFacility: (facilityId) => api.get(`/pas/referrals/pending/${facilityId}`),
+  modifyReferral: (referralId, data) => api.put(`/pas/referrals/${referralId}/modify`, data),
 
   // PA Code APIs
-  getPACodes: (params) => api.get('/v1/pas/pa-codes', { params }),
-  generatePACode: (data) => api.post('/v1/pas/workflow/pa-code', data, {
+  getPACodes: (params) => api.get('/pas/pa-codes', { params }),
+  generatePACode: (data) => api.post('/pas/workflow/pa-code', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  getPACode: (id) => api.get(`/v1/pas/pa-codes/${id}`),
-  getPACodeById: (id) => api.get(`/v1/pas/pa-codes/${id}`), // Alias for consistency
-  generatePACodeFromReferral: (referralId, data) => api.post(`/v1/pas/referrals/${referralId}/generate-pa-code`, data),
-  markPACodeUsed: (id, data) => api.post(`/v1/pas/pa-codes/${id}/mark-used`, data),
-  markPACodeAsUsed: (id) => api.post(`/v1/pas/pa-codes/${id}/mark-used`), // Alias without data
-  cancelPACode: (id) => api.post(`/v1/pas/pa-codes/${id}/cancel`),
-  generateUTN: (id) => api.post(`/v1/pas/pa-codes/${id}/generate-utn`),
-  verifyPACode: (data) => api.post('/v1/pas/pa-codes/verify', data),
-  getPACodeStatistics: () => api.get('/v1/pas/pa-codes-statistics'),
+  getPACode: (id) => api.get(`/pas/pa-codes/${id}`),
+  getPACodeById: (id) => api.get(`/pas/pa-codes/${id}`), // Alias for consistency
+  generatePACodeFromReferral: (referralId, data) => api.post(`/pas/referrals/${referralId}/generate-pa-code`, data),
+  markPACodeUsed: (id, data) => api.post(`/pas/pa-codes/${id}/mark-used`, data),
+  markPACodeAsUsed: (id) => api.post(`/pas/pa-codes/${id}/mark-used`), // Alias without data
+  cancelPACode: (id) => api.post(`/pas/pa-codes/${id}/cancel`),
+  generateUTN: (id) => api.post(`/pas/pa-codes/${id}/generate-utn`),
+  verifyPACode: (data) => api.post('/pas/pa-codes/verify', data),
+  getPACodeStatistics: () => api.get('/pas/pa-codes-statistics'),
 
   // UTN Validation APIs
-  validateUTN: (referralId, data) => api.post(`/v1/pas/referrals/${referralId}/validate-utn`, data),
+  validateUTN: (referralId, data) => api.post(`/pas/referrals/${referralId}/validate-utn`, data),
 };
 
 // Drug Management API
 export const drugAPI = {
-  getAll: (params) => api.get('/v1/drugs', { params }),
-  getById: (id) => api.get(`/v1/drugs/${id}`),
-  create: (data) => api.post('/v1/drugs', data),
-  update: (id, data) => api.put(`/v1/drugs/${id}`, data),
-  delete: (id) => api.delete(`/v1/drugs/${id}`),
-  import: (formData) => api.post('/v1/drugs/import', formData, {
+  getAll: (params) => api.get('/drugs', { params }),
+  getById: (id) => api.get(`/drugs/${id}`),
+  create: (data) => api.post('/drugs', data),
+  update: (id, data) => api.put(`/drugs/${id}`, data),
+  delete: (id) => api.delete(`/drugs/${id}`),
+  import: (formData) => api.post('/drugs/import', formData, {
     headers: {
       'Content-Type': 'multipart/form-data',
     },
     timeout: 60000
   }),
-  export: (params) => api.get('/v1/drugs-export', {
+  export: (params) => api.get('/drugs-export', {
     params,
     responseType: 'blob'
   }),
-  downloadTemplate: () => api.get('/v1/drugs-template', {
+  downloadTemplate: () => api.get('/drugs-template', {
     responseType: 'blob'
   }),
-  getStatistics: () => api.get('/v1/drugs-statistics'),
+  getStatistics: () => api.get('/drugs-statistics'),
 };
 
 // Service Management API
 export const serviceAPI = {
-  getAll: (params) => api.get('/v1/services', { params }),
-  getById: (id) => api.get(`/v1/services/${id}`),
-  create: (data) => api.post('/v1/services', data),
-  update: (id, data) => api.put(`/v1/services/${id}`, data),
-  delete: (id) => api.delete(`/v1/services/${id}`),
-  import: (formData) => api.post('/v1/services/import', formData, {
+  getAll: (params) => api.get('/services', { params }),
+  getById: (id) => api.get(`/services/${id}`),
+  create: (data) => api.post('/services', data),
+  update: (id, data) => api.put(`/services/${id}`, data),
+  delete: (id) => api.delete(`/services/${id}`),
+  import: (formData) => api.post('/services/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  export: (params) => api.get('/v1/services-export', {
+  export: (params) => api.get('/services-export', {
     params,
     responseType: 'blob'
   }),
-  downloadTemplate: () => api.get('/v1/services-template', {
+  downloadTemplate: () => api.get('/services-template', {
     responseType: 'blob'
   }),
-  getStatistics: () => api.get('/v1/services-statistics'),
-  getGroups: () => api.get('/v1/services-groups'),
+  getStatistics: () => api.get('/services-statistics'),
+  getGroups: () => api.get('/services-groups'),
 };
 
 // Case Management API
 export const caseAPI = {
-  getAll: (params) => api.get('/v1/cases', { params }),
-  getById: (id) => api.get(`/v1/cases/${id}`),
-  create: (data) => api.post('/v1/cases', data),
-  update: (id, data) => api.put(`/v1/cases/${id}`, data),
-  delete: (id) => api.delete(`/v1/cases/${id}`),
-  getStatistics: () => api.get('/v1/cases-statistics'),
-  getGroups: () => api.get('/v1/cases-groups'),
-  import: (formData) => api.post('/v1/cases/import', formData, {
+  getAll: (params) => api.get('/cases', { params }),
+  getById: (id) => api.get(`/cases/${id}`),
+  create: (data) => api.post('/cases', data),
+  update: (id, data) => api.put(`/cases/${id}`, data),
+  delete: (id) => api.delete(`/cases/${id}`),
+  getStatistics: () => api.get('/cases-statistics'),
+  getGroups: () => api.get('/cases-groups'),
+  import: (formData) => api.post('/cases/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  export: (params) => api.get('/v1/cases-export', {
+  export: (params) => api.get('/cases-export', {
     params,
     responseType: 'blob'
   }),
-  downloadTemplate: () => api.get('/v1/cases-template', {
+  downloadTemplate: () => api.get('/cases-template', {
     responseType: 'blob'
   })
 };
 
 // Tariff Item Management API
 export const tariffItemAPI = {
-  getAll: (params) => api.get('/v1/tariff-items', { params }),
-  getById: (id) => api.get(`/v1/tariff-items/${id}`),
-  create: (data) => api.post('/v1/tariff-items', data),
-  update: (id, data) => api.put(`/v1/tariff-items/${id}`, data),
-  delete: (id) => api.delete(`/v1/tariff-items/${id}`),
-  getStatistics: () => api.get('/v1/tariff-items-statistics'),
-  import: (formData) => api.post('/v1/tariff-items/import', formData, {
+  getAll: (params) => api.get('/tariff-items', { params }),
+  getById: (id) => api.get(`/tariff-items/${id}`),
+  create: (data) => api.post('/tariff-items', data),
+  update: (id, data) => api.put(`/tariff-items/${id}`, data),
+  delete: (id) => api.delete(`/tariff-items/${id}`),
+  getStatistics: () => api.get('/tariff-items-statistics'),
+  import: (formData) => api.post('/tariff-items/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data',
        'X-Requested-With': 'XMLHttpRequest'
      },
     timeout: 60000
   }),
-  export: (params) => api.get('/v1/tariff-items-export', {
+  export: (params) => api.get('/tariff-items-export', {
     params,
     responseType: 'blob'
   }),
-  downloadTemplate: () => api.get('/v1/tariff-items-template', {
+  downloadTemplate: () => api.get('/tariff-items-template', {
     responseType: 'blob'
   })
 };
 
 // Service Type API
 export const serviceTypeAPI = {
-  getAll: (params) => api.get('/v1/service-types', { params }),
-  getById: (id) => api.get(`/v1/service-types/${id}`)
+  getAll: (params) => api.get('/service-types', { params }),
+  getById: (id) => api.get(`/service-types/${id}`)
 };
 
 // Case Type API
 export const caseTypeAPI = {
-  getAll: (params) => api.get('/v1/case-types', { params }),
-  getById: (id) => api.get(`/v1/case-types/${id}`)
+  getAll: (params) => api.get('/case-types', { params }),
+  getById: (id) => api.get(`/case-types/${id}`)
 };
 
 // Feedback Management API
 export const feedbackAPI = {
-  getAll: (params) => api.get('/v1/feedback', { params }),
-  getById: (id) => api.get(`/v1/feedback/${id}`),
-  create: (data) => api.post('/v1/feedback', data),
-  update: (id, data) => api.put(`/v1/feedback/${id}`, data),
-  getStatistics: () => api.get('/v1/feedback/statistics'),
-  searchEnrollees: (params) => api.get('/v1/feedback/search-enrollees', { params }),
-  getFeedbackOfficers: () => api.get('/v1/feedback/officers'),
-  getMyFeedbacks: (params) => api.get('/v1/feedback/my-feedbacks', { params }),
-  getEnrolleeComprehensiveData: (enrolleeId) => api.get(`/v1/feedback/enrollee/${enrolleeId}/comprehensive-data`),
-  assignToOfficer: (id, data) => api.post(`/v1/feedback/${id}/assign`, data),
+  getAll: (params) => api.get('/feedback', { params }),
+  getById: (id) => api.get(`/feedback/${id}`),
+  create: (data) => api.post('/feedback', data),
+  update: (id, data) => api.put(`/feedback/${id}`, data),
+  getStatistics: () => api.get('/feedback/statistics'),
+  searchEnrollees: (params) => api.get('/feedback/search-enrollees', { params }),
+  getFeedbackOfficers: () => api.get('/feedback/officers'),
+  getMyFeedbacks: (params) => api.get('/feedback/my-feedbacks', { params }),
+  getEnrolleeComprehensiveData: (enrolleeId) => api.get(`/feedback/enrollee/${enrolleeId}/comprehensive-data`),
+  assignToOfficer: (id, data) => api.post(`/feedback/${id}/assign`, data),
 };
 
 // Case Category Management API
 export const caseCategoryAPI = {
-  getAll: (params) => api.get('/v1/case-categories', { params }),
-  getById: (id) => api.get(`/v1/case-categories/${id}`),
-  create: (data) => api.post('/v1/case-categories', data),
-  update: (id, data) => api.put(`/v1/case-categories/${id}`, data),
-  delete: (id) => api.delete(`/v1/case-categories/${id}`),
-  toggleStatus: (id) => api.post(`/v1/case-categories/${id}/toggle-status`),
+  getAll: (params) => api.get('/case-categories', { params }),
+  getById: (id) => api.get(`/case-categories/${id}`),
+  create: (data) => api.post('/case-categories', data),
+  update: (id, data) => api.put(`/case-categories/${id}`, data),
+  delete: (id) => api.delete(`/case-categories/${id}`),
+  toggleStatus: (id) => api.post(`/case-categories/${id}/toggle-status`),
 };
 
 // Service Category Management API
 export const serviceCategoryAPI = {
-  getAll: (params) => api.get('/v1/service-categories', { params }),
-  getById: (id) => api.get(`/v1/service-categories/${id}`),
-  create: (data) => api.post('/v1/service-categories', data),
-  update: (id, data) => api.put(`/v1/service-categories/${id}`, data),
-  delete: (id) => api.delete(`/v1/service-categories/${id}`),
-  toggleStatus: (id) => api.post(`/v1/service-categories/${id}/toggle-status`),
+  getAll: (params) => api.get('/service-categories', { params }),
+  getById: (id) => api.get(`/service-categories/${id}`),
+  create: (data) => api.post('/service-categories', data),
+  update: (id, data) => api.put(`/service-categories/${id}`, data),
+  delete: (id) => api.delete(`/service-categories/${id}`),
+  toggleStatus: (id) => api.post(`/service-categories/${id}/toggle-status`),
 };
 // DOFacility Management API
 export const doFacilityAPI = {
-  getAll: (params) => api.get('/v1/do-facilities', { params }),
-  getById: (id) => api.get(`/v1/do-facilities/${id}`),
-  create: (data) => api.post('/v1/do-facilities', data),
-  update: (id, data) => api.put(`/v1/do-facilities/${id}`, data),
-  delete: (id) => api.delete(`/v1/do-facilities/${id}`),
-  getDeskOfficers: () => api.get('/v1/do-facilities/desk-officers'),
-  getFacilities: () => api.get('/v1/do-facilities/facilities'),
-  getUserFacilities: (userId) => api.get(`/v1/do-facilities/user/${userId}/facilities`),
+  getAll: (params) => api.get('/do-facilities', { params }),
+  getById: (id) => api.get(`/do-facilities/${id}`),
+  create: (data) => api.post('/do-facilities', data),
+  update: (id, data) => api.put(`/do-facilities/${id}`, data),
+  delete: (id) => api.delete(`/do-facilities/${id}`),
+  getDeskOfficers: () => api.get('/do-facilities/desk-officers'),
+  getFacilities: () => api.get('/do-facilities/facilities'),
+  getUserFacilities: (userId) => api.get(`/do-facilities/user/${userId}/facilities`),
 };
 
 export const doDashboardAPI = {
-  getOverview: () => api.get('/v1/do-dashboard/overview'),
-  getReferrals: (params) => api.get('/v1/do-dashboard/referrals', { params }),
-  getPACodes: (params) => api.get('/v1/do-dashboard/pa-codes', { params }),
-  validateUTN: (data) => api.post('/v1/do-dashboard/validate-utn', data),
+  getOverview: () => api.get('/do-dashboard/overview'),
+  getReferrals: (params) => api.get('/do-dashboard/referrals', { params }),
+  getPACodes: (params) => api.get('/do-dashboard/pa-codes', { params }),
+  validateUTN: (data) => api.post('/do-dashboard/validate-utn', data),
 };
 
 export const departmentAPI = {
-  getAll: (params) => api.get('/v1/departments', { params }),
-  getById: (id) => api.get(`/v1/departments/${id}`),
-  create: (data) => api.post('/v1/departments', data),
-  update: (id, data) => api.put(`/v1/departments/${id}`, data),
-  delete: (id) => api.delete(`/v1/departments/${id}`),
+  getAll: (params) => api.get('/departments', { params }),
+  getById: (id) => api.get(`/departments/${id}`),
+  create: (data) => api.post('/departments', data),
+  update: (id, data) => api.put(`/departments/${id}`, data),
+  delete: (id) => api.delete(`/departments/${id}`),
 };
 
 export const designationAPI = {
-  getAll: (params) => api.get('/v1/designations', { params }),
-  getById: (id) => api.get(`/v1/designations/${id}`),
-  create: (data) => api.post('/v1/designations', data),
-  update: (id, data) => api.put(`/v1/designations/${id}`, data),
-  delete: (id) => api.delete(`/v1/designations/${id}`),
+  getAll: (params) => api.get('/designations', { params }),
+  getById: (id) => api.get(`/designations/${id}`),
+  create: (data) => api.post('/designations', data),
+  update: (id, data) => api.put(`/designations/${id}`, data),
+  delete: (id) => api.delete(`/designations/${id}`),
 };
 
 // Claims Management API (core claim submission & lifecycle)
 export const claimsAPI = {
-  getAll: (params) => api.get('/v1/pas/claims', { params }),
-  getById: (id) => api.get(`/v1/pas/claims/${id}`),
-  create: (data) => api.post('/v1/pas/claims', data),
-  update: (id, data) => api.put(`/v1/pas/claims/${id}`, data),
-  submit: (id) => api.post(`/v1/pas/claims/${id}/submit`),
+  getAll: (params) => api.get('/pas/claims', { params }),
+  getById: (id) => api.get(`/pas/claims/${id}`),
+  create: (data) => api.post('/pas/claims', data),
+  update: (id, data) => api.put(`/pas/claims/${id}`, data),
+  submit: (id) => api.post(`/pas/claims/${id}/submit`),
   getServicesForReferralOrPACode: (params) =>
-    api.get('/v1/pas/claims/services/for-referral-or-pacode', { params }),
-  getClaims: (params) => api.get('/v1/pas/claims', { params }),
-  approveClaim: (id, data) => api.post(`/v1/pas/claims/${id}/approve`, data),
-  rejectClaim: (id, data) => api.post(`/v1/pas/claims/${id}/reject`, data),
+    api.get('/pas/claims/services/for-referral-or-pacode', { params }),
+  getClaims: (params) => api.get('/pas/claims', { params }),
+  approveClaim: (id, data) => api.post(`/pas/claims/${id}/approve`, data),
+  rejectClaim: (id, data) => api.post(`/pas/claims/${id}/reject`, data),
 };
 
 // Claims Automation API - Hybrid Bundle/FFS Payment Model
 export const claimsAutomationAPI = {
   // Admission Management
-  createAdmission: (data) => api.post('/v1/pas/claims/automation/admissions', data),
-  dischargePatient: (admissionId, data) => api.post(`/v1/pas/claims/automation/admissions/${admissionId}/discharge`, data),
-  getAdmissionHistory: (params) => api.get('/v1/pas/claims/automation/admissions/history', { params }),
+  createAdmission: (data) => api.post('/pas/claims/automation/admissions', data),
+  dischargePatient: (admissionId, data) => api.post(`/pas/claims/automation/admissions/${admissionId}/discharge`, data),
+  getAdmissionHistory: (params) => api.get('/pas/claims/automation/admissions/history', { params }),
 
   // Claim Processing
-  processClaim: (claimId) => api.post(`/v1/pas/claims/automation/${claimId}/process`),
-  getClaimPreview: (claimId) => api.get(`/v1/pas/claims/automation/${claimId}/preview`),
-  validateClaim: (claimId) => api.post(`/v1/pas/claims/automation/${claimId}/validate`),
-  classifyTreatments: (claimId) => api.post(`/v1/pas/claims/automation/${claimId}/classify`),
-  buildSections: (claimId) => api.post(`/v1/pas/claims/automation/${claimId}/build-sections`),
+  processClaim: (claimId) => api.post(`/pas/claims/automation/${claimId}/process`),
+  getClaimPreview: (claimId) => api.get(`/pas/claims/automation/${claimId}/preview`),
+  validateClaim: (claimId) => api.post(`/pas/claims/automation/${claimId}/validate`),
+  classifyTreatments: (claimId) => api.post(`/pas/claims/automation/${claimId}/classify`),
+  buildSections: (claimId) => api.post(`/pas/claims/automation/${claimId}/build-sections`),
 
   // Diagnosis Management
-  addDiagnosis: (claimId, data) => api.post(`/v1/pas/claims/automation/${claimId}/diagnoses`, data),
+  addDiagnosis: (claimId, data) => api.post(`/pas/claims/automation/${claimId}/diagnoses`, data),
 
   // PA Code Management
-  detectMissingPAs: (claimId) => api.get(`/v1/pas/claims/automation/${claimId}/missing-pas`),
+  detectMissingPAs: (claimId) => api.get(`/pas/claims/automation/${claimId}/missing-pas`),
 
   // Treatment Management
-  convertToFFS: (treatmentId, data) => api.post(`/v1/pas/claims/automation/treatments/${treatmentId}/convert-to-ffs`, data),
+  convertToFFS: (treatmentId, data) => api.post(`/pas/claims/automation/treatments/${treatmentId}/convert-to-ffs`, data),
 
   // Compliance Alerts
-  getComplianceAlerts: (claimId) => api.get(`/v1/pas/claims/automation/${claimId}/alerts`),
-  resolveAlert: (alertId, data) => api.post(`/v1/pas/claims/automation/alerts/${alertId}/resolve`, data),
-  overrideAlert: (alertId, data) => api.post(`/v1/pas/claims/automation/alerts/${alertId}/override`, data),
+  getComplianceAlerts: (claimId) => api.get(`/pas/claims/automation/${claimId}/alerts`),
+  resolveAlert: (alertId, data) => api.post(`/pas/claims/automation/alerts/${alertId}/resolve`, data),
+  overrideAlert: (alertId, data) => api.post(`/pas/claims/automation/alerts/${alertId}/override`, data),
 };
 
 // Bundle Management API
 export const bundleAPI = {
-  getAll: (params) => api.get('/v1/bundles', { params }),
-  getById: (id) => api.get(`/v1/bundles/${id}`),
-  findByDiagnosis: (diagnosisCode) => api.get('/v1/bundles/find-by-diagnosis', { params: { diagnosis_code: diagnosisCode } }),
-  create: (data) => api.post('/v1/bundles', data),
-  update: (id, data) => api.put(`/v1/bundles/${id}`, data),
-  delete: (id) => api.delete(`/v1/bundles/${id}`),
+  getAll: (params) => api.get('/bundles', { params }),
+  getById: (id) => api.get(`/bundles/${id}`),
+  findByDiagnosis: (diagnosisCode) => api.get('/bundles/find-by-diagnosis', { params: { diagnosis_code: diagnosisCode } }),
+  create: (data) => api.post('/bundles', data),
+  update: (id, data) => api.put(`/bundles/${id}`, data),
+  delete: (id) => api.delete(`/bundles/${id}`),
 };
 
 // Document Requirements API
 export const documentRequirementAPI = {
-  getAll: (params) => api.get('/v1/document-requirements', { params }),
-  getById: (id) => api.get(`/v1/document-requirements/${id}`),
-  create: (data) => api.post('/v1/document-requirements', data),
-  update: (id, data) => api.put(`/v1/document-requirements/${id}`, data),
-  delete: (id) => api.delete(`/v1/document-requirements/${id}`),
-  forReferral: () => api.get('/v1/document-requirements/for-referral'),
-  forPACode: () => api.get('/v1/document-requirements/for-pa-code'),
-  toggleStatus: (id) => api.post(`/v1/document-requirements/${id}/toggle-status`),
-  reorder: (items) => api.post('/v1/document-requirements/reorder', { items }),
+  getAll: (params) => api.get('/document-requirements', { params }),
+  getById: (id) => api.get(`/document-requirements/${id}`),
+  create: (data) => api.post('/document-requirements', data),
+  update: (id, data) => api.put(`/document-requirements/${id}`, data),
+  delete: (id) => api.delete(`/document-requirements/${id}`),
+  forReferral: () => api.get('/document-requirements/for-referral'),
+  forPACode: () => api.get('/document-requirements/for-pa-code'),
+  toggleStatus: (id) => api.post(`/document-requirements/${id}/toggle-status`),
+  reorder: (items) => api.post('/document-requirements/reorder', { items }),
 };
 
 export default api;

@@ -23,8 +23,13 @@ class UserResource extends JsonResource
             'status_label' => $this->getStatusLabel(),
             'userable_type' => $this->userable_type,
             'userable_id' => $this->userable_id,
+            'current_role_id' => $this->current_role_id,
             'userable' => $this->whenLoaded('userable'),
             'roles' => RoleResource::collection($this->whenLoaded('roles')),
+            'current_role' => new RoleResource($this->whenLoaded('currentRole')),
+            'available_modules' => $this->when($this->relationLoaded('currentRole') || $this->relationLoaded('roles'), function() {
+                return $this->getAvailableModules();
+            }),
             'permissions' => PermissionResource::collection($this->whenLoaded('permissions')),
             'audit_trails' => AuditTrailResource::collection($this->whenLoaded('auditTrails')),
             'last_login_at' => $this->last_login_at,

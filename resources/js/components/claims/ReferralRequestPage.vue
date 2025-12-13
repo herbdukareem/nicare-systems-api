@@ -320,6 +320,68 @@
                   </v-col>
                 </v-row>
 
+                <!-- Supporting Documents -->
+                <h3 class="mt-4 mb-2">Supporting Documents</h3>
+                <v-alert type="info" density="compact" class="mb-4">
+                  Upload required supporting documents for your referral request.
+                </v-alert>
+
+                <v-row v-if="documentRequirements.length > 0">
+                  <v-col cols="12">
+                    <v-table density="compact" class="mb-4">
+                      <thead>
+                        <tr>
+                          <th style="width: 30%">Document Type</th>
+                          <th style="width: 35%">Description</th>
+                          <th style="width: 10%">Required</th>
+                          <th style="width: 25%">Upload</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr v-for="requirement in documentRequirements" :key="requirement.id">
+                          <td>
+                            <strong>{{ requirement.name }}</strong>
+                            <v-chip v-if="requirement.is_required" color="error" size="x-small" class="ml-2">Required</v-chip>
+                          </td>
+                          <td class="text-caption">{{ requirement.description }}</td>
+                          <td class="text-center">
+                            <v-icon v-if="requirement.is_required" color="error">mdi-asterisk</v-icon>
+                            <v-icon v-else color="grey">mdi-minus</v-icon>
+                          </td>
+                          <td>
+                            <v-file-input
+                              v-model="uploadedDocuments[requirement.document_type]"
+                              :label="`Upload ${requirement.name}`"
+                              variant="outlined"
+                              density="compact"
+                              :accept="requirement.allowed_file_types.split(',').map(t => '.' + t.trim()).join(',')"
+                              :rules="requirement.is_required ? [v => !!v || `${requirement.name} is required`] : []"
+                              prepend-icon="mdi-paperclip"
+                              show-size
+                              clearable
+                              @update:model-value="(file) => handleDocumentUpload(requirement, file)"
+                            >
+                              <template v-slot:selection="{ fileNames }">
+                                <v-chip size="small" color="success">
+                                  <v-icon start>mdi-check</v-icon>
+                                  {{ fileNames[0] }}
+                                </v-chip>
+                              </template>
+                            </v-file-input>
+                            <div class="text-caption text-grey mt-1">
+                              Max size: {{ requirement.max_file_size_mb }}MB | Allowed: {{ requirement.allowed_file_types }}
+                            </div>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </v-table>
+                  </v-col>
+                </v-row>
+
+                <v-alert v-else type="warning" density="compact" class="mb-4">
+                  No document requirements configured for referrals.
+                </v-alert>
+
                 <!-- Requested Services (PA Items) -->
                 <h3 class="mt-4 mb-2">Requested Services (PA Items)</h3>
                 <v-alert
@@ -442,13 +504,11 @@
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
 import { useAuthStore } from '../../stores/auth';
 import api, { doDashboardAPI } from '../../utils/api';
 import AdminLayout from '../layout/AdminLayout.vue';
 
-const router = useRouter();
 const authStore = useAuthStore();
 const { showSuccess, showError } = useToast();
 
@@ -466,9 +526,12 @@ const validatedReferral = ref(null);
 const facilities = ref([]);
 const enrollees = ref([]);
 const caseRecords = ref([]);
+const documentRequirements = ref([]);
+const uploadedDocuments = ref({});
 const loadingFacilities = ref(false);
 const loadingEnrollees = ref(false);
 const loadingServices = ref(false);
+const loadingDocuments = ref(false);
 const enrolleeSearch = ref('');
 
 const requestedServices = ref([]);
@@ -515,13 +578,13 @@ const receivingFacilities = computed(() => {
 
 onMounted(async () => {
   // Auto-populate referring facility from logged-in user's facility
-  // TODO: Replace with actual user facility ID from auth store
   formData.value.referring_facility_id = authStore.user?.facility_id || 1;
 
   await Promise.all([
     fetchFacilities(),
     fetchEnrollees(),
     fetchCaseRecords(),
+    fetchDocumentRequirements(),
   ]);
 });
 
@@ -564,6 +627,21 @@ const fetchCaseRecords = async () => {
   }
 };
 
+// Fetch document requirements for referrals
+const fetchDocumentRequirements = async () => {
+  loadingDocuments.value = true;
+  try {
+    const response = await api.get('/v1/document-requirements', {
+      params: { request_type: 'referral', status: 1 }
+    });
+    documentRequirements.value = response.data.data || response.data;
+  } catch (err) {
+    showError('Failed to load document requirements');
+  } finally {
+    loadingDocuments.value = false;
+  }
+};
+
 // Reset follow-up specific state when switching flows
 watch(flowType, (val) => {
   if (val === 'new') {
@@ -595,6 +673,36 @@ const onServiceSelected = (index, caseRecordId) => {
   if (caseRecord) {
     requestedServices.value[index].price = caseRecord.price;
   }
+};
+
+// Handle document upload
+const handleDocumentUpload = (requirement, files) => {
+  if (!files || files.length === 0) {
+    uploadedDocuments.value[requirement.document_type] = null;
+    return;
+  }
+
+  const uploadedFile = files[0];
+
+  // Validate file size
+  const maxSizeBytes = requirement.max_file_size_mb * 1024 * 1024;
+  if (uploadedFile.size > maxSizeBytes) {
+    showError(`File size exceeds ${requirement.max_file_size_mb}MB limit`);
+    uploadedDocuments.value[requirement.document_type] = null;
+    return;
+  }
+
+  // Validate file type
+  const allowedTypes = requirement.allowed_file_types.split(',').map(t => t.trim());
+  const fileExtension = uploadedFile.name.split('.').pop().toLowerCase();
+  if (!allowedTypes.includes(fileExtension)) {
+    showError(`File type .${fileExtension} is not allowed. Allowed types: ${requirement.allowed_file_types}`);
+    uploadedDocuments.value[requirement.document_type] = null;
+    return;
+  }
+
+  // File is valid, store it
+  uploadedDocuments.value[requirement.document_type] = uploadedFile;
 };
 
 // Validate UTN for follow-up flow
@@ -659,29 +767,64 @@ const handleSubmission = async () => {
     return;
   }
 
+  // Validate required documents
+  const requiredDocs = documentRequirements.value.filter(req => req.is_required);
+  for (const req of requiredDocs) {
+    if (!uploadedDocuments.value[req.document_type]) {
+      showError(`Required document "${req.name}" is missing`);
+      return;
+    }
+  }
+
   loading.value = true;
   error.value = null;
   createdReferral.value = null;
 
   try {
-    const payload = {
-      ...formData.value,
-      requested_services: requestedServices.value.map(s => ({
+    // Create FormData for file uploads
+    const formDataPayload = new FormData();
+
+    // Add all form fields
+    Object.keys(formData.value).forEach(key => {
+      if (formData.value[key] !== null && formData.value[key] !== undefined) {
+        formDataPayload.append(key, formData.value[key]);
+      }
+    });
+
+    // Add requested services as JSON
+    formDataPayload.append('requested_services', JSON.stringify(
+      requestedServices.value.map(s => ({
         case_record_id: s.case_record_id,
         quantity: s.quantity,
-      })),
-      flow_type: flowType.value,
-      utn: isFollowUp ? utnInput.value : undefined,
-    };
+      }))
+    ));
 
-    const response = await api.post('/v1/referrals', payload);
+    // Add flow type and UTN for follow-up
+    formDataPayload.append('flow_type', flowType.value);
+    if (isFollowUp) {
+      formDataPayload.append('utn', utnInput.value);
+    }
+
+    // Add uploaded documents
+    Object.keys(uploadedDocuments.value).forEach(docType => {
+      const file = uploadedDocuments.value[docType];
+      if (file) {
+        formDataPayload.append(`documents[${docType}]`, file);
+      }
+    });
+
+    const response = await api.post('/v1/referrals', formDataPayload, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
     createdReferral.value = response.data.data || response.data;
 
     showSuccess(`Referral request submitted successfully! UTN: ${createdReferral.value.utn}`);
 
-    // Optional: Reset form or redirect
-    // referralForm.value.reset();
-    // router.push('/claims/referrals/track');
+    // Reset form
+    resetForm();
   } catch (err) {
     const message = err.response?.data?.message || err.message || 'Failed to submit referral request';
     error.value = message;
@@ -689,6 +832,37 @@ const handleSubmission = async () => {
   } finally {
     loading.value = false;
   }
+};
+
+// Reset form
+const resetForm = () => {
+  formData.value = {
+    enrollee_id: null,
+    referring_facility_id: authStore.user?.facility_id || 1,
+    receiving_facility_id: null,
+    presenting_complains: '',
+    reasons_for_referral: '',
+    treatments_given: '',
+    investigations_done: '',
+    examination_findings: '',
+    preliminary_diagnosis: '',
+    medical_history: '',
+    medication_history: '',
+    severity_level: 'Routine',
+    referring_person_name: '',
+    referring_person_specialisation: '',
+    referring_person_cadre: '',
+    contact_person_name: '',
+    contact_person_phone: '',
+    contact_person_email: '',
+  };
+  requestedServices.value = [];
+  uploadedDocuments.value = {};
+  flowType.value = 'new';
+  utnInput.value = '';
+  utnValidationStatus.value = null;
+  validatedReferral.value = null;
+  referralForm.value?.reset();
 };
 </script>
 

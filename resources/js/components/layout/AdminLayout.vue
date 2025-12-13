@@ -286,13 +286,19 @@ const dashboardMenu = {
       name: 'Enrollee Dashboard',
       path: '/dashboard',
       icon: 'mdi-account-group',
-      roles: ['admin', 'doctor', 'pharmacist', 'reviewer', 'confirmer', 'approver'],
+      roles: ['admin', 'doctor', 'pharmacist', 'reviewer', 'confirmer', 'approver', 'Super Admin'],
     },
     {
       name: 'DO Dashboard',
       path: '/do-dashboard',
       icon: 'mdi-desk',
-      roles: ['desk_officer'],
+      roles: ['desk_officer', 'Super Admin'],
+    },
+    {
+      name: 'Facility Dashboard',
+      path: '/facility-dashboard',
+      icon: 'mdi-hospital-building',
+      roles: ['facility_admin', 'facility_user', 'Super Admin'],
     },
   ],
 };
@@ -305,11 +311,13 @@ const userManagementMenu = {
       name: 'Users',
       path: '/settings/users',
       icon: 'mdi-account-multiple',
+      roles: ['admin', 'Super Admin'],
     },
     {
       name: 'Roles & Permissions',
       path: '/settings/roles',
       icon: 'mdi-shield-account',
+      roles: ['admin', 'Super Admin'],
     },
   ],
 };
@@ -319,63 +327,77 @@ const pasMenu = {
   icon: 'mdi-shield-check',
   children: [
     {
-      name: 'PAS Management',
+      name: 'PAS Dashboard',
       path: '/pas',
-      icon: 'mdi-clipboard-list',
-      badge: 'New',
-    },
-    {
-      name: 'Manage Cases',
-      path: '/pas/programmes',
-      icon: 'mdi-format-list-bulleted-type',
-    },
-    {
-      name: 'Manage Drugs',
-      path: '/pas/drugs',
-      icon: 'mdi-pill',
-    },
-    {
-      name: 'Manage Labs',
-      path: '/pas/labs',
-      icon: 'mdi-test-tube',
-    },
-    {
-      name: 'Manage Tariff Items',
-      path: '/tariff-items',
-      icon: 'mdi-receipt',
-    },
-    {
-      name: 'Case Categories',
-      path: '/case-categories',
-      icon: 'mdi-folder-multiple',
-    },
-    {
-      name: 'Service Categories',
-      path: '/service-categories',
-      icon: 'mdi-format-list-bulleted',
+      icon: 'mdi-view-dashboard',
+      roles: ['admin', 'Super Admin', 'claims_officer'],
     },
     {
       name: 'DO Facility Assignments',
       path: '/do-facilities',
       icon: 'mdi-hospital-marker',
+      roles: ['admin', 'Super Admin'],
+    },
+    {
+      name: 'Assigned Facilities Referrals',
+      path: '/do/assigned-referrals',
+      icon: 'mdi-file-document-multiple',
+      roles: ['desk_officer', 'facility_admin', 'facility_user', 'Super Admin'],
+    },
+    {
+      name: 'Validate UTN',
+      path: '/pas/validate-utn',
+      icon: 'mdi-shield-check',
+      roles: ['facility_admin', 'facility_user', 'desk_officer', 'Super Admin'],
+    },
+    {
+      name: 'Admission Management',
+      path: '/facility/admissions',
+      icon: 'mdi-hospital-box',
+      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'],
+    },
+    {
+      name: 'FU-PA Code Management',
+      path: '/pas/facility-pa-codes',
+      icon: 'mdi-shield-check',
+      roles: ['desk_officer', 'facility_admin', 'facility_user', 'Super Admin'],
+    },
+    {
+      name: 'Submit Claim',
+      path: '/facility/claims/submit',
+      icon: 'mdi-file-document-plus',
+      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'],
+    },
+    {
+      name: 'FU-PA Code Approval',
+      path: '/pas/fu-pa-approval',
+      icon: 'mdi-check-decagram',
+      roles: ['admin', 'Super Admin', 'claims_officer'],
+    },
+    {
+      name: 'Referral Management',
+      path: '/pas/referral-management',
+      icon: 'mdi-file-document-check',
+      roles: ['admin', 'Super Admin', 'claims_officer', 'desk_officer', 'facility_admin', 'facility_user'],
     },
     {
       name: 'Document Requirements',
       path: '/document-requirements',
-      icon: 'mdi-file-document-check',
+      icon: 'mdi-file-document-multiple',
+      roles: ['admin', 'Super Admin', 'claims_officer'],
     },
   ],
 };
 
 const pasFeedbackMenu = {
-  name: 'Referrals and PA Codes Feedback',
-  icon: 'mdi-shield-check',
+  name: 'Feedback Management',
+  icon: 'mdi-comment-text-multiple',
   children: [
     {
       name: 'Feedback',
       path: '/feedback',
-      icon: 'mdi-clipboard-list',
-      badge: 'New',
+      icon: 'mdi-comment-text',
+      roles: ['admin', 'Super Admin', 'claims_officer', 'facility_admin', 'facility_user'],
     },
   ],
 };
@@ -385,19 +407,22 @@ const claimsMenu = {
   icon: 'mdi-file-document-multiple',
   children: [
     {
-      name: 'Manage Referrals',
+      name: 'Claims Dashboard',
+      path: '/claims',
+      icon: 'mdi-view-dashboard',
+      roles: ['admin', 'Super Admin', 'claims_officer', 'claim_reviewer', 'claim_confirmer', 'claim_approver'],
+    },
+    {
+      name: 'Submit Referral to PAS',
       path: '/claims/referrals',
       icon: 'mdi-account-arrow-right',
+      roles: ['admin', 'Super Admin', 'claims_officer'],
     },
     {
-      name: 'Claim Submissions',
-      path: '/claims/submissions',
-      icon: 'mdi-upload',
-    },
-    {
-      name: 'Claims History',
-      path: '/claims/history',
-      icon: 'mdi-history',
+      name: 'Review Claims',
+      path: '/claims/review',
+      icon: 'mdi-file-check',
+      roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'],
     },
   ],
 };
@@ -410,17 +435,19 @@ const claimsAutomationMenu = {
       name: 'Admission Management',
       path: '/claims/automation/admissions',
       icon: 'mdi-hospital-building',
-      badge: 'New',
+      roles: ['admin', 'Super Admin', 'claims_officer'],
     },
     {
       name: 'Claims Processing',
       path: '/claims/automation/process',
       icon: 'mdi-cog-transfer',
+      roles: ['admin', 'Super Admin', 'claims_officer', 'claim_reviewer'],
     },
     {
       name: 'Bundle Management',
       path: '/claims/automation/bundles',
       icon: 'mdi-package-variant-closed',
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
   ],
 };
@@ -433,37 +460,43 @@ const managementMenu = {
       name: 'Management Dashboard',
       path: '/management',
       icon: 'mdi-view-dashboard-outline',
-      badge: 'New',
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
     {
       name: 'Drugs Management',
       path: '/management/drugs',
       icon: 'mdi-pill',
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
     {
       name: 'Laboratories',
       path: '/management/laboratories',
       icon: 'mdi-test-tube',
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
     {
       name: 'Professional Services',
       path: '/management/professional-services',
       icon: 'mdi-medical-bag',
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
     {
       name: 'Bundle Services',
       path: '/management/bundle-services',
       icon: 'mdi-package-variant',
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
     {
       name: 'Bundle Components',
       path: '/management/bundle-components',
       icon: 'mdi-puzzle',
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
     {
       name: 'Case Management',
       path: '/management/cases',
       icon: 'mdi-file-document-multiple-outline',
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
   ],
 };
@@ -478,14 +511,27 @@ const moduleMenus = {
 	  management: [dashboardMenu, managementMenu],
 	};
 
-// Module switcher options
-const moduleOptions = [
+// Module switcher options - filtered by user's available modules
+const allModuleOptions = [
   { value: 'general', label: 'Core & Admin' },
   { value: 'pas', label: 'Pre-Authorization (PAS)' },
   { value: 'claims', label: 'Claims' },
   { value: 'automation', label: 'Claims Automation' },
   { value: 'management', label: 'Management' },
 ];
+
+// Filter modules based on user's current role
+const moduleOptions = computed(() => {
+  const availableModules = authStore.availableModules || [];
+
+  // If no modules specified or user is admin, show all
+  if (availableModules.length === 0 || authStore.hasRole('admin') || authStore.hasRole('Super Admin')) {
+    return allModuleOptions;
+  }
+
+  // Filter to only show modules user has access to
+  return allModuleOptions.filter(option => availableModules.includes(option.value));
+});
 
 const selectedModule = computed({
   get: () => uiStore.currentModule,
@@ -599,6 +645,7 @@ const getModuleForPath = (path) => {
     path.startsWith('/case-categories') ||
     path.startsWith('/service-categories') ||
     path.startsWith('/do-facilities') ||
+    path.startsWith('/do/assigned-referrals') ||
     path.startsWith('/document-requirements') ||
     path.startsWith('/feedback')
   ) {
@@ -619,6 +666,22 @@ watch(
     const module = getModuleForPath(newPath);
     uiStore.setModule(module);
   },
+);
+
+// Watch for changes in available modules and validate current module
+watch(
+  () => authStore.availableModules,
+  (newModules) => {
+    const currentModule = uiStore.currentModule;
+    const availableModuleValues = moduleOptions.value.map(m => m.value);
+
+    // If current module is not available, switch to first available module
+    if (!availableModuleValues.includes(currentModule) && availableModuleValues.length > 0) {
+      uiStore.setModule(availableModuleValues[0]);
+      router.push(availableModuleValues[0] === 'general' ? '/dashboard' : `/${availableModuleValues[0]}`);
+    }
+  },
+  { immediate: true }
 );
 
 // Close sidebar on route change (mobile)

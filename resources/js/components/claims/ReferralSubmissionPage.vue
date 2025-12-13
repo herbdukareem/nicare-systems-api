@@ -10,11 +10,7 @@
               Submit Referral to Pre-Authorization System (PAS)
             </v-card-title>
             <v-card-text>
-              <v-alert type="info" class="mb-4">
-                <strong>Admin Referral Submission to PAS</strong><br>
-                Submit a referral on behalf of a primary facility to the Pre-Authorization System. Select the facility, enrollee, and provide clinical details.
-              </v-alert>
-
+            
               <v-alert v-if="error" type="error" class="mb-4">{{ error }}</v-alert>
 
               <!-- Stepper -->
@@ -318,11 +314,12 @@
                             </v-col>
                           </v-row>
 
-                          <!-- Direct Service Selection -->
+                          <!-- Direct Service Selection (Multiple) -->
+                          <!-- :rules="formData.service_selection_type === 'direct' ? [v => !!v || 'Service is required'] : []" -->
                           <v-row v-if="formData.service_selection_type === 'direct'">
                             <v-col cols="12">
                               <v-autocomplete
-                                v-model="formData.case_record_id"
+                                v-model="formData.case_record_ids"
                                 label="Select Direct Service *"
                                 :items="caseRecords"
                                 item-title="display_name"
@@ -330,8 +327,11 @@
                                 variant="outlined"
                                 density="comfortable"
                                 :loading="loadingCaseRecords"
-                                :rules="formData.service_selection_type === 'direct' ? [v => !!v || 'Service is required'] : []"
                                 clearable
+                                multiple
+                                chips
+                                closable-chips
+                                :rules="[v => (v && v.length > 0) || 'At least one service is required']"
                                 hint="Select a single service/treatment"
                                 persistent-hint
                               >
@@ -537,13 +537,17 @@
 
 <script setup>
 import AdminLayout from '../layout/AdminLayout.vue';
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
-import api from '../../utils/api';
+import api, { doFacilityAPI } from '../../utils/api';
+import { useAuthStore } from '../../stores/auth';
+import { storeToRefs } from 'pinia';
 
 const router = useRouter();
 const { success: showSuccess, error: showError } = useToast();
+const authStore = useAuthStore();
+const { user, currentRole } = storeToRefs(authStore);
 
 // Reactive state
 const loading = ref(false);
@@ -564,6 +568,13 @@ const loadingBundles = ref(false);
 const loadingCaseRecords = ref(false);
 
 const showSuccessDialog = ref(false);
+const assignedPrimaryFacilities = ref([]);
+const isFacilityRole = computed(() => {
+  const user_roles = user.value?.roles || []
+  const user_role_names = user_roles.map(role => role.name);
+
+  return user_role_names.some(role => ['facility_admin', 'facility_user', 'desk_officer'].includes(role));
+});
 
 const severityLevels = [
   { title: 'Routine', value: 'Routine' },
@@ -597,12 +608,16 @@ const formData = ref({
   contact_person_email: '',
   service_selection_type: null,
   service_bundle_id: null,
-  case_record_id: null,
+  case_record_ids: [], 
 });
 
 // Computed properties for filtering facilities
 const primaryFacilities = computed(() => {
-  return facilities.value.filter(f => f.type === 'Primary');
+  const allPrimary = facilities.value.filter(f => f.type === 'Primary');
+  if (isFacilityRole.value && assignedPrimaryFacilities.value.length) {
+    return assignedPrimaryFacilities.value;
+  }
+  return allPrimary;
 });
 
 const secondaryFacilities = computed(() => {
@@ -614,7 +629,17 @@ onMounted(async () => {
     fetchFacilities(),
     fetchServiceBundles(),
     fetchCaseRecords(),
+    fetchAssignedFacilities(), // safe no-op for non facility roles
   ]);
+});
+
+// Refetch assigned facilities if role changes
+watch(isFacilityRole, async (isFacility) => {
+  if (isFacility) {
+    await fetchAssignedFacilities();
+  } else {
+    assignedPrimaryFacilities.value = [];
+  }
 });
 
 // Fetch facilities
@@ -627,6 +652,35 @@ const fetchFacilities = async () => {
     showError('Failed to load facilities');
   } finally {
     loadingFacilities.value = false;
+  }
+};
+
+// Fetch facilities assigned to the current user (desk officer/facility roles)
+const fetchAssignedFacilities = async () => {
+  if (!isFacilityRole.value || !user.value?.id) {
+    assignedPrimaryFacilities.value = [];
+    return;
+  }
+  try {
+    const response = await doFacilityAPI.getUserFacilities(user.value.id);
+    const assignments = response.data?.data || response.data || [];
+
+    // Map assignments to unique Primary facilities
+    const seen = new Set();
+    const facilitiesList = assignments.reduce((acc, assignment) => {
+      const facility = assignment.facility;
+      if (facility && facility.type === 'Primary' && !seen.has(facility.id)) {
+        seen.add(facility.id);
+        acc.push(facility);
+      }
+      return acc;
+    }, []);
+
+    assignedPrimaryFacilities.value = facilitiesList;
+  } catch (err) {
+    assignedPrimaryFacilities.value = [];
+    showError('Failed to load assigned facilities');
+    console.error('Assigned facilities fetch error:', err);
   }
 };
 
@@ -698,8 +752,8 @@ const fetchCaseRecords = async () => {
 // Handle service selection type change
 const onServiceTypeChange = (type) => {
   // Clear selections when type changes
-  formData.value.service_bundle_id = null;
-  formData.value.case_record_id = null;
+    formData.value.service_bundle_id = null;
+  formData.value.case_record_ids = [];
 };
 
 // Get icon for case record type

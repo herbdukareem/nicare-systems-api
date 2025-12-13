@@ -26,6 +26,15 @@ class Role extends Model
     protected $guarded = ['id'];
 
     /**
+     * The attributes that should be cast.
+     *
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'modules' => 'array',
+    ];
+
+    /**
      * A role may be assigned to many users.
      */
     public function users()
@@ -39,5 +48,19 @@ class Role extends Model
     public function permissions()
     {
         return $this->belongsToMany(Permission::class, 'permission_role');
+    }
+
+    /**
+     * Check if role has access to a specific module.
+     *
+     * @param  string  $module
+     * @return bool
+     */
+    public function hasModule(string $module): bool
+    {
+        if (!$this->modules) {
+            return false;
+        }
+        return in_array($module, $this->modules);
     }
 }

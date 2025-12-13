@@ -33,6 +33,42 @@ const routes = [
       breadcrumb: 'Dashboard'
     },
   },
+  {
+    path: '/do-dashboard',
+    name: 'do-dashboard',
+    component: () => import('../components/do/DODashboard.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['desk_officer', 'Super Admin'],
+      title: 'DO Dashboard',
+      description: 'Desk Officer dashboard for managing assigned facilities',
+      breadcrumb: 'DO Dashboard'
+    },
+  },
+  {
+    path: '/facility-dashboard',
+    name: 'facility-dashboard',
+    component: () => import('../components/dashboard/FacilityDashboard.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['facility_admin', 'facility_user', 'Super Admin'],
+      title: 'Facility Dashboard',
+      description: 'Facility dashboard for managing operations and requests',
+      breadcrumb: 'Facility Dashboard'
+    },
+  },
+  {
+    path: '/do/assigned-referrals',
+    name: 'do-assigned-referrals',
+    component: () => import('../components/do/DOAssignedReferralsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['desk_officer', 'facility_admin', 'facility_user', 'Super Admin'],
+      title: 'Assigned Facilities Referrals',
+      description: 'View referrals for your assigned facilities',
+      breadcrumb: 'Assigned Referrals'
+    },
+  },
   // Enrollment Routes
   {
     path: '/enrollees',
@@ -183,6 +219,30 @@ const routes = [
     }
   },
   {
+    path: '/do-facilities',
+    name: 'do-facility-assignments',
+    component: () => import('../components/pas/DOFacilityAssignmentPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin'],
+      title: 'DO Facility Assignments',
+      description: 'Assign facilities to desk officers',
+      breadcrumb: 'DO Facility Assignments'
+    }
+  },
+  {
+    path: '/pas/validate-utn',
+    name: 'validate-utn',
+    component: () => import('../components/pas/UTNValidationPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['facility_admin', 'facility_user', 'desk_officer', 'Super Admin'],
+      title: 'Validate UTN',
+      description: 'Validate Unique Transaction Numbers for approved referrals',
+      breadcrumb: 'UTN Validation'
+    }
+  },
+  {
     path: '/pas/fu-pa-request',
     name: 'fu-pa-code-request',
     component: () => import('../components/pas/FUPACodeRequestPage.vue'),
@@ -207,12 +267,24 @@ const routes = [
     }
   },
   {
+    path: '/pas/facility-pa-codes',
+    name: 'facility-pa-codes',
+    component: () => import('../components/pas/FacilityPACodeManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['desk_officer', 'facility_admin', 'facility_user'],
+      title: 'FU-PA Code Management',
+      description: 'View and manage your FU-PA Code requests',
+      breadcrumb: 'FU-PA Code Management'
+    }
+  },
+  {
     path: '/pas/referral-management',
     name: 'referral-management',
     component: () => import('../components/pas/ReferralManagementPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'claims_officer'],
+      roles: ['admin', 'Super Admin', 'claims_officer', 'desk_officer', 'facility_admin', 'facility_user'],
       title: 'Referral Management',
       description: 'View, approve, reject, and print referrals',
       breadcrumb: 'Referral Management'
@@ -248,10 +320,10 @@ const routes = [
   {
     path: '/claims/referral-request',
     name: 'claims-referral-request',
-    component: () => import('../components/claims/ReferralRequestPage.vue'),
+    component: () => import('../components/claims/ReferralSubmissionPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['primary_facility', 'facility_admin', 'admin', 'Super Admin'],
+      roles: ['primary_facility', 'facility_admin', 'admin'],
       title: 'Referral Request to Pre-Authorization System (PAS)',
       description: 'Submit referral requests for your facility to PAS',
       breadcrumb: 'Referral Request to PAS'
@@ -297,6 +369,30 @@ const routes = [
       title: 'Admission Management',
       description: 'Manage patient admissions for episode-of-care tracking',
       breadcrumb: 'Admission Management'
+    }
+  },
+  {
+    path: '/facility/admissions',
+    name: 'facility-admissions',
+    component: () => import('../components/facility/FacilityAdmissionManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'],
+      title: 'Admission Management',
+      description: 'Create admissions from validated UTNs and manage patient episodes',
+      breadcrumb: 'Admission Management'
+    }
+  },
+  {
+    path: '/facility/claims/submit',
+    name: 'facility-claim-submission',
+    component: () => import('../components/facility/FacilityClaimSubmissionPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'],
+      title: 'Submit Claim',
+      description: 'Submit claims for discharged patients with validated UTN and approved PA codes',
+      breadcrumb: 'Submit Claim'
     }
   },
   {
@@ -504,7 +600,28 @@ router.beforeEach(async (to, _from, next) => {
     }
 
     if (authStore.isAuthenticated) {
-      // Check role-based access (supports both single role and array of roles)
+      // Check permission-based access first (preferred method)
+      const requiredPermissions = to.meta.permissions || (to.meta.permission ? [to.meta.permission] : null);
+
+      if (requiredPermissions && requiredPermissions.length > 0) {
+        // Check if user has at least one of the required permissions
+        const hasRequiredPermission = requiredPermissions.some(permission => authStore.hasPermission(permission));
+
+        if (!hasRequiredPermission) {
+          // User doesn't have required permissions, redirect to appropriate dashboard
+          const userRole = authStore.userRoles[0]?.name;
+          if (userRole === 'desk_officer') {
+            next({ path: '/do-dashboard', replace: true });
+          } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
+            next({ path: '/facility-dashboard', replace: true });
+          } else {
+            next({ path: '/dashboard', replace: true });
+          }
+          return;
+        }
+      }
+
+      // Fallback to role-based access (for backward compatibility)
       const requiredRoles = to.meta.roles || (to.meta.role ? [to.meta.role] : null);
 
       if (requiredRoles && requiredRoles.length > 0) {
@@ -516,6 +633,8 @@ router.beforeEach(async (to, _from, next) => {
           const userRole = authStore.userRoles[0]?.name;
           if (userRole === 'desk_officer') {
             next({ path: '/do-dashboard', replace: true });
+          } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
+            next({ path: '/facility-dashboard', replace: true });
           } else {
             next({ path: '/dashboard', replace: true });
           }
@@ -530,6 +649,13 @@ router.beforeEach(async (to, _from, next) => {
         return;
       }
 
+      // Special handling for facility users accessing general dashboard
+      if (to.name === 'dashboard' && (authStore.hasRole('facility_admin') || authStore.hasRole('facility_user'))) {
+        // Redirect facility users to their specialized dashboard
+        next({ path: '/facility-dashboard', replace: true });
+        return;
+      }
+
       next();
     } else {
       next({ path: '/login', replace: true });
@@ -538,8 +664,11 @@ router.beforeEach(async (to, _from, next) => {
     // Handle login page redirect for already authenticated users
     if (to.name === 'login' && authStore.isAuthenticated) {
       // Redirect authenticated users away from login page
-      if (authStore.hasRole('desk_officer')) {
+      const userRole = authStore.userRoles[0]?.name;
+      if (userRole === 'desk_officer') {
         next({ path: '/do-dashboard', replace: true });
+      } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
+        next({ path: '/facility-dashboard', replace: true });
       } else {
         next({ path: '/dashboard', replace: true });
       }

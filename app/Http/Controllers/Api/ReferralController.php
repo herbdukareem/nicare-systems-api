@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\PAS;
+namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 
@@ -91,39 +91,149 @@ class ReferralController extends Controller
     public function store(Request $request)
     {
         // 1. Validation (Ensures all fields from the RR Template are present)
-        $request->validate([
+        $validator = Validator::make($request->all(), [
             'enrollee_id' => 'required|exists:enrollees,id',
             'referring_facility_id' => 'required|exists:facilities,id',
             'receiving_facility_id' => 'required|exists:facilities,id',
             'presenting_complains' => 'required|string',
             'reasons_for_referral' => 'required|string',
+            'treatments_given' => 'required|string',
+            'investigations_done' => 'required|string',
+            'examination_findings' => 'required|string',
+            'preliminary_diagnosis' => 'required|string',
+            'medical_history' => 'nullable|string',
+            'medication_history' => 'nullable|string',
             'severity_level' => 'required|in:Routine,Urgent/Expidited,Emergency',
-            // ... all other required RR fields ...
-        ]);
-        
-        // Mock data for code generation (In real world, use sequencing logic)
-        $facilityCode = Facility::findOrFail($request->referring_facility_id)->nicare_code ?? 'FAC001';
-        $serial = Referral::where('referring_facility_id', $request->referring_facility_id)->count() + 1;
-        
-        $referral = Referral::create([
-            // Core Fields
-            'enrollee_id' => $request->enrollee_id,
-            'referring_facility_id' => $request->referring_facility_id,
-            'receiving_facility_id' => $request->receiving_facility_id,
-            'request_date' => now(),
-            
-            // Generated Codes (RR Template)
-            'referral_code' => 'NGSCHA/' . $facilityCode . '/' . str_pad($serial, 4, '0', STR_PAD_LEFT),
-            'utn' => 'UTN-' . strtoupper(bin2hex(random_bytes(10))), // Unique Transaction Number
-            
-            // Clinical Data
-            'presenting_complains' => $request->presenting_complains,
-            'reasons_for_referral' => $request->reasons_for_referral,
-            // ... map remaining RR template fields ...
-            'severity_level' => $request->severity_level,
+            'referring_person_name' => 'required|string',
+            'referring_person_specialisation' => 'required|string',
+            'referring_person_cadre' => 'required|string',
+            'contact_person_name' => 'nullable|string',
+            'contact_person_phone' => 'nullable|string',
+            'contact_person_email' => 'nullable|email',
+            'requested_services' => 'required|json',
+            'flow_type' => 'nullable|in:new,followup',
+            'utn' => 'nullable|string|exists:referrals,utn',
+            'service_selection_type' => 'nullable|in:bundle,direct',
+            'service_bundle_id' => 'nullable|exists:service_bundles,id',
+            'case_record_ids' => 'nullable|json',
+            'documents.*' => 'nullable|file|max:10240', // Max 10MB per file
         ]);
 
-        return response()->json(['message' => 'Referral Request submitted for review.', 'referral' => $referral], 201);
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        try {
+            DB::beginTransaction();
+
+            // Get facility code for referral code generation
+            $facility = \App\Models\Facility::findOrFail($request->referring_facility_id);
+            $facilityCode = $facility->nicare_code ?? $facility->hcp_code ?? 'FAC001';
+            $serial = Referral::where('referring_facility_id', $request->referring_facility_id)->count() + 1;
+
+            // Parse requested services
+            $requestedServices = json_decode($request->requested_services, true);
+            $caseRecordIds = $request->case_record_ids ? json_decode($request->case_record_ids, true) : null;
+
+            // Create referral
+            $referral = Referral::create([
+                // Core Fields
+                'enrollee_id' => $request->enrollee_id,
+                'referring_facility_id' => $request->referring_facility_id,
+                'receiving_facility_id' => $request->receiving_facility_id,
+                'request_date' => now(),
+
+                // Generated Codes (RR Template)
+                'referral_code' => 'NGSCHA/' . $facilityCode . '/' . str_pad($serial, 4, '0', STR_PAD_LEFT),
+                'utn' => 'UTN-' . strtoupper(bin2hex(10)), // Unique Transaction Number
+                'valid_until' => now()->addMonths(3), // UTN valid for 3 months
+
+                // Clinical Data
+                'presenting_complains' => $request->presenting_complains,
+                'reasons_for_referral' => $request->reasons_for_referral,
+                'treatments_given' => $request->treatments_given,
+                'investigations_done' => $request->investigations_done,
+                'examination_findings' => $request->examination_findings,
+                'preliminary_diagnosis' => $request->preliminary_diagnosis,
+                'medical_history' => $request->medical_history,
+                'medication_history' => $request->medication_history,
+                'severity_level' => $request->severity_level,
+
+                // Referring Personnel
+                'referring_person_name' => $request->referring_person_name,
+                'referring_person_specialisation' => $request->referring_person_specialisation,
+                'referring_person_cadre' => $request->referring_person_cadre,
+
+                // Contact Information
+                'contact_person_name' => $request->contact_person_name,
+                'contact_person_phone' => $request->contact_person_phone,
+                'contact_person_email' => $request->contact_person_email,
+
+                // Service Selection
+                'requested_services' => $requestedServices,
+                'service_selection_type' => $request->service_selection_type,
+                'service_bundle_id' => $request->service_bundle_id,
+                'case_record_ids' => $caseRecordIds,
+
+                // Status
+                'status' => 'PENDING',
+            ]);
+
+            // Handle document uploads
+            if ($request->hasFile('documents')) {
+                foreach ($request->file('documents') as $docType => $file) {
+                    // Upload file to S3/Wasabi
+                    $uploadResult = $this->fileUploadService->uploadPASDocument(
+                        $file,
+                        $referral->referral_code,
+                        $docType
+                    );
+
+                    if ($uploadResult['success']) {
+                        // Find the document requirement
+                        $docRequirement = \App\Models\DocumentRequirement::where('document_type', $docType)
+                            ->where('request_type', 'referral')
+                            ->first();
+
+                        // Create document record
+                        \App\Models\ReferralDocument::create([
+                            'referral_id' => $referral->id,
+                            'document_requirement_id' => $docRequirement?->id,
+                            'document_type' => $docType,
+                            'file_name' => $uploadResult['filename'],
+                            'file_path' => $uploadResult['path'],
+                            'file_type' => $file->getClientOriginalExtension(),
+                            'file_size' => $file->getSize(),
+                            'mime_type' => $file->getMimeType(),
+                            'original_filename' => $uploadResult['original_name'],
+                            'uploaded_by' => Auth::id(),
+                            'is_required' => $docRequirement?->is_required ?? false,
+                        ]);
+                    }
+                }
+            }
+
+            DB::commit();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Referral Request submitted for review.',
+                'data' => $referral->load(['referringFacility', 'receivingFacility', 'enrollee', 'documents'])
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to submit referral request',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
     
     /**
@@ -132,6 +242,25 @@ class ReferralController extends Controller
     public function approve(Referral $referral)
     {
         $referral->update(['status' => 'APPROVED', 'approval_date' => now()]);
+
+        // Auto-create PA code if referral has service bundle selected
+        if ($referral->service_bundle_id) {
+            \App\Models\PACode::create([
+                'enrollee_id' => $referral->enrollee_id,
+                'facility_id' => $referral->receiving_facility_id,
+                'referral_id' => $referral->id,
+                'admission_id' => null, // Will be linked when admission is created
+                'code' => 'PA-REF-' . $referral->id,
+                'type' => \App\Models\PACode::TYPE_BUNDLE,
+                'status' => 'APPROVED',
+                'justification' => 'Auto-generated from approved referral with service bundle',
+                'requested_services' => [],
+                'service_selection_type' => 'bundle',
+                'service_bundle_id' => $referral->service_bundle_id,
+                'case_record_ids' => null,
+            ]);
+        }
+
         return response()->json([
             'message' => 'Referral PA approved. Receiving facility can now request Follow-up PA Codes.',
             'referral_code' => $referral->referral_code,

@@ -64,7 +64,7 @@ class DOFacility extends Model
     public function scopeDeskOfficers($query)
     {
         return $query->whereHas('user.roles', function ($q) {
-            $q->where('name', 'desk_officer');
+            $q->whereIn('name', ['desk_officer', 'facility_admin', 'facility_user']);
         });
     }
 

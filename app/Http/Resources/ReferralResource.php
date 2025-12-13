@@ -36,10 +36,12 @@ class ReferralResource extends JsonResource
             'contact_person_email' => $this->contact_person_email,
             'service_selection_type' => $this->service_selection_type,
             'service_bundle_id' => $this->service_bundle_id,
-            'case_record_id' => $this->case_record_id,
+            'case_record_ids' => $this->case_record_ids ?? [],
             'requested_services' => $this->requested_services ?? [],
             'request_date' => $this->request_date,
             'approval_date' => $this->approval_date,
+            'valid_until' => $this->valid_until,
+            'is_expired' => $this->isExpired(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'enrollee' => new EnrolleeResource($this->whenLoaded('enrollee')),
@@ -55,14 +57,7 @@ class ReferralResource extends JsonResource
                     'diagnosis_icd10' => $this->serviceBundle->diagnosis_icd10,
                 ];
             }),
-            'case_record' => $this->whenLoaded('caseRecord', function () {
-                return [
-                    'id' => $this->caseRecord->id,
-                    'nicare_code' => $this->caseRecord->nicare_code,
-                    'case_name' => $this->caseRecord->case_name,
-                    'detail_type' => $this->caseRecord->detail_type,
-                ];
-            }),
+            'case_records' => !empty($this->case_record_ids) ? $this->caseRecords() : [],
         ];
     }
 }

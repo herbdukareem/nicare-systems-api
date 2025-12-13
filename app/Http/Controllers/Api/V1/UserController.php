@@ -29,35 +29,31 @@ class UserController extends BaseController
     }
 
     /**
-     * Display a listing of users.
+     * Display a listing of users with improved search and pagination.
      */
     public function index(Request $request)
     {
-        $filters = $request->only(['name', 'email', 'status', 'search']);
+        $filters = $request->only(['name', 'email', 'username', 'status', 'search', 'role']);
         $perPage = (int) $request->get('per_page', 15);
         $sortBy = $request->get('sort_by', 'created_at');
         $sortDirection = $request->get('sort_direction', 'desc');
 
         $users = $this->userService->paginate($filters, $perPage, $sortBy, $sortDirection);
 
-        // total user, active user, pending user, suspended user
+        // Calculate stats from all users (not just current page)
+        $allUsers = User::all();
         $stats = [
-            'total' => $users->total(),
-            'active' => $users->filter(function ($user) {
-                return $user->status === 1;
-            })->count(),
-            'pending' => $users->filter(function ($user) {
-                return $user->status === 0;
-            })->count(),
-            'suspended' => $users->filter(function ($user) {
-                return $user->status === 2;
-            })->count(),
+            'total' => $allUsers->count(),
+            'active' => $allUsers->where('status', 1)->count(),
+            'pending' => $allUsers->where('status', 0)->count(),
+            'suspended' => $allUsers->where('status', 2)->count(),
         ];
-   
+
         $response = UserResource::collection($users);
         $response->additional([
             'stats' => $stats,
             'meta' => [
+                'total' => $users->total(),
                 'per_page' => $users->perPage(),
                 'current_page' => $users->currentPage(),
                 'last_page' => $users->lastPage(),
@@ -248,6 +244,47 @@ class UserController extends BaseController
             ['deleted_count' => $deleted],
             "Successfully deleted {$deleted} users"
         );
+    }
+
+    /**
+     * Switch user's current role
+     */
+    public function switchRole(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'role_id' => 'required|exists:roles,id',
+        ]);
+
+        // Check if the role is assigned to the user
+        if (!$user->roles()->where('roles.id', $validated['role_id'])->exists()) {
+            return $this->sendError('Role not assigned to user', [], 400);
+        }
+
+        $user->current_role_id = $validated['role_id'];
+        $user->save();
+
+        return $this->sendResponse(
+            new UserResource($user->load('roles', 'currentRole')),
+            'Role switched successfully'
+        );
+    }
+
+    /**
+     * Get available modules for current user
+     */
+    public function getAvailableModules(Request $request)
+    {
+        $user = $request->user();
+        $modules = $user->getAvailableModules();
+
+        return $this->sendResponse([
+            'modules' => $modules,
+            'current_role' => $user->currentRole ? [
+                'id' => $user->currentRole->id,
+                'name' => $user->currentRole->name,
+                'label' => $user->currentRole->label,
+            ] : null,
+        ], 'Available modules retrieved successfully');
     }
 
     /**

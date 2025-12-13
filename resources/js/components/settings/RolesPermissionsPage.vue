@@ -150,12 +150,7 @@
             </div>
           </template>
 
-          <!-- Status -->
-          <template #item.status="{ item }">
-            <v-chip :color="item.status === 'active' ? 'success' : 'error'" size="small" variant="flat">
-              {{ item.status }}
-            </v-chip>
-          </template>
+        
 
           <!-- Permissions count -->
           <template #item.permissions_count="{ item }">
@@ -283,6 +278,49 @@
             </div>
 
             <v-textarea v-model="roleForm.description" label="Description" variant="outlined" rows="3" />
+
+            <!-- Module Assignment -->
+            <div>
+              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-3">Assigned Modules</h4>
+              <p class="tw-text-sm tw-text-gray-600 tw-mb-3">Select which modules this role can access</p>
+              <div class="tw-grid tw-grid-cols-2 md:tw-grid-cols-5 tw-gap-3">
+                <v-checkbox
+                  v-model="roleForm.modules"
+                  value="general"
+                  label="General"
+                  density="compact"
+                  hide-details
+                />
+                <v-checkbox
+                  v-model="roleForm.modules"
+                  value="pas"
+                  label="PAS"
+                  density="compact"
+                  hide-details
+                />
+                <v-checkbox
+                  v-model="roleForm.modules"
+                  value="claims"
+                  label="Claims"
+                  density="compact"
+                  hide-details
+                />
+                <v-checkbox
+                  v-model="roleForm.modules"
+                  value="automation"
+                  label="Automation"
+                  density="compact"
+                  hide-details
+                />
+                <v-checkbox
+                  v-model="roleForm.modules"
+                  value="management"
+                  label="Management"
+                  density="compact"
+                  hide-details
+                />
+              </div>
+            </div>
 
             <div>
               <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-3">Permissions</h4>
@@ -460,7 +498,6 @@ const allPermissions = ref([]);
 const roleHeaders = [
   { title: 'Role Name', key: 'name', sortable: true },
   { title: 'Description', key: 'description', sortable: false },
-  { title: 'Status', key: 'status', sortable: true },
   { title: 'Permissions', key: 'permissions_count', sortable: false },
   { title: 'Users', key: 'users_count', sortable: true },
   { title: 'Created', key: 'created_at', sortable: true },
@@ -472,6 +509,7 @@ const roleForm = ref({
   name: '',
   description: '',
   status: 'active',
+  modules: [], // array of module names
   permissions: [] // array of permission IDs
 });
 
@@ -524,7 +562,7 @@ const formatDate = (val) => {
 // actions
 const openCreateDialog = () => {
   editingRole.value = null;
-  roleForm.value = { name: '', description: '', status: 'active', permissions: [] };
+  roleForm.value = { name: '', description: '', status: 'active', modules: [], permissions: [] };
   showCreateRoleDialog.value = true;
 };
 
@@ -540,6 +578,7 @@ const editRole = (role) => {
     name: role.name || '',
     description: role.description || '',
     status: role.status || 'active',
+    modules: role.modules || [],
     permissions: [...ids]
   };
   showViewRoleDialog.value = false;
@@ -574,41 +613,46 @@ const toggleCategory = (cat) => {
 
 const saveRole = async () => {
   try {
+    const payload = {
+      name: roleForm.value.name,
+      description: roleForm.value.description,
+      status: roleForm.value.status,
+      modules: roleForm.value.modules,
+      permissions: roleForm.value.permissions.map(p => typeof p === 'object' ? p.id : p)
+    };
+
     if (editingRole.value) {
-      Object.assign(editingRole.value, {
-        name: roleForm.value.name,
-        description: roleForm.value.description,
-        status: roleForm.value.status,
-        permissions: [...roleForm.value.permissions] // keep IDs to be consistent
-      });
-      // Optionally: await roleAPI.update(editingRole.value.id, payload)
-      success('Role updated successfully');
+      // Update existing role
+      const response = await roleAPI.update(editingRole.value.id, payload);
+      if (response?.data?.success) {
+        // Update the role in the local list
+        const index = roles.value.findIndex(r => r.id === editingRole.value.id);
+        if (index !== -1) {
+          roles.value[index] = response.data.data;
+        }
+        success('Role updated successfully');
+      }
     } else {
-      const newRole = {
-        id: Date.now(),
-        name: roleForm.value.name,
-        description: roleForm.value.description,
-        status: roleForm.value.status,
-        permissions: [...roleForm.value.permissions],
-        users_count: 0,
-        created_at: new Date().toISOString()
-      };
-      // Optionally: const { data } = await roleAPI.create(payload); roles.value.unshift(data)
-      roles.value.unshift(newRole);
-      totalRoles.value += 1;
-      success('Role created successfully');
+      // Create new role
+      const response = await roleAPI.create(payload);
+      if (response?.data?.success) {
+        roles.value.unshift(response.data.data);
+        totalRoles.value += 1;
+        success('Role created successfully');
+      }
     }
     closeRoleDialog();
+    await loadRoles(); // Reload to get fresh data
   } catch (e) {
     console.error(e);
-    error('Failed to save role');
+    error(e.response?.data?.message || 'Failed to save role');
   }
 };
 
 const closeRoleDialog = () => {
   showCreateRoleDialog.value = false;
   editingRole.value = null;
-  roleForm.value = { name: '', description: '', status: 'active', permissions: [] };
+  roleForm.value = { name: '', description: '', status: 'active', modules: [], permissions: [] };
 };
 
 // bulk

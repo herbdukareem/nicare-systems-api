@@ -18,6 +18,7 @@ class RoleResource extends JsonResource
             'name' => $this->name,
             'label' => $this->label,
             'description' => $this->description,
+            'modules' => $this->modules ?? [],
             'permissions' => PermissionResource::collection($this->whenLoaded('permissions')),
             'users_count' => $this->when(isset($this->users_count), $this->users_count),
             'created_at' => $this->created_at,

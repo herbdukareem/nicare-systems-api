@@ -49,4 +49,34 @@ class ServiceBundle extends Model
     {
         return $value ?? $this->caseRecord?->nicare_code;
     }
+
+    /**
+     * Find a service bundle by ICD-10 diagnosis code
+     *
+     * @param string $icdCode The ICD-10 diagnosis code
+     * @param string|null $levelOfCare Optional level of care filter
+     * @return ServiceBundle|null
+     */
+    public static function findByDiagnosis(string $icdCode, ?string $levelOfCare = null): ?self
+    {
+        $query = self::where('is_active', true)
+            ->where(function ($q) use ($icdCode) {
+                $q->where('diagnosis_icd10', $icdCode)
+                  ->orWhereRaw("? LIKE CONCAT(diagnosis_icd10, '%')", [$icdCode]);
+            });
+
+        // Note: service_bundles table doesn't have level_of_care column
+        // If you need to filter by level of care, you'll need to add that column
+        // For now, we'll ignore the $levelOfCare parameter
+
+        return $query->first();
+    }
+
+    /**
+     * Scope to get only active service bundles
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
 }

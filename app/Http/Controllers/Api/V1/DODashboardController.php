@@ -122,17 +122,10 @@ class DODashboardController extends Controller
                 'referringFacility',
                 'receivingFacility',
                 'enrollee',
-                'service',
-                'approvedBy',
-                'utnValidatedBy',
+                'serviceBundle',
+                'caseRecord',
                 'paCodes'
             ])->paginate($perPage);
-
-            // Add claims count to each referral
-            $referrals->getCollection()->transform(function ($referral) {
-                $referral->claims_count = $referral->claims()->count();
-                return $referral;
-            });
 
             return response()->json([
                 'success' => true,
@@ -279,6 +272,14 @@ class DODashboardController extends Controller
                 ], 400);
             }
 
+            // Check validity window (default 3 months from generation)
+            if ($referral->valid_until && now()->gt($referral->valid_until)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Referral validity has expired and cannot be validated',
+                ], 400);
+            }
+
             // Validate the UTN
             $referral->update([
                 'utn_validated' => true,
@@ -290,7 +291,13 @@ class DODashboardController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'UTN validated successfully',
-                'data' => $referral->fresh(['utnValidatedBy'])
+                'data' => $referral->fresh([
+                    'referringFacility',
+                    'receivingFacility',
+                    'enrollee',
+                    'serviceBundle',
+                    'caseRecord'
+                ])
             ]);
 
         } catch (\Exception $e) {
@@ -327,6 +334,10 @@ class DODashboardController extends Controller
                                    ->where('status', 'approved')
                                    ->whereNotNull('utn')
                                    ->where('utn_validated', false)
+                                   ->where(function ($q) {
+                                        $q->whereNull('valid_until')
+                                          ->orWhere('valid_until', '>=', now());
+                                   })
                                    ->count();
 
         $totalPACodes = PACode::whereHas('referral', function ($query) use ($facilityIds) {
@@ -338,6 +349,10 @@ class DODashboardController extends Controller
                                         ->where('status', 'approved')
                                         ->whereNotNull('utn')
                                         ->where('utn_validated', false)
+                                        ->where(function ($q) {
+                                            $q->whereNull('valid_until')
+                                              ->orWhere('valid_until', '>=', now());
+                                        })
                                         ->count();
 
         return [
@@ -389,6 +404,11 @@ class DODashboardController extends Controller
     {
         if ($request->has('status')) {
             $query->where('status', $request->status);
+        }
+
+        // UTN
+        if ($request->has('utn') && !empty($request->utn)) {
+            $query->where('utn', $request->utn);
         }
 
         if ($request->has('severity_level')) {

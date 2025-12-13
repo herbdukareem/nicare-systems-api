@@ -85,7 +85,7 @@
                     v-model="searchQuery"
                     label="Search requirements..."
                     prepend-inner-icon="mdi-magnify"
-                    outlined
+                    variant="outlined"
                     dense
                     clearable
                     @input="debouncedSearch"
@@ -97,7 +97,7 @@
                     v-model="statusFilter"
                     label="Status"
                     :items="statusOptions"
-                    outlined
+                    variant="outlined"
                     dense
                     clearable
                     @update:modelValue="loadRequirements"
@@ -108,7 +108,7 @@
                     v-model="documentTypeFilter"
                     label="Document Type"
                     :items="documentTypes"
-                    outlined
+                    variant="outlined"
                     dense
                     clearable
                     @update:modelValue="loadRequirements"
@@ -162,28 +162,34 @@
                 @update:options="handleTableUpdate"
                 class="elevation-0"
               >
-                <template v-slot:item.requirement_name="{ item }">
+                <template v-slot:item.name="{ item }">
                   <div>
-                    <div class="font-weight-medium">{{ item.requirement_name }}</div>
+                    <div class="font-weight-medium">{{ item.name }}</div>
                     <div class="text-caption text-grey">{{ item.description }}</div>
                   </div>
                 </template>
 
-                <template v-slot:item.document_type="{ item }">
+                <template v-slot:item.request_type="{ item }">
+                  <v-chip :color="getDocumentTypeColor(item.request_type)" variant="outlined" size="small">
+                    {{ item.request_type }}
+                  </v-chip>
+                </template>
+
+                 <template v-slot:item.document_type="{ item }">
                   <v-chip :color="getDocumentTypeColor(item.document_type)" variant="outlined" size="small">
                     {{ item.document_type }}
                   </v-chip>
                 </template>
 
-                <template v-slot:item.is_mandatory="{ item }">
-                  <v-chip :color="item.is_mandatory ? 'error' : 'grey'" size="small">
-                    {{ item.is_mandatory ? 'Mandatory' : 'Optional' }}
+                <template v-slot:item.is_required="{ item }">
+                  <v-chip :color="item.is_required ? 'error' : 'grey'" size="small">
+                    {{ item.is_required ? 'Mandatory' : 'Optional' }}
                   </v-chip>
                 </template>
 
-                <template v-slot:item.is_active="{ item }">
-                  <v-chip :color="item.is_active ? 'success' : 'grey'" size="small">
-                    {{ item.is_active ? 'Active' : 'Inactive' }}
+                <template v-slot:item.status="{ item }">
+                  <v-chip :color="item.status ? 'success' : 'grey'" size="small">
+                    {{ item.status ? 'Active' : 'Inactive' }}
                   </v-chip>
                 </template>
 
@@ -226,19 +232,29 @@
             <v-row>
               <v-col cols="12" md="6">
                 <v-text-field
-                  v-model="formData.requirement_name"
+                  v-model="formData.name"
                   label="Requirement Name *"
-                  outlined
+                  variant="outlined"
                   dense
                   :rules="[v => !!v || 'Requirement name is required']"
                 />
               </v-col>
               <v-col cols="12" md="6">
                 <v-select
+                  v-model="formData.request_type"
+                  label="Request Type *"
+                  :items="requestTypes"
+                  variant="outlined"
+                  dense
+                  :rules="[v => !!v || 'Request type is required']"
+                />
+              </v-col>
+               <v-col cols="12" md="6">
+                <v-select
                   v-model="formData.document_type"
                   label="Document Type *"
                   :items="documentTypes"
-                  outlined
+                  variant="outlined"
                   dense
                   :rules="[v => !!v || 'Document type is required']"
                 />
@@ -247,14 +263,14 @@
                 <v-textarea
                   v-model="formData.description"
                   label="Description"
-                  outlined
+                  variant="outlined"
                   dense
                   rows="3"
                 />
               </v-col>
               <v-col cols="12" md="4">
                 <v-switch
-                  v-model="formData.is_mandatory"
+                  v-model="formData.is_required"
                   label="Mandatory"
                   color="error"
                   hide-details
@@ -262,7 +278,7 @@
               </v-col>
               <v-col cols="12" md="4">
                 <v-switch
-                  v-model="formData.is_active"
+                  v-model="formData.status"
                   label="Active"
                   color="success"
                   hide-details
@@ -273,7 +289,7 @@
                   v-model.number="formData.display_order"
                   label="Display Order"
                   type="number"
-                  outlined
+                  variant="outlined"
                   dense
                   hint="Order in which this requirement appears"
                 />
@@ -299,7 +315,7 @@
         </v-card-title>
         <v-card-text class="pt-4">
           <p>Are you sure you want to delete this requirement?</p>
-          <p class="font-weight-bold">{{ requirementToDelete?.requirement_name }}</p>
+          <p class="font-weight-bold">{{ requirementToDelete?.name }}</p>
           <v-alert type="warning" class="mt-4">
             This action cannot be undone.
           </v-alert>
@@ -344,19 +360,19 @@ const requirementForm = ref(null);
 const requirementToDelete = ref(null);
 
 const formData = ref({
-  requirement_name: '',
+  name: '',
   description: '',
-  document_type: '',
-  is_mandatory: false,
-  is_active: true,
+  request_type: '',
+  is_required: false,
+  status: true,
   display_order: 0,
 });
 
 const headers = [
-  { title: 'Requirement Name', key: 'requirement_name', sortable: true },
-  { title: 'Document Type', key: 'document_type', sortable: true },
-  { title: 'Mandatory', key: 'is_mandatory', sortable: true },
-  { title: 'Status', key: 'is_active', sortable: true },
+  { title: 'Requirement Name', key: 'name', sortable: true },
+  { title: 'Request Type', key: 'request_type', sortable: true },
+  { title: 'Mandatory', key: 'is_required', sortable: true },
+  { title: 'Status', key: 'status', sortable: true },
   { title: 'Display Order', key: 'display_order', sortable: true },
   { title: 'Actions', key: 'actions', sortable: false },
 ];
@@ -366,10 +382,25 @@ const statusOptions = [
   { title: 'Inactive', value: 0 },
 ];
 
+const requestTypes = [
+  { title: 'Referral', value: 'referral' },
+  { title: 'Pre-Authorization', value: 'pa_Code' },
+  { title: 'Both', value: 'both' },
+];
+
 const documentTypes = [
-  { title: 'Referral', value: 'REFERRAL' },
-  { title: 'Pre-Authorization', value: 'PA' },
-  { title: 'Both', value: 'BOTH' },
+  { title: 'Enrollee ID', value: 'enrollee_id' },
+  { title: 'Referral Slip', value: 'referral_id' },
+  { title: 'Medical Report', value: 'medical_report' },
+  { title: 'Lab Results', value: 'lab_results' },
+  { title: 'Radiology Results', value: 'radiology_results' },
+  { title: 'Consent Form', value: 'consent_form' },
+  { title: 'PA Request Form', value: 'pa_request_form' },
+  { title: 'Clinical Justification', value: 'clinical_justification' },
+  { title: 'Treatment plan', value: 'treatment_plan' },
+  { title: 'Supporting Lab Results', value: 'supporting_lab_results' },
+  { title: 'Specialist Recommendation', value: 'specialist_recommendation' },
+  { title: 'Specialist Recommendation', value: 'specialist_recommendation' },
 ];
 
 onMounted(async () => {
@@ -387,11 +418,11 @@ const loadRequirements = async (options = {}) => {
       page: options.page || 1,
       per_page: options.itemsPerPage || 15,
       search: searchQuery.value,
-      is_active: statusFilter.value,
-      document_type: documentTypeFilter.value,
+      status: statusFilter.value,
+      request_type: documentTypeFilter.value,
     };
 
-    const response = await api.get('/api/document-requirements', { params });
+    const response = await api.get('/document-requirements', { params });
     requirements.value = response.data.data || response.data;
     totalItems.value = response.data.total || requirements.value.length;
   } catch (err) {
@@ -404,7 +435,7 @@ const loadRequirements = async (options = {}) => {
 // Load statistics
 const loadStatistics = async () => {
   try {
-    const response = await api.get('/api/document-requirements/statistics');
+    const response = await api.get('/document-requirements/statistics');
     statistics.value = response.data.data || response.data;
   } catch (err) {
     console.error('Failed to load statistics', err);
@@ -433,11 +464,11 @@ const resetFilters = () => {
 const openCreateDialog = () => {
   editMode.value = false;
   formData.value = {
-    requirement_name: '',
+    name: '',
     description: '',
-    document_type: '',
-    is_mandatory: false,
-    is_active: true,
+    request_type: '',
+    is_required: false,
+    status: true,
     display_order: 0,
   };
   showCreateDialog.value = true;
@@ -460,10 +491,10 @@ const saveRequirement = async () => {
   saving.value = true;
   try {
     if (editMode.value) {
-      await api.put(`/api/document-requirements/${formData.value.id}`, formData.value);
+      await api.put(`/document-requirements/${formData.value.id}`, formData.value);
       showSuccess('Requirement updated successfully');
     } else {
-      await api.post('/api/document-requirements', formData.value);
+      await api.post('/document-requirements', formData.value);
       showSuccess('Requirement created successfully');
     }
     closeDialog();
@@ -486,7 +517,7 @@ const confirmDelete = (requirement) => {
 const deleteRequirement = async () => {
   deleting.value = true;
   try {
-    await api.delete(`/api/document-requirements/${requirementToDelete.value.id}`);
+    await api.delete(`/document-requirements/${requirementToDelete.value.id}`);
     showSuccess('Requirement deleted successfully');
     showDeleteDialog.value = false;
     requirementToDelete.value = null;
@@ -504,11 +535,12 @@ const closeDialog = () => {
   showCreateDialog.value = false;
   editMode.value = false;
   formData.value = {
-    requirement_name: '',
-    description: '',
     document_type: '',
-    is_mandatory: false,
-    is_active: true,
+    name: '',
+    description: '',
+    request_type: '',
+    is_required: false,
+    status: true,
     display_order: 0,
   };
 };

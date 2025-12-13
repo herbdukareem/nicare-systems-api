@@ -9,7 +9,7 @@ use Illuminate\Support\Str;
 class FileUploadService
 {
     /**
-     * Upload file to AWS S3/Wasabi
+     * Upload file to local storage (public disk)
      *
      * @param UploadedFile $file
      * @param string $folder
@@ -30,15 +30,15 @@ class FileUploadService
             // Create full path
             $path = $folder . '/' . $filename;
 
-            // Upload to S3/Wasabi
-            $uploaded = Storage::disk('s3')->put($path, file_get_contents($file), 'public');
+            // Upload to local public storage
+            $uploaded = Storage::disk('public')->put($path, file_get_contents($file));
 
             if (!$uploaded) {
                 throw new \Exception('Failed to upload file to storage');
             }
 
-            // Get the URL
-            $url = Storage::disk('s3')->url($path);
+            // Get the URL (for local storage, use asset URL)
+            $url = Storage::disk('public')->url($path);
 
             return [
                 'success' => true,
@@ -87,8 +87,8 @@ class FileUploadService
     public function deleteFile(string $path): bool
     {
         try {
-            return Storage::disk('s3')->delete($path);
-        } catch (\Exception $e) {
+            return Storage::disk('public')->delete($path);
+        } catch (\Exception) {
             return false;
         }
     }
@@ -102,11 +102,11 @@ class FileUploadService
     public function getFileUrl(string $path): ?string
     {
         try {
-            if (Storage::disk('s3')->exists($path)) {
-                return Storage::disk('s3')->url($path);
+            if (Storage::disk('public')->exists($path)) {
+                return asset('storage/' . $path);
             }
             return null;
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             return null;
         }
     }
@@ -216,8 +216,8 @@ class FileUploadService
     public function fileExists(string $path): bool
     {
         try {
-            return Storage::disk('s3')->exists($path);
-        } catch (\Exception $e) {
+            return Storage::disk('public')->exists($path);
+        } catch (\Exception) {
             return false;
         }
     }
@@ -236,12 +236,12 @@ class FileUploadService
             }
 
             return [
-                'size' => Storage::disk('s3')->size($path),
-                'last_modified' => Storage::disk('s3')->lastModified($path),
-                'url' => Storage::disk('s3')->url($path),
+                'size' => Storage::disk('public')->size($path),
+                'last_modified' => Storage::disk('public')->lastModified($path),
+                'url' => asset('storage/' . $path),
                 'exists' => true
             ];
-        } catch (\Exception $e) {
+        } catch (\Exception) {
             return null;
         }
     }

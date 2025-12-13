@@ -33,6 +33,7 @@ class User extends Authenticatable
     'password',
     'userable_id',
     'userable_type',
+    'current_role_id',
 ];
 
     protected $hidden = [
@@ -54,6 +55,14 @@ class User extends Authenticatable
     }
 
     /**
+     * The currently active role for the user.
+     */
+    public function currentRole()
+    {
+        return $this->belongsTo(Role::class, 'current_role_id');
+    }
+
+    /**
      * Determine if the user has a given role.
      *
      * @param  string  $roleName
@@ -62,6 +71,33 @@ class User extends Authenticatable
     public function hasRole(string $roleName): bool
     {
         return $this->roles()->where('name', $roleName)->exists();
+    }
+
+    /**
+     * Switch to a different role (must be one of user's assigned roles).
+     *
+     * @param  int  $roleId
+     * @return bool
+     */
+    public function switchRole(int $roleId): bool
+    {
+        if ($this->roles()->where('roles.id', $roleId)->exists()) {
+            $this->current_role_id = $roleId;
+            $this->save();
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * Get the modules available to the user based on current role.
+     *
+     * @return array
+     */
+    public function getAvailableModules(): array
+    {
+        $role = $this->currentRole ?? $this->roles()->first();
+        return $role ? ($role->modules ?? []) : [];
     }
 
     /**
@@ -174,4 +210,6 @@ class User extends Authenticatable
             ->flatten()
             ->unique('id');
     }
+
+    // determine if the user 
 }

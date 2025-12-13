@@ -1,46 +1,137 @@
 <template>
-  <div class="admission-management-page">
-    <v-container>
+  <AdminLayout>
+    <div class="admission-management-page">
+      <v-container fluid>
+      <!-- Page Header -->
+      <v-row class="mb-4">
+        <v-col cols="12">
+          <div class="d-flex justify-space-between align-center">
+            <div>
+              <h1 class="text-h4 font-weight-bold">
+                <v-icon size="32" color="primary" class="mr-2">mdi-hospital-box</v-icon>
+                Admission Management
+              </h1>
+              <p class="text-subtitle-1 text-grey mt-2">
+                Manage patient admissions from approved referrals with validated UTN
+              </p>
+            </div>
+            <v-btn
+              color="primary"
+              size="large"
+              @click="openCreateDialog"
+              prepend-icon="mdi-plus"
+            >
+              New Admission
+            </v-btn>
+          </div>
+        </v-col>
+      </v-row>
+
+      <!-- Stats Cards -->
+      <v-row class="mb-4">
+        <v-col cols="12" md="3">
+          <v-card class="stat-card">
+            <v-card-text>
+              <div class="d-flex justify-space-between align-center">
+                <div>
+                  <p class="text-caption text-grey mb-1">Total Admissions</p>
+                  <h3 class="text-h5 font-weight-bold">{{ stats.total }}</h3>
+                </div>
+                <v-icon size="40" color="primary">mdi-hospital-building</v-icon>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" md="3">
+          <v-card class="stat-card">
+            <v-card-text>
+              <div class="d-flex justify-space-between align-center">
+                <div>
+                  <p class="text-caption text-grey mb-1">Active Admissions</p>
+                  <h3 class="text-h5 font-weight-bold text-success">{{ stats.active }}</h3>
+                </div>
+                <v-icon size="40" color="success">mdi-bed</v-icon>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" md="3">
+          <v-card class="stat-card">
+            <v-card-text>
+              <div class="d-flex justify-space-between align-center">
+                <div>
+                  <p class="text-caption text-grey mb-1">Discharged</p>
+                  <h3 class="text-h5 font-weight-bold text-info">{{ stats.discharged }}</h3>
+                </div>
+                <v-icon size="40" color="info">mdi-exit-run</v-icon>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" md="3">
+          <v-card class="stat-card">
+            <v-card-text>
+              <div class="d-flex justify-space-between align-center">
+                <div>
+                  <p class="text-caption text-grey mb-1">Pending</p>
+                  <h3 class="text-h5 font-weight-bold text-warning">{{ stats.pending }}</h3>
+                </div>
+                <v-icon size="40" color="warning">mdi-clock-outline</v-icon>
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
+
+      <!-- Main Content Card -->
       <v-row>
         <v-col cols="12">
-          <v-card>
-            <v-card-title class="bg-primary text-white d-flex justify-space-between align-center">
-              <div>
-                <v-icon left>mdi-hospital-box</v-icon>
-                Admission Management
-              </div>
-              <v-btn color="white" @click="openCreateDialog">
-                <v-icon left>mdi-plus</v-icon>
-                New Admission
-              </v-btn>
-            </v-card-title>
-
+          <v-card elevation="2">
             <v-card-text>
               <!-- Filters -->
               <v-row class="mb-4">
                 <v-col cols="12" md="4">
                   <v-text-field
                     v-model="searchQuery"
-                    label="Search by admission number or patient"
-                    outlined
-                    dense
-                    prepend-icon="mdi-magnify"
+                    label="Search by admission #, UTN, or patient"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-magnify"
+                    clearable
+                    hide-details
                   />
                 </v-col>
-                <v-col cols="12" md="4">
+                <v-col cols="12" md="3">
                   <v-select
                     v-model="statusFilter"
                     label="Filter by Status"
                     :items="statusOptions"
-                    outlined
-                    dense
+                    variant="outlined"
+                    density="comfortable"
                     clearable
+                    hide-details
                   />
                 </v-col>
-                <v-col cols="12" md="4">
-                  <v-btn color="secondary" @click="resetFilters">
-                    <v-icon left>mdi-refresh</v-icon>
-                    Reset Filters
+                <v-col cols="12" md="3">
+                  <v-text-field
+                    v-model="dateFilter"
+                    label="Filter by Date"
+                    type="date"
+                    variant="outlined"
+                    density="comfortable"
+                    clearable
+                    hide-details
+                  />
+                </v-col>
+                <v-col cols="12" md="2">
+                  <v-btn
+                    color="secondary"
+                    variant="outlined"
+                    block
+                    @click="resetFilters"
+                    prepend-icon="mdi-refresh"
+                  >
+                    Reset
                   </v-btn>
                 </v-col>
               </v-row>
@@ -50,13 +141,35 @@
                 :headers="headers"
                 :items="filteredAdmissions"
                 :loading="loading"
-                class="elevation-1"
+                class="elevation-0"
+                item-value="id"
               >
+                <template v-slot:item.utn="{ item }">
+                  <v-chip
+                    size="small"
+                    color="primary"
+                    variant="outlined"
+                  >
+                    <v-icon start size="small">mdi-barcode</v-icon>
+                    {{ item.utn || item.referral?.utn || 'N/A' }}
+                  </v-chip>
+                </template>
+
+                <template v-slot:item.patient_name="{ item }">
+                  <div>
+                    <div class="font-weight-medium">{{ item.patient_name || item.enrollee?.first_name + ' ' + item.enrollee?.last_name || 'N/A' }}</div>
+                    <div class="text-caption text-grey">{{ item.enrollee?.nicare_number || item.enrollee?.enrollee_id || '' }}</div>
+                  </div>
+                </template>
+
+                <template v-slot:item.admission_date="{ item }">
+                  {{ formatDate(item.admission_date) }}
+                </template>
+
                 <template v-slot:item.status="{ item }">
                   <v-chip
                     :color="getStatusColor(item.status)"
-                    text-color="white"
-                    small
+                    size="small"
                   >
                     {{ item.status }}
                   </v-chip>
@@ -64,21 +177,29 @@
 
                 <template v-slot:item.actions="{ item }">
                   <v-btn
-                    icon
-                    small
+                    icon="mdi-eye"
+                    size="small"
                     color="primary"
+                    variant="text"
                     @click="viewAdmission(item)"
                   >
-                    <v-icon>mdi-eye</v-icon>
                   </v-btn>
                   <v-btn
-                    icon
-                    small
+                    icon="mdi-pencil"
+                    size="small"
                     color="warning"
+                    variant="text"
                     @click="editAdmission(item)"
                   >
-                    <v-icon>mdi-pencil</v-icon>
                   </v-btn>
+                </template>
+
+                <template v-slot:no-data>
+                  <div class="text-center py-8">
+                    <v-icon size="64" color="grey-lighten-2">mdi-hospital-box-outline</v-icon>
+                    <p class="text-h6 text-grey mt-4">No admissions found</p>
+                    <p class="text-body-2 text-grey">Create a new admission from an approved referral with validated UTN</p>
+                  </div>
                 </template>
               </v-data-table>
             </v-card-text>
@@ -87,38 +208,69 @@
       </v-row>
 
       <!-- Create/Edit Dialog -->
-      <v-dialog v-model="showCreateDialog" max-width="600px">
+      <!-- Create/Edit Dialog -->
+      <v-dialog v-model="showCreateDialog" max-width="700px" persistent>
         <v-card>
-          <v-card-title>
+          <v-card-title class="bg-primary text-white">
+            <v-icon start>mdi-hospital-box-outline</v-icon>
             {{ editingAdmission ? 'Edit Admission' : 'Create New Admission' }}
           </v-card-title>
-          <v-card-text>
-            <v-form ref="admissionForm">
-              <v-alert
-                v-if="eligibleReferrals.length === 0"
-                type="warning"
-                class="mb-4"
-              >
-                No patients with an open, UTN-validated referral are available for admission.
-              </v-alert>
+          <v-card-text class="pt-4">
+            <!-- Episode Flow Info -->
+            <v-alert
+              type="info"
+              variant="tonal"
+              class="mb-4"
+              density="compact"
+            >
+              <div class="d-flex align-center">
+                <v-icon start>mdi-information</v-icon>
+                <span class="text-body-2">
+                  <strong>Episode Flow:</strong> Referral → Admission → FU-PA Code → Claim
+                </span>
+              </div>
+            </v-alert>
 
+            <v-alert
+              v-if="eligibleReferrals.length === 0"
+              type="warning"
+              variant="tonal"
+              class="mb-4"
+            >
+              <div class="text-body-2">
+                <strong>No eligible referrals found.</strong><br>
+                Patients must have an approved referral with validated UTN before admission.
+              </div>
+            </v-alert>
+
+            <v-form ref="admissionForm">
               <v-select
                 v-model="admissionData.referral_id"
-                label="Patient (open referral with validated UTN)"
+                label="Select Patient Referral *"
                 :items="eligibleReferrals"
                 :item-title="referralItemLabel"
                 item-value="id"
-                outlined
+                variant="outlined"
                 :rules="[v => !!v || 'Select a patient referral']"
                 :disabled="eligibleReferrals.length === 0"
-                hint="Only referrals that are approved and have a validated UTN are listed"
+                hint="Only approved referrals with validated UTN are shown"
                 persistent-hint
+                class="mb-2"
               >
+                <template #prepend-inner>
+                  <v-icon>mdi-account-search</v-icon>
+                </template>
                 <template #item="{ item, props }">
                   <v-list-item v-bind="props">
+                    <template #prepend>
+                      <v-icon color="primary">mdi-account-circle</v-icon>
+                    </template>
                     <v-list-item-title>{{ referralItemLabel(item.raw) }}</v-list-item-title>
                     <v-list-item-subtitle>
-                      UTN: {{ item.raw.utn || item.raw.utn_number || '—' }} • Status: {{ item.raw.status }}
+                      <v-chip size="x-small" color="primary" variant="outlined" class="mr-2">
+                        UTN: {{ item.raw.utn || item.raw.utn_number || '—' }}
+                      </v-chip>
+                      <v-chip size="x-small" color="success">{{ item.raw.status }}</v-chip>
                     </v-list-item-subtitle>
                   </v-list-item>
                 </template>
@@ -126,58 +278,99 @@
 
               <v-text-field
                 v-model="selectedReferralDisplay"
-                label="Enrollee"
-                outlined
+                label="Enrollee Information"
+                variant="outlined"
                 readonly
-                class="mt-3"
-                hint="Auto-filled from referral"
+                class="mb-2"
+                hint="Auto-filled from selected referral"
                 persistent-hint
-              />
+              >
+                <template #prepend-inner>
+                  <v-icon>mdi-account</v-icon>
+                </template>
+              </v-text-field>
 
               <v-text-field
                 v-model="selectedFacilityDisplay"
                 label="Receiving Facility"
-                outlined
+                variant="outlined"
                 readonly
-              />
+                class="mb-2"
+              >
+                <template #prepend-inner>
+                  <v-icon>mdi-hospital-building</v-icon>
+                </template>
+              </v-text-field>
 
               <v-text-field
                 v-model="admissionData.admission_date"
-                label="Admission Date"
+                label="Admission Date *"
                 type="date"
-                outlined
+                variant="outlined"
                 required
                 :rules="[v => !!v || 'Admission date is required']"
-              />
+                class="mb-2"
+              >
+                <template #prepend-inner>
+                  <v-icon>mdi-calendar</v-icon>
+                </template>
+              </v-text-field>
+
               <v-text-field
                 v-model="admissionData.ward_type"
-                label="Ward Type"
-                outlined
+                label="Ward Type *"
+                variant="outlined"
                 required
                 :rules="[v => !!v || 'Ward type is required']"
-              />
+                hint="e.g., General Ward, ICU, Maternity, etc."
+                persistent-hint
+                class="mb-2"
+              >
+                <template #prepend-inner>
+                  <v-icon>mdi-bed</v-icon>
+                </template>
+              </v-text-field>
+
               <v-text-field
                 v-model="admissionData.principal_diagnosis_icd10"
-                label="Principal Diagnosis (ICD-10)"
-                outlined
+                label="Principal Diagnosis (ICD-10) *"
+                variant="outlined"
                 required
                 :rules="[v => !!v || 'Principal diagnosis is required']"
-              />
+                hint="Enter the ICD-10 code for the principal diagnosis"
+                persistent-hint
+              >
+                <template #prepend-inner>
+                  <v-icon>mdi-medical-bag</v-icon>
+                </template>
+              </v-text-field>
             </v-form>
           </v-card-text>
-          <v-card-actions>
+          <v-divider></v-divider>
+          <v-card-actions class="pa-4">
             <v-spacer></v-spacer>
-            <v-btn color="secondary" @click="showCreateDialog = false">
+            <v-btn
+              color="secondary"
+              variant="outlined"
+              @click="closeDialog"
+            >
               Cancel
             </v-btn>
-            <v-btn color="primary" @click="saveAdmission" :loading="loading">
-              Save
+            <v-btn
+              color="primary"
+              @click="saveAdmission"
+              :loading="loading"
+              :disabled="eligibleReferrals.length === 0"
+            >
+              <v-icon start>mdi-content-save</v-icon>
+              Save Admission
             </v-btn>
           </v-card-actions>
         </v-card>
       </v-dialog>
     </v-container>
-  </div>
+    </div>
+  </AdminLayout>
 </template>
 
 <script setup>
@@ -185,6 +378,7 @@ import { ref, computed, onMounted } from 'vue';
 import { useToast } from '@/js/composables/useToast';
 import { useClaimsAPI } from '@/js/composables/useClaimsAPI';
 import { useClaimsStore } from '@/js/stores/claimsStore';
+import AdminLayout from '../../layout/AdminLayout.vue';
 
 const { success: showSuccess, error: showError } = useToast();
 const { fetchAdmissions, fetchReferrals, createAdmission, loading } = useClaimsAPI();
@@ -192,6 +386,7 @@ const claimsStore = useClaimsStore();
 
 const searchQuery = ref('');
 const statusFilter = ref(null);
+const dateFilter = ref(null);
 const showCreateDialog = ref(false);
 const editingAdmission = ref(null);
 const admissionForm = ref(null);
@@ -203,11 +398,13 @@ const statusOptions = [
 ];
 
 const headers = [
-  { title: 'Admission Number', value: 'admission_number' },
-  { title: 'Patient Name', value: 'patient_name' },
-  { title: 'Admission Date', value: 'admission_date' },
-  { title: 'Status', value: 'status' },
-  { title: 'Actions', value: 'actions' },
+  { title: 'Admission #', value: 'admission_number', key: 'admission_number' },
+  { title: 'UTN', value: 'utn', key: 'utn' },
+  { title: 'Patient Name', value: 'patient_name', key: 'patient_name' },
+  { title: 'Admission Date', value: 'admission_date', key: 'admission_date' },
+  { title: 'Ward Type', value: 'ward_type', key: 'ward_type' },
+  { title: 'Status', value: 'status', key: 'status' },
+  { title: 'Actions', value: 'actions', key: 'actions', sortable: false },
 ];
 
 const admissionData = ref({
@@ -239,15 +436,28 @@ const selectedFacilityDisplay = computed(() => {
   return facility?.name || '—';
 });
 
+const stats = computed(() => {
+  const admissions = claimsStore.admissions || [];
+  return {
+    total: admissions.length,
+    active: admissions.filter(a => a.status?.toLowerCase() === 'active').length,
+    discharged: admissions.filter(a => a.status?.toLowerCase() === 'discharged').length,
+    pending: admissions.filter(a => a.status?.toLowerCase() === 'pending').length,
+  };
+});
+
 const filteredAdmissions = computed(() => {
   return claimsStore.admissions.filter(admission => {
-    const matchesSearch = !searchQuery.value || 
+    const matchesSearch = !searchQuery.value ||
       admission.admission_number?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
-      admission.patient_name?.toLowerCase().includes(searchQuery.value.toLowerCase());
-    
-    const matchesStatus = !statusFilter.value || admission.status === statusFilter.value;
-    
-    return matchesSearch && matchesStatus;
+      admission.patient_name?.toLowerCase().includes(searchQuery.value.toLowerCase()) ||
+      admission.utn?.toLowerCase().includes(searchQuery.value.toLowerCase());
+
+    const matchesStatus = !statusFilter.value || admission.status?.toLowerCase() === statusFilter.value.toLowerCase();
+
+    const matchesDate = !dateFilter.value || admission.admission_date?.startsWith(dateFilter.value);
+
+    return matchesSearch && matchesStatus && matchesDate;
   });
 });
 
@@ -274,7 +484,14 @@ const viewAdmission = (admission) => {
   // Navigate to detail page
 };
 
-const openCreateDialog = () => {
+const openCreateDialog = async () => {
+  resetForm();
+  // Fetch eligible referrals when opening dialog
+  try {
+    await fetchReferrals({ status: 'approved', utn_validated: true });
+  } catch (err) {
+    console.error('Failed to fetch referrals:', err);
+  }
   showCreateDialog.value = true;
 };
 
@@ -301,18 +518,39 @@ const saveAdmission = async () => {
         ward_type: admissionData.value.ward_type,
         principal_diagnosis_icd10: admissionData.value.principal_diagnosis_icd10,
       });
-      showSuccess('Admission created successfully');
+      showSuccess('Admission created successfully. Episode started!');
     }
     showCreateDialog.value = false;
     resetForm();
+    // Refresh admissions list
+    await fetchAdmissions();
   } catch (err) {
-    showError(err.message || 'Failed to save admission');
+    showError(err.response?.data?.message || err.message || 'Failed to save admission');
   }
+};
+
+const closeDialog = () => {
+  showCreateDialog.value = false;
+  resetForm();
 };
 
 const resetFilters = () => {
   searchQuery.value = '';
   statusFilter.value = null;
+  dateFilter.value = null;
+};
+
+const formatDate = (date) => {
+  if (!date) return 'N/A';
+  try {
+    return new Date(date).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  } catch (e) {
+    return date;
+  }
 };
 
 const resetForm = () => {
@@ -337,5 +575,31 @@ const referralItemLabel = (referral) => {
 <style scoped>
 .admission-management-page {
   padding: 20px 0;
+}
+
+.stat-card {
+  border-left: 4px solid;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-card:nth-child(1) {
+  border-left-color: rgb(var(--v-theme-primary));
+}
+
+.stat-card:nth-child(2) {
+  border-left-color: rgb(var(--v-theme-success));
+}
+
+.stat-card:nth-child(3) {
+  border-left-color: rgb(var(--v-theme-info));
+}
+
+.stat-card:nth-child(4) {
+  border-left-color: rgb(var(--v-theme-warning));
 }
 </style>

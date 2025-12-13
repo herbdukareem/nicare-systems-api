@@ -149,6 +149,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('users', UserController::class);
     Route::get('users-with-roles', [UserController::class, 'withRoles']);
     Route::post('users/{user}/roles', [UserController::class, 'syncRoles']);
+    Route::post('users/{user}/switch-role', [UserController::class, 'switchRole']);
+    Route::get('users/available-modules', [UserController::class, 'getAvailableModules']);
     Route::get('users/{user}/profile', [UserController::class, 'profile']);
     Route::patch('users/{user}/password', [UserController::class, 'updatePassword']);
     Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
@@ -252,11 +254,12 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('claims-automation')->group(function () {
         // Admission Management
         Route::prefix('admissions')->group(function () {
+            Route::get('/', [AdmissionController::class, 'index']);
             Route::post('/', [AdmissionController::class, 'store']);
-            Route::get('/{admission}', [AdmissionController::class, 'show']);
-            Route::get('/enrollee/{enrolleeId}', [AdmissionController::class, 'getActiveAdmission']);
-            Route::post('/{admission}/discharge', [AdmissionController::class, 'discharge']);
             Route::get('/check/{referralId}', [AdmissionController::class, 'checkAdmissionEligibility']);
+            Route::get('/enrollee/{enrolleeId}', [AdmissionController::class, 'getActiveAdmission']);
+            Route::get('/{admission}', [AdmissionController::class, 'show']);
+            Route::post('/{admission}/discharge', [AdmissionController::class, 'discharge']);
         });
 
         // Claim Management

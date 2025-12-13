@@ -47,7 +47,15 @@ class PACode extends Model
      */
     public function referral()
     {
-        return $this->belongsTo(Referral::class);
+        return $this->belongsTo(Referral::class, 'referral_id', 'id');
+    }
+
+    /**
+     * PA Code belongs to an Admission (episode tracking).
+     */
+    public function admission()
+    {
+        return $this->belongsTo(Admission::class);
     }
 
     /**
@@ -69,5 +77,13 @@ class PACode extends Model
         }
 
         return CaseRecord::whereIn('id', $this->case_record_ids)->get();
+    }
+
+    /**
+     * PA Code has many uploaded documents.
+     */
+    public function documents()
+    {
+        return $this->hasMany(PACodeDocument::class);
     }
 }
