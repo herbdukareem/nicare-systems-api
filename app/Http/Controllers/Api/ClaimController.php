@@ -105,16 +105,19 @@ class ClaimController extends Controller
                 'referral_id' => 'required|integer|exists:referrals,id',
                 'admission_id' => 'nullable|integer|exists:admissions,id',
                 'claim_date' => 'nullable|date',
-                // Bundle components with actual amounts
+                // Bundle amount (fixed price from service bundle)
+                'bundle_amount' => 'nullable|numeric|min:0',
+                'bundle_pa_code_id' => 'nullable|integer|exists:pa_codes,id',
+                // Selected bundle components (for tracking which components were used)
                 'bundle_components' => 'nullable|array',
                 'bundle_components.*.bundle_component_id' => 'required|integer|exists:bundle_components,id',
                 'bundle_components.*.case_record_id' => 'nullable|integer|exists:case_records,id',
-                'bundle_components.*.quantity' => 'required|integer|min:1',
-                'bundle_components.*.unit_price' => 'required|numeric|min:0',
-                'bundle_components.*.actual_amount' => 'required|numeric|min:0',
+                'bundle_components.*.quantity' => 'nullable|integer|min:1',
+                'bundle_components.*.unit_price' => 'nullable|numeric|min:0',
                 // FFS line items
                 'line_items' => 'nullable|array',
                 'line_items.*.pa_code_id' => 'required|integer|exists:pa_codes,id',
+                'line_items.*.case_record_id' => 'nullable|integer|exists:case_records,id',
                 'line_items.*.service_description' => 'required|string',
                 'line_items.*.quantity' => 'required|integer|min:1',
                 'line_items.*.unit_price' => 'required|numeric|min:0',
@@ -156,11 +159,9 @@ class ClaimController extends Controller
                 }
             }
 
-            // 4. Calculate bundle amount from bundle components
+            // 4. Get bundle amount (fixed price from service bundle)
             $bundleComponents = $validated['bundle_components'] ?? [];
-            $bundleAmount = array_reduce($bundleComponents, function ($sum, $comp) {
-                return $sum + (float) ($comp['actual_amount'] ?? 0);
-            }, 0);
+            $bundleAmount = (float) ($validated['bundle_amount'] ?? 0);
 
             // 5. Validate PA codes for FFS line items
             $lineItems = $validated['line_items'] ?? [];
@@ -212,16 +213,19 @@ class ClaimController extends Controller
                     'submitted_by' => auth()->id() ?? null,
                 ]);
 
-                // 9. Create claim line items for bundle components
+                // 9. Create claim line items for selected bundle components (for tracking)
                 foreach ($bundleComponents as $component) {
+                    $unitPrice = (float) ($component['unit_price'] ?? 0);
+                    $quantity = (int) ($component['quantity'] ?? 1);
+
                     \App\Models\ClaimLine::create([
                         'claim_id' => $claim->id,
                         'bundle_component_id' => $component['bundle_component_id'],
                         'case_record_id' => $component['case_record_id'] ?? null,
                         'service_description' => 'Bundle Component',
-                        'quantity' => $component['quantity'],
-                        'unit_price' => $component['unit_price'],
-                        'line_total' => $component['actual_amount'],
+                        'quantity' => $quantity,
+                        'unit_price' => $unitPrice,
+                        'line_total' => $unitPrice * $quantity, // Component cost for tracking
                         'tariff_type' => 'BUNDLE',
                         'service_type' => 'bundle_component',
                         'reporting_type' => 'IN_BUNDLE',
@@ -233,6 +237,7 @@ class ClaimController extends Controller
                     \App\Models\ClaimLine::create([
                         'claim_id' => $claim->id,
                         'pa_code_id' => $lineItem['pa_code_id'],
+                        'case_record_id' => $lineItem['case_record_id'] ?? null,
                         'service_description' => $lineItem['service_description'],
                         'quantity' => $lineItem['quantity'],
                         'unit_price' => $lineItem['unit_price'],
@@ -393,6 +398,43 @@ class ClaimController extends Controller
             'success' => true,
             'data' => $summary,
         ]);
+    }
+
+    /**
+     * Download claim submission slip as PDF
+     * GET /api/claims-automation/claims/{id}/slip
+     */
+    public function downloadSlip(Claim $claim)
+    {
+        try {
+            // Load relationships needed for the slip
+            $claim->load([
+                'referral.enrollee.lga',
+                'referral.receivingFacility',
+                'enrollee',
+                'facility',
+                'lineItems.paCode',
+                'lineItems.bundleComponent.caseRecord',
+            ]);
+
+            $data = [
+                'claim' => $claim,
+                'generated_at' => now()->format('d M Y, H:i:s'),
+                'bundle_items' => $claim->lineItems->where('tariff_type', 'BUNDLE'),
+                'ffs_items' => $claim->lineItems->where('tariff_type', 'FFS'),
+            ];
+
+            $pdf = \Barryvdh\DomPDF\Facade\Pdf::loadView('pdf.claim-slip', $data);
+            $pdf->setPaper('A4', 'portrait');
+
+            return $pdf->download("claim-slip-{$claim->claim_number}.pdf");
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to generate claim slip: ' . $e->getMessage(),
+            ], 500);
+        }
     }
 }
 

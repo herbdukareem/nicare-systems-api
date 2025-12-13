@@ -171,13 +171,12 @@
                         Step 2: Bundle Service (Auto-detected)
                       </h3>
                       <v-alert type="success" variant="tonal" density="comfortable" class="mb-4">
-                        A bundle service was found for this referral. Enter actual amounts for each component.
+                        A bundle service was found for this referral. Select the components that were used.
                       </v-alert>
                     </v-col>
                     <v-col cols="12">
                       <v-card elevation="1" color="success-lighten-5">
                         <v-card-title>
-                       
                           {{ bundleService.name ?? bundleService.description }}
                           <v-chip class="ml-2" color="success" size="small">
                             Fixed Price: ₦{{ Number(bundleService.fixed_price || 0).toLocaleString() }}
@@ -187,36 +186,28 @@
                           <v-table density="comfortable">
                             <thead>
                               <tr>
+                                <th style="width: 50px;">Used</th>
                                 <th>Case/Service</th>
-                                <th>Quantity</th>
-                                <th>Unit Price</th>
-                                <th style="width: 200px;">Actual Amount</th>
                               </tr>
                             </thead>
                             <tbody>
                               <tr v-for="(component, idx) in bundleComponents" :key="idx">
-                               
-                                <td>{{ component.case_record?.name || component.description }}</td>
-                                <td>{{ component.quantity }}</td>
-                                <td>₦{{ Number(component.unit_price || 0).toLocaleString() }}</td>
                                 <td>
-                                  <v-text-field
-                                    v-model.number="component.actual_amount"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    density="compact"
-                                    variant="outlined"
+                                  <v-checkbox
+                                    v-model="component.selected"
                                     hide-details
-                                    prefix="₦"
-                                  ></v-text-field>
+                                    density="compact"
+                                    color="success"
+                                  ></v-checkbox>
                                 </td>
+                                <td>{{ component.case_record?.name || component.description }}</td>
                               </tr>
                             </tbody>
                             <tfoot>
                               <tr>
-                                <td colspan="4" class="text-right font-weight-bold">Bundle Total:</td>
-                                <td class="font-weight-bold text-success">₦{{ bundleTotal.toLocaleString() }}</td>
+                                <td colspan="4" class="text-right font-weight-bold">
+                                  Bundle Fixed Price: <span class="text-success">₦{{ Number(bundleService.fixed_price || 0).toLocaleString() }}</span>
+                                </td>
                               </tr>
                             </tfoot>
                           </v-table>
@@ -362,7 +353,9 @@
                               <div class="mb-2" v-else>
                                 <strong>Admission:</strong> N/A (No admission)
                               </div>
-                              <div class="mb-2"><strong>Bundle Amount:</strong> ₦{{ bundleTotal.toLocaleString() }}</div>
+                              <div class="mb-2" v-if="bundleService">
+                                <strong>Bundle Amount:</strong> ₦{{ Number(bundleService.fixed_price || 0).toLocaleString() }}
+                              </div>
                               <div class="mb-2"><strong>FFS Amount:</strong> ₦{{ ffsTotal.toLocaleString() }}</div>
                             </v-col>
                           </v-row>
@@ -385,39 +378,7 @@
                     </v-col>
                   </v-row>
 
-                  <!-- Validation Summary -->
-                  <v-row v-if="selectedReferral">
-                    <v-col cols="12">
-                      <v-divider class="my-4"></v-divider>
-                      <h3 class="text-h6 mb-3">Validation Checks</h3>
-                      <v-list density="compact">
-                        <v-list-item>
-                          <template #prepend>
-                            <v-icon :color="validationChecks.hasValidatedUTN ? 'success' : 'error'">
-                              {{ validationChecks.hasValidatedUTN ? 'mdi-check-circle' : 'mdi-close-circle' }}
-                            </v-icon>
-                          </template>
-                          <v-list-item-title>UTN Validated</v-list-item-title>
-                        </v-list-item>
-
-                        <v-list-item>
-                          <template #prepend>
-                            <v-icon :color="validationChecks.hasClaimItems ? 'success' : 'error'">
-                              {{ validationChecks.hasClaimItems ? 'mdi-check-circle' : 'mdi-close-circle' }}
-                            </v-icon>
-                          </template>
-                          <v-list-item-title>Has Bundle or FFS Items</v-list-item-title>
-                        </v-list-item>
-
-                        <v-list-item v-if="bundleService">
-                          <template #prepend>
-                            <v-icon color="success">mdi-check-circle</v-icon>
-                          </template>
-                          <v-list-item-title>Bundle Service: {{ bundleService.name }}</v-list-item-title>
-                        </v-list-item>
-                      </v-list>
-                    </v-col>
-                  </v-row>
+                 
                 </v-form>
               </v-card-text>
 
@@ -442,6 +403,90 @@
                   Submit Claim
                 </v-btn>
               </v-card-actions>
+            </v-card>
+          </v-col>
+        </v-row>
+
+        <!-- Submitted Claims Table -->
+        <v-row class="mt-6">
+          <v-col cols="12">
+            <v-card elevation="2">
+              <v-card-title class="bg-primary text-white d-flex justify-space-between align-center">
+                <div>
+                  <v-icon class="mr-2">mdi-clipboard-list</v-icon>
+                  Submitted Claims
+                </div>
+                <v-btn
+                  variant="text"
+                  color="white"
+                  size="small"
+                  @click="fetchSubmittedClaims"
+                  :loading="loadingClaims"
+                >
+                  <v-icon>mdi-refresh</v-icon>
+                </v-btn>
+              </v-card-title>
+
+              <v-card-text class="pa-0">
+                <v-data-table
+                  :headers="claimsTableHeaders"
+                  :items="submittedClaims"
+                  :loading="loadingClaims"
+                  density="comfortable"
+                  class="elevation-0"
+                >
+                  <template #item.claim_number="{ item }">
+                    <strong class="text-primary">{{ item.claim_number }}</strong>
+                  </template>
+
+                  <template #item.utn="{ item }">
+                    <v-chip size="small" color="info" variant="tonal">{{ item.utn }}</v-chip>
+                  </template>
+
+                  <template #item.enrollee="{ item }">
+                    {{ item.enrollee?.first_name }} {{ item.enrollee?.last_name }}
+                  </template>
+
+                  <template #item.total_amount="{ item }">
+                    <strong class="text-success">₦{{ Number(item.total_amount || 0).toLocaleString() }}</strong>
+                  </template>
+
+                  <template #item.status="{ item }">
+                    <v-chip
+                      :color="getStatusColor(item.status)"
+                      size="small"
+                      variant="elevated"
+                    >
+                      {{ item.status }}
+                    </v-chip>
+                  </template>
+
+                  <template #item.claim_date="{ item }">
+                    {{ formatDate(item.claim_date) }}
+                  </template>
+
+                  <template #item.actions="{ item }">
+                    <v-btn
+                      icon
+                      size="small"
+                      variant="text"
+                      color="primary"
+                      @click="downloadClaimSlipById(item.id)"
+                      :loading="downloadingSlipId === item.id"
+                    >
+                      <v-icon>mdi-download</v-icon>
+                      <v-tooltip activator="parent" location="top">Download Claim Slip</v-tooltip>
+                    </v-btn>
+                  </template>
+
+                  <template #no-data>
+                    <div class="text-center pa-6">
+                      <v-icon size="64" color="grey-lighten-1">mdi-clipboard-text-outline</v-icon>
+                      <p class="text-grey mt-2">No claims submitted yet</p>
+                    </div>
+                  </template>
+                </v-data-table>
+              </v-card-text>
             </v-card>
           </v-col>
         </v-row>
@@ -470,11 +515,12 @@
                     density="comfortable"
                     prepend-inner-icon="mdi-shield-check"
                     :rules="[v => !!v || 'PA Code is required']"
+                    @update:model-value="onPACodeSelected"
                   >
                     <template #item="{ props, item }">
                       <v-list-item v-bind="props">
                         <template #title>
-                          <strong>{{ item.raw.case_record?.name || item.raw.service_bundle?.name }}</strong>
+                          <strong>{{ item.raw.code }}</strong>
                         </template>
                         <template #subtitle>
                           {{ item.raw.justification }}
@@ -484,7 +530,34 @@
                   </v-autocomplete>
                 </v-col>
 
-                <!-- Service Description -->
+                <!-- Case Record Selection (from PA Code's case_records) -->
+                <v-col cols="12" v-if="selectedPACodeCaseRecords.length > 0">
+                  <v-autocomplete
+                    v-model="lineItemFormData.case_record_id"
+                    :items="selectedPACodeCaseRecords"
+                    item-title="display_text"
+                    item-value="id"
+                    label="Select Service/Case *"
+                    variant="outlined"
+                    density="comfortable"
+                    prepend-inner-icon="mdi-medical-bag"
+                    :rules="[v => !!v || 'Service/Case is required']"
+                    @update:model-value="onCaseRecordSelected"
+                  >
+                    <template #item="{ props, item }">
+                      <v-list-item v-bind="props">
+                        <template #title>
+                          <strong>{{ item.raw.case_name }}</strong>
+                        </template>
+                        <template #subtitle>
+                          {{ item.raw.nicare_code }} | ₦{{ Number(item.raw.price || 0).toLocaleString() }}
+                        </template>
+                      </v-list-item>
+                    </template>
+                  </v-autocomplete>
+                </v-col>
+
+                <!-- Service Description (auto-filled, editable) -->
                 <v-col cols="12">
                   <v-textarea
                     v-model="lineItemFormData.service_description"
@@ -511,18 +584,15 @@
                   ></v-text-field>
                 </v-col>
 
-                <!-- Unit Price -->
+                <!-- Unit Price (read-only, from case record) -->
                 <v-col cols="12" md="4">
                   <v-text-field
-                    v-model.number="lineItemFormData.unit_price"
-                    label="Unit Price (₦) *"
-                    type="number"
-                    min="0"
-                    step="0.01"
+                    :model-value="'₦' + Number(lineItemFormData.unit_price || 0).toLocaleString()"
+                    label="Unit Price (from tariff)"
                     variant="outlined"
                     density="comfortable"
-                    :rules="[v => v >= 0 || 'Unit price must be 0 or greater']"
-                    @update:model-value="calculateLineTotal"
+                    readonly
+                    prepend-inner-icon="mdi-currency-ngn"
                   ></v-text-field>
                 </v-col>
 
@@ -548,6 +618,46 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
+
+      <!-- Claim Submission Success Dialog -->
+      <v-dialog v-model="showSuccessDialog" max-width="500px" persistent>
+        <v-card>
+          <v-card-title class="bg-success text-white">
+            <v-icon class="mr-2">mdi-check-circle</v-icon>
+            Claim Submitted Successfully
+          </v-card-title>
+
+          <v-card-text class="pt-6 text-center">
+            <v-icon color="success" size="80" class="mb-4">mdi-file-document-check</v-icon>
+            <h3 class="text-h5 mb-2">Claim Number: {{ submittedClaim?.claim_number }}</h3>
+            <p class="text-body-1 text-grey mb-4">
+              Your claim has been submitted successfully. You can download the claim submission slip for your records.
+            </p>
+            <v-chip color="info" class="mb-4">
+              UTN: {{ submittedClaim?.utn }}
+            </v-chip>
+          </v-card-text>
+
+          <v-card-actions class="justify-center pb-4">
+            <v-btn
+              color="primary"
+              variant="elevated"
+              @click="downloadClaimSlip"
+              :loading="downloadingSlip"
+            >
+              <v-icon class="mr-1">mdi-download</v-icon>
+              Download Claim Slip
+            </v-btn>
+            <v-btn
+              color="grey"
+              variant="text"
+              @click="closeSuccessDialog"
+            >
+              Close
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </div>
   </AdminLayout>
 </template>
@@ -558,7 +668,7 @@ import { useToast } from '../../composables/useToast';
 import api from '../../utils/api';
 import AdminLayout from '../layout/AdminLayout.vue';
 
-const { success: showSuccess, error: showError, warning: showWarning } = useToast();
+const { success: showSuccess, error: showError } = useToast();
 
 // State
 const loadingReferrals = ref(false);
@@ -580,10 +690,21 @@ const bundlePACode = ref(null);
 // FFS state
 const ffsPACodes = ref([]);
 const claimLineItems = ref([]);
+const selectedPACodeCaseRecords = ref([]);
 
 const showLineItemDialog = ref(false);
+const showSuccessDialog = ref(false);
+const submittedClaim = ref(null);
+const downloadingSlip = ref(false);
+const downloadingSlipId = ref(null);
+
+// Submitted claims state
+const submittedClaims = ref([]);
+const loadingClaims = ref(false);
+
 const lineItemFormData = ref({
   pa_code_id: null,
+  case_record_id: null,
   service_description: '',
   quantity: 1,
   unit_price: 0,
@@ -597,24 +718,28 @@ const formData = ref({
 });
 
 // Headers
-const paCodeHeaders = [
-  { title: 'PA Code', key: 'code', sortable: false },
-  { title: 'Type', key: 'type', sortable: false },
-  { title: 'Status', key: 'status', sortable: false },
-  { title: 'Justification', key: 'justification', sortable: false },
-];
-
 const lineItemHeaders = [
-  { title: 'Service Description', key: 'service_description', sortable: false },
+  { title: 'Service', key: 'service_description', sortable: false },
   { title: 'Quantity', key: 'quantity', sortable: false },
   { title: 'Unit Price', key: 'unit_price', sortable: false },
   { title: 'Line Total', key: 'line_total', sortable: false },
   { title: 'Actions', key: 'actions', sortable: false, align: 'center' },
 ];
 
+const claimsTableHeaders = [
+  { title: 'Claim Number', key: 'claim_number', sortable: true },
+  { title: 'UTN', key: 'utn', sortable: true },
+  { title: 'Enrollee', key: 'enrollee', sortable: false },
+  { title: 'Total Amount', key: 'total_amount', sortable: true },
+  { title: 'Status', key: 'status', sortable: true },
+  { title: 'Claim Date', key: 'claim_date', sortable: true },
+  { title: 'Actions', key: 'actions', sortable: false, align: 'center' },
+];
+
 // Computed
-const bundleTotal = computed(() => {
-  return bundleComponents.value.reduce((sum, comp) => sum + (parseFloat(comp.actual_amount) || 0), 0);
+const bundleAmount = computed(() => {
+  // Bundle amount is the fixed price of the service bundle (if any)
+  return bundleService.value ? Number(bundleService.value.fixed_price || 0) : 0;
 });
 
 const ffsTotal = computed(() => {
@@ -622,7 +747,12 @@ const ffsTotal = computed(() => {
 });
 
 const totalClaimAmount = computed(() => {
-  return bundleTotal.value + ffsTotal.value;
+  return bundleAmount.value + ffsTotal.value;
+});
+
+// Check if at least one bundle component is selected
+const hasSelectedBundleComponents = computed(() => {
+  return bundleComponents.value.some(comp => comp.selected);
 });
 
 const validationChecks = computed(() => {
@@ -635,7 +765,7 @@ const validationChecks = computed(() => {
 
   return {
     hasValidatedUTN: selectedReferral.value.utn_validated || false,
-    hasClaimItems: bundleComponents.value.length > 0 || claimLineItems.value.length > 0,
+    hasClaimItems: hasSelectedBundleComponents.value || claimLineItems.value.length > 0,
   };
 });
 
@@ -684,6 +814,7 @@ const onReferralSelected = async (referralId) => {
   bundlePACode.value = null;
   ffsPACodes.value = [];
   claimLineItems.value = [];
+  selectedPACodeCaseRecords.value = [];
   formData.value.admission_id = null;
 
   if (!selectedReferral.value) {
@@ -694,7 +825,7 @@ const onReferralSelected = async (referralId) => {
   // Load admissions for this referral
   referralAdmissions.value = (selectedReferral.value.admissions || []).map(adm => ({
     ...adm,
-    display_text: `${adm.admission_code} - ${adm.status}`,
+    display_text: `${adm.admission_code || adm.admission_number} - ${adm.status}`,
   }));
 
   // Auto-detect bundle service from PA codes
@@ -705,14 +836,16 @@ const onReferralSelected = async (referralId) => {
     bundlePACode.value = bundlePA;
     bundleService.value = bundlePA.service_bundle;
 
-    // Load bundle components with editable actual_amount
+    // Load bundle components with selection checkbox (default: all selected, quantity: 1)
     bundleComponents.value = (bundlePA.service_bundle.components || []).map(comp => ({
       ...comp,
-      actual_amount: comp.quantity * comp.unit_price, // Default to calculated amount
+      selected: true, // Default to selected
+      quantity: comp.quantity || 1, // Ensure quantity has default value
+      unit_price: comp.unit_price || 0,
     }));
   }
 
-  // Get FFS PA codes
+  // Get FFS PA codes only (exclude BUNDLE type)
   ffsPACodes.value = paCodes
     .filter(pa => pa.type === 'FFS_TOP_UP' && pa.status === 'APPROVED')
     .map(pa => ({
@@ -725,14 +858,53 @@ const onAdmissionSelected = (admissionId) => {
   selectedAdmission.value = referralAdmissions.value.find(a => a.id === admissionId) || null;
 };
 
+// When PA code is selected in dialog, load its case records
+const onPACodeSelected = (paCodeId) => {
+  lineItemFormData.value.case_record_id = null;
+  lineItemFormData.value.service_description = '';
+  lineItemFormData.value.unit_price = 0;
+  lineItemFormData.value.line_total = 0;
+  selectedPACodeCaseRecords.value = [];
+
+  if (!paCodeId) return;
+
+  const selectedPA = ffsPACodes.value.find(pa => pa.id === paCodeId);
+  if (selectedPA && selectedPA.case_records) {
+    selectedPACodeCaseRecords.value = selectedPA.case_records.map(cr => ({
+      ...cr,
+      display_text: `${cr.case_name} (₦${Number(cr.price || 0).toLocaleString()})`,
+    }));
+  }
+};
+
+// When case record is selected, populate unit price and description
+const onCaseRecordSelected = (caseRecordId) => {
+  if (!caseRecordId) {
+    lineItemFormData.value.unit_price = 0;
+    lineItemFormData.value.service_description = '';
+    lineItemFormData.value.line_total = 0;
+    return;
+  }
+
+  const selectedCase = selectedPACodeCaseRecords.value.find(cr => cr.id === caseRecordId);
+  if (selectedCase) {
+    lineItemFormData.value.unit_price = Number(selectedCase.price || 0);
+    lineItemFormData.value.service_description = selectedCase.case_name || '';
+    calculateLineTotal();
+  }
+};
+
 const openAddLineItemDialog = () => {
+  selectedPACodeCaseRecords.value = [];
   showLineItemDialog.value = true;
 };
 
 const closeLineItemDialog = () => {
   showLineItemDialog.value = false;
+  selectedPACodeCaseRecords.value = [];
   lineItemFormData.value = {
     pa_code_id: null,
+    case_record_id: null,
     service_description: '',
     quantity: 1,
     unit_price: 0,
@@ -754,10 +926,14 @@ const addLineItem = async () => {
     return;
   }
 
+  // Find the selected case record for display
+  const selectedCase = selectedPACodeCaseRecords.value.find(cr => cr.id === lineItemFormData.value.case_record_id);
+
   // Add line item to the list
   claimLineItems.value.push({
     ...lineItemFormData.value,
     pa_code: ffsPACodes.value.find(pa => pa.id === lineItemFormData.value.pa_code_id),
+    case_record: selectedCase,
   });
 
   showSuccess('FFS line item added successfully');
@@ -783,22 +959,27 @@ const submitClaim = async () => {
 
   submitting.value = true;
   try {
-    // Build payload with bundle components and FFS line items
+    // Build payload with selected bundle components and FFS line items
     const payload = {
       referral_id: formData.value.referral_id,
       admission_id: formData.value.admission_id || null, // Optional
       claim_date: formData.value.claim_date,
-      // Bundle components with actual amounts
-      bundle_components: bundleComponents.value.map(comp => ({
-        bundle_component_id: comp.id,
-        case_record_id: comp.case_record_id,
-        quantity: comp.quantity,
-        unit_price: comp.unit_price,
-        actual_amount: comp.actual_amount,
-      })),
+      // Only include selected bundle components
+      bundle_components: bundleComponents.value
+        .filter(comp => comp.selected)
+        .map(comp => ({
+          bundle_component_id: comp.id,
+          case_record_id: comp.case_record_id || null,
+          quantity: comp.quantity || 1,
+          unit_price: comp.unit_price || 0,
+        })),
+      // Bundle fixed price (if bundle exists)
+      bundle_amount: bundleAmount.value,
+      bundle_pa_code_id: bundlePACode.value?.id || null,
       // FFS line items
       line_items: claimLineItems.value.map(item => ({
         pa_code_id: item.pa_code_id,
+        case_record_id: item.case_record_id,
         tariff_type: 'FFS',
         service_type: 'service',
         service_description: item.service_description,
@@ -812,15 +993,92 @@ const submitClaim = async () => {
     const response = await api.post('/claims-automation/claims', payload);
     const claim = response.data?.data;
 
-    showSuccess(`Claim created successfully! Claim Number: ${claim?.claim_number || 'N/A'}`);
+    // Store submitted claim and show success dialog
+    submittedClaim.value = claim;
+    showSuccessDialog.value = true;
+
     resetForm();
     await fetchReferrals();
+    await fetchSubmittedClaims();
   } catch (err) {
     showError(err.response?.data?.message || 'Failed to create claim');
     console.error(err);
   } finally {
     submitting.value = false;
   }
+};
+
+// Fetch submitted claims for this facility
+const fetchSubmittedClaims = async () => {
+  loadingClaims.value = true;
+  try {
+    const response = await api.get('/claims-automation/claims', {
+      params: {
+        with: 'enrollee,referral',
+        per_page: 20,
+        sort: '-created_at',
+      }
+    });
+    submittedClaims.value = response.data?.data?.data || response.data?.data || [];
+  } catch (err) {
+    console.error('Failed to fetch submitted claims:', err);
+  } finally {
+    loadingClaims.value = false;
+  }
+};
+
+// Download claim slip for the just-submitted claim
+const downloadClaimSlip = async () => {
+  if (!submittedClaim.value?.id) return;
+  await downloadClaimSlipById(submittedClaim.value.id);
+};
+
+// Download claim slip by claim ID
+const downloadClaimSlipById = async (claimId) => {
+  downloadingSlipId.value = claimId;
+  downloadingSlip.value = true;
+  try {
+    const response = await api.get(`/claims-automation/claims/${claimId}/slip`, {
+      responseType: 'blob',
+    });
+
+    // Create blob and download
+    const blob = new Blob([response.data], { type: 'application/pdf' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `claim-slip-${claimId}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+
+    showSuccess('Claim slip downloaded successfully');
+  } catch (err) {
+    showError(err.response?.data?.message || 'Failed to download claim slip');
+    console.error(err);
+  } finally {
+    downloadingSlip.value = false;
+    downloadingSlipId.value = null;
+  }
+};
+
+// Close success dialog
+const closeSuccessDialog = () => {
+  showSuccessDialog.value = false;
+  submittedClaim.value = null;
+};
+
+// Get status color for chip
+const getStatusColor = (status) => {
+  const colors = {
+    'SUBMITTED': 'info',
+    'REVIEWING': 'warning',
+    'APPROVED': 'success',
+    'REJECTED': 'error',
+    'DRAFT': 'grey',
+  };
+  return colors[status] || 'grey';
 };
 
 const resetForm = () => {
@@ -832,6 +1090,7 @@ const resetForm = () => {
   bundlePACode.value = null;
   ffsPACodes.value = [];
   claimLineItems.value = [];
+  selectedPACodeCaseRecords.value = [];
   formData.value = {
     referral_id: null,
     admission_id: null,
@@ -850,7 +1109,7 @@ const formatDate = (date) => {
 };
 
 onMounted(async () => {
-  await fetchReferrals();
+  await Promise.all([fetchReferrals(), fetchSubmittedClaims()]);
 });
 </script>
 

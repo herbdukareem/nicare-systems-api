@@ -188,29 +188,14 @@
                             <thead>
                               <tr>
                                 <th>Case/Service</th>
-                                <th>Quantity</th>
-                                <th>Unit Price</th>
-                                <th style="width: 200px;">Actual Amount</th>
+                               
                               </tr>
                             </thead>
                             <tbody>
                               <tr v-for="(component, idx) in bundleComponents" :key="idx">
                                
                                 <td>{{ component.case_record?.name || component.description }}</td>
-                                <td>{{ component.quantity }}</td>
-                                <td>₦{{ Number(component.unit_price || 0).toLocaleString() }}</td>
-                                <td>
-                                  <v-text-field
-                                    v-model.number="component.actual_amount"
-                                    type="number"
-                                    min="0"
-                                    step="0.01"
-                                    density="compact"
-                                    variant="outlined"
-                                    hide-details
-                                    prefix="₦"
-                                  ></v-text-field>
-                                </td>
+                         
                               </tr>
                             </tbody>
                             <tfoot>
