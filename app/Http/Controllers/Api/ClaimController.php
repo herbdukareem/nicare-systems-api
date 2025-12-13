@@ -105,12 +105,20 @@ class ClaimController extends Controller
                 'referral_id' => 'required|integer|exists:referrals,id',
                 'admission_id' => 'nullable|integer|exists:admissions,id',
                 'claim_date' => 'nullable|date',
+                // Bundle components with actual amounts
+                'bundle_components' => 'nullable|array',
+                'bundle_components.*.bundle_component_id' => 'required|integer|exists:bundle_components,id',
+                'bundle_components.*.case_record_id' => 'nullable|integer|exists:case_records,id',
+                'bundle_components.*.quantity' => 'required|integer|min:1',
+                'bundle_components.*.unit_price' => 'required|numeric|min:0',
+                'bundle_components.*.actual_amount' => 'required|numeric|min:0',
+                // FFS line items
                 'line_items' => 'nullable|array',
                 'line_items.*.pa_code_id' => 'required|integer|exists:pa_codes,id',
                 'line_items.*.service_description' => 'required|string',
                 'line_items.*.quantity' => 'required|integer|min:1',
                 'line_items.*.unit_price' => 'required|numeric|min:0',
-                'line_items.*.total_price' => 'required|numeric|min:0',
+                'line_items.*.line_total' => 'required|numeric|min:0',
             ]);
 
             // 1. Validate UTN
@@ -136,25 +144,25 @@ class ClaimController extends Controller
 
             // 3. Get admission if provided (optional)
             $admission = null;
-            $bundleAmount = 0;
-            if ($validated['admission_id']) {
+            if (!empty($validated['admission_id'])) {
                 $admission = \App\Models\Admission::with('serviceBundle')->find($validated['admission_id']);
 
                 // Validate admission belongs to the same referral
-                if ($admission->referral_id !== $validated['referral_id']) {
+                if ($admission && $admission->referral_id !== $validated['referral_id']) {
                     return response()->json([
                         'success' => false,
                         'message' => 'Admission does not belong to the selected referral',
                     ], 400);
                 }
-
-                // Get bundle amount if admission has a service bundle
-                if ($admission->service_bundle_id && $admission->serviceBundle) {
-                    $bundleAmount = $admission->serviceBundle->fixed_price;
-                }
             }
 
-            // 4. Validate PA codes for FFS line items
+            // 4. Calculate bundle amount from bundle components
+            $bundleComponents = $validated['bundle_components'] ?? [];
+            $bundleAmount = array_reduce($bundleComponents, function ($sum, $comp) {
+                return $sum + (float) ($comp['actual_amount'] ?? 0);
+            }, 0);
+
+            // 5. Validate PA codes for FFS line items
             $lineItems = $validated['line_items'] ?? [];
             $paCodeIds = array_column($lineItems, 'pa_code_id');
 
@@ -168,31 +176,35 @@ class ClaimController extends Controller
                 }
             }
 
-            // 5. Calculate totals
-            $totals = $this->validationService->calculateClaimTotals($bundleAmount, $lineItems);
+            // 6. Calculate FFS total
+            $ffsAmount = array_reduce($lineItems, function ($sum, $item) {
+                return $sum + (float) ($item['line_total'] ?? 0);
+            }, 0);
 
-            // 6. Validate at least one amount is present
-            if ($totals['total_amount'] <= 0) {
+            $totalAmount = $bundleAmount + $ffsAmount;
+
+            // 7. Validate at least one amount is present
+            if ($totalAmount <= 0) {
                 return response()->json([
                     'success' => false,
                     'message' => 'Claim must have at least one of: bundle amount or FFS line items',
                 ], 400);
             }
 
-            // 7. Create claim in transaction
+            // 8. Create claim in transaction
             DB::beginTransaction();
             try {
                 $claim = Claim::create([
                     'referral_id' => $validated['referral_id'],
-                    'admission_id' => $validated['admission_id'],
+                    'admission_id' => $validated['admission_id'] ?? null,
                     'enrollee_id' => $referral->enrollee_id,
                     'facility_id' => $referral->receiving_facility_id,
                     'claim_number' => Claim::generateClaimNumber(),
                     'utn' => $referral->utn,
-                    'bundle_amount' => $totals['bundle_amount'],
-                    'ffs_amount' => $totals['ffs_amount'],
-                    'total_amount' => $totals['total_amount'],
-                    'total_amount_claimed' => $totals['total_amount'],
+                    'bundle_amount' => $bundleAmount,
+                    'ffs_amount' => $ffsAmount,
+                    'total_amount' => $totalAmount,
+                    'total_amount_claimed' => $totalAmount,
                     'status' => 'SUBMITTED',
                     'claim_date' => $validated['claim_date'] ?? now(),
                     'service_date' => $admission ? $admission->admission_date : now(),
@@ -200,7 +212,23 @@ class ClaimController extends Controller
                     'submitted_by' => auth()->id() ?? null,
                 ]);
 
-                // 8. Create claim line items
+                // 9. Create claim line items for bundle components
+                foreach ($bundleComponents as $component) {
+                    \App\Models\ClaimLine::create([
+                        'claim_id' => $claim->id,
+                        'bundle_component_id' => $component['bundle_component_id'],
+                        'case_record_id' => $component['case_record_id'] ?? null,
+                        'service_description' => 'Bundle Component',
+                        'quantity' => $component['quantity'],
+                        'unit_price' => $component['unit_price'],
+                        'line_total' => $component['actual_amount'],
+                        'tariff_type' => 'BUNDLE',
+                        'service_type' => 'bundle_component',
+                        'reporting_type' => 'IN_BUNDLE',
+                    ]);
+                }
+
+                // 10. Create claim line items for FFS
                 foreach ($lineItems as $lineItem) {
                     \App\Models\ClaimLine::create([
                         'claim_id' => $claim->id,
@@ -208,12 +236,15 @@ class ClaimController extends Controller
                         'service_description' => $lineItem['service_description'],
                         'quantity' => $lineItem['quantity'],
                         'unit_price' => $lineItem['unit_price'],
-                        'line_total' => $lineItem['total_price'],
+                        'line_total' => $lineItem['line_total'],
                         'tariff_type' => 'FFS',
                         'service_type' => 'service',
                         'reporting_type' => 'FFS_TOP_UP',
                     ]);
                 }
+
+                // 11. Mark referral as claim submitted
+                $referral->markClaimSubmitted();
 
                 DB::commit();
 

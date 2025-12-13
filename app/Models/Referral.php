@@ -19,8 +19,10 @@ class Referral extends Model
         'request_date' => 'datetime',
         'approval_date' => 'datetime',
         'valid_until' => 'datetime',
+        'claim_submitted_at' => 'datetime',
         'requested_services' => 'array',
         'case_record_ids' => 'array',
+        'claim_submitted' => 'boolean',
     ];
 
     /**
@@ -117,5 +119,65 @@ class Referral extends Model
         }
 
         return now()->greaterThan($this->valid_until);
+    }
+
+    /**
+     * Check if referral has a bundle PA code.
+     */
+    public function hasBundlePACode(): bool
+    {
+        return $this->paCodes()
+            ->where('type', PACode::TYPE_BUNDLE)
+            ->exists();
+    }
+
+    /**
+     * Get the bundle PA code for this referral.
+     */
+    public function bundlePACode()
+    {
+        return $this->paCodes()
+            ->where('type', PACode::TYPE_BUNDLE)
+            ->first();
+    }
+
+    /**
+     * Mark claim as submitted for this referral.
+     */
+    public function markClaimSubmitted(): void
+    {
+        $this->update([
+            'claim_submitted' => true,
+            'claim_submitted_at' => now(),
+        ]);
+    }
+
+    /**
+     * Check if this referral is ready for claim submission.
+     * Must be approved and UTN validated.
+     */
+    public function isReadyForClaimSubmission(): bool
+    {
+        return $this->status === 'APPROVED'
+            && $this->utn_validated
+            && !$this->claim_submitted;
+    }
+
+    /**
+     * Scope to get referrals without submitted claims.
+     */
+    public function scopeWithoutClaim($query)
+    {
+        return $query->where('claim_submitted', false);
+    }
+
+    /**
+     * Scope to get referrals ready for claim submission.
+     */
+    public function scopeReadyForClaim($query)
+    {
+        return $query->where('status', 'APPROVED')
+            ->where('utn_validated', true)
+            ->where('claim_submitted', false);
     }
 }

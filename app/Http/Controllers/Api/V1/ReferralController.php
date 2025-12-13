@@ -8,6 +8,7 @@ use App\Services\ReferralService;
 use App\Services\FileUploadService;
 use App\Models\DocumentRequirement;
 use App\Models\ReferralDocument;
+use App\Models\Referral;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -28,9 +29,24 @@ class ReferralController extends BaseController
      */
     public function index(Request $request)
     {
-        $query = \App\Models\Referral::with(['enrollee', 'referringFacility', 'receivingFacility'])
+        // Determine eager loading based on 'with' parameter
+        $eagerLoad = ['enrollee', 'referringFacility', 'receivingFacility'];
+        if ($request->has('with')) {
+            $additionalRelations = explode(',', $request->with);
+            $eagerLoad = array_merge($eagerLoad, $additionalRelations);
+        }
+
+        $query = Referral::with($eagerLoad)
             ->when($request->status, fn($q) => $q->where('status', $request->status))
             ->when($request->severity_level, fn($q) => $q->where('severity_level', $request->severity_level))
+            // Filter by UTN validated status
+            ->when($request->has('utn_validated'), function ($q) use ($request) {
+                $q->where('utn_validated', filter_var($request->utn_validated, FILTER_VALIDATE_BOOLEAN));
+            })
+            // Filter by claim submitted status
+            ->when($request->has('claim_submitted'), function ($q) use ($request) {
+                $q->where('claim_submitted', filter_var($request->claim_submitted, FILTER_VALIDATE_BOOLEAN));
+            })
             ->when($request->search, function ($q) use ($request) {
                 $search = $request->search;
                 $q->where('referral_code', 'like', "%{$search}%")
@@ -62,6 +78,27 @@ class ReferralController extends BaseController
             ]);
         }
 
+        // BUSINESS RULE 1: Check if enrollee has pending referral without submitted claim
+        $enrolleeId = $request->input('enrollee_id');
+        if ($enrolleeId) {
+            $pendingReferral = Referral::where('enrollee_id', $enrolleeId)
+                ->where('status', 'APPROVED')
+                ->where('claim_submitted', false)
+                ->first();
+
+            if ($pendingReferral) {
+                return $this->sendError(
+                    'This enrollee has an approved referral (UTN: ' . $pendingReferral->utn . ') without a submitted claim. Please submit a claim for that referral before creating a new one.',
+                    ['pending_referral' => [
+                        'id' => $pendingReferral->id,
+                        'utn' => $pendingReferral->utn,
+                        'referral_code' => $pendingReferral->referral_code,
+                    ]],
+                    422
+                );
+            }
+        }
+
         // If service_selection_type is bundle, case_record_ids can be empty array
         $caseRecordIdsRule = ['nullable', 'array'];
         if ($request->service_selection_type === 'direct') {
@@ -69,7 +106,6 @@ class ReferralController extends BaseController
         }
 
         $validated = $request->validate([
-            'documents' => ['nullable', 'array'],
             'enrollee_id' => ['required', 'integer', 'exists:enrollees,id'],
             'referring_facility_id' => ['required', 'integer', 'exists:facilities,id'],
             'receiving_facility_id' => ['required', 'integer', 'exists:facilities,id'],
@@ -183,7 +219,8 @@ class ReferralController extends BaseController
         ]);
 
         // Auto-create PA code if referral has service bundle selected
-        if ($referral->service_bundle_id) {
+        // BUSINESS RULE 2: Only one bundle PA per referral
+        if ($referral->service_bundle_id && !$referral->hasBundlePACode()) {
             \App\Models\PACode::create([
                 'enrollee_id' => $referral->enrollee_id,
                 'facility_id' => $referral->receiving_facility_id,

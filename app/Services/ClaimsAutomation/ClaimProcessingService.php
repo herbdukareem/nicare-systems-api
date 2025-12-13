@@ -181,6 +181,11 @@ class ClaimProcessingService
             'submitted_at' => now(),
         ]);
 
+        // Mark referral as claim submitted
+        if ($claim->referral) {
+            $claim->referral->markClaimSubmitted();
+        }
+
         return $claim;
     }
 

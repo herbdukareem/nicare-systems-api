@@ -84,6 +84,6 @@ class PACode extends Model
      */
     public function documents()
     {
-        return $this->hasMany(PACodeDocument::class);
+        return $this->hasMany(PACodeDocument::class, 'pa_code_id', 'id');
     }
 }

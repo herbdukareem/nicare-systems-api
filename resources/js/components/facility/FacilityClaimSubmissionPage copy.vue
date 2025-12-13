@@ -263,7 +263,32 @@
                         <strong>{{ ffsPACodes.length }}</strong> FFS PA code(s) available for additional line items
                       </v-alert>
                     </v-col>
-                   
+                    <v-col cols="12">
+                      <v-data-table
+                        :headers="paCodeHeaders"
+                        :items="ffsPACodes"
+                        :items-per-page="5"
+                        class="elevation-1"
+                      >
+                        <template #item.code="{ item }">
+                          <v-chip size="small" color="primary" variant="outlined">
+                            {{ item.code }}
+                          </v-chip>
+                        </template>
+
+                        <template #item.type="{ item }">
+                          <v-chip size="small" color="info">
+                            {{ item.type }}
+                          </v-chip>
+                        </template>
+
+                        <template #item.status="{ item }">
+                          <v-chip size="small" color="success">
+                            {{ item.status }}
+                          </v-chip>
+                        </template>
+                      </v-data-table>
+                    </v-col>
                   </v-row>
 
                   <!-- Step 4: Claim Line Items (FFS) -->

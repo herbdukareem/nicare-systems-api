@@ -12,6 +12,8 @@ class PACodeDocument extends Model
 {
     use HasFactory, SoftDeletes;
 
+    protected $table = 'pa_code_documents';
+
     protected $fillable = [
         'pa_code_id',
         'document_requirement_id',
@@ -45,7 +47,7 @@ class PACodeDocument extends Model
      */
     public function paCode(): BelongsTo
     {
-        return $this->belongsTo(PACode::class);
+        return $this->belongsTo(PACode::class, 'pa_code_id', 'id');
     }
 
     /**
@@ -53,7 +55,7 @@ class PACodeDocument extends Model
      */
     public function documentRequirement(): BelongsTo
     {
-        return $this->belongsTo(DocumentRequirement::class);
+        return $this->belongsTo(DocumentRequirement::class, 'document_requirement_id', 'id');
     }
 
     /**

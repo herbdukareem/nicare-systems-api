@@ -1,5 +1,5 @@
 <template>
-  <div class="tw-fixed tw-top-4 tw-right-4 tw-z-50 tw-space-y-2">
+<div class="tw-fixed tw-top-4 tw-right-4 tw-space-y-2" style="z-index: 3000;">
     <transition-group name="toast" tag="div">
       <div
         v-for="toast in toasts"

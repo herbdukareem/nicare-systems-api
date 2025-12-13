@@ -51,7 +51,7 @@ const routes = [
     component: () => import('../components/dashboard/FacilityDashboard.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['facility_admin', 'facility_user', 'Super Admin'],
+      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'],
       title: 'Facility Dashboard',
       description: 'Facility dashboard for managing operations and requests',
       breadcrumb: 'Facility Dashboard'
@@ -327,17 +327,6 @@ const routes = [
       title: 'Referral Request to Pre-Authorization System (PAS)',
       description: 'Submit referral requests for your facility to PAS',
       breadcrumb: 'Referral Request to PAS'
-    }
-  },
-  {
-    path: '/claims/submissions',
-    name: 'claims-submissions',
-    component: () => import('../components/claims/ClaimSubmissionPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Submit Claim',
-      description: 'Submit a new claim',
-      breadcrumb: 'Submit Claim'
     }
   },
   {

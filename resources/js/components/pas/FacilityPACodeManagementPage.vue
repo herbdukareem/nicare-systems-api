@@ -530,7 +530,7 @@
                             :label="`Upload ${requirement.name}`"
                             variant="outlined"
                             density="compact"
-                            :accept="requirement.allowed_file_types.split(',').map(t => '.' + t.trim()).join(',')"
+                                    :accept="getAcceptedTypes(requirement.allowed_file_types)"
                             :rules="requirement.is_required ? [v => !!v || `${requirement.name} is required`] : []"
                             prepend-icon="mdi-paperclip"
                             show-size
@@ -996,7 +996,7 @@ const fetchServiceBundles = async () => {
 const fetchPADocumentRequirements = async () => {
   loadingPADocuments.value = true;
   try {
-    const response = await api.get('/v1/document-requirements', {
+    const response = await api.get('/document-requirements', {
       params: { request_type: 'pa_code', status: 1 }
     });
     paDocumentRequirements.value = response.data.data || response.data;
@@ -1009,6 +1009,12 @@ const fetchPADocumentRequirements = async () => {
 };
 
 // Handle PA document upload
+const getAcceptedTypes = (allowed) => {
+  if (!allowed) return '*';
+  const parts = Array.isArray(allowed) ? allowed : allowed.split(',').map(t => t.trim()).filter(Boolean);
+  return parts.map(t => (t.startsWith('.') ? t : `.${t}`)).join(',');
+};
+
 const handlePADocumentUpload = (requirement, files) => {
   if (!files || files.length === 0) {
     uploadedPADocuments.value[requirement.document_type] = null;
@@ -1026,10 +1032,14 @@ const handlePADocumentUpload = (requirement, files) => {
   }
 
   // Validate file type
-  const allowedTypes = requirement.allowed_file_types.split(',').map(t => t.trim());
-  const fileExtension = uploadedFile.name.split('.').pop().toLowerCase();
-  if (!allowedTypes.includes(fileExtension)) {
-    showError(`File type .${fileExtension} is not allowed. Allowed types: ${requirement.allowed_file_types}`);
+  const allowedRaw = requirement.allowed_file_types || '';
+  const allowedTypes = Array.isArray(allowedRaw)
+    ? allowedRaw
+    : allowedRaw.split(',').map(t => t.trim()).filter(Boolean);
+  const fileExtension = uploadedFile.name?.split('.').pop().toLowerCase();
+
+  if (allowedTypes.length && (!fileExtension || !allowedTypes.includes(fileExtension))) {
+    showError(`File type .${fileExtension || 'unknown'} is not allowed. Allowed types: ${allowedTypes.join(', ')}`);
     uploadedPADocuments.value[requirement.document_type] = null;
     return;
   }
@@ -1300,4 +1310,3 @@ onMounted(() => {
   transform: translateY(-2px);
 }
 </style>
-

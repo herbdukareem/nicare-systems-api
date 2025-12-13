@@ -2,6 +2,7 @@
 
 namespace App\Http\Resources;
 
+use App\Models\CaseRecord;
 use Illuminate\Http\Resources\Json\JsonResource;
 
 class ReferralResource extends JsonResource
@@ -47,15 +48,112 @@ class ReferralResource extends JsonResource
             'enrollee' => new EnrolleeResource($this->whenLoaded('enrollee')),
             'referring_facility' => new FacilityResource($this->whenLoaded('referringFacility')),
             'receiving_facility' => new FacilityResource($this->whenLoaded('receivingFacility')),
+            'utn_validated' => $this->utn_validated,
+            'claim_submitted' => $this->claim_submitted,
+            'claim_submitted_at' => $this->claim_submitted_at,
+            'valid_until' => $this->valid_until,
             'service_bundle' => $this->whenLoaded('serviceBundle', function () {
+                $bundle = $this->serviceBundle;
                 return [
-                    'id' => $this->serviceBundle->id,
-                    'code' => $this->serviceBundle->code,
-                    'name' => $this->serviceBundle->name,
-                    'description' => $this->serviceBundle->description,
-                    'fixed_price' => $this->serviceBundle->fixed_price,
-                    'diagnosis_icd10' => $this->serviceBundle->diagnosis_icd10,
+                    'id' => $bundle->id,
+                    'code' => $bundle->code,
+                    'name' => $bundle->name,
+                    'description' => $bundle->description,
+                    'fixed_price' => $bundle->fixed_price,
+                    'diagnosis_icd10' => $bundle->diagnosis_icd10,
+                    'components' => $bundle->relationLoaded('components')
+                        ? $bundle->components->map(function ($component) {
+                            return [
+                                'id' => $component->id,
+                                'case_record_id' => $component->case_record_id,
+                                'quantity' => $component->quantity,
+                                'max_quantity' => $component->max_quantity,
+                                'case_record' => $component->relationLoaded('caseRecord') && $component->caseRecord ? [
+                                    'id' => $component->caseRecord->id,
+                                    'nicare_code' => $component->caseRecord->nicare_code,
+                                    'case_name' => $component->caseRecord->case_name,
+                                    'price' => $component->caseRecord->price,
+                                    'detail_type' => $component->caseRecord->detail_type,
+                                ] : null,
+                            ];
+                        })
+                        : [],
                 ];
+            }),
+            'pa_codes' => $this->whenLoaded('paCodes', function () {
+                return $this->paCodes->map(function ($pa) {
+                    $serviceBundleData = null;
+                    $caseRecordData = null;
+                    $caseRecords = [];
+                    // fix ($json) must be of type string, array given, null given
+                    $caseRecordIds = $pa->case_record_ids  ?? [];
+                    if (!empty($caseRecordIds)) {
+                        $caseRecords = CaseRecord::whereIn('id', $caseRecordIds)->get();
+                        $caseRecordData = $caseRecords->map(function ($caseRecord) {
+                            return [
+                                'id' => $caseRecord->id,
+                                'nicare_code' => $caseRecord->nicare_code,
+                                'case_name' => $caseRecord->case_name,
+                                'price' => $caseRecord->price,
+                                'detail_type' => $caseRecord->detail_type,
+                            ];
+                        });
+                    }
+                     
+                    
+                    if ($pa->relationLoaded('serviceBundle') && $pa->serviceBundle) {
+                        $bundle = $pa->serviceBundle;
+                        $serviceBundleData = [
+                            'id' => $bundle->id,
+                            'name' => $bundle->name,
+                            'description' => $bundle->description,
+                            'fixed_price' => $bundle->fixed_price,
+                            'components' => $bundle->relationLoaded('components')
+                                ? $bundle->components->map(function ($component) {
+                                    return [
+                                        'id' => $component->id,
+                                        'case_record_id' => $component->case_record_id,
+                                        'component_name' => $component->component_name ?? null,
+                                        'description' => $component->description ?? null,
+                                        'quantity' => $component->quantity,
+                                        'unit_price' => $component->unit_price ?? 0,
+                                        'max_quantity' => $component->max_quantity,
+                                        'item_type' => $component->item_type ?? null,
+                                        'case_record' => $component->relationLoaded('caseRecord') && $component->caseRecord ? [
+                                            'id' => $component->caseRecord->id,
+                                            'nicare_code' => $component->caseRecord->nicare_code,
+                                            'name' => $component->caseRecord->case_name,
+                                            'price' => $component->caseRecord->price,
+                                            'detail_type' => $component->caseRecord->detail_type,
+                                        ] : null,
+                                    ];
+                                })
+                                : [],
+                        ];
+                    }
+                    return [
+                        'id' => $pa->id,
+                        'code' => $pa->code,
+                        'type' => $pa->type,
+                        'status' => $pa->status,
+                        'case_record_ids' => $pa->case_record_ids,
+                        'justification' => $pa->justification ?? null,
+                        'service_bundle_id' => $pa->service_bundle_id,
+                        'service_bundle' => $serviceBundleData,
+                        'case_records' => $caseRecordData,
+                    ];
+                });
+            }),
+            'admissions' => $this->whenLoaded('admissions', function () {
+                return $this->admissions->map(function ($admission) {
+                    return [
+                        'id' => $admission->id,
+                        'admission_number' => $admission->admission_number,
+                        'admission_date' => $admission->admission_date,
+                        'discharge_date' => $admission->discharge_date,
+                        'status' => $admission->status,
+                    ];
+                });
             }),
             'case_record' => $this->whenLoaded('caseRecord', function () {
                 return [

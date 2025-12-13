@@ -104,7 +104,6 @@ class PACodeController extends Controller
         $validator = Validator::make($request->all(), [
             'enrollee_id' => 'required|exists:enrollees,id',
             'facility_id' => 'required|exists:facilities,id',
-            'is_complication_pa' => 'boolean',
             'requested_items' => 'nullable|json',
             'justification' => 'required|string|max:1000',
             'diagnosis_update' => 'nullable|string|max:1000',
@@ -182,8 +181,8 @@ class PACodeController extends Controller
                 'diagnosis_update' => $request->diagnosis_update,
                 'requested_services' => $requestedItems,
                 'service_selection_type' => $request->service_selection_type,
-                'service_bundle_id' => $request->service_bundle_id,
-                'case_record_ids' => $caseRecordIds,
+                'service_bundle_id' => $request->service_selection_type === 'bundle' ? $request->service_bundle_id : null,
+                'case_record_id' => $request->service_selection_type === 'direct' ? $caseRecordIds[0] : null,
             ]);
 
             // Handle document uploads
