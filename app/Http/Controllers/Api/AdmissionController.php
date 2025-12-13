@@ -163,7 +163,7 @@ class AdmissionController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Patient discharged successfully',
-                'data' => $admission,
+                'data' => $admission->load(['referral', 'serviceBundle', 'enrollee', 'facility', 'paCodes']),
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -194,4 +194,3 @@ class AdmissionController extends Controller
         }
     }
 }
-

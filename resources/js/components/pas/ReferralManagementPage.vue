@@ -552,6 +552,102 @@
 
               <v-divider></v-divider>
 
+              <!-- Uploaded Documents -->
+              <v-row class="pa-4" v-if="selectedReferral.documents && selectedReferral.documents.length > 0">
+                <v-col cols="12">
+                  <h3 class="text-h6 mb-3">
+                    <v-icon color="primary" class="mr-2">mdi-file-document-multiple</v-icon>
+                    Uploaded Documents
+                  </h3>
+                </v-col>
+                <v-col cols="12">
+                  <v-table density="comfortable">
+                    <thead>
+                      <tr>
+                        <th>Document Type</th>
+                        <th>File Name</th>
+                        <th>Size</th>
+                        <th>Uploaded By</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr v-for="doc in selectedReferral.documents" :key="doc.id">
+                        <td>
+                          <div class="font-weight-medium">{{ doc.document_requirement?.name || doc.document_type }}</div>
+                          <div class="text-caption text-grey">{{ doc.document_requirement?.description }}</div>
+                        </td>
+                        <td>
+                          <div class="text-body-2">{{ doc.original_filename }}</div>
+                          <div class="text-caption text-grey">{{ doc.mime_type }}</div>
+                        </td>
+                        <td>
+                          <v-chip size="small" variant="outlined">{{ doc.file_size_human }}</v-chip>
+                        </td>
+                        <td>
+                          <div class="text-body-2">{{ doc.uploader?.name || 'N/A' }}</div>
+                          <div class="text-caption text-grey">{{ formatDate(doc.created_at) }}</div>
+                        </td>
+                        <td>
+                          <v-chip
+                            :color="doc.is_validated ? 'success' : 'warning'"
+                            size="small"
+                            variant="flat"
+                          >
+                            <v-icon start size="small">{{ doc.is_validated ? 'mdi-check-circle' : 'mdi-clock-outline' }}</v-icon>
+                            {{ doc.is_validated ? 'Validated' : 'Pending' }}
+                          </v-chip>
+                          <v-chip
+                            v-if="doc.is_required"
+                            size="small"
+                            color="error"
+                            variant="outlined"
+                            class="ml-1"
+                          >
+                            Required
+                          </v-chip>
+                        </td>
+                        <td>
+                          <v-btn
+                            :href="doc.url"
+                            target="_blank"
+                            size="small"
+                            color="primary"
+                            variant="text"
+                            icon
+                          >
+                            <v-icon>mdi-download</v-icon>
+                          </v-btn>
+                          <v-btn
+                            :href="doc.url"
+                            target="_blank"
+                            size="small"
+                            color="info"
+                            variant="text"
+                            icon
+                          >
+                            <v-icon>mdi-eye</v-icon>
+                          </v-btn>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </v-table>
+                </v-col>
+              </v-row>
+
+              <!-- No Documents Message -->
+              <v-row class="pa-4" v-else>
+                <v-col cols="12">
+                  <v-alert type="info" variant="tonal" density="compact">
+                    <v-icon start>mdi-information</v-icon>
+                    No documents uploaded for this referral.
+                  </v-alert>
+                </v-col>
+              </v-row>
+
+              <v-divider></v-divider>
+
               <!-- Timestamps -->
               <v-row class="pa-4 bg-grey-lighten-5">
                 <v-col cols="12" md="4">

@@ -54,7 +54,7 @@ class Facility extends Model
     /**
      * The desk officers assigned to this facility.
      */
-    public function assignedDeskOfficers()
+    public function assignedUsers()
     {
         return $this->hasMany(DOFacility::class);
     }

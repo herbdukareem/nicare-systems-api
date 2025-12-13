@@ -335,6 +335,84 @@
           </v-card-actions>
         </v-card>
       </v-dialog>
+
+      <!-- Discharge Admission Dialog -->
+      <v-dialog v-model="dischargeDialog" max-width="600px" persistent>
+        <v-card>
+          <v-card-title class="bg-warning text-white">
+            <v-icon class="mr-2">mdi-exit-run</v-icon>
+            Discharge Patient
+          </v-card-title>
+
+          <v-card-text class="pt-6">
+            <v-form ref="dischargeForm" @submit.prevent="submitDischarge">
+              <v-row>
+                <v-col cols="12">
+                  <p class="text-body-2 mb-2">
+                    Discharging: <strong>{{ selectedAdmission?.admission_code }}</strong>
+                    <br />
+                    Patient: {{ selectedAdmission?.enrollee?.first_name }} {{ selectedAdmission?.enrollee?.last_name }}
+                  </p>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model="dischargeData.discharge_date"
+                    label="Discharge Date"
+                    type="date"
+                    variant="outlined"
+                    density="comfortable"
+                    :rules="[v => !!v || 'Discharge date is required']"
+                    prepend-inner-icon="mdi-calendar"
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model.number="dischargeData.ward_days"
+                    label="Ward Days"
+                    type="number"
+                    min="1"
+                    variant="outlined"
+                    density="comfortable"
+                    :rules="[v => !!v || 'Ward days required', v => v > 0 || 'Must be at least 1']"
+                    prepend-inner-icon="mdi-bed"
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="12">
+                  <v-textarea
+                    v-model="dischargeData.discharge_summary"
+                    label="Discharge Summary"
+                    variant="outlined"
+                    density="comfortable"
+                    rows="4"
+                    :rules="[v => !!v || 'Discharge summary is required']"
+                    prepend-inner-icon="mdi-file-document"
+                  ></v-textarea>
+                </v-col>
+              </v-row>
+            </v-form>
+          </v-card-text>
+
+          <v-card-actions>
+            <v-spacer></v-spacer>
+            <v-btn
+              color="grey"
+              variant="text"
+              @click="dischargeDialog = false"
+              :disabled="submitting"
+            >
+              Cancel
+            </v-btn>
+            <v-btn
+              color="warning"
+              variant="elevated"
+              @click="submitDischarge"
+              :loading="submitting"
+            >
+              Discharge
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </div>
   </AdminLayout>
 </template>
@@ -352,11 +430,14 @@ const loading = ref(false);
 const loadingReferrals = ref(false);
 const submitting = ref(false);
 const createDialog = ref(false);
+const dischargeDialog = ref(false);
 const admissionForm = ref(null);
+const dischargeForm = ref(null);
 
 const admissions = ref([]);
 const validatedReferrals = ref([]);
 const selectedReferral = ref(null);
+const selectedAdmission = ref(null);
 
 const searchQuery = ref('');
 const statusFilter = ref(null);
@@ -366,6 +447,12 @@ const formData = ref({
   admission_date: new Date().toISOString().split('T')[0],
   ward_type: null,
   principal_diagnosis_icd10: '',
+});
+
+const dischargeData = ref({
+  discharge_date: new Date().toISOString().split('T')[0],
+  discharge_summary: '',
+  ward_days: 1,
 });
 
 // Options
@@ -497,8 +584,44 @@ const viewAdmission = (admission) => {
 };
 
 const openDischargeDialog = (admission) => {
-  // Open discharge dialog
-  console.log('Discharge admission:', admission);
+  selectedAdmission.value = admission;
+  dischargeData.value = {
+    discharge_date: new Date().toISOString().split('T')[0],
+    discharge_summary: '',
+    ward_days: 1,
+  };
+  dischargeDialog.value = true;
+};
+
+const submitDischarge = async () => {
+  const { valid } = await dischargeForm.value?.validate();
+  if (!valid) {
+    showError('Please fill in all required fields');
+    return;
+  }
+
+  if (!selectedAdmission.value?.id) {
+    showError('No admission selected for discharge');
+    return;
+  }
+
+  submitting.value = true;
+  try {
+    await api.post(`/claims-automation/admissions/${selectedAdmission.value.id}/discharge`, {
+      discharge_date: dischargeData.value.discharge_date,
+      discharge_summary: dischargeData.value.discharge_summary,
+      ward_days: dischargeData.value.ward_days,
+    });
+    showSuccess('Patient discharged successfully');
+    dischargeDialog.value = false;
+    selectedAdmission.value = null;
+    await fetchAdmissions();
+  } catch (err) {
+    showError(err.response?.data?.message || 'Failed to discharge admission');
+    console.error(err);
+  } finally {
+    submitting.value = false;
+  }
 };
 
 const resetFilters = () => {
@@ -558,4 +681,3 @@ onMounted(async () => {
   border-left-color: rgb(var(--v-theme-primary));
 }
 </style>
-

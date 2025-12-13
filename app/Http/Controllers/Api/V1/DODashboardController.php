@@ -33,11 +33,11 @@ class DODashboardController extends Controller
         try {
             $user = Auth::user();
             
-            // Verify user is a desk officer
-            if (!$user->hasRole('desk_officer')) {
+            //check if user has role of desk_officer, facility_admin, or facility_user
+            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Access denied. Desk officer role required.'
+                    'message' => 'Access denied. Facility role required.'
                 ], 403);
             }
 
@@ -92,16 +92,18 @@ class DODashboardController extends Controller
         try {
             $user = Auth::user();
             
-            if (!$user->hasRole('desk_officer')) {
+            //check if user has role of desk_officer, facility_admin, or facility_user
+            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Access denied. Desk officer role required.'
+                    'message' => 'Access denied. Facility role required.'
                 ], 403);
             }
 
             $assignedFacilities = $this->getAssignedFacilities($user->id);
+           
             $facilityIds = $assignedFacilities->pluck('id');
-
+            
             if ($facilityIds->isEmpty()) {
                 return response()->json([
                     'success' => true,
@@ -124,7 +126,9 @@ class DODashboardController extends Controller
                 'enrollee',
                 'serviceBundle',
                 'caseRecord',
-                'paCodes'
+                'paCodes',
+                'documents.documentRequirement',
+                'documents.uploader'
             ])->paginate($perPage);
 
             return response()->json([
@@ -150,10 +154,11 @@ class DODashboardController extends Controller
         try {
             $user = Auth::user();
             
-            if (!$user->hasRole('desk_officer')) {
+            //check if user has role of desk_officer, facility_admin, or facility_user
+            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Access denied. Desk officer role required.'
+                    'message' => 'Access denied. Facility role required.'
                 ], 403);
             }
 
@@ -235,10 +240,11 @@ class DODashboardController extends Controller
 
             $user = Auth::user();
             
-            if (!$user->hasRole('desk_officer')) {
+            //check if user has role of desk_officer, facility_admin, or facility_user
+            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Access denied. Desk officer role required.'
+                    'message' => 'Access denied. Facility role required.'
                 ], 403);
             }
 
@@ -314,9 +320,13 @@ class DODashboardController extends Controller
      */
     private function getAssignedFacilities(int $userId)
     {
-        return Facility::whereHas('assignedDeskOfficers', function ($query) use ($userId) {
+       
+        $assignedFacilities = Facility::whereHas('assignedUsers', function ($query) use ($userId) {
             $query->where('user_id', $userId);
         })->with(['lga', 'ward'])->get();
+ 
+
+        return $assignedFacilities;
     }
 
     /**

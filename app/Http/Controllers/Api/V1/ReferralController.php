@@ -5,15 +5,22 @@ namespace App\Http\Controllers\Api\V1;
 use App\Http\Controllers\Api\V1\BaseController;
 use App\Http\Resources\ReferralResource;
 use App\Services\ReferralService;
+use App\Services\FileUploadService;
+use App\Models\DocumentRequirement;
+use App\Models\ReferralDocument;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 
 class ReferralController extends BaseController
 {
     private ReferralService $service;
+    private FileUploadService $fileUploadService;
 
-    public function __construct(ReferralService $service)
+    public function __construct(ReferralService $service, FileUploadService $fileUploadService)
     {
         $this->service = $service;
+        $this->fileUploadService = $fileUploadService;
     }
 
     /**
@@ -48,7 +55,21 @@ class ReferralController extends BaseController
      */
     public function store(Request $request)
     {
+        // Handle case_record_ids - convert JSON string to array if needed
+        if ($request->has('case_record_ids') && is_string($request->case_record_ids)) {
+            $request->merge([
+                'case_record_ids' => json_decode($request->case_record_ids, true) ?? []
+            ]);
+        }
+
+        // If service_selection_type is bundle, case_record_ids can be empty array
+        $caseRecordIdsRule = ['nullable', 'array'];
+        if ($request->service_selection_type === 'direct') {
+            $caseRecordIdsRule[] = 'required';
+        }
+
         $validated = $request->validate([
+            'documents' => ['nullable', 'array'],
             'enrollee_id' => ['required', 'integer', 'exists:enrollees,id'],
             'referring_facility_id' => ['required', 'integer', 'exists:facilities,id'],
             'receiving_facility_id' => ['required', 'integer', 'exists:facilities,id'],
@@ -69,18 +90,62 @@ class ReferralController extends BaseController
             'contact_person_email' => ['nullable', 'email'],
             'service_selection_type' => ['nullable', 'in:bundle,direct'],
             'service_bundle_id' => ['nullable', 'required_if:service_selection_type,bundle', 'exists:service_bundles,id'],
-            // 'case_record_id' => ['nullable', 'required_if:service_selection_type,direct', 'exists:case_records,id'],
-            'case_record_ids' => ['nullable', 'required_if:service_selection_type,direct', 'array'],
+            'case_record_ids' => $caseRecordIdsRule,
             'case_record_ids.*' => ['exists:case_records,id'],
+            'documents' => ['nullable', 'array'],
+            'documents.*' => ['nullable', 'file', 'max:10240', 'mimes:pdf,jpeg,jpg,png,doc,docx,xls,xlsx'],
         ]);
 
-        $referral = $this->service->create($validated);
+        DB::beginTransaction();
+        try {
+            // Create the referral
+            $referral = $this->service->create($validated);
 
-        return $this->sendResponse(
-            new ReferralResource($referral->load(['enrollee', 'referringFacility', 'receivingFacility', 'serviceBundle'])),
-            'Referral created successfully',
-            201
-        );
+            // Handle document uploads
+            if ($request->hasFile('documents')) {
+                foreach ($request->file('documents') as $docType => $file) {
+                    // Upload file to local storage
+                    $uploadResult = $this->fileUploadService->uploadPASDocument(
+                        $file,
+                        $referral->referral_code,
+                        $docType
+                    );
+
+                    if ($uploadResult['success']) {
+                        // Find the document requirement
+                        $docRequirement = DocumentRequirement::where('document_type', $docType)
+                            ->where('request_type', 'referral')
+                            ->first();
+
+                        // Create document record
+                        ReferralDocument::create([
+                            'referral_id' => $referral->id,
+                            'document_requirement_id' => $docRequirement?->id,
+                            'document_type' => $docType,
+                            'file_name' => $uploadResult['filename'],
+                            'file_path' => $uploadResult['path'],
+                            'file_type' => $file->getClientOriginalExtension(),
+                            'file_size' => $file->getSize(),
+                            'mime_type' => $file->getMimeType(),
+                            'original_filename' => $uploadResult['original_name'],
+                            'uploaded_by' => Auth::id(),
+                            'is_required' => $docRequirement?->is_required ?? false,
+                        ]);
+                    }
+                }
+            }
+
+            DB::commit();
+
+            return $this->sendResponse(
+                new ReferralResource($referral->load(['enrollee', 'referringFacility', 'receivingFacility', 'serviceBundle', 'documents'])),
+                'Referral created successfully',
+                201
+            );
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return $this->sendError('Failed to create referral: ' . $e->getMessage(), [], 500);
+        }
     }
 
     /**
@@ -88,7 +153,14 @@ class ReferralController extends BaseController
      */
     public function show(\App\Models\Referral $referral)
     {
-        $referral->load(['enrollee', 'referringFacility', 'receivingFacility', 'serviceBundle']);
+        $referral->load([
+            'enrollee',
+            'referringFacility',
+            'receivingFacility',
+            'serviceBundle',
+            'documents.documentRequirement',
+            'documents.uploader'
+        ]);
 
         return $this->sendResponse(
             new ReferralResource($referral),

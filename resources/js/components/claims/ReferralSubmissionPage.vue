@@ -44,7 +44,16 @@
                   <v-divider></v-divider>
 
                   <v-stepper-item
+                    :complete="currentStep > 4"
                     :value="4"
+                    title="Document Upload"
+                    subtitle="Required documents"
+                  ></v-stepper-item>
+
+                  <v-divider></v-divider>
+
+                  <v-stepper-item
+                    :value="5"
                     title="Review & Submit"
                     subtitle="Confirm details"
                   ></v-stepper-item>
@@ -448,14 +457,118 @@
                     </v-form>
                   </v-stepper-window-item>
 
-                  <!-- Step 4: Review & Submit -->
+                  <!-- Step 4: Document Upload -->
                   <v-stepper-window-item :value="4">
+                    <v-form ref="step4Form">
+                      <v-card flat>
+                        <v-card-text>
+                          <h3 class="mb-4">Document Upload</h3>
+                          <v-alert type="info" density="compact" class="mb-4">
+                            <v-icon start>mdi-information</v-icon>
+                            Upload required documents for this referral. Documents marked with * are mandatory.
+                          </v-alert>
+
+                          <!-- Loading State -->
+                          <v-progress-linear v-if="loadingDocumentRequirements" indeterminate color="primary" class="mb-4" />
+
+                          <!-- Document Requirements Table -->
+                          <v-table v-if="!loadingDocumentRequirements && documentRequirements.length > 0" density="comfortable">
+                            <thead>
+                              <tr>
+                                <th class="text-left">Document Type</th>
+                                <th class="text-left">Description</th>
+                                <th class="text-left">Upload</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              <tr v-for="requirement in documentRequirements" :key="requirement.id">
+                                <td>
+                                  <div class="tw-font-medium">
+                                    {{ requirement.name }}
+                                    <v-chip v-if="requirement.is_required" size="x-small" color="error" class="ml-2">
+                                      Required
+                                    </v-chip>
+                                  </div>
+                                </td>
+                                <td>
+                                  <div class="text-caption">{{ requirement.description }}</div>
+                                </td>
+                                <td>
+                                  <v-file-input
+                                    v-model="uploadedDocuments[requirement.document_type]"
+                                    :label="`Upload ${requirement.name}`"
+                                    variant="outlined"
+                                    density="compact"
+                                    :accept="getAcceptedFileTypes(requirement.allowed_file_types)"
+                                    :rules="requirement.is_required ? [v => !!v || `${requirement.name} is required`] : []"
+                                    prepend-icon="mdi-paperclip"
+                                    show-size
+                                    clearable
+                                    @update:model-value="(file) => handleDocumentUpload(requirement, file)"
+                                  >
+                                    <template v-slot:selection="{ fileNames }">
+                                      <v-chip size="small" color="success">
+                                        <v-icon start>mdi-check</v-icon>
+                                        {{ fileNames[0] }}
+                                      </v-chip>
+                                    </template>
+                                  </v-file-input>
+                                  <div class="text-caption text-grey mt-1">
+                                    Max size: {{ requirement.max_file_size_mb }}MB | Allowed: {{ requirement.allowed_file_types }}
+                                  </div>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </v-table>
+
+                          <!-- No Requirements Message -->
+                          <v-alert v-if="!loadingDocumentRequirements && documentRequirements.length === 0" type="info" variant="tonal">
+                            No document requirements configured for referrals.
+                          </v-alert>
+                        </v-card-text>
+                        <v-card-actions>
+                          <v-btn @click="prevStep">
+                            <v-icon left>mdi-chevron-left</v-icon>
+                            Back
+                          </v-btn>
+                          <v-spacer></v-spacer>
+                          <v-btn color="primary" @click="nextStep(4)">
+                            Next
+                            <v-icon right>mdi-chevron-right</v-icon>
+                          </v-btn>
+                        </v-card-actions>
+                      </v-card>
+                    </v-form>
+                  </v-stepper-window-item>
+
+                  <!-- Step 5: Review & Submit -->
+                  <v-stepper-window-item :value="5">
                     <v-card flat>
                       <v-card-text>
                         <h3 class="mb-4">Review & Submit</h3>
                         <v-alert type="info" density="compact" class="mb-4">
                           Please review all information before submitting the referral.
                         </v-alert>
+
+                        <!-- Summary of uploaded documents -->
+                        <v-card v-if="Object.keys(uploadedDocuments).length > 0" variant="outlined" class="mb-4">
+                          <v-card-title class="text-subtitle-1">
+                            <v-icon start>mdi-file-document-multiple</v-icon>
+                            Uploaded Documents
+                          </v-card-title>
+                          <v-card-text>
+                            <v-chip
+                              v-for="(file, docType) in uploadedDocuments"
+                              :key="docType"
+                              class="ma-1"
+                              color="success"
+                              variant="flat"
+                            >
+                              <v-icon start>mdi-check-circle</v-icon>
+                              {{ getDocumentName(docType) }}: {{ file?.[0]?.name || 'Uploaded' }}
+                            </v-chip>
+                          </v-card-text>
+                        </v-card>
                       </v-card-text>
                       <v-card-actions>
                         <v-btn @click="prevStep">
@@ -556,16 +669,21 @@ const createdReferral = ref(null);
 const step1Form = ref(null);
 const step2Form = ref(null);
 const step3Form = ref(null);
+const step4Form = ref(null);
 const currentStep = ref(1);
 
 const facilities = ref([]);
 const enrollees = ref([]);
 const caseRecords = ref([]);
 const serviceBundles = ref([]);
+const documentRequirements = ref([]);
+const uploadedDocuments = ref({});
+
 const loadingFacilities = ref(false);
 const loadingEnrollees = ref(false);
 const loadingBundles = ref(false);
 const loadingCaseRecords = ref(false);
+const loadingDocumentRequirements = ref(false);
 
 const showSuccessDialog = ref(false);
 const assignedPrimaryFacilities = ref([]);
@@ -630,6 +748,7 @@ onMounted(async () => {
     fetchServiceBundles(),
     fetchCaseRecords(),
     fetchAssignedFacilities(), // safe no-op for non facility roles
+    fetchDocumentRequirements(),
   ]);
 });
 
@@ -749,10 +868,75 @@ const fetchCaseRecords = async () => {
   }
 };
 
+// Fetch document requirements for referrals
+const fetchDocumentRequirements = async () => {
+  loadingDocumentRequirements.value = true;
+  try {
+    const response = await api.get('/document-requirements/for-referral');
+    const data = response.data.data || response.data;
+
+    // Combine required and optional documents
+    const required = data.required || [];
+    const optional = data.optional || [];
+    documentRequirements.value = [...required, ...optional];
+  } catch (err) {
+    console.error('Failed to fetch document requirements:', err);
+    showError('Failed to load document requirements');
+  } finally {
+    loadingDocumentRequirements.value = false;
+  }
+};
+
+// Handle document upload
+const handleDocumentUpload = (requirement, files) => {
+  // Vuetify v-file-input passes a single File when `multiple` is false; normalize to an array
+  const fileList = Array.isArray(files) ? files : (files ? [files] : []);
+
+  if (!fileList || fileList.length === 0) {
+    uploadedDocuments.value[requirement.document_type] = null;
+    return;
+  }
+
+  const uploadedFile = fileList[0];
+
+  // Validate file size
+  const maxSizeBytes = requirement.max_file_size_mb * 1024 * 1024;
+  if (uploadedFile.size > maxSizeBytes) {
+    showError(`File size exceeds ${requirement.max_file_size_mb}MB limit`);
+    uploadedDocuments.value[requirement.document_type] = null;
+    return;
+  }
+
+  // Validate file type
+  const allowedTypes = requirement.allowed_file_types.split(',').map(t => t.trim().toLowerCase());
+  const fileExtension = uploadedFile.name.split('.').pop().toLowerCase();
+
+  if (!allowedTypes.includes(fileExtension)) {
+    showError(`File type .${fileExtension} is not allowed. Allowed types: ${requirement.allowed_file_types}`);
+    uploadedDocuments.value[requirement.document_type] = null;
+    return;
+  }
+
+  // Store the file
+  uploadedDocuments.value[requirement.document_type] = fileList;
+};
+
+// Get accepted file types for file input
+const getAcceptedFileTypes = (allowedTypes) => {
+  if (!allowedTypes) return '*';
+  return allowedTypes.split(',').map(t => '.' + t.trim()).join(',');
+};
+
+// Get document name from document type
+const getDocumentName = (docType) => {
+  const requirement = documentRequirements.value.find(r => r.document_type === docType);
+  return requirement?.name || docType;
+};
+
 // Handle service selection type change
-const onServiceTypeChange = (type) => {
+const onServiceTypeChange = () => {
   // Clear selections when type changes
-    formData.value.service_bundle_id = null;
+  formData.value.service_bundle_id = null;
   formData.value.case_record_ids = [];
 };
 
@@ -779,6 +963,8 @@ const nextStep = async (step) => {
     formRef = step2Form.value;
   } else if (step === 3) {
     formRef = step3Form.value;
+  } else if (step === 4) {
+    formRef = step4Form.value;
   }
 
   if (formRef) {
@@ -814,8 +1000,9 @@ const handleSubmission = async () => {
   const step1Valid = await step1Form.value?.validate();
   const step2Valid = await step2Form.value?.validate();
   const step3Valid = await step3Form.value?.validate();
+  const step4Valid = await step4Form.value?.validate();
 
-  if (!step1Valid?.valid || !step2Valid?.valid || !step3Valid?.valid) {
+  if (!step1Valid?.valid || !step2Valid?.valid || !step3Valid?.valid || !step4Valid?.valid) {
     showError('Please fill in all required fields in all steps');
     return;
   }
@@ -825,11 +1012,36 @@ const handleSubmission = async () => {
   createdReferral.value = null;
 
   try {
-    const payload = {
-      ...formData.value,
-    };
+    // Create FormData for file upload
+    const formDataPayload = new FormData();
 
-    const response = await api.post('/referrals', payload);
+    // Append all form fields
+    Object.keys(formData.value).forEach(key => {
+      const value = formData.value[key];
+      if (value !== null && value !== undefined) {
+        if (Array.isArray(value)) {
+          formDataPayload.append(key, JSON.stringify(value));
+        } else {
+          formDataPayload.append(key, value);
+        }
+      }
+    });
+
+    // Append document files
+  Object.keys(uploadedDocuments.value).forEach(docType => {
+    const files = uploadedDocuments.value[docType];
+    const fileList = Array.isArray(files) ? files : (files ? [files] : []);
+    if (fileList.length > 0) {
+      formDataPayload.append(`documents[${docType}]`, fileList[0]);
+    }
+  });
+
+    const response = await api.post('/referrals', formDataPayload, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+
     createdReferral.value = response.data.data || response.data;
 
     showSuccess(`Referral created successfully! UTN: ${createdReferral.value.utn}`);
@@ -865,12 +1077,16 @@ const resetForm = () => {
     contact_person_name: '',
     contact_person_phone: '',
     contact_person_email: '',
+    service_selection_type: null,
+    service_bundle_id: null,
+    case_record_ids: [],
   };
-  requestedServices.value = [];
+  uploadedDocuments.value = {};
   currentStep.value = 1;
   step1Form.value?.reset?.();
   step2Form.value?.reset?.();
   step3Form.value?.reset?.();
+  step4Form.value?.reset?.();
 };
 </script>
 

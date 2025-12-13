@@ -104,6 +104,7 @@ class AdmissionService
             'status' => 'discharged',
             'discharge_date' => $data['discharge_date'] ?? now(),
             'discharge_summary' => $data['discharge_summary'] ?? null,
+            'ward_days' => $data['ward_days'] ?? null,
             'discharged_by' => auth()->id(),
         ]);
 
@@ -155,4 +156,3 @@ class AdmissionService
             ->first();
     }
 }
-

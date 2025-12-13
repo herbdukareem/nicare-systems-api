@@ -101,7 +101,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('do-facilities', DOFacilityController::class);
 
     // DO Dashboard routes (for desk officers)
-    Route::prefix('do-dashboard')->middleware('claims.role:desk_officer')->group(function () {
+    Route::prefix('do-dashboard')->middleware('claims.role:desk_officer,facility_admin,facility_user')->group(function () {
         Route::get('overview', [DODashboardController::class, 'overview']);
         Route::get('referrals', [DODashboardController::class, 'getReferrals']);
         Route::get('pa-codes', [DODashboardController::class, 'getPACodes']);

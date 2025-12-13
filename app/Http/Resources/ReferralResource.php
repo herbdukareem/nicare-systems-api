@@ -36,12 +36,12 @@ class ReferralResource extends JsonResource
             'contact_person_email' => $this->contact_person_email,
             'service_selection_type' => $this->service_selection_type,
             'service_bundle_id' => $this->service_bundle_id,
-            'case_record_ids' => $this->case_record_ids ?? [],
+            'case_record_ids' => is_array($this->case_record_ids)
+                ? $this->case_record_ids
+                : (json_decode($this->case_record_ids, true) ?: []),
             'requested_services' => $this->requested_services ?? [],
             'request_date' => $this->request_date,
             'approval_date' => $this->approval_date,
-            'valid_until' => $this->valid_until,
-            'is_expired' => $this->isExpired(),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
             'enrollee' => new EnrolleeResource($this->whenLoaded('enrollee')),
@@ -57,7 +57,45 @@ class ReferralResource extends JsonResource
                     'diagnosis_icd10' => $this->serviceBundle->diagnosis_icd10,
                 ];
             }),
-            'case_records' => !empty($this->case_record_ids) ? $this->caseRecords() : [],
+            'case_record' => $this->whenLoaded('caseRecord', function () {
+                return [
+                    'id' => $this->caseRecord->id,
+                    'nicare_code' => $this->caseRecord->nicare_code,
+                    'case_name' => $this->caseRecord->case_name,
+                    'detail_type' => $this->caseRecord->detail_type,
+                ];
+            }),
+            'documents' => $this->whenLoaded('documents', function () {
+                return $this->documents->map(function ($doc) {
+                    return [
+                        'id' => $doc->id,
+                        'document_type' => $doc->document_type,
+                        'file_name' => $doc->file_name,
+                        'file_path' => $doc->file_path,
+                        'file_type' => $doc->file_type,
+                        'file_size' => $doc->file_size,
+                        'file_size_human' => $doc->file_size_human,
+                        'mime_type' => $doc->mime_type,
+                        'original_filename' => $doc->original_filename,
+                        'url' => $doc->url,
+                        'is_required' => $doc->is_required,
+                        'is_validated' => $doc->is_validated,
+                        'validated_at' => $doc->validated_at,
+                        'uploaded_by' => $doc->uploaded_by,
+                        'created_at' => $doc->created_at,
+                        'document_requirement' => $doc->relationLoaded('documentRequirement') && $doc->documentRequirement ? [
+                            'id' => $doc->documentRequirement->id,
+                            'name' => $doc->documentRequirement->name,
+                            'description' => $doc->documentRequirement->description,
+                        ] : null,
+                        'uploader' => $doc->relationLoaded('uploader') && $doc->uploader ? [
+                            'id' => $doc->uploader->id,
+                            'name' => $doc->uploader->name,
+                            'email' => $doc->uploader->email,
+                        ] : null,
+                    ];
+                });
+            }),
         ];
     }
 }
