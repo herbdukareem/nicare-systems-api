@@ -394,10 +394,16 @@ const pasFeedbackMenu = {
   icon: 'mdi-comment-text-multiple',
   children: [
     {
-      name: 'Feedback',
+      name: 'Feedback List',
       path: '/feedback',
       icon: 'mdi-comment-text',
       roles: ['admin', 'Super Admin', 'claims_officer', 'facility_admin', 'facility_user'],
+    },
+    {
+      name: 'Create Feedback',
+      path: '/feedback/create',
+      icon: 'mdi-message-plus',
+      roles: ['admin', 'Super Admin', 'claims_officer', 'desk_officer'],
     },
   ],
 };
@@ -423,6 +429,12 @@ const claimsMenu = {
       path: '/claims/review',
       icon: 'mdi-file-check',
       roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'],
+    },
+    {
+      name: 'Payment Batches',
+      path: '/claims/payment-batches',
+      icon: 'mdi-cash-multiple',
+      roles: ['admin', 'Super Admin', 'claims_officer', 'claim_approver'],
     },
   ],
 };

@@ -331,6 +331,7 @@ export const feedbackAPI = {
   getMyFeedbacks: (params) => api.get('/feedback/my-feedbacks', { params }),
   getEnrolleeComprehensiveData: (enrolleeId) => api.get(`/feedback/enrollee/${enrolleeId}/comprehensive-data`),
   assignToOfficer: (id, data) => api.post(`/feedback/${id}/assign`, data),
+  getApprovedReferrals: (params) => api.get('/feedback/approved-referrals', { params }),
 };
 
 // Case Category Management API
@@ -399,6 +400,22 @@ export const claimsAPI = {
   getClaims: (params) => api.get('/pas/claims', { params }),
   approveClaim: (id, data) => api.post(`/pas/claims/${id}/approve`, data),
   rejectClaim: (id, data) => api.post(`/pas/claims/${id}/reject`, data),
+  // Review and batch operations
+  reviewClaim: (id, data) => api.post(`/claims-automation/claims/${id}/review`, data),
+  batchApprove: (data) => api.post('/claims-automation/claims/batch-approve', data),
+  batchReject: (data) => api.post('/claims-automation/claims/batch-reject', data),
+  downloadSlip: (id) => api.get(`/claims-automation/claims/${id}/slip`, { responseType: 'blob' }),
+};
+
+// Payment Batch API
+export const paymentBatchAPI = {
+  getAll: (params) => api.get('/claims-automation/payment-batches', { params }),
+  getById: (id) => api.get(`/claims-automation/payment-batches/${id}`),
+  create: (data) => api.post('/claims-automation/payment-batches', data),
+  getApprovedClaims: (params) => api.get('/claims-automation/payment-batches/approved-claims', { params }),
+  process: (id, data) => api.post(`/claims-automation/payment-batches/${id}/process`, data),
+  markPaid: (id, data) => api.post(`/claims-automation/payment-batches/${id}/mark-paid`, data),
+  downloadReceipt: (id) => api.get(`/claims-automation/payment-batches/${id}/receipt`, { responseType: 'blob' }),
 };
 
 // Claims Automation API - Hybrid Bundle/FFS Payment Model

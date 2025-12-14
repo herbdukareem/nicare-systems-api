@@ -182,16 +182,31 @@ class FeedbackController extends Controller
         $request->validate([
             'enrollee_id' => 'required|exists:enrollees,id',
             'referral_id' => 'nullable|exists:referrals,id',
-            'pa_code_id' => 'nullable|exists:p_a_codes,id',
+            'pa_code_id' => 'nullable|exists:pa_codes,id',
             'feedback_type' => 'required|in:referral,pa_code,general',
             'priority' => 'required|in:low,medium,high,urgent',
             'feedback_comments' => 'nullable|string',
             'officer_observations' => 'nullable|string',
-            'claims_guidance' => 'nullable|string'
+            'claims_guidance' => 'nullable|string',
+            // Optional referral status change
+            'new_referral_status' => 'nullable|string|in:PENDING,APPROVED,REJECTED,CANCELLED,COMPLETED',
         ]);
 
         try {
             DB::beginTransaction();
+
+            $referralStatusBefore = null;
+            $referralStatusAfter = null;
+
+            // Handle referral status change if provided
+            if ($request->filled('referral_id') && $request->filled('new_referral_status')) {
+                $referral = Referral::find($request->referral_id);
+                if ($referral) {
+                    $referralStatusBefore = $referral->status;
+                    $referral->update(['status' => $request->new_referral_status]);
+                    $referralStatusAfter = $request->new_referral_status;
+                }
+            }
 
             $feedback = FeedbackRecord::create([
                 'enrollee_id' => $request->enrollee_id,
@@ -199,10 +214,14 @@ class FeedbackController extends Controller
                 'pa_code_id' => $request->pa_code_id,
                 'feedback_officer_id' => Auth::id(),
                 'feedback_type' => $request->feedback_type,
+                'event_type' => null, // Manual feedback, not system generated
+                'is_system_generated' => false,
                 'priority' => $request->priority,
                 'feedback_comments' => $request->feedback_comments,
                 'officer_observations' => $request->officer_observations,
                 'claims_guidance' => $request->claims_guidance,
+                'referral_status_before' => $referralStatusBefore,
+                'referral_status_after' => $referralStatusAfter,
                 'status' => 'pending',
                 'feedback_date' => now(),
                 'created_by' => Auth::id()
@@ -212,7 +231,7 @@ class FeedbackController extends Controller
 
             $feedback->load([
                 'enrollee:id,nicare_number,full_name',
-                'referral:id,referral_code',
+                'referral:id,referral_code,status',
                 'paCode:id,pa_code',
                 'feedbackOfficer:id,name'
             ]);
@@ -229,6 +248,45 @@ class FeedbackController extends Controller
                 'success' => false,
                 'message' => 'Failed to create feedback record',
                 'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Get approved referrals for feedback creation
+     */
+    public function getApprovedReferrals(Request $request): JsonResponse
+    {
+        try {
+            $query = Referral::with([
+                'enrollee:id,nicare_number,full_name,phone',
+                'referringFacility:id,name',
+                'receivingFacility:id,name',
+            ])
+            ->where('status', 'APPROVED');
+
+            if ($request->filled('search')) {
+                $search = $request->search;
+                $query->where(function ($q) use ($search) {
+                    $q->where('referral_code', 'like', "%{$search}%")
+                      ->orWhere('utn', 'like', "%{$search}%")
+                      ->orWhereHas('enrollee', function ($eq) use ($search) {
+                          $eq->where('nicare_number', 'like', "%{$search}%")
+                             ->orWhere('full_name', 'like', "%{$search}%");
+                      });
+                });
+            }
+
+            $referrals = $query->orderBy('created_at', 'desc')->limit(200)->get();
+
+            return response()->json([
+                'success' => true,
+                'data' => $referrals,
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to get referrals: ' . $e->getMessage(),
             ], 500);
         }
     }

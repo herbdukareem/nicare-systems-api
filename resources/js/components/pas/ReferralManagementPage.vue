@@ -456,9 +456,11 @@
                           <div class="text-caption" v-if="selectedReferral.service_bundle.diagnosis_icd10">ICD-10: {{ selectedReferral.service_bundle.diagnosis_icd10 }}</div>
                         </div>
                         <div v-if="selectedReferral.service_selection_type === 'direct'" class="mt-2">
+                         
                           <div v-if="selectedReferral.case_records?.length">
                             <div class="text-subtitle-2 mb-1">Selected Services</div>
                             <div class="d-flex flex-wrap">
+                              
                               <v-chip
                                 v-for="service in selectedReferral.case_records"
                                 :key="service.id"
@@ -642,6 +644,74 @@
                   <v-alert type="info" variant="tonal" density="compact">
                     <v-icon start>mdi-information</v-icon>
                     No documents uploaded for this referral.
+                  </v-alert>
+                </v-col>
+              </v-row>
+
+              <v-divider></v-divider>
+
+              <!-- Feedback Records -->
+              <v-row class="pa-4" v-if="selectedReferral.feedback_records && selectedReferral.feedback_records.length > 0">
+                <v-col cols="12">
+                  <h3 class="text-h6 mb-3">
+                    <v-icon color="primary" class="mr-2">mdi-comment-text-multiple</v-icon>
+                    Feedback History
+                  </h3>
+                </v-col>
+                <v-col cols="12">
+                  <v-timeline density="compact" side="end">
+                    <v-timeline-item
+                      v-for="fb in selectedReferral.feedback_records"
+                      :key="fb.id"
+                      :dot-color="fb.is_system_generated ? 'grey' : 'primary'"
+                      size="small"
+                    >
+                      <template #opposite>
+                        <div class="text-caption text-grey">{{ formatDate(fb.created_at) }}</div>
+                      </template>
+                      <v-card variant="outlined" density="compact">
+                        <v-card-title class="text-body-2 d-flex align-center">
+                          <v-chip
+                            :color="fb.is_system_generated ? 'grey' : 'primary'"
+                            size="x-small"
+                            class="mr-2"
+                          >
+                            {{ fb.is_system_generated ? 'Auto' : 'Manual' }}
+                          </v-chip>
+                          <span class="font-weight-medium">{{ fb.event_type || fb.feedback_type }}</span>
+                          <v-spacer />
+                          <span class="text-caption text-grey">{{ fb.feedback_code }}</span>
+                        </v-card-title>
+                        <v-card-text class="py-2">
+                          <div class="text-body-2">{{ fb.feedback_comments }}</div>
+                          <div v-if="fb.officer_observations" class="text-caption text-grey mt-1">
+                            <strong>Observations:</strong> {{ fb.officer_observations }}
+                          </div>
+                          <div v-if="fb.referral_status_before || fb.referral_status_after" class="mt-2">
+                            <v-chip v-if="fb.referral_status_before" size="x-small" color="orange" class="mr-1">
+                              {{ fb.referral_status_before }}
+                            </v-chip>
+                            <v-icon v-if="fb.referral_status_before && fb.referral_status_after" size="small">mdi-arrow-right</v-icon>
+                            <v-chip v-if="fb.referral_status_after" size="x-small" color="green" class="ml-1">
+                              {{ fb.referral_status_after }}
+                            </v-chip>
+                          </div>
+                          <div class="text-caption text-grey mt-2">
+                            By: {{ fb.feedback_officer?.name || fb.creator?.name || 'System' }}
+                          </div>
+                        </v-card-text>
+                      </v-card>
+                    </v-timeline-item>
+                  </v-timeline>
+                </v-col>
+              </v-row>
+
+              <!-- No Feedback Message -->
+              <v-row class="pa-4" v-else>
+                <v-col cols="12">
+                  <v-alert type="info" variant="tonal" density="compact">
+                    <v-icon start>mdi-information</v-icon>
+                    No feedback records for this referral.
                   </v-alert>
                 </v-col>
               </v-row>

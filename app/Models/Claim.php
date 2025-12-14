@@ -65,6 +65,28 @@ class Claim extends Model
         return $this->hasMany(ClaimLine::class);
     }
 
+    public function claimLineItems(): HasMany
+    {
+        return $this->hasMany(ClaimLine::class);
+    }
+
+    public function claimBundleComponents(): HasMany
+    {
+        return $this->hasMany(BundleComponent::class);
+    }
+
+    public function serviceBundleComponents()
+    {
+        // This traverses: Claim -> Referral -> ServiceBundle -> Components
+        return $this->referral->serviceBundle->components();
+    }
+
+    public function claimPACodes(): HasMany
+    {
+        return $this->hasMany(PACode::class);
+    }
+    
+
     /**
      * Claim has many alerts.
      */
@@ -103,6 +125,22 @@ class Claim extends Model
     public function submittedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'submitted_by');
+    }
+
+    /**
+     * User who reviewed the claim.
+     */
+    public function reviewedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /**
+     * Claim belongs to a payment batch.
+     */
+    public function paymentBatch(): BelongsTo
+    {
+        return $this->belongsTo(ClaimPaymentBatch::class, 'payment_batch_id');
     }
 
     // Scopes

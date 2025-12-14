@@ -97,7 +97,7 @@ class DocumentRequirementController extends BaseController
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
-            'request_type' => 'required|in:referral,fup_code,both',
+            'request_type' => 'required|in:referral,pa_code,both',
             'document_type' => 'required|string|max:50',
             'name' => 'required|string|max:255',
             'description' => 'nullable|string',
@@ -155,7 +155,7 @@ class DocumentRequirementController extends BaseController
     public function update(Request $request, DocumentRequirement $documentRequirement)
     {
         $validator = Validator::make($request->all(), [
-            'request_type' => 'sometimes|in:referral,fup_code,both',
+            'request_type' => 'sometimes|in:referral,pa_code,both',
             'document_type' => 'sometimes|string|max:50',
             'name' => 'sometimes|string|max:255',
             'description' => 'nullable|string',

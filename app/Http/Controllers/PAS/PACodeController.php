@@ -219,6 +219,10 @@ class PACodeController extends Controller
                 }
             }
 
+            // Create automatic feedback for FUP request
+            $feedbackService = app(\App\Services\FeedbackService::class);
+            $feedbackService->createFUPRequestedFeedback($paCode);
+
             DB::commit();
 
             $paCode->load(['enrollee', 'facility', 'referral', 'admission', 'serviceBundle', 'documents']);
@@ -249,6 +253,10 @@ class PACodeController extends Controller
             'status' => 'APPROVED',
             'approval_date' => now(),
         ]);
+
+        // Create automatic feedback for FUP approval
+        $feedbackService = app(\App\Services\FeedbackService::class);
+        $feedbackService->createFUPApprovedFeedback($paCode);
 
         $paCode->load(['enrollee', 'facility', 'referral', 'admission', 'serviceBundle']);
 

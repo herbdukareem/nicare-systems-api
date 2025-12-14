@@ -112,8 +112,9 @@ class DODashboardController extends Controller
                 ]);
             }
 
+
             // Build referrals query based on facility level
-            $referralsQuery = $this->buildReferralsQuery($facilityIds, $assignedFacilities);
+            $referralsQuery = $this->buildReferralsQuery($request, $facilityIds, $assignedFacilities);
             
             // Apply filters
             $this->applyReferralFilters($referralsQuery, $request);
@@ -294,6 +295,10 @@ class DODashboardController extends Controller
                 'utn_validation_notes' => $request->validation_notes
             ]);
 
+            // Create automatic feedback for UTN validation
+            $feedbackService = app(\App\Services\FeedbackService::class);
+            $feedbackService->createUTNValidatedFeedback($referral);
+
             return response()->json([
                 'success' => true,
                 'message' => 'UTN validated successfully',
@@ -377,9 +382,14 @@ class DODashboardController extends Controller
     /**
      * Build referrals query based on facility levels
      */
-    private function buildReferralsQuery($facilityIds, $assignedFacilities)
+    private function buildReferralsQuery(Request $request, $facilityIds, $assignedFacilities)
     {
         $query = Referral::query();
+
+        // Filter by UTN validated status
+        if ($request->has('utn_validated')) {
+            $query->where('utn_validated', filter_var($request->utn_validated, FILTER_VALIDATE_BOOLEAN));
+        }
 
         // IMPORTANT: Desk officers should only see APPROVED referrals
         $query->where('status', 'approved');

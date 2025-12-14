@@ -195,7 +195,8 @@ class ReferralController extends BaseController
             'receivingFacility',
             'serviceBundle',
             'documents.documentRequirement',
-            'documents.uploader'
+            'documents.uploader',
+            'feedbackRecords'
         ]);
 
         return $this->sendResponse(

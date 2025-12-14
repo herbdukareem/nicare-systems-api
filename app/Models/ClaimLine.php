@@ -12,6 +12,8 @@ class ClaimLine extends Model
     protected $casts = [
         'unit_price' => 'decimal:2',
         'line_total' => 'decimal:2',
+        'approved_amount' => 'decimal:2',
+        'is_approved' => 'boolean',
     ];
 
     /**

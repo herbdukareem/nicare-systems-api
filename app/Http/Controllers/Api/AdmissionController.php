@@ -92,6 +92,10 @@ class AdmissionController extends Controller
                 $validated
             );
 
+            // Create automatic feedback for admission
+            $feedbackService = app(\App\Services\FeedbackService::class);
+            $feedbackService->createAdmissionFeedback($admission);
+
             return response()->json([
                 'success' => true,
                 'message' => 'Admission created successfully',
@@ -159,6 +163,10 @@ class AdmissionController extends Controller
             ]);
 
             $admission = $this->admissionService->dischargePatient($admission, $validated);
+
+            // Create automatic feedback for discharge
+            $feedbackService = app(\App\Services\FeedbackService::class);
+            $feedbackService->createDischargeFeedback($admission);
 
             return response()->json([
                 'success' => true,

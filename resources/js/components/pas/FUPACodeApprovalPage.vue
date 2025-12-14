@@ -77,7 +77,7 @@
 
                   <template v-slot:item.actions="{ item }">
                     <v-btn
-                      v-if="item.status === 'PENDING'"
+                     
                       icon
                       size="small"
                       color="primary"
@@ -477,7 +477,9 @@ const fetchPACodes = async () => {
   loading.value = true;
   try {
     const response = await api.get('/pas/pa-codes', {
-      params: { type: 'FFS_TOP_UP' }
+      params: { 
+        // type: 'FFS_TOP_UP'
+       }
     });
     paCodes.value = response.data.data || response.data;
   } catch (err) {

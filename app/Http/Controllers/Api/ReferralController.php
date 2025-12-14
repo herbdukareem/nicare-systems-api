@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 
+use App\Http\Resources\ReferralResource;
 use App\Models\Referral;
 use App\Services\FileUploadService;
 use Illuminate\Http\Request;
@@ -274,7 +275,18 @@ class ReferralController extends Controller
     public function show(Referral $referral): JsonResponse
     {
         try {
-            $referral->load(['approvedBy', 'deniedBy', 'paCodes']);
+            $referral->load([
+                'referringFacility',
+                'receivingFacility',
+                'enrollee',
+                'approvedBy',
+                'deniedBy',
+                'paCodes',
+                'documents.documentRequirement',
+                'documents.uploader',
+                'feedbackRecords.feedbackOfficer',
+                'feedbackRecords.creator'
+            ]);
 
             // Add file URLs if files exist
             if ($referral->enrollee_id_card_path) {
@@ -287,7 +299,7 @@ class ReferralController extends Controller
 
             return response()->json([
                 'success' => true,
-                'data' => $referral
+                'data' => new ReferralResource($referral)
             ]);
 
         } catch (\Exception $e) {

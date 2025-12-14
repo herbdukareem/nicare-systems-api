@@ -426,25 +426,9 @@
                           <div class="text-caption">Code: {{ selectedReferral.service_bundle.code }} | Price: ₦{{ Number(selectedReferral.service_bundle.fixed_price).toLocaleString() }}</div>
                           <div class="text-caption" v-if="selectedReferral.service_bundle.diagnosis_icd10">ICD-10: {{ selectedReferral.service_bundle.diagnosis_icd10 }}</div>
                         </div>
-                        <div v-if="selectedReferral.service_selection_type === 'direct'" class="mt-2">
-                          <div v-if="selectedReferral.case_records?.length">
-                            <div class="text-subtitle-2 mb-1">Selected Services</div>
-                            <div class="d-flex flex-wrap">
-                              <v-chip
-                                v-for="service in selectedReferral.case_records"
-                                :key="service.id"
-                                class="mr-1 mb-1"
-                                variant="outlined"
-                                size="small"
-                              >
-                                {{ service.case_name || service.service_description }} ({{ service.nicare_code }})
-                              </v-chip>
-                            </div>
-                          </div>
-                          <div v-else-if="selectedReferral.case_record_ids?.length" class="text-caption">
-                            {{ selectedReferral.case_record_ids.length }} service(s) selected
-                          </div>
-                          <div v-else class="text-caption">No direct services found</div>
+                        <div v-if="selectedReferral.case_record" class="mt-2">
+                          <div class="text-subtitle-2">{{ selectedReferral.case_record.case_name }}</div>
+                          <div class="text-caption">NiCare Code: {{ selectedReferral.case_record.nicare_code }}</div>
                         </div>
                       </div>
                     </div>
@@ -652,6 +636,7 @@ const fetchReferrals = async () => {
   loading.value = true;
   try {
     const response = await doDashboardAPI.getReferrals({
+      utn_validated: true,
       per_page: 100, // Get more records to avoid pagination issues
     });
 
@@ -926,7 +911,7 @@ const generatePrintContent = (ref) => {
     <body>
       <div class="header">
         <div class="logo">NGSCHA</div>
-        <div class="subtitle">Nasarawa State Contributory Healthcare Agency</div>
+        <div class="subtitle">Niger State Contributory Health Agency</div>
         <div class="subtitle">REFERRAL SLIP</div>
       </div>
 
@@ -1080,7 +1065,7 @@ const generatePrintContent = (ref) => {
 
       <div class="footer">
         <div>Printed: ${currentDate}</div>
-        <div>Nasarawa State Contributory Healthcare Agency</div>
+        <div>Niger State Contributory Health Agency</div>
         <div>www.ngscha.ng.gov.ng</div>
       </div>
     </body>
@@ -1177,3 +1162,4 @@ onMounted(() => {
   font-weight: 500;
 }
 </style>
+

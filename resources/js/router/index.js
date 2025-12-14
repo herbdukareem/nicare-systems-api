@@ -181,7 +181,18 @@ const routes = [
       breadcrumb: 'Feedback Management'
     }
   },
-    {
+  {
+    path: '/feedback/create',
+    name: 'feedback-create',
+    component: () => import('../components/feedback/FeedbackCreationPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Create Feedback',
+      description: 'Create feedback for approved referrals',
+      breadcrumb: 'Create Feedback'
+    }
+  },
+  {
     path: '/task-management',
     name: 'task-management',
     component: () => import('../components/task-management/TaskManagementPage.vue'),
@@ -346,6 +357,17 @@ const routes = [
     component: () => import('../components/common/ComingSoonPage.vue'),
     meta: { requiresAuth: true },
     props: { title: 'Claims History', subtitle: 'View claims history and reports', icon: 'mdi-history' }
+  },
+  {
+    path: '/claims/payment-batches',
+    name: 'payment-batch-management',
+    component: () => import('../components/claims/PaymentBatchManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      title: 'Payment Batch Management',
+      description: 'Create and manage payment batches for approved claims',
+      breadcrumb: 'Payment Batches'
+    }
   },
 
   // Claims Automation Routes (Bundle/FFS Hybrid Payment Model)

@@ -57,6 +57,8 @@ class Referral extends Model
         return $this->belongsTo(ServiceBundle::class, 'service_bundle_id');
     }
 
+    
+
     /**
      * Referral may have a selected direct service (case record).
      */
@@ -68,12 +70,22 @@ class Referral extends Model
     /**
      * Referral can have multiple direct service selections stored as IDs.
      */
-    public function caseRecords()
+    // public function caseRecords()
+    // {
+    //     if (empty($this->case_record_ids)) {
+    //         return collect([]);
+    //     }
+
+    //     return CaseRecord::whereIn('id', $this->case_record_ids)->get();
+    // }
+
+   public function getCaseRecordsDataAttribute() 
     {
         if (empty($this->case_record_ids)) {
             return collect([]);
         }
 
+        // Use whereIn to retrieve the associated Case Records
         return CaseRecord::whereIn('id', $this->case_record_ids)->get();
     }
 
@@ -107,6 +119,14 @@ class Referral extends Model
     public function claims()
     {
         return $this->hasMany(Claim::class);
+    }
+
+    /**
+     * Referral has many feedback records.
+     */
+    public function feedbackRecords()
+    {
+        return $this->hasMany(FeedbackRecord::class);
     }
 
     /**
@@ -180,4 +200,8 @@ class Referral extends Model
             ->where('utn_validated', true)
             ->where('claim_submitted', false);
     }
+
+    protected $appends = [
+        'case_records_data'
+    ];
 }

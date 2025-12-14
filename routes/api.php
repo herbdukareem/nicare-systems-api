@@ -49,6 +49,7 @@ use App\Http\Controllers\Api\AdmissionController;
 use App\Http\Controllers\Api\ClaimController;
 use App\Http\Controllers\Api\ClaimLineController;
 use App\Http\Controllers\Api\PaymentController;
+use App\Http\Controllers\Api\PaymentBatchController;
 use App\Http\Controllers\Api\ReportingController;
 use App\Http\Controllers\PAS\PACodeController;
 
@@ -267,12 +268,17 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/', [ClaimController::class, 'index']);
             Route::post('/', [ClaimController::class, 'store']);
             Route::get('/{claim}', [ClaimController::class, 'show']);
+            Route::get('/{claim}/full-details', [ClaimController::class, 'showFullDetails']);
             Route::get('/{claim}/slip', [ClaimController::class, 'downloadSlip']);
             Route::post('/{claim}/submit', [ClaimController::class, 'submit']);
             Route::post('/{claim}/validate', [ClaimController::class, 'validateClaim']);
             Route::post('/{claim}/approve', [ClaimController::class, 'approve']);
             Route::post('/{claim}/reject', [ClaimController::class, 'reject']);
             Route::get('/{claim}/summary', [ClaimController::class, 'summary']);
+            // Review and batch operations
+            Route::post('/{claim}/review', [ClaimController::class, 'review']);
+            Route::post('/batch-approve', [ClaimController::class, 'batchApprove']);
+            Route::post('/batch-reject', [ClaimController::class, 'batchReject']);
 
             // Claim Lines
             Route::post('/{claim}/lines/bundle', [ClaimLineController::class, 'addBundleTreatment']);
@@ -284,6 +290,17 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::prefix('claim-lines')->group(function () {
             Route::get('/{claimLine}', [ClaimLineController::class, 'show']);
             Route::delete('/{claimLine}', [ClaimLineController::class, 'destroy']);
+        });
+
+        // Payment Batch Management
+        Route::prefix('payment-batches')->group(function () {
+            Route::get('/', [PaymentBatchController::class, 'index']);
+            Route::post('/', [PaymentBatchController::class, 'store']);
+            Route::get('/approved-claims', [PaymentBatchController::class, 'getApprovedClaims']);
+            Route::get('/{batch}', [PaymentBatchController::class, 'show']);
+            Route::post('/{batch}/process', [PaymentBatchController::class, 'process']);
+            Route::post('/{batch}/mark-paid', [PaymentBatchController::class, 'markPaid']);
+            Route::get('/{batch}/receipt', [PaymentBatchController::class, 'downloadReceipt']);
         });
 
         // Payment Management
@@ -310,10 +327,11 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/search-enrollees', [FeedbackController::class, 'searchEnrollees']);
         Route::get('/officers', [FeedbackController::class, 'getFeedbackOfficers']);
         Route::get('/my-feedbacks', [FeedbackController::class, 'getMyFeedbacks']);
+        Route::get('/approved-referrals', [FeedbackController::class, 'getApprovedReferrals']);
         Route::get('/enrollee/{enrolleeId}/comprehensive-data', [FeedbackController::class, 'getEnrolleeComprehensiveData']);
-        Route::get('/{id}', [FeedbackController::class, 'show']);
-        Route::put('/{id}', [FeedbackController::class, 'update']);
-        Route::post('/{id}/assign', [FeedbackController::class, 'assignToOfficer']);
+        Route::get('/{id}', [FeedbackController::class, 'show'])->whereNumber('id');
+        Route::put('/{id}', [FeedbackController::class, 'update'])->whereNumber('id');
+        Route::post('/{id}/assign', [FeedbackController::class, 'assignToOfficer'])->whereNumber('id');
     });
 
     // Task Management
@@ -346,6 +364,17 @@ Route::middleware(['auth:sanctum'])->prefix('pas')->group(function () {
     Route::post('pa-codes/{paCode}/approve', [PACodeController::class, 'approve']);
     Route::post('pa-codes/{paCode}/reject', [PACodeController::class, 'reject']);
 
+    // Claims Management (for review/approval)
+    Route::prefix('claims')->group(function () {
+        Route::get('/', [ClaimController::class, 'index']);
+        Route::get('/{claim}', [ClaimController::class, 'show']);
+        Route::get('/{claim}/full-details', [ClaimController::class, 'showFullDetails']);
+        Route::get('/{claim}/slip', [ClaimController::class, 'downloadSlip']);
+        Route::post('/{claim}/review', [ClaimController::class, 'review']);
+        Route::post('/batch-approve', [ClaimController::class, 'batchApprove']);
+        Route::post('/batch-reject', [ClaimController::class, 'batchReject']);
+    });
+
     // Security routes
     Route::prefix('security')->group(function () {
         Route::get('dashboard', [SecurityController::class, 'dashboard']);
@@ -356,8 +385,4 @@ Route::middleware(['auth:sanctum'])->prefix('pas')->group(function () {
         Route::get('sessions', [SecurityController::class, 'sessions']);
         Route::post('sessions/revoke', [SecurityController::class, 'revokeSessions']);
     });
-
-
-
-
 });
