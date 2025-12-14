@@ -8,6 +8,7 @@ use App\Models\PACode;
 use App\Models\Facility;
 use App\Models\Referral;
 use App\Services\FileUploadService;
+use Illuminate\Queue\Failed\NullFailedJobProvider;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 
@@ -101,6 +102,13 @@ class PACodeController extends Controller
      */
     public function store(Request $request) // Use RequestPACodeRequest for real validation
     {
+
+        $caseRecordIdsRule = ['nullable'];
+        if ($request->service_selection_type === 'direct') {
+            $caseRecordIdsRule[] = 'required';
+        }
+
+
         $validator = Validator::make($request->all(), [
             'enrollee_id' => 'required|exists:enrollees,id',
             'facility_id' => 'required|exists:facilities,id',
@@ -111,7 +119,8 @@ class PACodeController extends Controller
             'admission_id' => 'nullable|exists:admissions,id',
             'service_selection_type' => ['nullable', 'in:bundle,direct'],
             'service_bundle_id' => ['nullable', 'required_if:service_selection_type,bundle', 'exists:service_bundles,id'],
-            'case_record_ids' => ['nullable', 'required_if:service_selection_type,direct', 'json'],
+            'case_record_ids' => $caseRecordIdsRule,
+            'case_record_ids.*' => ['exists:case_records,id'],
             'documents.*' => 'nullable|file|max:10240', // Max 10MB per file
         ]);
 
@@ -165,9 +174,14 @@ class PACodeController extends Controller
                 }
             }
 
+            $caseRecordIds = $request->case_record_ids ?? null;
+
             // Parse JSON fields
             $requestedItems = $request->requested_items ? json_decode($request->requested_items, true) : [];
-            $caseRecordIds = $request->case_record_ids ? json_decode($request->case_record_ids, true) : null;
+            // ensure case_record_ids is an array
+            if (is_string($caseRecordIds)) {
+                $caseRecordIds = json_decode($request->case_record_ids, true);
+            }
 
             $paCode = PACode::create([
                 'enrollee_id' => $request->enrollee_id,
@@ -182,7 +196,7 @@ class PACodeController extends Controller
                 'requested_services' => $requestedItems,
                 'service_selection_type' => $request->service_selection_type,
                 'service_bundle_id' => $request->service_selection_type === 'bundle' ? $request->service_bundle_id : null,
-                'case_record_id' => $request->service_selection_type === 'direct' ? $caseRecordIds[0] : null,
+                'case_record_ids' => $request->service_selection_type === 'direct' ? $caseRecordIds : null,
             ]);
 
             // Handle document uploads

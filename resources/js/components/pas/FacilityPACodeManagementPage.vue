@@ -234,83 +234,12 @@
         </v-row>
       </v-container>
 
-      <!-- Details Dialog -->
-      <v-dialog v-model="detailsDialog" max-width="800px" scrollable>
-        <v-card>
-          <v-card-title class="bg-primary text-white">
-            <v-icon start>mdi-shield-check</v-icon>
-            PA Code Details
-            <v-spacer></v-spacer>
-            <v-btn icon variant="text" @click="detailsDialog = false" color="white">
-              <v-icon>mdi-close</v-icon>
-            </v-btn>
-          </v-card-title>
-          <v-card-text v-if="selectedPA" class="pt-4">
-            <v-row>
-              <v-col cols="12" md="6">
-                <div class="mb-3">
-                  <strong>PA Code:</strong>
-                  <v-chip color="primary" size="small" class="ml-2">{{ selectedPA.code || 'Pending' }}</v-chip>
-                </div>
-                <div class="mb-3">
-                  <strong>UTN:</strong>
-                  <v-chip color="indigo" size="small" class="ml-2">{{ selectedPA.referral?.utn || 'N/A' }}</v-chip>
-                </div>
-                <div class="mb-3">
-                  <strong>Type:</strong> {{ selectedPA.type === 'FFS_TOP_UP' ? 'FFS Top-Up' : 'Bundle' }}
-                </div>
-                <div class="mb-3">
-                  <strong>Status:</strong>
-                  <v-chip :color="getStatusColor(selectedPA.status)" size="small" class="ml-2">
-                    {{ selectedPA.status }}
-                  </v-chip>
-                </div>
-              </v-col>
-              <v-col cols="12" md="6">
-                <div class="mb-3">
-                  <strong>Patient:</strong> {{ selectedPA.referral?.enrollee?.first_name }} {{ selectedPA.referral?.enrollee?.last_name }}
-                </div>
-                <div class="mb-3">
-                  <strong>Enrollee ID:</strong> {{ selectedPA.referral?.enrollee?.nicare_number || selectedPA.referral?.enrollee?.enrollee_id }}
-                </div>
-                <div class="mb-3">
-                  <strong>Requested Date:</strong> {{ formatDate(selectedPA.created_at) }}
-                </div>
-                <div class="mb-3" v-if="selectedPA.approved_at">
-                  <strong>Approved Date:</strong> {{ formatDate(selectedPA.approved_at) }}
-                </div>
-              </v-col>
-            </v-row>
-
-            <v-divider class="my-4"></v-divider>
-
-            <div v-if="selectedPA.service_description">
-              <h4 class="mb-2">Service Description:</h4>
-              <p>{{ selectedPA.service_description }}</p>
-            </div>
-
-            <div v-if="selectedPA.rejection_reason" class="mt-4">
-              <v-alert type="error" variant="tonal">
-                <strong>Rejection Reason:</strong><br>
-                {{ selectedPA.rejection_reason }}
-              </v-alert>
-            </div>
-          </v-card-text>
-          <v-divider></v-divider>
-          <v-card-actions class="pa-4">
-            <v-btn
-              color="purple"
-              variant="outlined"
-              @click="printPASlip(selectedPA)"
-              prepend-icon="mdi-printer"
-            >
-              Print Slip
-            </v-btn>
-            <v-spacer></v-spacer>
-            <v-btn variant="outlined" @click="detailsDialog = false">Close</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <!-- FU-PA Code Details Modal -->
+      <FUPACodeDetailsModal
+        v-model="detailsDialog"
+        :pa-code="selectedPA"
+        @print-slip="printPASlip(selectedPA)"
+      />
 
       <!-- FU-PA Request Dialog -->
       <v-dialog v-model="showRequestDialog" max-width="1200px" persistent scrollable>
@@ -593,6 +522,7 @@ import { useRouter } from 'vue-router';
 import api from '../../utils/api';
 import { useToast } from '../../composables/useToast';
 import AdminLayout from '../layout/AdminLayout.vue';
+import FUPACodeDetailsModal from '../modals/FUPACodeDetailsModal.vue';
 
 const router = useRouter();
 const { success: showSuccess, error: showError, info: showInfo, warning: showWarning } = useToast();
