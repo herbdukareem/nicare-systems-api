@@ -114,12 +114,20 @@ function formatDate(
 
 
 const getStatusColor = (status) => {
+  if (!status) return 'grey';
   switch (status.toLowerCase()) {
-    case 'active': return 'success';
-    case 'pending': return 'warning';
-    case 'expired': return 'error';
-    case 'inactive': return 'error';
-    default: return 'grey';
+    case 'active':
+    case 'approved':
+    case 'paid':
+      return 'success';
+    case 'pending':
+      return 'warning';
+    case 'expired':
+    case 'inactive':
+    case 'rejected':
+      return 'error';
+    default:
+      return 'grey';
   }
 };
 
