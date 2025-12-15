@@ -632,12 +632,16 @@ public function showFullDetails($claimId): JsonResponse
                 'claim_ids' => 'required|array|min:1',
                 'claim_ids.*' => 'integer|exists:claims,id',
                 'approval_comments' => 'nullable|string',
+                'payment_code' => 'required|string',
+                'generate_approval_letter' => 'nullable|boolean',
+                'generate_payment_receipts' => 'nullable|boolean',
             ]);
 
             DB::beginTransaction();
 
             $approvedCount = 0;
             $errors = [];
+            $approvedClaims = [];
 
             foreach ($validated['claim_ids'] as $claimId) {
                 $claim = Claim::find($claimId);
@@ -651,20 +655,35 @@ public function showFullDetails($claimId): JsonResponse
                     'status' => 'APPROVED',
                     'approved_amount' => $claim->approved_amount ?? $claim->total_amount_claimed,
                     'approval_comments' => $validated['approval_comments'] ?? null,
+                    'payment_code' => $validated['payment_code'],
                     'approved_by' => auth()->id(),
                     'approved_at' => now(),
                 ]);
 
+                $approvedClaims[] = $claim;
                 $approvedCount++;
             }
 
             DB::commit();
+
+            // Generate approval letter if requested
+            if ($validated['generate_approval_letter'] ?? false) {
+                // TODO: Generate approval letter for all claims
+                // This will be a batch approval letter document
+            }
+
+            // Generate payment receipts if requested
+            if ($validated['generate_payment_receipts'] ?? false) {
+                // TODO: Generate individual payment receipts for each claim
+                // Each receipt will include the payment code
+            }
 
             return response()->json([
                 'success' => true,
                 'message' => "{$approvedCount} claims approved successfully",
                 'approved_count' => $approvedCount,
                 'errors' => $errors,
+                'payment_code' => $validated['payment_code'],
             ]);
         } catch (\Exception $e) {
             DB::rollBack();

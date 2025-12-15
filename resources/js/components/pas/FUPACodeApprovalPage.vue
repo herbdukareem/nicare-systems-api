@@ -11,12 +11,12 @@
               </v-card-title>
               <v-card-text>
                 <!-- Filters -->
-                <v-row class="mb-4">
+                <v-row class="mb-4 mt-4">
                   <v-col cols="12" md="4">
                     <v-text-field
                       v-model="searchQuery"
                       label="Search by PA Code or Patient"
-                      outlined
+                      variant="outlined"
                       dense
                       prepend-icon="mdi-magnify"
                       clearable
@@ -27,7 +27,7 @@
                       v-model="statusFilter"
                       label="Filter by Status"
                       :items="statusOptions"
-                      outlined
+                       variant="outlined"
                       dense
                       clearable
                     />
@@ -118,7 +118,6 @@
       <FUPACodeDetailsModal
         v-model="detailsDialog"
         :pa-code="selectedPA"
-        @print-slip="printPASlip(selectedPA)"
       >
         <template #actions>
           <v-btn
@@ -154,7 +153,7 @@
             <v-textarea
               v-model="rejectionReason"
               label="Rejection Reason *"
-              outlined
+               variant="outlined"
               rows="4"
               hint="Provide a reason for rejection"
               :rules="[v => !!v || 'Rejection reason is required']"
@@ -179,8 +178,10 @@ import AdminLayout from '../layout/AdminLayout.vue';
 import FUPACodeDetailsModal from '../modals/FUPACodeDetailsModal.vue';
 import api from '@/js/utils/api';
 import { useToast } from '@/js/composables/useToast';
+import { useUtils } from '@/js/utils/utils';
 
 const { success: showSuccess, error: showError } = useToast();
+const { getStatusColor, formatDate } = useUtils();
 
 // Reactive state
 const loading = ref(false);
@@ -328,10 +329,6 @@ const confirmReject = async () => {
 const resetFilters = () => {
   searchQuery.value = '';
   statusFilter.value = null;
-};
-
-const printPASlip = (pa) => {
-  showInfo('Print functionality coming soon!');
 };
 
 onMounted(async () => {

@@ -141,11 +141,27 @@ const navigationCards = ref([
   },
   {
     title: 'Review Claims',
-    description: 'Review and approve submitted claims',
+    description: 'Review  submitted claims',
     icon: 'mdi-file-check',
     color: 'warning',
     route: '/claims/review',
     roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'],
+  },
+   {
+    title: 'Claims Approval',
+    description: 'Approve submitted claims',
+    icon: 'mdi-file-check',
+    color: 'warning',
+    route: '/claims/approval',
+    roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'],
+  },
+  {
+    title: 'Payment Batches',
+    description: 'Authorize and process payment batches',
+    icon: 'mdi-cash-multiple',
+    color: 'success',
+    route: '/claims/payment-batches',
+    roles: ['admin', 'Super Admin', 'claims_officer', 'claim_approver'],
   },
   {
     title: 'Claims History',

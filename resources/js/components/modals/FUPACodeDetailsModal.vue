@@ -281,6 +281,38 @@
               </v-table>
             </v-col>
           </v-row>
+
+          <v-divider></v-divider>
+
+          <!-- PA Documents -->
+          <v-row class="pa-4" v-if="paCode.documents && paCode.documents.length > 0">
+            <v-col cols="12">
+              <h3 class="text-h6 mb-3">
+                <v-icon color="primary" class="mr-2">mdi-file-document-multiple</v-icon>
+                Supporting Documents
+              </h3>
+            </v-col>
+            <v-col cols="12">
+              <v-list density="compact">
+                <v-list-item
+                  v-for="(doc, index) in paCode.documents"
+                  :key="index"
+                  class="mb-2"
+                >
+                  <template v-slot:prepend>
+                    <v-icon color="primary">mdi-file-pdf-box</v-icon>
+                  </template>
+                  <v-list-item-title class="font-weight-medium">{{ doc.document_type }}</v-list-item-title>
+                  <v-list-item-subtitle>
+                    <v-chip size="x-small" color="blue" variant="flat" class="mr-2">
+                      {{ doc.file_name }}
+                    </v-chip>
+                    <span class="text-caption">Uploaded: {{ formatDate(doc.created_at) }}</span>
+                  </v-list-item-subtitle>
+                </v-list-item>
+              </v-list>
+            </v-col>
+          </v-row>
         </v-container>
       </v-card-text>
 
@@ -290,7 +322,7 @@
         <v-btn
           color="purple"
           variant="elevated"
-          @click="$emit('print-slip')"
+          @click="printPASlip"
           prepend-icon="mdi-printer"
         >
           Print Slip
@@ -317,6 +349,8 @@ const isOpen = computed({
   get: () => props.modelValue,
   set: (value) => emit('update:modelValue', value),
 });
+
+const paCode = computed(() => props.paCode);
 
 const handleClose = () => {
   isOpen.value = false;
@@ -404,6 +438,325 @@ const getCaseTypeLabel = (detailType) => {
 const getServiceName = (caseRecordId) => {
   // This would need to be passed as a prop or fetched
   return `Service ${caseRecordId}`;
+};
+
+const printPASlip = () => {
+  if (!paCode.value) return;
+  const printWindow = window.open('', '_blank', 'width=400,height=700,scrollbars=yes');
+  const printContent = generatePAPrintContent(paCode.value);
+
+  printWindow.document.write(printContent);
+  printWindow.document.close();
+  printWindow.focus();
+};
+
+const generatePAPrintContent = (pa) => {
+  const currentDate = new Date().toLocaleString('en-NG');
+
+  // Helper function for case type labels
+  const getCaseTypeLabel = (detailType) => {
+    const labels = {
+      drug: 'Drug',
+      laboratory: 'Lab',
+      professional_service: 'Service',
+      radiology: 'Radiology',
+      consultation: 'Consultation',
+      consumable: 'Consumable',
+    };
+    return labels[detailType] || 'Service';
+  };
+
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>PA Code Slip - ${pa.code || 'Pending'}</title>
+      <style>
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+
+        body {
+          font-family: 'Courier New', monospace;
+          font-size: 12px;
+          line-height: 1.4;
+          color: #000;
+          background: #fff;
+          width: 80mm;
+          margin: 0 auto;
+          padding: 10px;
+        }
+
+        .header {
+          text-align: center;
+          border-bottom: 2px solid #000;
+          padding-bottom: 8px;
+          margin-bottom: 12px;
+        }
+
+        .logo {
+          font-weight: bold;
+          font-size: 16px;
+          margin-bottom: 4px;
+        }
+
+        .subtitle {
+          font-size: 10px;
+          margin-bottom: 2px;
+        }
+
+        .section {
+          margin-bottom: 12px;
+          border-bottom: 1px dashed #666;
+          padding-bottom: 8px;
+        }
+
+        .section:last-child {
+          border-bottom: none;
+        }
+
+        .section-title {
+          font-weight: bold;
+          font-size: 11px;
+          margin-bottom: 4px;
+          text-transform: uppercase;
+        }
+
+        .row {
+          display: flex;
+          justify-content: space-between;
+          margin-bottom: 2px;
+          font-size: 10px;
+        }
+
+        .label {
+          font-weight: bold;
+          width: 40%;
+        }
+
+        .value {
+          width: 58%;
+          text-align: right;
+        }
+
+        .full-row {
+          margin-bottom: 4px;
+          font-size: 10px;
+        }
+
+        .full-row .label {
+          font-weight: bold;
+          display: block;
+          margin-bottom: 2px;
+        }
+
+        .full-row .value {
+          display: block;
+          text-align: left;
+          font-size: 9px;
+          padding-left: 8px;
+        }
+
+        .status {
+          text-align: center;
+          font-weight: bold;
+          font-size: 14px;
+          padding: 4px;
+          border: 2px solid #000;
+          margin: 8px 0;
+        }
+
+        .status.pending { background: #fff3cd; }
+        .status.approved { background: #d1edff; }
+        .status.rejected { background: #f8d7da; }
+
+        .table {
+          width: 100%;
+          border-collapse: collapse;
+          margin: 4px 0;
+          font-size: 9px;
+        }
+
+        .table th, .table td {
+          border: 1px solid #666;
+          padding: 2px 4px;
+          text-align: left;
+        }
+
+        .table th {
+          background: #f0f0f0;
+          font-weight: bold;
+        }
+
+        .qr-placeholder {
+          text-align: center;
+          border: 1px solid #666;
+          padding: 8px;
+          margin: 8px 0;
+          font-size: 10px;
+        }
+
+        .footer {
+          text-align: center;
+          font-size: 9px;
+          margin-top: 12px;
+          padding-top: 8px;
+          border-top: 1px solid #666;
+        }
+
+        @media print {
+          body { margin: 0; padding: 5px; }
+          .no-print { display: none; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="logo">NGSCHA</div>
+        <div class="subtitle">Niger State Contributory Health Agency</div>
+        <div class="subtitle">FU-PA CODE SLIP</div>
+      </div>
+
+      <div class="section">
+        <div class="row">
+          <span class="label">PA CODE:</span>
+          <span class="value">${pa.code || '—'}</span>
+        </div>
+        <div class="row">
+          <span class="label">TYPE:</span>
+          <span class="value">${pa.type === 'FFS_TOP_UP' ? 'FFS TOP-UP' : 'BUNDLE'}</span>
+        </div>
+        <div class="row">
+          <span class="label">DATE:</span>
+          <span class="value">${formatDateShort(pa.created_at)}</span>
+        </div>
+      </div>
+
+      <div class="status ${(pa.status || '').toLowerCase()}">
+        STATUS: ${(pa.status || 'PENDING').toUpperCase()}
+      </div>
+
+      <div class="section">
+        <div class="section-title">Referral Information</div>
+        <div class="row">
+          <span class="label">Ref Code:</span>
+          <span class="value">${pa.referral?.referral_code || '—'}</span>
+        </div>
+        <div class="row">
+          <span class="label">UTN:</span>
+          <span class="value">${pa.referral?.utn || '—'}</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Patient Information</div>
+        <div class="row">
+          <span class="label">Name:</span>
+          <span class="value">${pa.enrollee?.first_name || ''} ${pa.enrollee?.last_name || ''}</span>
+        </div>
+        <div class="row">
+          <span class="label">Enrollee ID:</span>
+          <span class="value">${pa.enrollee?.enrollee_id || '—'}</span>
+        </div>
+        <div class="row">
+          <span class="label">Phone:</span>
+          <span class="value">${pa.enrollee?.phone_number || '—'}</span>
+        </div>
+      </div>
+
+      <div class="section">
+        <div class="section-title">Requesting Facility</div>
+        <div class="row">
+          <span class="label">Facility:</span>
+          <span class="value">${pa.facility?.name || '—'}</span>
+        </div>
+        <div class="row">
+          <span class="label">Code:</span>
+          <span class="value">${pa.facility?.facility_code || '—'}</span>
+        </div>
+      </div>
+
+      ${pa.service_selection_type === 'bundle' && pa.service_bundle ? `
+      <div class="section">
+        <div class="section-title">Bundle Service</div>
+        <div class="row">
+          <span class="label">Service:</span>
+          <span class="value">${pa.service_bundle.description || pa.service_bundle.name}</span>
+        </div>
+        <div class="row">
+          <span class="label">Code:</span>
+          <span class="value">${pa.service_bundle.code || '—'}</span>
+        </div>
+        <div class="row">
+          <span class="label">Price:</span>
+          <span class="value">₦${Number(pa.service_bundle.fixed_price || 0).toLocaleString()}</span>
+        </div>
+        ${pa.service_bundle.diagnosis_icd10 ? `
+        <div class="row">
+          <span class="label">ICD-10:</span>
+          <span class="value">${pa.service_bundle.diagnosis_icd10}</span>
+        </div>
+        ` : ''}
+      </div>
+      ` : ''}
+
+      ${pa.service_selection_type === 'direct' && pa.case_records && pa.case_records.length > 0 ? `
+      <div class="section">
+        <div class="section-title">Direct Services (${pa.case_records.length})</div>
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Type</th>
+              <th>Code</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pa.case_records.map(record => `
+            <tr>
+              <td>${record.case_name || '—'}</td>
+              <td>${getCaseTypeLabel(record.detail_type)}</td>
+              <td>${record.nicare_code || '—'}</td>
+            </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      ` : ''}
+
+      ${pa.justification ? `
+      <div class="section">
+        <div class="full-row">
+          <span class="label">Clinical Justification:</span>
+          <span class="value">${pa.justification}</span>
+        </div>
+      </div>
+      ` : ''}
+
+      <div class="qr-placeholder">
+        QR CODE: ${pa.code || 'PENDING'}
+        <br>Scan for verification
+      </div>
+
+      <div class="footer">
+        <div>Printed: ${currentDate}</div>
+        <div>Niger State Contributory Health Agency</div>
+        <div>www.ngscha.ng.gov.ng</div>
+      </div>
+    </body>
+    </html>
+  `;
+};
+
+const formatDateShort = (date) => {
+  if (!date) return 'N/A';
+  return new Date(date).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
 };
 </script>
 

@@ -70,7 +70,7 @@ class PACode extends Model
      * PA Code has many Case Records (for direct service selection).
      * This is a custom accessor since we store IDs in JSON.
      */
-    public function caseRecords()
+    public function getCaseRecordsAttribute()
     {
         if (empty($this->case_record_ids)) {
             return collect([]);
@@ -86,4 +86,8 @@ class PACode extends Model
     {
         return $this->hasMany(PACodeDocument::class, 'pa_code_id', 'id');
     }
+
+     protected $appends = [
+        'case_records'
+    ];
 }

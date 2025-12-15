@@ -352,6 +352,18 @@ const routes = [
     }
   },
   {
+    path: '/claims/approval',
+    name: 'claims-approval',
+    component: () => import('../components/claims/ClaimsApprovalPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'claims_officer'],
+      title: 'Approve Claims',
+      description: 'Batch approve submitted claims with shared payment code and comments',
+      breadcrumb: 'Approve Claims'
+    }
+  },
+  {
     path: '/claims/history',
     name: 'claims-history',
     component: () => import('../components/common/ComingSoonPage.vue'),
