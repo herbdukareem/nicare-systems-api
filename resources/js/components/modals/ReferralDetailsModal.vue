@@ -5,6 +5,16 @@
         <v-icon left class="mr-2">mdi-file-document-check</v-icon>
         <span class="text-h6">Referral Details</span>
         <v-spacer></v-spacer>
+        <v-btn
+          v-if="canCreateFeedback"
+          color="white"
+          variant="outlined"
+          prepend-icon="mdi-comment-plus"
+          @click="openCreateFeedback"
+          class="mr-2"
+        >
+          Create Feedback
+        </v-btn>
         <v-btn icon variant="text" @click="handleClose" color="white">
           <v-icon>mdi-close</v-icon>
         </v-btn>
@@ -295,6 +305,173 @@
 
           <v-divider></v-divider>
 
+          <!-- Feedback Records -->
+          <v-row class="pa-4" v-if="referral.feedback_records && referral.feedback_records.length > 0">
+            <v-col cols="12">
+              <h3 class="text-h6 mb-3">
+                <v-icon color="primary" class="mr-2">mdi-comment-text-multiple</v-icon>
+                Feedback Records
+                <v-chip size="small" class="ml-2" color="primary">{{ referral.feedback_records.length }}</v-chip>
+              </h3>
+            </v-col>
+            <v-col cols="12">
+              <v-timeline side="end" density="compact">
+                <v-timeline-item
+                  v-for="feedback in referral.feedback_records"
+                  :key="feedback.id"
+                  dot-color="primary"
+                  size="small"
+                >
+                  <template v-slot:opposite>
+                    <div class="text-caption font-weight-bold">
+                      <v-icon size="small" color="grey">mdi-calendar</v-icon>
+                      {{ formatDate(feedback.feedback_date || feedback.created_at) }}
+                    </div>
+                  </template>
+                  <v-card variant="outlined">
+                    <v-card-title class="text-subtitle-1 d-flex align-center">
+                      <span class="text-caption text-grey">{{ feedback.feedback_code }}</span>
+                      <v-spacer></v-spacer>
+                      <v-chip v-if="feedback.is_system_generated" size="x-small" variant="outlined">
+                        <v-icon start size="x-small">mdi-robot</v-icon>
+                        System
+                      </v-chip>
+                    </v-card-title>
+                    <v-card-subtitle class="pb-0">
+                      <div class="d-flex align-center text-caption mb-1">
+                        <v-icon size="small" class="mr-1">mdi-clock-outline</v-icon>
+                        <span class="font-weight-bold">Submitted:</span>
+                        <span class="ml-1">{{ formatDate(feedback.feedback_date || feedback.created_at) }}</span>
+                      </div>
+                      <div v-if="feedback.creator" class="d-flex align-center text-caption">
+                        <v-icon size="small" class="mr-1">mdi-account</v-icon>
+                        <span class="font-weight-bold">Created by:</span>
+                        <span class="ml-1">{{ feedback.creator.name }}</span>
+                      </div>
+                    </v-card-subtitle>
+                    <v-card-text>
+                      <div v-if="feedback.feedback_type" class="mb-2">
+                        <v-chip size="small" variant="tonal" color="blue">
+                          <v-icon start size="small">mdi-tag</v-icon>
+                          {{ feedback.feedback_type }}
+                        </v-chip>
+                        <v-chip v-if="feedback.event_type" size="small" variant="tonal" color="purple" class="ml-1">
+                          <v-icon start size="small">mdi-calendar-clock</v-icon>
+                          {{ feedback.event_type }}
+                        </v-chip>
+                      </div>
+                      <div v-if="feedback.feedback_comments" class="mb-2">
+                        <div class="text-caption font-weight-bold text-grey-darken-1">Comments:</div>
+                        <div class="text-body-2">{{ feedback.feedback_comments }}</div>
+                      </div>
+                      <div v-if="feedback.officer_observations" class="mb-2">
+                        <div class="text-caption font-weight-bold text-grey-darken-1">Officer Observations:</div>
+                        <div class="text-body-2">{{ feedback.officer_observations }}</div>
+                      </div>
+                      <div v-if="feedback.referral_status_before || feedback.referral_status_after" class="mt-2">
+                        <v-chip size="x-small" variant="outlined" class="mr-1">
+                          Before: {{ feedback.referral_status_before || 'N/A' }}
+                        </v-chip>
+                        <v-icon size="small">mdi-arrow-right</v-icon>
+                        <v-chip size="x-small" variant="outlined" class="ml-1">
+                          After: {{ feedback.referral_status_after || 'N/A' }}
+                        </v-chip>
+                      </div>
+                    </v-card-text>
+                  </v-card>
+                </v-timeline-item>
+              </v-timeline>
+            </v-col>
+          </v-row>
+
+          <v-divider v-if="referral.feedback_records && referral.feedback_records.length > 0"></v-divider>
+
+          <!-- Documents -->
+          <v-row class="pa-4" v-if="referral.documents && referral.documents.length > 0">
+            <v-col cols="12">
+              <h3 class="text-h6 mb-3">
+                <v-icon color="primary" class="mr-2">mdi-file-document-multiple</v-icon>
+                Uploaded Documents
+                <v-chip size="small" class="ml-2" color="primary">{{ referral.documents.length }}</v-chip>
+              </h3>
+            </v-col>
+            <v-col cols="12">
+              <v-row>
+                <v-col
+                  v-for="doc in referral.documents"
+                  :key="doc.id"
+                  cols="12"
+                  md="6"
+                  lg="4"
+                >
+                  <v-card variant="outlined" class="h-100">
+                    <v-card-title class="text-subtitle-2 d-flex align-center bg-grey-lighten-4">
+                      <v-icon :color="getFileTypeColor(doc.file_type)" class="mr-2">
+                        {{ getFileTypeIcon(doc.file_type) }}
+                      </v-icon>
+                      <span class="text-truncate">{{ doc.file_name }}</span>
+                    </v-card-title>
+                    <v-card-text>
+                      <div class="mb-2">
+                        <div class="text-caption text-grey">Document Type</div>
+                        <v-chip size="small" variant="tonal" color="indigo">{{ doc.document_type }}</v-chip>
+                      </div>
+                      <div v-if="doc.document_requirement" class="mb-2">
+                        <div class="text-caption text-grey">Requirement</div>
+                        <div class="text-body-2">{{ doc.document_requirement.name }}</div>
+                      </div>
+                      <div class="mb-2">
+                        <div class="text-caption text-grey">File Size</div>
+                        <div class="text-body-2">{{ doc.file_size_human }}</div>
+                      </div>
+                      <div v-if="doc.uploader" class="mb-2">
+                        <div class="text-caption text-grey">Uploaded By</div>
+                        <div class="text-body-2">{{ doc.uploader.name }}</div>
+                      </div>
+                      <div class="mb-2">
+                        <div class="text-caption text-grey">Upload Date</div>
+                        <div class="text-body-2">{{ formatDate(doc.created_at) }}</div>
+                      </div>
+                      <div v-if="doc.is_required" class="d-flex align-center">
+                        <v-chip
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                        >
+                          Required
+                        </v-chip>
+                      </div>
+                    </v-card-text>
+                    <v-card-actions>
+                      <v-btn
+                        :href="doc.url"
+                        target="_blank"
+                        size="small"
+                        variant="tonal"
+                        color="primary"
+                        prepend-icon="mdi-download"
+                      >
+                        Download
+                      </v-btn>
+                      <v-btn
+                        :href="doc.url"
+                        target="_blank"
+                        size="small"
+                        variant="text"
+                        color="primary"
+                        prepend-icon="mdi-eye"
+                      >
+                        View
+                      </v-btn>
+                    </v-card-actions>
+                  </v-card>
+                </v-col>
+              </v-row>
+            </v-col>
+          </v-row>
+
+          <v-divider v-if="referral.documents && referral.documents.length > 0"></v-divider>
+
           <!-- Timestamps -->
           <v-row class="pa-4 bg-grey-lighten-5">
             <v-col cols="12" md="4">
@@ -319,7 +496,7 @@
         <v-btn
           color="purple"
           variant="elevated"
-          @click="$emit('print-slip')"
+          @click="emit('print-slip')"
           prepend-icon="mdi-printer"
         >
           Print Slip
@@ -334,6 +511,11 @@
 
 <script setup>
 import { computed } from 'vue';
+import { useAuthStore } from '../../stores/auth';
+import { useRouter } from 'vue-router';
+
+const authStore = useAuthStore();
+const router = useRouter();
 
 const props = defineProps({
   modelValue: Boolean,
@@ -347,8 +529,24 @@ const isOpen = computed({
   set: (value) => emit('update:modelValue', value),
 });
 
+// Check if user has permission to create feedback
+const canCreateFeedback = computed(() => {
+  return authStore.hasPermission('feedback.create');
+});
+
 const handleClose = () => {
   isOpen.value = false;
+};
+
+const openCreateFeedback = () => {
+  // Close the modal
+  handleClose();
+
+  // Navigate to feedback creation page with the referral pre-selected
+  router.push({
+    path: '/feedback/create',
+    query: { referral_id: props.referral?.id }
+  });
 };
 
 const getStatusColor = (status) => {
@@ -390,6 +588,42 @@ const formatDate = (date) => {
     hour: '2-digit',
     minute: '2-digit',
   });
+};
+
+const getFileTypeIcon = (fileType) => {
+  const icons = {
+    pdf: 'mdi-file-pdf-box',
+    doc: 'mdi-file-word',
+    docx: 'mdi-file-word',
+    xls: 'mdi-file-excel',
+    xlsx: 'mdi-file-excel',
+    jpg: 'mdi-file-image',
+    jpeg: 'mdi-file-image',
+    png: 'mdi-file-image',
+    gif: 'mdi-file-image',
+    txt: 'mdi-file-document',
+    zip: 'mdi-folder-zip',
+    rar: 'mdi-folder-zip',
+  };
+  return icons[fileType?.toLowerCase()] || 'mdi-file';
+};
+
+const getFileTypeColor = (fileType) => {
+  const colors = {
+    pdf: 'red',
+    doc: 'blue',
+    docx: 'blue',
+    xls: 'green',
+    xlsx: 'green',
+    jpg: 'purple',
+    jpeg: 'purple',
+    png: 'purple',
+    gif: 'purple',
+    txt: 'grey',
+    zip: 'orange',
+    rar: 'orange',
+  };
+  return colors[fileType?.toLowerCase()] || 'grey';
 };
 </script>
 

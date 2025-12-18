@@ -291,9 +291,19 @@ const statusOptions = [
 ];
 
 const typeOptions = [
-  { title: 'Referral', value: 'referral' },
-  { title: 'PA Code', value: 'pa_code' },
-  { title: 'General', value: 'general' }
+  { title: 'All Types', value: '' },
+  { title: 'Referral Follow-up', value: 'referral' },
+  { title: 'PA Code Issue', value: 'pa_code' },
+  { title: 'General Inquiry', value: 'general' },
+  { title: 'Enrollee Verification', value: 'enrollee_verification' },
+  { title: 'Service Delivery', value: 'service_delivery' },
+  { title: 'Claims Guidance', value: 'claims_guidance' },
+  { title: 'Medical History Review', value: 'medical_history' },
+  { title: 'Complaint Resolution', value: 'complaint' },
+  { title: 'UTN Validation Issue', value: 'utn_validation' },
+  { title: 'Facility Coordination', value: 'facility_coordination' },
+  { title: 'Document Verification', value: 'document_verification' },
+  { title: 'Treatment Progress', value: 'treatment_progress' },
 ];
 
 const priorityOptions = [

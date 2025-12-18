@@ -18,6 +18,10 @@ class FeedbackRecord extends Model
         'pa_code_id',
         'feedback_officer_id',
         'feedback_type',
+        'event_type',
+        'is_system_generated',
+        'referral_status_before',
+        'referral_status_after',
         'status',
         'feedback_comments',
         'officer_observations',
@@ -36,6 +40,7 @@ class FeedbackRecord extends Model
         'enrollee_verification_data' => 'array',
         'medical_history_summary' => 'array',
         'additional_information' => 'array',
+        'is_system_generated' => 'boolean',
         'feedback_date' => 'datetime',
         'completed_at' => 'datetime'
     ];

@@ -219,7 +219,43 @@ class ReferralResource extends JsonResource
             }),
             
             'feedback_records' => $this->whenLoaded('feedbackRecords', function () {
-                return $this->feedbackRecords->map(function ($feedback) {
+                $user = auth()->user();
+                $feedbackRecords = $this->feedbackRecords;
+
+                // Filter feedback based on user role
+                if ($user) {
+                    $isAdmin = $user->hasAnyRole(['Super Admin', 'admin']);
+
+                    if (!$isAdmin) {
+                        // For facility users, only show:
+                        // 1. Feedback created by users from their assigned facilities
+                        // 2. System-generated feedback
+                        $userFacilityIds = \App\Models\Facility::whereHas('assignedUsers', function ($query) use ($user) {
+                            $query->where('user_id', $user->id);
+                        })->pluck('id')->toArray();
+
+                        $feedbackRecords = $feedbackRecords->filter(function ($feedback) use ($userFacilityIds) {
+                            // Always show system-generated feedback
+                            if ($feedback->is_system_generated) {
+                                return true;
+                            }
+
+                            // Show feedback created by users from the same facilities
+                            if ($feedback->relationLoaded('creator') && $feedback->creator) {
+                                $creatorFacilityIds = \App\Models\Facility::whereHas('assignedUsers', function ($query) use ($feedback) {
+                                    $query->where('user_id', $feedback->creator->id);
+                                })->pluck('id')->toArray();
+
+                                // Check if there's any overlap between user's facilities and creator's facilities
+                                return !empty(array_intersect($userFacilityIds, $creatorFacilityIds));
+                            }
+
+                            return false;
+                        });
+                    }
+                }
+
+                return $feedbackRecords->map(function ($feedback) {
                     return [
                         'id' => $feedback->id,
                         'feedback_code' => $feedback->feedback_code,
@@ -234,18 +270,16 @@ class ReferralResource extends JsonResource
                         'referral_status_after' => $feedback->referral_status_after,
                         'feedback_date' => $feedback->feedback_date,
                         'created_at' => $feedback->created_at,
-                        // 'feedback_officer' => $feedback->whenLoaded('feedbackOfficer', function () use ($feedback) {
-                        //     return $feedback->feedbackOfficer ? [
-                        //         'id' => $feedback->feedbackOfficer->id,
-                        //         'name' => $feedback->feedbackOfficer->name,
-                        //     ] : null;
-                        // }),
-                        // 'creator' => $feedback->whenLoaded('creator', function () use ($feedback) {
-                        //     return $feedback->creator ? [
-                        //         'id' => $feedback->creator->id,
-                        //         'name' => $feedback->creator->name,
-                        //     ] : null;
-                        // }),
+                        'feedback_officer' => $feedback->relationLoaded('feedbackOfficer') && $feedback->feedbackOfficer ? [
+                            'id' => $feedback->feedbackOfficer->id,
+                            'name' => $feedback->feedbackOfficer->name,
+                            'email' => $feedback->feedbackOfficer->email,
+                        ] : null,
+                        'creator' => $feedback->relationLoaded('creator') && $feedback->creator ? [
+                            'id' => $feedback->creator->id,
+                            'name' => $feedback->creator->name,
+                            'email' => $feedback->creator->email,
+                        ] : null,
                     ];
                 });
             }),

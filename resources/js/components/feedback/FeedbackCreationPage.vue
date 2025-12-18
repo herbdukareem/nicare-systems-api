@@ -149,8 +149,13 @@
 
 <script setup>
 import { ref, onMounted } from 'vue';
+import { useRoute } from 'vue-router';
 import AdminLayout from '../layout/AdminLayout.vue';
 import { feedbackAPI } from '../../utils/api';
+import { useToast } from '../../composables/useToast';
+
+const { success, error } = useToast();
+const route = useRoute();
 
 const formRef = ref(null);
 const loadingReferrals = ref(false);
@@ -162,26 +167,33 @@ const changeStatus = ref(false);
 
 const form = ref({
   referral_id: null,
-  feedback_type: 'FOLLOW_UP',
-  priority: 'MEDIUM',
+  feedback_type: 'referral',
+  priority: 'medium',
   feedback_comments: '',
   officer_observations: '',
   new_referral_status: null,
 });
 
 const feedbackTypes = [
-  { title: 'Follow Up', value: 'FOLLOW_UP' },
-  { title: 'Status Update', value: 'STATUS_UPDATE' },
-  { title: 'Complaint', value: 'COMPLAINT' },
-  { title: 'Inquiry', value: 'INQUIRY' },
-  { title: 'General', value: 'GENERAL' },
+  { title: 'Referral Follow-up', value: 'referral' },
+  { title: 'PA Code Issue', value: 'pa_code' },
+  { title: 'General Inquiry', value: 'general' },
+  { title: 'Enrollee Verification', value: 'enrollee_verification' },
+  { title: 'Service Delivery', value: 'service_delivery' },
+  { title: 'Claims Guidance', value: 'claims_guidance' },
+  { title: 'Medical History Review', value: 'medical_history' },
+  { title: 'Complaint Resolution', value: 'complaint' },
+  { title: 'UTN Validation Issue', value: 'utn_validation' },
+  { title: 'Facility Coordination', value: 'facility_coordination' },
+  { title: 'Document Verification', value: 'document_verification' },
+  { title: 'Treatment Progress', value: 'treatment_progress' },
 ];
 
 const priorityOptions = [
-  { title: 'Low', value: 'LOW' },
-  { title: 'Medium', value: 'MEDIUM' },
-  { title: 'High', value: 'HIGH' },
-  { title: 'Urgent', value: 'URGENT' },
+  { title: 'Low', value: 'low' },
+  { title: 'Medium', value: 'medium' },
+  { title: 'High', value: 'high' },
+  { title: 'Urgent', value: 'urgent' },
 ];
 
 const referralStatusOptions = [
@@ -236,9 +248,15 @@ const submitFeedback = async () => {
   const { valid } = await formRef.value.validate();
   if (!valid) return;
 
+  if (!selectedReferral.value) {
+    error('Please select a referral');
+    return;
+  }
+
   submitting.value = true;
   try {
     const payload = {
+      enrollee_id: selectedReferral.value.enrollee_id,
       referral_id: form.value.referral_id,
       feedback_type: form.value.feedback_type,
       priority: form.value.priority,
@@ -250,31 +268,47 @@ const submitFeedback = async () => {
       payload.new_referral_status = form.value.new_referral_status;
     }
 
-    await feedbackAPI.create(payload);
+    const response = await feedbackAPI.create(payload);
 
-    // Reset form
-    form.value = {
-      referral_id: null,
-      feedback_type: 'FOLLOW_UP',
-      priority: 'MEDIUM',
-      feedback_comments: '',
-      officer_observations: '',
-      new_referral_status: null,
-    };
-    selectedReferral.value = null;
-    changeStatus.value = false;
+    if (response.data.success) {
+      success('Feedback submitted successfully');
 
-    await loadRecentFeedbacks();
+      // Reset form
+      form.value = {
+        referral_id: null,
+        feedback_type: 'referral',
+        priority: 'medium',
+        feedback_comments: '',
+        officer_observations: '',
+        new_referral_status: null,
+      };
+      selectedReferral.value = null;
+      changeStatus.value = false;
+
+      await loadRecentFeedbacks();
+    } else {
+      error(response.data.message || 'Failed to submit feedback');
+    }
   } catch (err) {
     console.error('Failed to submit feedback:', err);
+    const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Failed to submit feedback. Please try again.';
+    error(errorMessage);
   } finally {
     submitting.value = false;
   }
 };
 
-onMounted(() => {
-  loadReferrals();
+onMounted(async () => {
+  await loadReferrals();
   loadRecentFeedbacks();
+
+  // Check if there's a pre-selected referral from query params
+  const referralId = route.query.referral_id;
+  if (referralId) {
+    const referralIdNum = parseInt(referralId);
+    form.value.referral_id = referralIdNum;
+    onReferralSelected(referralIdNum);
+  }
 });
 </script>
 

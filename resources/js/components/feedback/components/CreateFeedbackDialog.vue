@@ -277,9 +277,18 @@ const stepperItems = [
 ];
 
 const typeOptions = [
-  { title: 'Referral', value: 'referral' },
-  { title: 'PA Code', value: 'pa_code' },
-  { title: 'General', value: 'general' }
+  { title: 'Referral Follow-up', value: 'referral' },
+  { title: 'PA Code Issue', value: 'pa_code' },
+  { title: 'General Inquiry', value: 'general' },
+  { title: 'Enrollee Verification', value: 'enrollee_verification' },
+  { title: 'Service Delivery', value: 'service_delivery' },
+  { title: 'Claims Guidance', value: 'claims_guidance' },
+  { title: 'Medical History Review', value: 'medical_history' },
+  { title: 'Complaint Resolution', value: 'complaint' },
+  { title: 'UTN Validation Issue', value: 'utn_validation' },
+  { title: 'Facility Coordination', value: 'facility_coordination' },
+  { title: 'Document Verification', value: 'document_verification' },
+  { title: 'Treatment Progress', value: 'treatment_progress' },
 ];
 
 const priorityOptions = [
@@ -343,13 +352,16 @@ const submitFeedback = async () => {
 
     const response = await feedbackAPI.create(payload);
     if (response.data.success) {
+      success('Feedback created successfully');
       emit('created', response.data.data);
       closeDialog();
-      success('Feedback created successfully');
+    } else {
+      error(response.data.message || 'Failed to create feedback');
     }
   } catch (err) {
     console.error('Failed to create feedback:', err);
-    error('Failed to create feedback');
+    const errorMessage = err.response?.data?.message || err.response?.data?.error || 'Failed to create feedback. Please try again.';
+    error(errorMessage);
   } finally {
     submitting.value = false;
   }

@@ -24,9 +24,9 @@ class FeedbackController extends Controller
     {
         try {
             $query = FeedbackRecord::with([
-                'enrollee:id,nicare_number,full_name,phone,gender',
+                'enrollee:id,enrollee_id,first_name,middle_name,last_name,phone,sex',
                 'referral:id,referral_code,status',
-                'paCode:id,pa_code,status',
+                'paCode:id,code,status',
                 'feedbackOfficer:id,name,email'
             ]);
 
@@ -52,8 +52,9 @@ class FeedbackController extends Controller
                 $query->where(function ($q) use ($search) {
                     $q->where('feedback_code', 'like', "%{$search}%")
                       ->orWhereHas('enrollee', function ($eq) use ($search) {
-                          $eq->where('nicare_number', 'like', "%{$search}%")
-                             ->orWhere('full_name', 'like', "%{$search}%");
+                          $eq->where('enrollee_id', 'like', "%{$search}%")
+                             ->orWhere('first_name', 'like', "%{$search}%")
+                             ->orWhere('last_name', 'like', "%{$search}%");
                       });
                 });
             }
@@ -183,7 +184,7 @@ class FeedbackController extends Controller
             'enrollee_id' => 'required|exists:enrollees,id',
             'referral_id' => 'nullable|exists:referrals,id',
             'pa_code_id' => 'nullable|exists:pa_codes,id',
-            'feedback_type' => 'required|in:referral,pa_code,general',
+            'feedback_type' => 'required|in:referral,pa_code,general,enrollee_verification,service_delivery,claims_guidance,medical_history,complaint,utn_validation,facility_coordination,document_verification,treatment_progress',
             'priority' => 'required|in:low,medium,high,urgent',
             'feedback_comments' => 'nullable|string',
             'officer_observations' => 'nullable|string',
@@ -230,9 +231,9 @@ class FeedbackController extends Controller
             DB::commit();
 
             $feedback->load([
-                'enrollee:id,nicare_number,full_name',
+                'enrollee:id,enrollee_id,first_name,middle_name,last_name',
                 'referral:id,referral_code,status',
-                'paCode:id,pa_code',
+                'paCode:id,code',
                 'feedbackOfficer:id,name'
             ]);
 
@@ -254,16 +255,18 @@ class FeedbackController extends Controller
 
     /**
      * Get approved referrals for feedback creation
+     * Only show referrals where claims have not been submitted yet
      */
     public function getApprovedReferrals(Request $request): JsonResponse
     {
         try {
             $query = Referral::with([
-                'enrollee:id,nicare_number,full_name,phone',
+                'enrollee:id,enrollee_id,first_name,middle_name,last_name,phone',
                 'referringFacility:id,name',
                 'receivingFacility:id,name',
             ])
-            ->where('status', 'APPROVED');
+            ->where('status', 'APPROVED')
+            ->where('claim_submitted', false); // Only show referrals without submitted claims
 
             if ($request->filled('search')) {
                 $search = $request->search;
@@ -271,8 +274,9 @@ class FeedbackController extends Controller
                     $q->where('referral_code', 'like', "%{$search}%")
                       ->orWhere('utn', 'like', "%{$search}%")
                       ->orWhereHas('enrollee', function ($eq) use ($search) {
-                          $eq->where('nicare_number', 'like', "%{$search}%")
-                             ->orWhere('full_name', 'like', "%{$search}%");
+                          $eq->where('enrollee_id', 'like', "%{$search}%")
+                             ->orWhere('first_name', 'like', "%{$search}%")
+                             ->orWhere('last_name', 'like', "%{$search}%");
                       });
                 });
             }
@@ -355,9 +359,9 @@ class FeedbackController extends Controller
             $feedback->update($updateData);
 
             $feedback->load([
-                'enrollee:id,nicare_number,full_name',
+                'enrollee:id,enrollee_id,first_name,middle_name,last_name',
                 'referral:id,referral_code',
-                'paCode:id,pa_code',
+                'paCode:id,code',
                 'feedbackOfficer:id,name'
             ]);
 
@@ -392,6 +396,15 @@ class FeedbackController extends Controller
                     'referral' => FeedbackRecord::where('feedback_type', 'referral')->count(),
                     'pa_code' => FeedbackRecord::where('feedback_type', 'pa_code')->count(),
                     'general' => FeedbackRecord::where('feedback_type', 'general')->count(),
+                    'enrollee_verification' => FeedbackRecord::where('feedback_type', 'enrollee_verification')->count(),
+                    'service_delivery' => FeedbackRecord::where('feedback_type', 'service_delivery')->count(),
+                    'claims_guidance' => FeedbackRecord::where('feedback_type', 'claims_guidance')->count(),
+                    'medical_history' => FeedbackRecord::where('feedback_type', 'medical_history')->count(),
+                    'complaint' => FeedbackRecord::where('feedback_type', 'complaint')->count(),
+                    'utn_validation' => FeedbackRecord::where('feedback_type', 'utn_validation')->count(),
+                    'facility_coordination' => FeedbackRecord::where('feedback_type', 'facility_coordination')->count(),
+                    'document_verification' => FeedbackRecord::where('feedback_type', 'document_verification')->count(),
+                    'treatment_progress' => FeedbackRecord::where('feedback_type', 'treatment_progress')->count(),
                 ],
                 'by_priority' => [
                     'low' => FeedbackRecord::where('priority', 'low')->count(),
@@ -434,13 +447,14 @@ class FeedbackController extends Controller
 
             $enrollees = Enrollee::with(['facility:id,name,hcp_code'])
                 ->where(function ($query) use ($search) {
-                    $query->where('nicare_number', 'like', "%{$search}%")
-                          ->orWhere('full_name', 'like', "%{$search}%")
+                    $query->where('enrollee_id', 'like', "%{$search}%")
+                          ->orWhere('first_name', 'like', "%{$search}%")
+                          ->orWhere('last_name', 'like', "%{$search}%")
                           ->orWhere('phone', 'like', "%{$search}%");
                 })
                 ->where('status', 1) // Only active enrollees
                 ->limit(20)
-                ->get(['id', 'nicare_number', 'full_name', 'phone', 'gender', 'facility_id']);
+                ->get(['id', 'enrollee_id', 'first_name', 'middle_name', 'last_name', 'phone', 'sex', 'facility_id']);
 
             return response()->json([
                 'success' => true,
@@ -529,9 +543,9 @@ class FeedbackController extends Controller
     {
         try {
             $query = FeedbackRecord::with([
-                'enrollee:id,nicare_number,full_name,phone,gender',
+                'enrollee:id,enrollee_id,first_name,middle_name,last_name,phone,sex',
                 'referral:id,referral_code,status',
-                'paCode:id,pa_code,status'
+                'paCode:id,code,status'
             ])
             ->where('feedback_officer_id', Auth::id());
 
