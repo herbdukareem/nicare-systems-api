@@ -16,6 +16,7 @@ class Drug extends Model
         'drug_dosage_form',
         'drug_strength',
         'drug_presentation',
+        'pack_description',
         'drug_unit_price',
         'status',
         'created_by',

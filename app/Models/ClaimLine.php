@@ -55,4 +55,12 @@ class ClaimLine extends Model
     {
         return $this->belongsTo(ServiceBundle::class, 'bundle_id');
     }
+
+    /**
+     * Claim Line belongs to a BundleComponent (when reporting_type is 'IN_BUNDLE').
+     */
+    public function bundleComponent()
+    {
+        return $this->belongsTo(BundleComponent::class, 'bundle_component_id');
+    }
 }

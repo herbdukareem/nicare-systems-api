@@ -24,7 +24,7 @@ return new class extends Migration
             $table->json('case_record_ids')
                   ->nullable()
                   ->after('service_bundle_id')
-                  ->comment('Array of selected direct service IDs for multi-service FU-PA codes');
+                  ->comment('Array of selected FFS service IDs for multi-service FU-PA codes');
         });
     }
 

@@ -63,24 +63,25 @@ class ReferralResource extends JsonResource
             'valid_until' => $this->valid_until,
             
             // ----------------------------------------------------
-            // 2. Service Bundle (Mapping the loaded components)
+            // 2. Service Bundle (CaseRecord where is_bundle = true)
             // ----------------------------------------------------
             'service_bundle' => $this->whenLoaded('serviceBundle', function () {
                 $bundle = $this->serviceBundle;
                 return [
                     'id' => $bundle->id,
-                    'code' => $bundle->code,
-                    'name' => $bundle->name,
-                    'description' => $bundle->description,
-                    'fixed_price' => $bundle->fixed_price,
+                    'code' => $bundle->nicare_code,
+                    'name' => $bundle->case_name,
+                    'description' => $bundle->service_description,
+                    'fixed_price' => $bundle->bundle_price ?? $bundle->price,
                     'diagnosis_icd10' => $bundle->diagnosis_icd10,
-                    'components' => $bundle->relationLoaded('components')
+                    'components' => $bundle->load('components')
                         ? $bundle->components->map(function ($component) {
                             return [
                                 'id' => $component->id,
                                 'case_record_id' => $component->case_record_id,
                                 'quantity' => $component->quantity,
                                 'max_quantity' => $component->max_quantity,
+                                'item_name' => $component->item_name,
                                 'case_record' => $component->relationLoaded('caseRecord') && $component->caseRecord ? [
                                     'id' => $component->caseRecord->id,
                                     'nicare_code' => $component->caseRecord->nicare_code,
@@ -98,51 +99,85 @@ class ReferralResource extends JsonResource
             // 3. PA Codes (CRITICAL FIX: Removed manual database query)
             // ----------------------------------------------------
             'pa_codes' => $this->whenLoaded('paCodes', function () {
-                return $this->paCodes->map(function ($pa) {
-                    
+                // Collect all case record IDs from all PA codes to fetch in a single query
+                $allCaseRecordIds = [];
+                foreach ($this->paCodes as $pa) {
+                    if (!empty($pa->case_record_ids) && is_array($pa->case_record_ids)) {
+                        $allCaseRecordIds = array_merge($allCaseRecordIds, $pa->case_record_ids);
+                    }
+                }
+
+                // Fetch all case records in a single query (prevents N+1)
+                $caseRecordsById = [];
+                if (!empty($allCaseRecordIds)) {
+                    $caseRecords = \App\Models\CaseRecord::whereIn('id', array_unique($allCaseRecordIds))->get();
+                    $caseRecordsById = $caseRecords->keyBy('id');
+                }
+
+                return $this->paCodes->map(function ($pa) use ($caseRecordsById) {
+
                     // Service Bundle Data (for PA-type Service Bundles)
-                    $serviceBundleData = $pa->whenLoaded('serviceBundle', function () use ($pa) {
+                    // Bundle is now a CaseRecord where is_bundle = true
+                    $serviceBundleData = null;
+                    if ($pa->relationLoaded('serviceBundle') && $pa->serviceBundle) {
                         $bundle = $pa->serviceBundle;
-                        return [
+                        $serviceBundleData = [
                             'id' => $bundle->id,
-                            'name' => $bundle->name,
-                            'description' => $bundle->description,
-                            'fixed_price' => $bundle->fixed_price,
-                            'components' => $bundle->whenLoaded('components', function () use ($bundle) {
-                                return $bundle->components->map(function ($component) {
-                                    // Use component mapping logic as above
-                                    return [
-                                        'id' => $component->id,
-                                        'case_record_id' => $component->case_record_id,
-                                        'component_name' => $component->component_name ?? null,
-                                        'description' => $component->description ?? null,
-                                        'quantity' => $component->quantity,
-                                        'unit_price' => $component->unit_price ?? 0,
-                                        'max_quantity' => $component->max_quantity,
-                                        'item_type' => $component->item_type ?? null,
-                                        'case_record' => $component->whenLoaded('caseRecord', function () use ($component) {
-                                            return $component->caseRecord ? [
-                                                'id' => $component->caseRecord->id,
-                                                'nicare_code' => $component->caseRecord->nicare_code,
-                                                'name' => $component->caseRecord->case_name, // Note: using 'name' vs 'case_name'
-                                                'price' => $component->caseRecord->price,
-                                                'detail_type' => $component->caseRecord->detail_type,
-                                            ] : null;
-                                        }),
-                                    ];
-                                });
-                            }),
+                            'name' => $bundle->case_name,
+                            'description' => $bundle->service_description,
+                            'fixed_price' => $bundle->bundle_price ?? $bundle->price,
+                            'components' => []
                         ];
-                    });
+
+                        // Check if bundle components are loaded
+                        if ($bundle->relationLoaded('bundleComponents') || $bundle->relationLoaded('components')) {
+                            $components = $bundle->bundleComponents ?? $bundle->components;
+                            $serviceBundleData['components'] = $components->map(function ($component) {
+                                $caseRecordData = null;
+                                if ($component->relationLoaded('caseRecord') && $component->caseRecord) {
+                                    $caseRecordData = [
+                                        'id' => $component->caseRecord->id,
+                                        'nicare_code' => $component->caseRecord->nicare_code,
+                                        'name' => $component->caseRecord->case_name,
+                                        'price' => $component->caseRecord->price,
+                                        'detail_type' => $component->caseRecord->detail_type,
+                                    ];
+                                }
+
+                                return [
+                                    'id' => $component->id,
+                                    'case_record_id' => $component->case_record_id,
+                                    'component_name' => $component->component_name ?? null,
+                                    'item_name' => $component->item_name ?? $component->component_name,
+                                    'description' => $component->description ?? null,
+                                    'quantity' => $component->quantity,
+                                    'unit_price' => $component->unit_price ?? 0,
+                                    'max_quantity' => $component->max_quantity,
+                                    'case_record' => $caseRecordData,
+                                ];
+                            })->toArray();
+                        }
+                    }
 
                     // Case Records Data (for PA-type FFS Case Records)
-                    // The manual query has been removed. 
-                    // To include FFS CaseRecords, the Referral model should have a relationship 
-                    // (e.g., hasManyThrough or a dedicated pivot) that is eager-loaded.
-                    // Since that's not possible from an array of IDs, we only include the IDs here.
-                    // **Note: The consuming front-end should primarily rely on the Claim's
-                    // `claimLineItems` and `claimPACodes` for FFS details.**
-                    
+                    // Use the pre-fetched case records to avoid N+1 queries
+                    $caseRecordsData = [];
+                    if (!empty($pa->case_record_ids) && is_array($pa->case_record_ids)) {
+                        foreach ($pa->case_record_ids as $caseRecordId) {
+                            if (isset($caseRecordsById[$caseRecordId])) {
+                                $cr = $caseRecordsById[$caseRecordId];
+                                $caseRecordsData[] = [
+                                    'id' => $cr->id,
+                                    'nicare_code' => $cr->nicare_code,
+                                    'case_name' => $cr->case_name,
+                                    'service_description' => $cr->service_description,
+                                    'price' => $cr->price,
+                                    'detail_type' => $cr->detail_type,
+                                ];
+                            }
+                        }
+                    }
+
                     return [
                         'id' => $pa->id,
                         'code' => $pa->code,
@@ -152,13 +187,10 @@ class ReferralResource extends JsonResource
                         'justification' => $pa->justification ?? null,
                         'service_bundle_id' => $pa->service_bundle_id,
                         'service_bundle' => $serviceBundleData,
-                        // 'case_records' is intentionally removed/set to null to prevent N+1 queries. 
-                        // If this data is essential, a proper many-to-many relationship must be defined 
-                        // and eager-loaded in the controller instead of querying here.
-                        'case_records' => null, 
+                        'case_records' => $caseRecordsData,
                     ];
 
-                    
+
                 });
             }),
             

@@ -127,12 +127,15 @@ const statistics = ref({
 });
 
 const navigationCards = ref([
-  {
-    title: 'Document Requirements',
-    description: 'Manage document requirements for referrals and PA codes',
-    icon: 'mdi-file-document-multiple',
+   {
+    title: 'Submit Referral to PAS',
+    description: 'Submit referrals on behalf of primary facilities',
+    icon: 'mdi-hospital-box-outline',
     color: 'primary',
-    route: '/document-requirements',
+    route: '/pas/referrals',
+    // badge: 'Admin Only',
+    badgeColor: 'primary',
+    roles: ['admin', 'Super Admin', 'claims_officer'],
   },
   {
     title: 'Referral Management',
@@ -154,6 +157,13 @@ const navigationCards = ref([
     icon: 'mdi-check-decagram',
     color: 'warning',
     route: '/pas/fu-pa-approval',
+  },
+  {
+    title: 'Document Requirements',
+    description: 'Manage document requirements for referrals and PA codes',
+    icon: 'mdi-file-document-multiple',
+    color: 'primary',
+    route: '/document-requirements',
   },
 ]);
 

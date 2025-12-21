@@ -310,7 +310,7 @@
 
           <v-card-text class="pa-6">
             <v-alert type="info" density="compact" class="mb-4">
-              Select a service bundle (single) or multiple direct services for this FU-PA Code request.
+              Select a service bundle  or multiple Fee-For-Service (FFS) for this FU-PA Code request.
             </v-alert>
 
             <v-row>
@@ -362,12 +362,12 @@
               </v-col>
             </v-row>
 
-            <!-- Direct Service Selection (Multiple) -->
+            <!-- FFS Service Selection (Multiple) -->
             <v-row v-if="formData.service_selection_type === 'direct'">
               <v-col cols="12">
                 <v-autocomplete
                   v-model="formData.case_record_ids"
-                  label="Select Direct Services * (Multiple allowed)"
+                  label="Select FFS Services * (Multiple allowed)"
                   :items="caseRecords"
                   item-title="display_name"
                   item-value="id"
@@ -577,7 +577,7 @@ const loadingCaseRecords = ref(false);
 
 const serviceSelectionTypes = [
   { value: 'bundle', text: 'Bundle Service (Package)' },
-  { value: 'direct', text: 'Direct Service (Single Item)' },
+  { value: 'direct', text: 'Fee-For-Service (FFS)' },
 ];
 
 const formData = ref({
@@ -679,16 +679,22 @@ const fetchCaseRecords = async () => {
   }
 };
 
-// Fetch service bundles
+// Fetch service bundles (case records where is_bundle = true)
 const fetchServiceBundles = async () => {
   loadingBundles.value = true;
   try {
-    const response = await api.get('/service-bundles', {
-      params: { status: 'active' }
+    const response = await api.get('/cases', {
+      params: {
+        is_bundle: true,
+        status: true
+      }
     });
     serviceBundles.value = (response.data.data || response.data).map(bundle => ({
       ...bundle,
-      display_name: `${bundle.description || bundle.name} - ₦${Number(bundle.fixed_price).toLocaleString()}`
+      display_name: `${bundle.service_description || bundle.case_name} - ₦${Number(bundle.bundle_price || bundle.price).toLocaleString()}`,
+      description: bundle.service_description,
+      name: bundle.case_name,
+      fixed_price: bundle.bundle_price || bundle.price
     }));
   } catch (err) {
     showError('Failed to load service bundles');

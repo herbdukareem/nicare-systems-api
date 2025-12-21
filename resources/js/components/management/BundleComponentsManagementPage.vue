@@ -57,13 +57,22 @@
                     v-model="bundleFilter"
                     label="Filter by Bundle"
                     :items="bundles"
-                    item-title="description"
+                    item-title="service_description"
                     item-value="id"
                     clearable
                     variant="outlined"
                     dense
                     @update:model-value="loadComponents"
-                  />
+                  >
+                    <template v-slot:item="{ props, item }">
+                      <v-list-item v-bind="props">
+                        <template v-slot:title>{{ item.raw.service_description }}</template>
+                        <template v-slot:subtitle>
+                          {{ item.raw.case_name }}
+                        </template>
+                      </v-list-item>
+                    </template>
+                  </v-autocomplete>
                 </v-col>
                 <v-col cols="12" md="3">
                   <v-select
@@ -131,8 +140,8 @@
               >
                 <template v-slot:item.service_bundle="{ item }">
                   <div>
-                    <div class="font-weight-medium">{{ item.service_bundle?.description }}</div>
-                    <!-- <div class="text-caption text-grey">{{ item.service_bundle?. }}</div> -->
+                    <div class="font-weight-medium">{{ item.service_bundle?.case_name || item.service_bundle?.service_description }}</div>
+                    <div class="text-caption text-grey">{{ item.service_bundle?.nicare_code }}</div>
                   </div>
                 </template>
 
@@ -143,7 +152,7 @@
                   </div>
                 </template>
 
-               
+
 
                 <template v-slot:item.max_quantity="{ item }">
                   <v-chip color="info" variant="outlined" size="small">
@@ -188,13 +197,13 @@
         <v-card-text class="pt-4">
           <v-form ref="componentForm">
             <v-row>
-         
+
               <v-col cols="12">
                 <v-autocomplete
                   v-model="formData.service_bundle_id"
                   label="Service Bundle *"
                   :items="bundles"
-                  item-title="description"
+                  item-title="service_description"
                   item-value="id"
                   :rules="[v => !!v || 'Service bundle is required']"
                   variant="outlined"
@@ -202,10 +211,7 @@
                 >
                   <template v-slot:item="{ props, item }">
                     <v-list-item v-bind="props">
-                      <template v-slot:title>{{ item.raw.description }}</template>
-                      <template v-slot:subtitle>
-                        ₦{{ Number(item.raw.fixed_price).toLocaleString() }}
-                      </template>
+                      <template v-slot:title>{{ item.raw.case_name }}</template>
                     </v-list-item>
                   </template>
                 </v-autocomplete>
@@ -214,7 +220,7 @@
 
             <v-row>
               <v-col cols="12" md="12">
-            
+
                 <v-select
                   v-model="caseTypeFilter"
                   label="Filter by Case Type"
@@ -296,12 +302,21 @@
                   v-model="bulkFormData.service_bundle_id"
                   label="Service Bundle *"
                   :items="bundles"
-                  item-title="description"
+                  item-title="service_description"
                   item-value="id"
                   :rules="[v => !!v || 'Service bundle is required']"
-                     variant="outlined"
+                  variant="outlined"
                   dense
-                />
+                >
+                  <template v-slot:item="{ props, item }">
+                    <v-list-item v-bind="props">
+                      <template v-slot:title>{{ item.raw.service_description }}</template>
+                      <template v-slot:subtitle>
+                        {{ item.raw.case_name }} | ₦{{ Number(item.raw.bundle_price || item.raw.price || 0).toLocaleString() }}
+                      </template>
+                    </v-list-item>
+                  </template>
+                </v-autocomplete>
               </v-col>
             </v-row>
 
@@ -513,21 +528,29 @@ const loadComponents = async (options = {}) => {
   }
 };
 
-// Load bundles
+// Load bundles (case records where is_bundle = true)
 const loadBundles = async () => {
   try {
-    const response = await api.get('/service-bundles');
+    const response = await api.get('/cases', {
+      params: {
+        is_bundle: true,
+        per_page: 1000
+      }
+    });
     bundles.value = response.data.data || response.data;
   } catch (err) {
     console.error('Failed to load bundles', err);
   }
 };
 
-// Load case records with optional case type filter
+// Load case records (only non-bundle items: is_bundle = false) with optional case type filter
 const loadCaseRecords = async () => {
   loadingCaseRecords.value = true;
   try {
-    const params = {};
+    const params = {
+      is_bundle: false, // Only load FFS services (non-bundle items)
+      per_page: 100000
+    };
 
     // Filter by case type if selected
     if (caseTypeFilter.value && caseTypeFilter.value !== '') {
@@ -776,3 +799,4 @@ const exportComponents = async () => {
   padding: 20px 0;
 }
 </style>
+

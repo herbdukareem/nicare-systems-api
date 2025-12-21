@@ -16,20 +16,24 @@ class CaseRecord extends Model
 
     protected $casts = [
         'price' => 'decimal:2',
+        'bundle_price' => 'decimal:2',
         'case_category' => 'integer',
         'pa_required' => 'boolean',
         'referable' => 'boolean',
         'status' => 'boolean',
+        'is_bundle' => 'boolean',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime'
     ];
 
-    protected $attributes = [
-        'status' => true,
-        'pa_required' => false,
-        'referable' => true
-    ];
+    // protected $attributes = [
+
+    //     'status' => true,
+    //     'pa_required' => false,
+    //     'referable' => true,
+    //     'is_bundle' => false
+    // ];
 
     // Level of care constants
     const LEVEL_PRIMARY = 'Primary';
@@ -166,6 +170,25 @@ class CaseRecord extends Model
     {
         return $this->morphTo();
     }
+
+    /**
+     * Get bundle components if this case is a bundle
+     * This relationship is used when is_bundle = true
+     */
+    public function bundleComponents()
+    {
+        return $this->hasMany(BundleComponent::class,  'service_bundle_id');
+    }
+
+    /**
+     * Alias for bundleComponents for backward compatibility
+     */
+    public function components()
+    {
+        // return $this->hasMany(BundleComponent::class,  'service_bundle_id');
+        return $this->bundleComponents();
+    }
+
 
     /**
      * Scope to get only active cases

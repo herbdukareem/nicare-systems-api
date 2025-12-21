@@ -4,7 +4,7 @@ namespace App\Http\Controllers\Api\V1;
 
 use App\Http\Controllers\Controller;
 use App\Models\BundleComponent;
-use App\Models\ServiceBundle;
+use App\Models\CaseRecord;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
@@ -65,8 +65,26 @@ class BundleComponentController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'service_bundle_id' => 'required|exists:service_bundles,id',
-                'case_record_id' => 'required|exists:case_records,id',
+                'service_bundle_id' => [
+                    'required',
+                    'exists:case_records,id',
+                    function ($attribute, $value, $fail) {
+                        $caseRecord = CaseRecord::find($value);
+                        if (!$caseRecord || !$caseRecord->is_bundle) {
+                            $fail('The selected service bundle must be a bundle case record.');
+                        }
+                    }
+                ],
+                'case_record_id' => [
+                    'required',
+                    'exists:case_records,id',
+                    function ($attribute, $value, $fail) {
+                        $caseRecord = CaseRecord::find($value);
+                        if ($caseRecord && $caseRecord->is_bundle) {
+                            $fail('The selected case record cannot be a bundle.');
+                        }
+                    }
+                ],
                 'item_type' => 'required|string|max:50',
                 'max_quantity' => 'required|integer|min:1'
             ]);
@@ -107,7 +125,7 @@ class BundleComponentController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Bundle component created successfully',
-                'data' => $component->load(['serviceBundle.caseRecord', 'caseRecord'])
+                'data' => $component->load(['serviceBundle', 'caseRecord'])
             ], 201);
 
         } catch (\Exception $e) {
@@ -215,7 +233,16 @@ class BundleComponentController extends Controller
     {
         try {
             $validator = Validator::make($request->all(), [
-                'service_bundle_id' => 'required|exists:service_bundles,id',
+                'service_bundle_id' => [
+                    'required',
+                    'exists:case_records,id',
+                    function ($attribute, $value, $fail) {
+                        $caseRecord = CaseRecord::find($value);
+                        if (!$caseRecord || !$caseRecord->is_bundle) {
+                            $fail('The selected service bundle must be a bundle case record.');
+                        }
+                    }
+                ],
                 'components' => 'required|array|min:1',
                 'components.*.case_record_id' => 'required|exists:case_records,id',
                 'components.*.item_type' => 'required|string|max:50',
@@ -288,10 +315,22 @@ class BundleComponentController extends Controller
                 ->groupBy('item_type')
                 ->pluck('count', 'item_type');
 
+            // Count active bundles (case records with is_bundle = true)
+            $activeBundles = CaseRecord::where('is_bundle', true)
+                ->where('status', true)
+                ->count();
+
+            // Count lab and drug items
+            $labItems = BundleComponent::where('item_type', 'laboratory')->count();
+            $drugItems = BundleComponent::where('item_type', 'drug')->count();
+
             return response()->json([
                 'success' => true,
                 'data' => [
                     'total' => $total,
+                    'active_bundles' => $activeBundles,
+                    'lab_items' => $labItems,
+                    'drug_items' => $drugItems,
                     'by_type' => $byType
                 ]
             ]);

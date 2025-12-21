@@ -18,6 +18,7 @@ use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\CasesImport;
 use App\Exports\CasesExport;
+use App\Models\CaseRecord;
 
 class CaseController extends Controller
 {
@@ -35,10 +36,11 @@ class CaseController extends Controller
     {
         try {
             $filters = $request->only([
-                'search', 'status', 'level_of_care', 'group', 'detail_type', 'exclude_groups', 'pa_required', 'referable',
+                'search', 'status', 'level_of_care', 'group', 'detail_type', 'exclude_groups', 'pa_required', 'referable', 'is_bundle',
                 'sort_by', 'sort_direction', 'per_page', 'page'
             ]);
 
+         
             $cases = $this->caseService->getAll($filters);
 
             return response()->json([
@@ -73,6 +75,9 @@ class CaseController extends Controller
                 'pa_required' => 'boolean',
                 'referable' => 'boolean',
                 'status' => 'boolean',
+                'is_bundle' => 'boolean',
+                'bundle_price' => 'nullable|numeric|min:0|required_if:is_bundle,true',
+                'diagnosis_icd10' => 'nullable|string|max:20',
                 'detail_type' => 'nullable|in:drug,laboratory,professional_service,radiology,consultation,consumable',
                 'detail_data' => 'nullable|array'
             ]);
@@ -90,6 +95,8 @@ class CaseController extends Controller
 
             $caseData = $request->except(['detail_type', 'detail_data']);
             $caseData['created_by'] = Auth::id();
+
+            $caseData['price'] = $caseData['price']   ?? $caseData['bundle_price'] ;
            
 
             // Generate NiCare code automatically
@@ -102,8 +109,8 @@ class CaseController extends Controller
 
             $caseRecord = \App\Models\CaseRecord::create($caseData);
 
-            // Handle polymorphic detail if provided
-            if ($request->has('detail_type') && $request->has('detail_data')) {
+            // Handle polymorphic detail if provided (skip for bundles)
+            if ($request->has('detail_type') && $request->detail_type && $request->has('detail_data')) {
                 $detail = $this->createDetail($request->detail_type, $request->detail_data);
                 if ($detail) {
                     $caseRecord->detail()->associate($detail);
@@ -154,21 +161,29 @@ class CaseController extends Controller
     /**
      * Update the specified case
      */
-    public function update(Request $request, \App\Models\CaseRecord $caseRecord): JsonResponse
+    public function update(Request $request, $id): JsonResponse
     {
+
+        $caseRecord = CaseRecord::find($id);
+
         try {
             $validator = Validator::make($request->all(), [
                 'case_name' => 'required|string|max:255',
-                'service_description' => 'required|string',
+                'service_description' => 'nullable|string',
                 'level_of_care' => 'required|in:Primary,Secondary,Tertiary',
                 'price' => 'required|numeric|min:0',
                 'case_group_id' => 'nullable|exists:case_groups,id',
                 'pa_required' => 'boolean',
                 'referable' => 'boolean',
                 'status' => 'boolean',
+                'is_bundle' => 'boolean',
+                'bundle_price' => 'nullable|numeric|min:0|required_if:is_bundle,true',
+                'diagnosis_icd10' => 'nullable|string|max:20',
                 'detail_type' => 'nullable|in:drug,laboratory,professional_service,radiology,consultation,consumable',
-                'detail_data' => 'nullable|array'
-            ]);
+                'detail_data' => 'nullable|array',
+               
+            ]); 
+
 
             if ($validator->fails()) {
                 return response()->json([
@@ -182,7 +197,11 @@ class CaseController extends Controller
 
             $caseData = $request->except(['detail_type', 'detail_data']);
             $caseData['updated_by'] = Auth::id();
-            $caseData['nicare_code'] = $caseRecord->nicare_code;
+         
+            // $caseData['nicare_code'] = $caseRecord->nicare_code;
+            $caseData['price'] = $caseRecord->price ?? $caseData['bundle_price'];
+
+
 
             // Regenerate NiCare code if case name or level of care changed
             if ($request->has('case_name') || $request->has('level_of_care')) {
@@ -198,15 +217,15 @@ class CaseController extends Controller
 
             $caseRecord->update($caseData);
 
-            // Handle polymorphic detail update
+            // Handle polymorphic detail update (skip for bundles)
             if ($request->has('detail_type')) {
                 // Delete old detail if exists
                 if ($caseRecord->detail) {
                     $caseRecord->detail->delete();
                 }
 
-                // Create new detail if data provided
-                 if ($request->has('detail_data') && !empty($request->detail_data)) {
+                // Create new detail if data provided and detail_type is not null
+                 if ($request->detail_type && $request->has('detail_data') && !empty($request->detail_data)) {
                         $detail = $this->createDetail($request->detail_type, $request->detail_data);
                         if ($detail) {
                             // Update polymorphic relationship directly

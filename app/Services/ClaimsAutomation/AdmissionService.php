@@ -3,7 +3,7 @@
 namespace App\Services\ClaimsAutomation;
 
 use App\Models\Admission;
-use App\Models\ServiceBundle;
+use App\Models\CaseRecord;
 use App\Models\Referral;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use InvalidArgumentException;

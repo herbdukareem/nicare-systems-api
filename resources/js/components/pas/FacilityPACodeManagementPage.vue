@@ -357,7 +357,7 @@
                     :rules="[v => !!v || 'Service type is required']"
                   >
                     <v-radio label="Bundle Service" value="bundle"></v-radio>
-                    <v-radio label="Direct Services (Case Records)" value="direct"></v-radio>
+                    <v-radio label="Fee-For-Service (FFS)" value="direct"></v-radio>
                   </v-radio-group>
 
                   <!-- Bundle Selection -->
@@ -708,6 +708,7 @@ const fetchApprovedReferralsForFacility = async () => {
 
     const response = await api.get('/referrals', {
       params: {
+        utn_validated: true,
         status: 'APPROVED',
         receiving_facility_id: facilityId // Filter by facility
       }
@@ -732,7 +733,7 @@ const fetchCaseRecords = async () => {
   loadingCaseRecords.value = true;
   try {
     const response = await api.get('/cases', {
-      params: { status: 'active' }
+      params: { status: 'active', is_bundle: false}
     });
     const records = response.data.data || response.data;
     caseRecords.value = records.map(record => ({
@@ -748,16 +749,22 @@ const fetchCaseRecords = async () => {
   }
 };
 
-// Fetch service bundles
+// Fetch service bundles (case records where is_bundle = true)
 const fetchServiceBundles = async () => {
   loadingBundles.value = true;
   try {
-    const response = await api.get('/service-bundles', {
-      params: { status: 'active' }
+    const response = await api.get('/cases', {
+      params: {
+        is_bundle: true,
+        status: true
+      }
     });
     serviceBundles.value = (response.data.data || response.data).map(bundle => ({
       ...bundle,
-      display_name: `${bundle.description || bundle.name} - ₦${Number(bundle.fixed_price).toLocaleString()}`
+      display_name: `${bundle.service_description || bundle.case_name} - ₦${Number(bundle.bundle_price || bundle.price).toLocaleString()}`,
+      description: bundle.service_description,
+      name: bundle.case_name,
+      fixed_price: bundle.bundle_price || bundle.price
     }));
   } catch (err) {
     showError('Failed to load service bundles');

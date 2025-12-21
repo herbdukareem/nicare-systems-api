@@ -15,21 +15,21 @@ return new class extends Migration
             $table->enum('service_selection_type', ['bundle', 'direct'])
                   ->nullable()
                   ->after('type')
-                  ->comment('Type of service selection: bundle (ServiceBundle), direct (CaseRecord), or null (FFS items only)');
-            
+                  ->comment('Type of service selection: bundle (ServiceBundle), direct (FFS Service - CaseRecord), or null (FFS items only)');
+
             $table->foreignId('service_bundle_id')
                   ->nullable()
                   ->after('service_selection_type')
                   ->constrained('service_bundles')
                   ->onDelete('restrict')
                   ->comment('Selected service bundle for bundle-based FU-PA codes');
-            
+
             $table->foreignId('case_record_id')
                   ->nullable()
                   ->after('service_bundle_id')
                   ->constrained('case_records')
                   ->onDelete('restrict')
-                  ->comment('Selected direct service for single-service FU-PA codes');
+                  ->comment('Selected FFS service for single-service FU-PA codes');
         });
     }
 

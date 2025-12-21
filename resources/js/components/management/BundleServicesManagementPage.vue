@@ -128,25 +128,26 @@
               >
                 <template v-slot:item.code="{ item }">
                   <v-chip color="primary" variant="outlined" size="small">
-                    {{ item.code }}
+                    {{ item.nicare_code || item.code }}
                   </v-chip>
                 </template>
 
                 <template v-slot:item.name="{ item }">
                   <div>
-                    <div class="font-weight-medium">{{ item.name }}</div>
-                    <div class="text-caption text-grey">{{ item.description }}</div>
+                    <div class="font-weight-medium">{{ item.case_name || item.service_description }}</div>
+                    <div class="text-caption text-grey">{{ item.service_description || item.description }}</div>
                   </div>
                 </template>
 
                 <template v-slot:item.diagnosis_icd10="{ item }">
-                  <v-chip color="purple" variant="outlined" size="small">
+                  <v-chip color="purple" variant="outlined" size="small" v-if="item.diagnosis_icd10">
                     {{ item.diagnosis_icd10 }}
                   </v-chip>
+                  <span v-else class="text-grey">-</span>
                 </template>
 
                 <template v-slot:item.fixed_price="{ item }">
-                  <span class="font-weight-medium">₦{{ Number(item.fixed_price).toLocaleString() }}</span>
+                  <span class="font-weight-medium">₦{{ Number(item.bundle_price || item.price || item.fixed_price || 0).toLocaleString() }}</span>
                 </template>
 
 
@@ -154,6 +155,16 @@
                 <template v-slot:item.components_count="{ item }">
                   <v-chip color="info" variant="outlined" size="small">
                     {{ item.components_count || 0 }} items
+                  </v-chip>
+                </template>
+
+                <template v-slot:item.status="{ item }">
+                  <v-chip
+                    :color="item.status ? 'success' : 'error'"
+                    size="small"
+                    variant="flat"
+                  >
+                    {{ item.status ? 'Active' : 'Inactive' }}
                   </v-chip>
                 </template>
 
@@ -460,7 +471,7 @@ const headers = [
   { title: 'ICD-10', key: 'diagnosis_icd10', sortable: true },
   { title: 'Fixed Price', key: 'fixed_price', sortable: true },
   { title: 'Components', key: 'components_count', sortable: true },
-  { title: 'Status', key: 'is_active', sortable: true },
+  { title: 'Status', key: 'status', sortable: true },
   { title: 'Actions', key: 'actions', sortable: false },
 ];
 
@@ -482,7 +493,7 @@ onMounted(async () => {
   ]);
 });
 
-// Load bundles with pagination and filters
+// Load bundles (case records where is_bundle = true) with pagination and filters
 const loadBundles = async (options = {}) => {
   loading.value = true;
   try {
@@ -490,11 +501,12 @@ const loadBundles = async (options = {}) => {
       page: options.page || 1,
       per_page: options.itemsPerPage || 15,
       search: searchQuery.value,
-      is_active: statusFilter.value,
+      is_bundle: true, // Only load bundle case records
+      status: statusFilter.value,
       diagnosis_icd10: diagnosisFilter.value,
     };
 
-    const response = await api.get('/service-bundles', { params });
+    const response = await api.get('/cases', { params });
     bundles.value = response.data.data || response.data;
     totalItems.value = response.data.total || bundles.value.length;
   } catch (err) {
@@ -504,11 +516,33 @@ const loadBundles = async (options = {}) => {
   }
 };
 
-// Load statistics
+// Load statistics (from case records where is_bundle = true)
 const loadStatistics = async () => {
   try {
-    const response = await api.get('/service-bundles/statistics');
-    statistics.value = response.data.data || response.data;
+    // Get statistics from case records
+    const response = await api.get('/cases', {
+      params: {
+        is_bundle: true,
+        per_page: 1
+      }
+    });
+
+    const total = response.data.total || 0;
+    const activeResponse = await api.get('/cases', {
+      params: {
+        is_bundle: true,
+        status: true,
+        per_page: 1
+      }
+    });
+    const active = activeResponse.data.total || 0;
+
+    statistics.value = {
+      total: total,
+      active: active,
+      inactive: total - active,
+      average_price: 0 // Can be calculated if needed
+    };
   } catch (err) {
     console.error('Failed to load statistics', err);
   }
@@ -617,7 +651,7 @@ const editBundle = async (bundle) => {
   showCreateDialog.value = true;
 };
 
-// Save bundle (create or update)
+// Save bundle (create or update case record with is_bundle = true)
 const saveBundle = async () => {
   if (!bundleForm.value.validate()) {
     showError('Please fill in all required fields');
@@ -626,11 +660,20 @@ const saveBundle = async () => {
 
   saving.value = true;
   try {
+    // Prepare case record data for bundle
+    const bundleData = {
+      ...formData.value,
+      is_bundle: true, // Mark as bundle
+      bundle_price: formData.value.fixed_price || formData.value.bundle_price,
+      price: formData.value.fixed_price || formData.value.bundle_price,
+      status: formData.value.is_active
+    };
+
     if (editMode.value) {
-      await api.put(`/service-bundles/${formData.value.id}`, formData.value);
+      await api.put(`/cases/${formData.value.id}`, bundleData);
       showSuccess('Bundle updated successfully');
     } else {
-      await api.post('/service-bundles', formData.value);
+      await api.post('/cases', bundleData);
       showSuccess('Bundle created successfully');
     }
     closeDialog();
@@ -662,11 +705,11 @@ const confirmDelete = (bundle) => {
   showDeleteDialog.value = true;
 };
 
-// Delete bundle
+// Delete bundle (delete case record)
 const deleteBundle = async () => {
   deleting.value = true;
   try {
-    await api.delete(`/service-bundles/${bundleToDelete.value.id}`);
+    await api.delete(`/cases/${bundleToDelete.value.id}`);
     showSuccess('Bundle deleted successfully');
     showDeleteDialog.value = false;
     bundleToDelete.value = null;

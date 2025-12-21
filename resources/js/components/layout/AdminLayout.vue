@@ -493,6 +493,12 @@ const managementMenu = {
       roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
     {
+      name: 'Case Management',
+      path: '/management/cases',
+      icon: 'mdi-file-document-multiple-outline',
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
+    },
+    {
       name: 'Bundle Services',
       path: '/management/bundle-services',
       icon: 'mdi-package-variant',
@@ -501,13 +507,7 @@ const managementMenu = {
     {
       name: 'Bundle Components',
       path: '/management/bundle-components',
-      icon: 'mdi-puzzle',
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-    },
-    {
-      name: 'Case Management',
-      path: '/management/cases',
-      icon: 'mdi-file-document-multiple-outline',
+      icon: 'mdi-package-variant-closed',
       roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
   ],

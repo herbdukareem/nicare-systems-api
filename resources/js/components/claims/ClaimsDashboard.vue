@@ -129,16 +129,7 @@ const statistics = ref({
 });
 
 const navigationCards = ref([
-  {
-    title: 'Submit Referral to PAS',
-    description: 'Submit referrals on behalf of primary facilities to Pre-Authorization System',
-    icon: 'mdi-hospital-box-outline',
-    color: 'primary',
-    route: '/claims/referrals',
-    badge: 'Admin Only',
-    badgeColor: 'primary',
-    roles: ['admin', 'Super Admin', 'claims_officer'],
-  },
+ 
   {
     title: 'Review Claims',
     description: 'Review  submitted claims',

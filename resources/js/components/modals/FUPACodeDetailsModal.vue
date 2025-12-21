@@ -189,15 +189,15 @@
                   <div>
                     <div class="font-weight-bold">Bundle Service Selected</div>
                     <div v-if="paCode.service_bundle" class="mt-2">
-                      <div class="text-subtitle-2">{{ paCode.service_bundle.description || paCode.service_bundle.name }}</div>
-                      <div class="text-caption">Code: {{ paCode.service_bundle.code }} | Price: ₦{{ Number(paCode.service_bundle.fixed_price).toLocaleString() }}</div>
+                      <div class="text-subtitle-2">{{ paCode.service_bundle.name || paCode.service_bundle.description }}</div>
+                      <div class="text-caption">Code: {{ paCode.service_bundle.code }} | Price: ₦{{ Number(paCode.service_bundle.fixed_price || 0).toLocaleString() }}</div>
                       <div class="text-caption" v-if="paCode.service_bundle.diagnosis_icd10">ICD-10: {{ paCode.service_bundle.diagnosis_icd10 }}</div>
                     </div>
                   </div>
                 </div>
               </v-alert>
 
-              <!-- Direct Services (Multiple) -->
+              <!-- FFS Services (Multiple) -->
               <div v-if="paCode.service_selection_type === 'direct'">
                 <v-alert
                   type="success"
@@ -207,7 +207,7 @@
                 >
                   <div class="font-weight-bold">
                     <v-icon left>mdi-medical-bag</v-icon>
-                    Direct Services Selected ({{ getDirectServicesCount(paCode) }})
+                    FFS Services Selected ({{ getDirectServicesCount(paCode) }})
                   </div>
                 </v-alert>
 
@@ -683,7 +683,7 @@ const generatePAPrintContent = (pa) => {
         <div class="section-title">Bundle Service</div>
         <div class="row">
           <span class="label">Service:</span>
-          <span class="value">${pa.service_bundle.description || pa.service_bundle.name}</span>
+          <span class="value">${pa.service_bundle.name || pa.service_bundle.description}</span>
         </div>
         <div class="row">
           <span class="label">Code:</span>
@@ -704,7 +704,7 @@ const generatePAPrintContent = (pa) => {
 
       ${pa.service_selection_type === 'direct' && pa.case_records && pa.case_records.length > 0 ? `
       <div class="section">
-        <div class="section-title">Direct Services (${pa.case_records.length})</div>
+        <div class="section-title">FFS Services (${pa.case_records.length})</div>
         <table class="table">
           <thead>
             <tr>

@@ -59,15 +59,17 @@ class PACode extends Model
     }
 
     /**
-     * PA Code belongs to a Service Bundle (optional).
+     * PA Code belongs to a Service Bundle (CaseRecord where is_bundle = true).
+     * service_bundle_id references case_records.id
      */
     public function serviceBundle()
     {
-        return $this->belongsTo(ServiceBundle::class, 'service_bundle_id');
+        return $this->belongsTo(CaseRecord::class, 'service_bundle_id')
+                    ->where('is_bundle', true);
     }
 
     /**
-     * PA Code has many Case Records (for direct service selection).
+     * PA Code has many Case Records (for FFS service selection).
      * This is a custom accessor since we store IDs in JSON.
      */
     public function getCaseRecordsAttribute()

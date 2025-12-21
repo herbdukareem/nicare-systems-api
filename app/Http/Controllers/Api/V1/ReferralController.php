@@ -9,6 +9,7 @@ use App\Services\FileUploadService;
 use App\Models\DocumentRequirement;
 use App\Models\ReferralDocument;
 use App\Models\Referral;
+use App\Models\CaseRecord;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -30,7 +31,7 @@ class ReferralController extends BaseController
     public function index(Request $request)
     {
         // Determine eager loading based on 'with' parameter
-        $eagerLoad = ['enrollee', 'referringFacility', 'receivingFacility'];
+        $eagerLoad = ['enrollee', 'referringFacility', 'receivingFacility','serviceBundle'];
         if ($request->has('with')) {
             $additionalRelations = explode(',', $request->with);
             $eagerLoad = array_merge($eagerLoad, $additionalRelations);
@@ -125,7 +126,19 @@ class ReferralController extends BaseController
             'contact_person_phone' => ['nullable', 'string'],
             'contact_person_email' => ['nullable', 'email'],
             'service_selection_type' => ['nullable', 'in:bundle,direct'],
-            'service_bundle_id' => ['nullable', 'required_if:service_selection_type,bundle', 'exists:service_bundles,id'],
+            'service_bundle_id' => [
+                'nullable',
+                'required_if:service_selection_type,bundle',
+                'exists:case_records,id',
+                function ($attribute, $value, $fail) {
+                    if ($value) {
+                        $caseRecord = CaseRecord::find($value);
+                        if (!$caseRecord || !$caseRecord->is_bundle) {
+                            $fail('The selected service bundle must be a bundle case record.');
+                        }
+                    }
+                }
+            ],
             'case_record_ids' => $caseRecordIdsRule,
             'case_record_ids.*' => ['exists:case_records,id'],
             'documents' => ['nullable', 'array'],

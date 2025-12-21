@@ -204,8 +204,8 @@
                       {{ referral.service_selection_type === 'bundle' ? 'Bundle Service Selected' : 'Direct Service Selected' }}
                     </div>
                     <div v-if="referral.service_bundle" class="mt-2">
-                      <div class="text-subtitle-2">{{ referral.service_bundle.description || referral.service_bundle.name }}</div>
-                      <div class="text-caption">Code: {{ referral.service_bundle.code }} | Price: ₦{{ Number(referral.service_bundle.fixed_price).toLocaleString() }}</div>
+                      <div class="text-subtitle-2">{{ referral.service_bundle.name || referral.service_bundle.description }}</div>
+                      <div class="text-caption">Code: {{ referral.service_bundle.code }} | Price: ₦{{ Number(referral.service_bundle.fixed_price || 0).toLocaleString() }}</div>
                       <div class="text-caption" v-if="referral.service_bundle.diagnosis_icd10">ICD-10: {{ referral.service_bundle.diagnosis_icd10 }}</div>
                     </div>
                     <div v-if="referral.service_selection_type === 'direct'" class="mt-2">

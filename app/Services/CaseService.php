@@ -63,6 +63,13 @@ class CaseService
             $query->where('referable', (bool) $filters['referable']);
         }
 
+        // Apply is_bundle filter
+        if (isset($filters['is_bundle'])) {
+            $is_bundle = filter_var($filters['is_bundle'], FILTER_VALIDATE_BOOLEAN) ? 1 : 0;
+            
+            $query->where('is_bundle', $is_bundle);
+        }
+
         // Apply sorting
         $sortBy = $filters['sort_by'] ?? 'created_at';
         $sortDirection = $filters['sort_direction'] ?? 'desc';
@@ -74,6 +81,8 @@ class CaseService
 
         // Apply pagination
         $perPage = $filters['per_page'] ?? 15;
+
+ 
         
         return $query->paginate($perPage);
     }
@@ -99,23 +108,12 @@ class CaseService
     {
         $query = CaseRecord::query();
 
-        // Apply exclude_groups filter if provided
-        if (!empty($filters['exclude_groups'])) {
-            $excludeGroups = is_array($filters['exclude_groups']) 
-                ? $filters['exclude_groups'] 
-                : explode(',', $filters['exclude_groups']);
-            $query->whereNotIn('group', $excludeGroups);
-        }
-
-        // Apply group filter if provided
-        if (!empty($filters['group'])) {
-            $query->where('group', $filters['group']);
-        }
+       
 
         $total = $query->count();
         $active = (clone $query)->where('status', true)->count();
         $paRequired = (clone $query)->where('pa_required', true)->count();
-        $specialties = (clone $query)->distinct('group')->count('group');
+        $specialties = (clone $query)->distinct('detail_type')->count('detail_type');
 
         return [
             'total' => $total,

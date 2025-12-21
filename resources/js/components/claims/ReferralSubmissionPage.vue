@@ -323,14 +323,36 @@
                             </v-col>
                           </v-row>
 
-                          <!-- Direct Service Selection (Multiple) -->
+                          <!-- FFS Service Selection (Multiple) -->
                           <!-- :rules="formData.service_selection_type === 'direct' ? [v => !!v || 'Service is required'] : []" -->
                           <v-row v-if="formData.service_selection_type === 'direct'">
+                            <!-- Detail Type Filter -->
+                            <v-col cols="12" md="6">
+                              <v-select
+                                v-model="detailTypeFilter"
+                                label="Filter by Service Type (Optional)"
+                                :items="detailTypeOptions"
+                                item-title="text"
+                                item-value="value"
+                                variant="outlined"
+                                density="comfortable"
+                                clearable
+                                hint="Filter FFS services by type"
+                                persistent-hint
+                                @update:model-value="onDetailTypeFilterChange"
+                              >
+                                <template v-slot:prepend-inner>
+                                  <v-icon>mdi-filter</v-icon>
+                                </template>
+                              </v-select>
+                            </v-col>
+
+                            <!-- FFS Service Selection -->
                             <v-col cols="12">
                               <v-autocomplete
                                 v-model="formData.case_record_ids"
-                                label="Select Direct Service *"
-                                :items="caseRecords"
+                                label="Select FFS Service *"
+                                :items="filteredCaseRecords"
                                 item-title="display_name"
                                 item-value="id"
                                 variant="outlined"
@@ -341,7 +363,7 @@
                                 chips
                                 closable-chips
                                 :rules="[v => (v && v.length > 0) || 'At least one service is required']"
-                                hint="Select a single service/treatment"
+                                hint="Select FFS services"
                                 persistent-hint
                               >
                                 <template v-slot:item="{ item, props }">
@@ -702,8 +724,19 @@ const severityLevels = [
 
 const serviceSelectionTypes = [
   { value: 'bundle', text: 'Bundle Service (Package)' },
-  { value: 'direct', text: 'Direct Service (Single Item)' },
+  { value: 'direct', text: 'Fee-For-Service Service(s)' },
 ];
+
+const detailTypeOptions = [
+  { text: 'All Types', value: null },
+  { text: 'Drug', value: 'drug' },
+  { text: 'Laboratory', value: 'laboratory' },
+  { text: 'Professional Service', value: 'professional_service' },
+  { text: 'Radiology', value: 'radiology' },
+  { text: 'Consumable', value: 'consumable' },
+];
+
+const detailTypeFilter = ref(null);
 
 const formData = ref({
   enrollee_id: null,
@@ -741,6 +774,24 @@ const primaryFacilities = computed(() => {
 const secondaryFacilities = computed(() => {
   return facilities.value.filter(f => f.type === 'Secondary' || f.type === 'Tertiary');
 });
+
+// Computed property for filtered case records based on detail_type filter
+const filteredCaseRecords = computed(() => {
+  if (!detailTypeFilter.value) {
+    return caseRecords.value;
+  }
+  return caseRecords.value.filter(record => {
+    // Convert detail_type to match the filter format
+    const recordDetailType = record.detail_type?.replace('App\\Models\\', '').replace('Detail', '').toLowerCase();
+    return recordDetailType === detailTypeFilter.value;
+  });
+});
+
+// Handler for detail type filter change
+const onDetailTypeFilterChange = () => {
+  // Optionally clear selected services when filter changes
+  // formData.value.case_record_ids = [];
+};
 
 onMounted(async () => {
   await Promise.all([
@@ -834,16 +885,21 @@ const onReferringFacilityChange = (facilityId) => {
   }
 };
 
-// Fetch service bundles
+// Fetch service bundles (case records where is_bundle = true)
 const fetchServiceBundles = async () => {
   loadingBundles.value = true;
   try {
-    const response = await api.get('/service-bundles', {
-      params: { status: 'active' }
+    const response = await api.get('/cases', {
+      params: {
+        is_bundle: true,
+        status: true // status is boolean in case_records
+      }
     });
     serviceBundles.value = (response.data.data || response.data).map(bundle => ({
       ...bundle,
-      display_name: `${bundle.description} - ₦${Number(bundle.fixed_price).toLocaleString()}`
+      display_name: `${bundle.case_name} - ₦${Number(bundle.bundle_price || bundle.price).toLocaleString()}`,
+      description: bundle.service_description,
+      fixed_price: bundle.bundle_price || bundle.price
     }));
   } catch (err) {
     showError('Failed to load service bundles');
@@ -852,11 +908,16 @@ const fetchServiceBundles = async () => {
   }
 };
 
-// Fetch case records (services)
+// Fetch case records (FFS services - where is_bundle = false)
 const fetchCaseRecords = async () => {
   loadingCaseRecords.value = true;
   try {
-    const response = await api.get('/cases');
+    const response = await api.get('/cases', {
+      params: {
+        is_bundle: false,
+        status: true // status is boolean in case_records
+      }
+    });
     caseRecords.value = (response.data.data || response.data).map(record => ({
       ...record,
       display_name: `${record.case_name} (${record.nicare_code})`

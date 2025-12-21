@@ -82,8 +82,6 @@ const breadcrumbMappings = {
   '/management': [{ name: 'Management', path: '/management' }, { name: 'Management Dashboard' }],
   '/management/drugs': [{ name: 'Management', path: '/management' }, { name: 'Drugs Management' }],
   '/management/laboratories': [{ name: 'Management', path: '/management' }, { name: 'Laboratories Management' }],
-  '/management/bundle-services': [{ name: 'Management', path: '/management' }, { name: 'Bundle Services Management' }],
-  '/management/bundle-components': [{ name: 'Management', path: '/management' }, { name: 'Bundle Components Management' }],
 };
 
 const breadcrumbItems = computed(() => {

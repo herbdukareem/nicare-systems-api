@@ -50,11 +50,12 @@ class Referral extends Model
     }
 
     /**
-     * Referral may have a selected service bundle.
+     * Referral may have a selected service bundle (CaseRecord where is_bundle = true).
+     * service_bundle_id references case_records.id
      */
     public function serviceBundle()
     {
-        return $this->belongsTo(ServiceBundle::class, 'service_bundle_id');
+        return $this->belongsTo(CaseRecord::class, 'service_bundle_id');
     }
 
     

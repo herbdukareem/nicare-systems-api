@@ -317,8 +317,8 @@ const routes = [
 
   // Claims Routes
   {
-    path: '/claims/referrals',
-    name: 'claims-referrals',
+    path: '/pas/referrals',
+    name: 'pas-referrals',
     component: () => import('../components/claims/ReferralSubmissionPage.vue'),
     meta: {
       requiresAuth: true,
@@ -529,30 +529,7 @@ const routes = [
       breadcrumb: 'Professional Services Management'
     }
   },
-  {
-    path: '/management/bundle-services',
-    name: 'management-bundle-services',
-    component: () => import('../components/management/BundleServicesManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-      title: 'Bundle Services Management',
-      description: 'Manage service bundles and configurations',
-      breadcrumb: 'Bundle Services Management'
-    }
-  },
-  {
-    path: '/management/bundle-components',
-    name: 'management-bundle-components',
-    component: () => import('../components/management/BundleComponentsManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-      title: 'Bundle Components Management',
-      description: 'Manage components within service bundles',
-      breadcrumb: 'Bundle Components Management'
-    }
-  },
+
   {
     path: '/management/cases',
     name: 'management-cases',
@@ -563,6 +540,32 @@ const routes = [
       title: 'Case Management',
       description: 'Manage case records and service tariffs',
       breadcrumb: 'Case Management'
+    }
+  },
+
+  {
+    path: '/management/bundle-services',
+    name: 'management-bundle-services',
+    component: () => import('../components/management/BundleServicesManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      title: 'Bundle Services Management',
+      description: 'Manage service bundles and configurations',
+      breadcrumb: 'Bundle Services'
+    }
+  },
+
+  {
+    path: '/management/bundle-components',
+    name: 'management-bundle-components',
+    component: () => import('../components/management/BundleComponentsManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      title: 'Bundle Components Management',
+      description: 'Manage components within service bundles',
+      breadcrumb: 'Bundle Components'
     }
   },
 

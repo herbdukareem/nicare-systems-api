@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use App\Models\PACode;
 use App\Models\Facility;
 use App\Models\Referral;
+use App\Models\CaseRecord;
 use App\Services\FileUploadService;
 use Illuminate\Queue\Failed\NullFailedJobProvider;
 use Illuminate\Support\Facades\DB;
@@ -112,13 +113,24 @@ class PACodeController extends Controller
         $validator = Validator::make($request->all(), [
             'enrollee_id' => 'required|exists:enrollees,id',
             'facility_id' => 'required|exists:facilities,id',
-            'requested_items' => 'nullable|json',
             'justification' => 'required|string|max:1000',
             'diagnosis_update' => 'nullable|string|max:1000',
             'referral_id' => 'required|exists:referrals,id',
             'admission_id' => 'nullable|exists:admissions,id',
             'service_selection_type' => ['nullable', 'in:bundle,direct'],
-            'service_bundle_id' => ['nullable', 'required_if:service_selection_type,bundle', 'exists:service_bundles,id'],
+            'service_bundle_id' => [
+                'nullable',
+                'required_if:service_selection_type,bundle',
+                'exists:case_records,id',
+                function ($attribute, $value, $fail) {
+                    if ($value) {
+                        $caseRecord = CaseRecord::find($value);
+                        if (!$caseRecord || !$caseRecord->is_bundle) {
+                            $fail('The selected service bundle must be a bundle case record.');
+                        }
+                    }
+                }
+            ],
             'case_record_ids' => $caseRecordIdsRule,
             'case_record_ids.*' => ['exists:case_records,id'],
             'documents.*' => 'nullable|file|max:10240', // Max 10MB per file

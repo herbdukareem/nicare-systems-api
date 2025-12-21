@@ -168,7 +168,7 @@
                       <v-divider class="my-4"></v-divider>
                       <h3 class="text-h6 mb-3">
                         <v-icon class="mr-2" color="success">mdi-package-variant</v-icon>
-                        Step 2: Bundle Service (Auto-detected)
+                        Step 2: Bundle Service 
                       </h3>
                       <v-alert type="success" variant="tonal" density="comfortable" class="mb-4">
                         A bundle service was found for this referral. Select the components that were used.
@@ -200,7 +200,7 @@
                                     color="success"
                                   ></v-checkbox>
                                 </td>
-                                <td>{{ component.case_record?.name || component.description }}</td>
+                                <td>{{ component.case_record?.case_name || component.item_name }}</td>
                               </tr>
                             </tbody>
                             <tfoot>
@@ -249,7 +249,7 @@
                   <v-row v-if="selectedReferral && ffsPACodes.length > 0">
                     <v-col cols="12">
                       <v-divider class="my-4"></v-divider>
-                      <h3 class="text-h6 mb-3">Step 3: FFS PA Codes (Optional)</h3>
+                      <h3 class="text-h6 mb-3">Step 3: FFS PA Codes</h3>
                       <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
                         <strong>{{ ffsPACodes.length }}</strong> FFS PA code(s) available for additional line items
                       </v-alert>
@@ -261,7 +261,7 @@
                   <v-row v-if="selectedReferral">
                     <v-col cols="12">
                       <v-divider class="my-4"></v-divider>
-                      <h3 class="text-h6 mb-3">Step 4: FFS Line Items (Optional)</h3>
+                      <h3 class="text-h6 mb-3">Step 4: FFS Line Items</h3>
                       <v-alert type="info" variant="tonal" density="comfortable" class="mb-4">
                         Add Fee-For-Service line items. Each line item must be linked to an approved FFS PA code.
                       </v-alert>
@@ -292,6 +292,12 @@
                         :items-per-page="10"
                         class="elevation-1"
                       >
+                        <template #item.pa_code.code="{ item }">
+                          <v-chip size="small" color="primary" variant="tonal">
+                            {{ item.pa_code?.code || 'N/A' }}
+                          </v-chip>
+                        </template>
+
                         <template #item.unit_price="{ item }">
                           ₦{{ Number(item.unit_price).toLocaleString() }}
                         </template>
@@ -534,7 +540,7 @@
                 <v-col cols="12" v-if="selectedPACodeCaseRecords.length > 0">
                   <v-autocomplete
                     v-model="lineItemFormData.case_record_id"
-                    :items="selectedPACodeCaseRecords"
+                    :items="availableCaseRecords"
                     item-title="display_text"
                     item-value="id"
                     label="Select Service/Case *"
@@ -543,6 +549,7 @@
                     prepend-inner-icon="mdi-medical-bag"
                     :rules="[v => !!v || 'Service/Case is required']"
                     @update:model-value="onCaseRecordSelected"
+                    :no-data-text="availableCaseRecords.length === 0 ? 'All services for this PA code have been added' : 'No services available'"
                   >
                     <template #item="{ props, item }">
                       <v-list-item v-bind="props">
@@ -555,6 +562,17 @@
                       </v-list-item>
                     </template>
                   </v-autocomplete>
+
+                  <!-- Info message when all services are added -->
+                  <v-alert
+                    v-if="availableCaseRecords.length === 0"
+                    type="info"
+                    variant="tonal"
+                    density="compact"
+                    class="mt-2"
+                  >
+                    All services for this PA code have been added to the claim.
+                  </v-alert>
                 </v-col>
 
                 <!-- Service Description (auto-filled, editable) -->
@@ -719,6 +737,7 @@ const formData = ref({
 
 // Headers
 const lineItemHeaders = [
+  { title: 'PA Code', key: 'pa_code.code', sortable: false },
   { title: 'Service', key: 'service_description', sortable: false },
   { title: 'Quantity', key: 'quantity', sortable: false },
   { title: 'Unit Price', key: 'unit_price', sortable: false },
@@ -787,7 +806,7 @@ const fetchReferrals = async () => {
         status: 'APPROVED',
         utn_validated: true,
         claim_submitted: false,
-        with: 'paCodes.serviceBundle.components.caseRecord,admissions',
+        with: 'paCodes.serviceBundle.components.caseRecord,admissions,serviceBundle',
       }
     });
     const referrals = response.data?.data?.data || response.data?.data || response.data || [];
@@ -858,6 +877,23 @@ const onAdmissionSelected = (admissionId) => {
   selectedAdmission.value = referralAdmissions.value.find(a => a.id === admissionId) || null;
 };
 
+// Computed property to filter out already-added case records for the selected PA code
+const availableCaseRecords = computed(() => {
+  if (!lineItemFormData.value.pa_code_id) {
+    return selectedPACodeCaseRecords.value;
+  }
+
+  // Get all case record IDs already added for this PA code
+  const addedCaseRecordIds = claimLineItems.value
+    .filter(item => item.pa_code_id === lineItemFormData.value.pa_code_id)
+    .map(item => item.case_record_id);
+
+  // Filter out already-added case records
+  return selectedPACodeCaseRecords.value.filter(
+    cr => !addedCaseRecordIds.includes(cr.id)
+  );
+});
+
 // When PA code is selected in dialog, load its case records
 const onPACodeSelected = (paCodeId) => {
   lineItemFormData.value.case_record_id = null;
@@ -926,6 +962,17 @@ const addLineItem = async () => {
     return;
   }
 
+  // Check for duplicate PA code + case record combination
+  const isDuplicate = claimLineItems.value.some(item =>
+    item.pa_code_id === lineItemFormData.value.pa_code_id &&
+    item.case_record_id === lineItemFormData.value.case_record_id
+  );
+
+  if (isDuplicate) {
+    showError('This service has already been added for the selected PA code');
+    return;
+  }
+
   // Find the selected case record for display
   const selectedCase = selectedPACodeCaseRecords.value.find(cr => cr.id === lineItemFormData.value.case_record_id);
 
@@ -959,25 +1006,30 @@ const submitClaim = async () => {
 
   submitting.value = true;
   try {
-    // Build payload with selected bundle components and FFS line items
-    const payload = {
-      referral_id: formData.value.referral_id,
-      admission_id: formData.value.admission_id || null, // Optional
-      claim_date: formData.value.claim_date,
-      // Only include selected bundle components
-      bundle_components: bundleComponents.value
-        .filter(comp => comp.selected)
-        .map(comp => ({
-          bundle_component_id: comp.id,
-          case_record_id: comp.case_record_id || null,
-          quantity: comp.quantity || 1,
-          unit_price: comp.unit_price || 0,
-        })),
-      // Bundle fixed price (if bundle exists)
-      bundle_amount: bundleAmount.value,
-      bundle_pa_code_id: bundlePACode.value?.id || null,
-      // FFS line items
-      line_items: claimLineItems.value.map(item => ({
+    // Build line items array combining bundle components and FFS items
+    const allLineItems = [];
+
+    // Add selected bundle components as line items (with calculated prices)
+    // Note: Bundle components are included in line items for tracking, but the bundle fixed price is used
+    const selectedBundleComponents = bundleComponents.value.filter(comp => comp.selected);
+    selectedBundleComponents.forEach(comp => {
+      allLineItems.push({
+        pa_code_id: bundlePACode.value?.id || null,
+        case_record_id: comp.case_record_id || null,
+        bundle_component_id: comp.id, // Link to bundle component
+        tariff_type: 'BUNDLE',
+        service_type: 'service',
+        service_description: comp.item_name || comp.component_name || comp.case_record?.case_name || 'Bundle Component',
+        quantity: comp.quantity || 1,
+        unit_price: 0, // Set to 0 since bundle fixed price is used
+        line_total: 0, // Set to 0 since bundle fixed price is used
+        reporting_type: 'IN_BUNDLE',
+      });
+    });
+
+    // Add FFS line items
+    claimLineItems.value.forEach(item => {
+      allLineItems.push({
         pa_code_id: item.pa_code_id,
         case_record_id: item.case_record_id,
         tariff_type: 'FFS',
@@ -987,7 +1039,26 @@ const submitClaim = async () => {
         unit_price: item.unit_price,
         line_total: item.line_total,
         reporting_type: 'FFS_TOP_UP',
+      });
+    });
+
+    // Build payload
+    const payload = {
+      referral_id: formData.value.referral_id,
+      admission_id: formData.value.admission_id || null, // Optional
+      claim_date: formData.value.claim_date,
+      // Bundle components metadata (for reference)
+      bundle_components: selectedBundleComponents.map(comp => ({
+        bundle_component_id: comp.id,
+        case_record_id: comp.case_record_id || null,
+        quantity: comp.quantity || 1,
+        unit_price: comp.unit_price || 0,
       })),
+      // Bundle fixed price (if bundle exists)
+      bundle_amount: bundleAmount.value,
+      bundle_pa_code_id: bundlePACode.value?.id || null,
+      // All line items (bundle components + FFS)
+      line_items: allLineItems,
     };
 
     const response = await api.post('/claims-automation/claims', payload);

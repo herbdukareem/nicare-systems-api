@@ -16,6 +16,7 @@ class DrugDetail extends Model
         'brand_name',
         'dosage_form',
         'strength',
+        'pack_description',
         'route_of_administration',
         'manufacturer',
         'drug_class',

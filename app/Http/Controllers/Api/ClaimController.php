@@ -207,9 +207,15 @@ public function showFullDetails($claimId): JsonResponse
             $bundleComponents = $validated['bundle_components'] ?? [];
             $bundleAmount = (float) ($validated['bundle_amount'] ?? 0);
 
-            // 5. Validate PA codes for FFS line items
+            // 5. Validate PA codes for all line items (bundle + FFS)
             $lineItems = $validated['line_items'] ?? [];
-            $paCodeIds = array_column($lineItems, 'pa_code_id');
+            $paCodeIds = array_unique(array_column($lineItems, 'pa_code_id'));
+
+            // Add bundle PA code if present
+            if (!empty($validated['bundle_pa_code_id'])) {
+                $paCodeIds[] = $validated['bundle_pa_code_id'];
+                $paCodeIds = array_unique($paCodeIds);
+            }
 
             if (!empty($paCodeIds)) {
                 $paValidation = $this->validationService->validatePACodes($paCodeIds, $validated['referral_id']);

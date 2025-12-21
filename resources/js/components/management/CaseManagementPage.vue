@@ -116,20 +116,7 @@
               @update:model-value="fetchCases"
             ></v-select>
           </v-col>
-          <v-col cols="12" md="2">
-            <v-select
-              v-model="filters.status"
-              label="Status"
-              :items="statusOptions"
-              item-title="text"
-              item-value="value"
-              variant="outlined"
-              density="comfortable"
-              clearable
-              hide-details
-              @update:model-value="fetchCases"
-            ></v-select>
-          </v-col>
+    
           <v-col cols="12" md="2" class="d-flex gap-2">
             <v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="openAddDialog">
               Add Case
@@ -175,11 +162,8 @@
           </template>
 
           <template #item.price="{ item }">
-            <span class="font-weight-medium">₦{{ Number(item.price).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
-          </template>
-
-          <template #item.group="{ item }">
-            <v-chip size="small" variant="outlined">{{ item.group }}</v-chip>
+            <span v-if="item.is_bundle" class="font-weight-medium">₦{{ Number(item.bundle_price).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
+            <span v-else class="font-weight-medium">₦{{ Number(item.price).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) }}</span>
           </template>
 
           <template #item.detail_type="{ item }">
@@ -192,7 +176,16 @@
             >
               {{ getDetailTypeLabel(item.detail_type) }}
             </v-chip>
-            <span v-else class="text-grey text-caption">—</span>
+             <v-chip
+             v-else 
+              size="small"
+              variant="outlined"
+              prepend-icon="mdi-information-outline"
+            >
+             <span v-if="!item.is_bundle && !item.detail_type">Case Type</span>
+             <span v-else-if="item.is_bundle">Bundle</span>
+             <span v-else>{{  item.detail_type }}</span>
+            </v-chip>
           </template>
 
           <template #item.pa_required="{ item }">
@@ -304,7 +297,7 @@
                 ></v-text-field>
               </v-col>
            
-              <v-col cols="12" md="4">
+              <v-col cols="12" md="3">
                 <v-switch
                   v-model="form.pa_required"
                   label="PA Required"
@@ -312,7 +305,7 @@
                   hide-details
                 ></v-switch>
               </v-col>
-              <v-col cols="12" md="4">
+              <v-col cols="12" md="3">
                 <v-switch
                   v-model="form.referable"
                   label="Referable"
@@ -320,7 +313,7 @@
                   hide-details
                 ></v-switch>
               </v-col>
-              <v-col cols="12" md="4">
+              <v-col cols="12" md="3">
                 <v-switch
                   v-model="form.status"
                   label="Active"
@@ -328,6 +321,50 @@
                   hide-details
                 ></v-switch>
               </v-col>
+              <v-col cols="12" md="3">
+                <v-switch
+                  v-model="form.is_bundle"
+                  label="Is Bundle"
+                  color="primary"
+                  hide-details
+                ></v-switch>
+              </v-col>
+
+              <!-- Bundle-specific fields -->
+              <template v-if="form.is_bundle">
+                <v-col cols="12">
+                  <v-divider class="my-2"></v-divider>
+                  <div class="text-subtitle-2 text-primary mb-2">
+                    <v-icon size="small" class="mr-1">mdi-package-variant</v-icon>
+                    Bundle Configuration
+                  </div>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model.number="form.bundle_price"
+                    label="Bundle Fixed Price (₦) *"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    variant="outlined"
+                    density="comfortable"
+                    :rules="form.is_bundle ? [v => v >= 0 || 'Bundle price must be positive'] : []"
+                    hint="Fixed price for this bundle package"
+                    persistent-hint
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                    v-model="form.diagnosis_icd10"
+                    label="ICD-10 Diagnosis Code"
+                    placeholder="e.g., A00.0"
+                    variant="outlined"
+                    density="comfortable"
+                    hint="Optional: Link bundle to specific diagnosis"
+                    persistent-hint
+                  ></v-text-field>
+                </v-col>
+              </template>
 
               <!-- Polymorphic Detail Type Selection -->
               <v-col cols="12">
@@ -337,7 +374,7 @@
                   Additional Details (Optional)
                 </div>
               </v-col>
-              <v-col cols="12">
+              <v-col cols="12" v-if="!form.is_bundle">
                 <v-select
                   v-model="form.detail_type"
                   label="Detail Type"
@@ -394,6 +431,14 @@
                     label="Strength (e.g., 500mg)"
                     variant="outlined"
                     density="comfortable"
+                  ></v-text-field>
+                </v-col>
+                <v-col cols="12" md="6">
+                  <v-text-field
+                      v-model="form.detail_data.pack_description"
+                      label="Pack Description"
+                      variant="outlined"
+                      density="comfortable"
                   ></v-text-field>
                 </v-col>
                 <v-col cols="12" md="6">
@@ -973,7 +1018,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useToast } from '@/js/composables/useToast';
 import api from '@/js/utils/api';
 import AdminLayout from '@/js/components/layout/AdminLayout.vue';
@@ -1032,6 +1077,9 @@ const form = reactive({
   pa_required: false,
   referable: true,
   status: true,
+  is_bundle: true,
+  bundle_price: null,
+  diagnosis_icd10: null,
   detail_type: null,
   detail_data: {}
 });
@@ -1039,10 +1087,7 @@ const form = reactive({
 const headers = [
   { title: 'Case Name', key: 'case_name', sortable: true },
   { title: 'NiCare Code', key: 'nicare_code', sortable: true },
-  { title: 'Description', key: 'service_description', sortable: true },
-  { title: 'Level', key: 'level_of_care', sortable: true },
   { title: 'Price', key: 'price', sortable: true },
-  { title: 'Group', key: 'group', sortable: false },
   { title: 'Detail Type', key: 'detail_type', sortable: false },
   { title: 'PA Required', key: 'pa_required', sortable: true },
   { title: 'Referable', key: 'referable', sortable: true },
@@ -1058,13 +1103,13 @@ const statusOptions = [
 ];
 
 const detailTypes = [
-  { text: 'None', value: null },
+  { text: 'None', value: null },  // disease conditions that can have diagnoses but no specific treatment
   { text: 'Drug', value: 'drug' },
   { text: 'Laboratory Test', value: 'laboratory' },
   { text: 'Professional Service', value: 'professional_service' },
   { text: 'Radiology', value: 'radiology' },
-  { text: 'Consultation', value: 'consultation' },
-  { text: 'Consumable', value: 'consumable' }
+  { text: 'Consumable', value: 'consumable' },
+  { text: 'Consultation', value: 'consultation' }
 ];
 
 // Drug-specific options
@@ -1119,20 +1164,7 @@ const fetchStatistics = async () => {
   }
 };
 
-const fetchCaseGroups = async () => {
-  loadingGroups.value = true;
-  try {
-    const response = await api.get('/cases-groups');
-    if (response.data.success) {
-      caseGroups.value = response.data.data;
-    }
-  } catch (error) {
-    console.error('Error fetching case groups:', error);
-    showError('Failed to fetch case groups');
-  } finally {
-    loadingGroups.value = false;
-  }
-};
+
 
 const openAddDialog = () => {
   editMode.value = false;
@@ -1150,6 +1182,9 @@ const openEditDialog = (item) => {
   form.pa_required = item.pa_required;
   form.referable = item.referable;
   form.status = item.status;
+  form.is_bundle = item.is_bundle || false;
+  form.bundle_price = item.bundle_price || null;
+  form.diagnosis_icd10 = item.diagnosis_icd10 || null;
 
   // Load polymorphic detail if exists
   if (item.detail_type && item.detail) {
@@ -1182,6 +1217,9 @@ const resetForm = () => {
   form.pa_required = false;
   form.referable = true;
   form.status = true;
+  form.is_bundle = true;
+  form.bundle_price = null;
+  form.diagnosis_icd10 = null;
   form.detail_type = null;
   form.detail_data = {};
 };
@@ -1204,6 +1242,7 @@ const onDetailTypeChange = (newType) => {
       contraindications: '',
       side_effects: '',
       storage_conditions: '',
+      pack_description: '',
       prescription_required: true,
       controlled_substance: false,
       nafdac_number: '',
@@ -1536,11 +1575,19 @@ const debouncedSearch = () => {
   }, 500);
 };
 
+// Watch is_bundle to automatically set pa_required to true when bundle is enabled
+watch(() => form.is_bundle, (newValue) => {
+  if (newValue) {
+    form.pa_required = true;
+    form.detail_type = null;
+    form.detail_data = {};
+  }
+});
+
 // Lifecycle
 onMounted(() => {
   fetchCases();
   fetchStatistics();
-  fetchCaseGroups();
 });
 </script>
 

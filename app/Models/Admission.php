@@ -100,9 +100,14 @@ class Admission extends Model
         return $this->belongsTo(Referral::class);
     }
 
+    /**
+     * Admission belongs to a Service Bundle (CaseRecord where is_bundle = true).
+     * service_bundle_id references case_records.id
+     */
     public function serviceBundle(): BelongsTo
     {
-        return $this->belongsTo(ServiceBundle::class, 'service_bundle_id');
+        return $this->belongsTo(CaseRecord::class, 'service_bundle_id')
+                    ->where('is_bundle', true);
     }
 
     public function paCodes(): HasMany

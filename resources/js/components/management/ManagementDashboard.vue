@@ -146,25 +146,18 @@ const navigationCards = ref([
     route: '/management/professional-services',
   },
   {
-    title: 'Bundle Services',
-    description: 'Manage service bundles and configurations',
-    icon: 'mdi-package-variant',
-    color: 'purple',
-    route: '/management/bundle-services',
-  },
-  {
-    title: 'Bundle Components',
-    description: 'Manage components within service bundles',
-    icon: 'mdi-puzzle',
-    color: 'orange',
-    route: '/management/bundle-components',
-  },
-  {
     title: 'Case Management',
-    description: 'Manage case records and service tariffs',
+    description: 'Manage case records, service tariffs, and bundles',
     icon: 'mdi-file-document-multiple-outline',
     color: 'indigo',
     route: '/management/cases',
+  },
+    {
+    title: 'Bundle Components',
+    description: 'Manage bundle components and configurations',
+    icon: 'mdi-package-variant',
+    color: 'purple',
+    route: '/management/bundle-components',
   },
 ]);
 
