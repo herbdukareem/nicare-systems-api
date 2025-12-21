@@ -34,6 +34,9 @@ return new class extends Migration
         Schema::table('referrals', function (Blueprint $table) {
             // Drop the case_records foreign key
             $table->dropForeign(['service_bundle_id']);
+
+            // request_date nullable
+            $table->timestamp('request_date')->nullable()->change();
             
             // Restore the old service_bundles foreign key
             $table->foreign('service_bundle_id')
