@@ -934,6 +934,8 @@
               <ul class="mt-2">
                 <li>Download the template file first</li>
                 <li>Fill in the required fields (marked with *)</li>
+                <li>For <strong>Bundle Services</strong>: Set "Is Bundle" to "Yes", provide "Bundle Price" and "ICD-10 Code"</li>
+                <li>For <strong>FFS Services</strong>: Set "Is Bundle" to "No" or leave blank</li>
                 <li>Upload the completed file</li>
                 <li>Supported formats: .xlsx, .xls, .csv</li>
               </ul>
@@ -1448,7 +1450,10 @@ const downloadTemplate = async () => {
 };
 
 const importCases = async () => {
-  if (!importFile.value || importFile.value.length === 0) {
+  // Check if file is selected (handle both array and single file)
+  const file = Array.isArray(importFile.value) ? importFile.value[0] : importFile.value;
+
+  if (!file) {
     showError('Please select a file to import');
     return;
   }
@@ -1460,7 +1465,7 @@ const importCases = async () => {
 
   try {
     const formData = new FormData();
-    formData.append('file', importFile.value[0]);
+    formData.append('file', file);
 
     const response = await api.post('/cases/import', formData, {
       headers: {

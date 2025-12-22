@@ -8,13 +8,13 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: 'DejaVu Sans', sans-serif; font-size: 11px; line-height: 1.4; color: #333; }
         .container { padding: 20px; max-width: 800px; margin: 0 auto; }
-        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #0d6efd; padding-bottom: 15px; }
-        .header h1 { font-size: 18px; color: #0d6efd; margin-bottom: 5px; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #273e60ff; padding-bottom: 15px; }
+        .header h1 { font-size: 18px; color: #273e60ff; margin-bottom: 5px; }
         .header h2 { font-size: 14px; color: #666; font-weight: normal; }
-        .logo { font-size: 24px; font-weight: bold; color: #0d6efd; margin-bottom: 5px; }
-        .claim-number { background: #0d6efd; color: white; padding: 8px 15px; display: inline-block; font-size: 14px; font-weight: bold; border-radius: 4px; margin-top: 10px; }
+        .logo { font-size: 24px; font-weight: bold; color: #273e60ff; margin-bottom: 5px; }
+        .claim-number { background: #273e60ff; color: white; padding: 8px 15px; display: inline-block; font-size: 14px; font-weight: bold; border-radius: 4px; margin-top: 10px; }
         .section { margin-bottom: 15px; }
-        .section-title { background: #f8f9fa; padding: 8px 10px; font-weight: bold; font-size: 12px; border-left: 3px solid #0d6efd; margin-bottom: 10px; }
+        .section-title { background: #f8f9fa; padding: 8px 10px; font-weight: bold; font-size: 12px; border-left: 3px solid #273e60ff; margin-bottom: 10px; }
         .info-grid { display: table; width: 100%; }
         .info-row { display: table-row; }
         .info-label { display: table-cell; padding: 5px 10px; font-weight: bold; width: 35%; background: #f8f9fa; }
@@ -30,7 +30,7 @@
         .summary-box .amount { font-size: 24px; font-weight: bold; color: #198754; }
         .footer { margin-top: 30px; padding-top: 15px; border-top: 1px solid #dee2e6; text-align: center; font-size: 9px; color: #666; }
         .status-badge { display: inline-block; padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: bold; }
-        .status-submitted { background: #cfe2ff; color: #0d6efd; }
+        .status-submitted { background: #cfe2ff; color: #273e60ff; }
         .status-approved { background: #d4edda; color: #198754; }
         .two-col { display: table; width: 100%; }
         .two-col > div { display: table-cell; width: 50%; vertical-align: top; padding-right: 10px; }
@@ -41,7 +41,7 @@
     <div class="container">
         <div class="header">
             <div class="logo">NiCare</div>
-            <h1>NASARAWA STATE CONTRIBUTORY HEALTH CARE MANAGEMENT AGENCY</h1>
+            <h1>NIGER STATE CONTRIBUTORY HEALTH AGENCY</h1>
             <h2>Claim Submission Slip</h2>
             <div class="claim-number">{{ $claim->claim_number }}</div>
         </div>

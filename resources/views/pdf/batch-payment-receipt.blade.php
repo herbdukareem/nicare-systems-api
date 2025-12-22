@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <title>Batch Payment Receipt - {{ $batch->batch_number }}</title>
     <style>
-        body { font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #333; }
+         body { font-family: Arial, sans-serif; font-size: 12px; line-height: 1.4; color: #333; }
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #2e7d32; padding-bottom: 15px; }
         .header h1 { color: #2e7d32; margin: 0; font-size: 20px; }
         .header h2 { color: #666; margin: 5px 0; font-size: 14px; }
@@ -23,12 +23,12 @@
         .status-badge { padding: 3px 8px; border-radius: 3px; font-size: 10px; font-weight: bold; }
         .status-paid { background: #c8e6c9; color: #2e7d32; }
         .status-pending { background: #fff3e0; color: #e65100; }
-        .status-processing { background: #e3f2fd; color: #1565c0; }
+        .status-processing { background: #e3f2fd; color: #273e60ff; }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>NASARAWA STATE GOVERNMENT CONTRIBUTORY HEALTHCARE AGENCY</h1>
+        <h1>NIGER STATE  CONTRIBUTORY HEALTH AGENCY</h1>
         <h2>BATCH PAYMENT RECEIPT</h2>
         <p>Generated: {{ $generated_at }}</p>
     </div>
