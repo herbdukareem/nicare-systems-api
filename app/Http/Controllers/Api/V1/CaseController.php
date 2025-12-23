@@ -18,6 +18,13 @@ use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Facades\Excel;
 use App\Imports\CasesImport;
 use App\Exports\CasesExport;
+use App\Exports\DrugCasesExport;
+use App\Exports\LaboratoryCasesExport;
+use App\Exports\RadiologyCasesExport;
+use App\Exports\ProfessionalServiceCasesExport;
+use App\Exports\ConsultationCasesExport;
+use App\Exports\ConsumableCasesExport;
+use App\Exports\BundleCasesExport;
 use App\Models\CaseRecord;
 
 class CaseController extends Controller
@@ -396,11 +403,36 @@ class CaseController extends Controller
     /**
      * Download import template
      */
-    public function downloadTemplate()
+    public function downloadTemplate(Request $request)
     {
         try {
-            $filename = 'cases_import_template.xlsx';
-            return Excel::download(new CasesExport([], true), $filename);
+            $detailType = $request->query('detail_type', 'general');
+
+            // Map detail type to export class
+            $exportClass = match($detailType) {
+                'drug' => DrugCasesExport::class,
+                'laboratory' => LaboratoryCasesExport::class,
+                'radiology' => RadiologyCasesExport::class,
+                'professional_service' => ProfessionalServiceCasesExport::class,
+                'consultation' => ConsultationCasesExport::class,
+                'consumable' => ConsumableCasesExport::class,
+                'bundle' => BundleCasesExport::class,
+                default => CasesExport::class,
+            };
+
+            // Generate filename based on detail type
+            $filename = match($detailType) {
+                'drug' => 'drug_cases_template.xlsx',
+                'laboratory' => 'laboratory_cases_template.xlsx',
+                'radiology' => 'radiology_cases_template.xlsx',
+                'professional_service' => 'professional_service_cases_template.xlsx',
+                'consultation' => 'consultation_cases_template.xlsx',
+                'consumable' => 'consumable_cases_template.xlsx',
+                'bundle' => 'bundle_cases_template.xlsx',
+                default => 'cases_import_template.xlsx',
+            };
+
+            return Excel::download(new $exportClass([], true), $filename);
 
         } catch (\Exception $e) {
             return response()->json([

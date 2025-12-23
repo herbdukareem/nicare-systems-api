@@ -4,8 +4,15 @@ namespace App\Imports;
 
 use App\Models\CaseRecord;
 use App\Models\CaseCategory;
+use App\Models\DrugDetail;
+use App\Models\LaboratoryDetail;
+use App\Models\RadiologyDetail;
+use App\Models\ProfessionalServiceDetail;
+use App\Models\ConsultationDetail;
+use App\Models\ConsumableDetail;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
@@ -14,9 +21,15 @@ class CasesImport implements ToCollection, WithHeadingRow
 {
     private int $importedCount = 0;
     private array $errors = [];
+    private ?string $detectedDetailType = null;
 
     public function collection(Collection $rows)
     {
+        // Detect detail type from first row's columns
+        if ($rows->isNotEmpty()) {
+            $this->detectedDetailType = $this->detectDetailType($rows->first());
+        }
+
         foreach ($rows as $index => $row) {
             try {
                 // Skip empty rows
@@ -133,8 +146,16 @@ class CasesImport implements ToCollection, WithHeadingRow
                     continue;
                 }
 
-                // Create case record
-                CaseRecord::create($caseData);
+                // Create case record and detail record in a transaction
+                DB::transaction(function () use ($caseData, $rowData, $index, $isBundle) {
+                    // Create case record
+                    $caseRecord = CaseRecord::create($caseData);
+
+                    // Create detail record if detail type was detected from template
+                    if ($this->detectedDetailType && !$isBundle) {
+                        $this->createDetailRecord($caseRecord, $this->detectedDetailType, $rowData, $index);
+                    }
+                });
 
                 $this->importedCount++;
 
@@ -351,6 +372,212 @@ class CasesImport implements ToCollection, WithHeadingRow
             'pa_required',
             'referable'
         ];
+    }
+
+    /**
+     * Detect detail type from column headers
+     */
+    private function detectDetailType($row): ?string
+    {
+        $columns = array_keys($row->toArray());
+
+        // Check for bundle-specific columns
+        if (in_array('bundle_price', $columns) && in_array('diagnosis_icd10', $columns)) {
+            return 'Bundle';
+        }
+
+        // Check for drug-specific columns
+        if (in_array('generic_name', $columns) || in_array('drug_class', $columns) || in_array('nafdac_number', $columns)) {
+            return 'Drug';
+        }
+
+        // Check for laboratory-specific columns
+        if (in_array('test_name', $columns) || in_array('test_code', $columns) || in_array('specimen_type', $columns)) {
+            return 'Laboratory';
+        }
+
+        // Check for radiology-specific columns
+        if (in_array('examination_name', $columns) || in_array('examination_code', $columns) || in_array('modality', $columns)) {
+            return 'Radiology';
+        }
+
+        // Check for professional service-specific columns
+        if (in_array('service_name', $columns) || in_array('service_code', $columns) || in_array('anesthesia_required', $columns)) {
+            return 'ProfessionalService';
+        }
+
+        // Check for consultation-specific columns
+        if (in_array('consultation_type', $columns) || in_array('consultation_mode', $columns)) {
+            return 'Consultation';
+        }
+
+        // Check for consumable-specific columns
+        if (in_array('item_name', $columns) || in_array('item_code', $columns) || in_array('sterile', $columns)) {
+            return 'Consumable';
+        }
+
+        return null; // General case without detail type
+    }
+
+    /**
+     * Create detail record based on detail type
+     */
+    private function createDetailRecord(CaseRecord $caseRecord, string $detailType, array $rowData, int $index): void
+    {
+        $detail = null;
+
+        switch ($detailType) {
+            case 'Drug':
+                $detail = $this->createDrugDetail($rowData, $index);
+                break;
+            case 'Laboratory':
+                $detail = $this->createLaboratoryDetail($rowData, $index);
+                break;
+            case 'Radiology':
+                $detail = $this->createRadiologyDetail($rowData, $index);
+                break;
+            case 'ProfessionalService':
+                $detail = $this->createProfessionalServiceDetail($rowData, $index);
+                break;
+            case 'Consultation':
+                $detail = $this->createConsultationDetail($rowData, $index);
+                break;
+            case 'Consumable':
+                $detail = $this->createConsumableDetail($rowData, $index);
+                break;
+            default:
+                throw new \Exception("Invalid detail type: {$detailType}");
+        }
+
+        // Link the detail to the case record
+        if ($detail) {
+            $caseRecord->update([
+                'detail_type' => get_class($detail),
+                'detail_id' => $detail->id,
+            ]);
+        }
+    }
+
+    /**
+     * Create Drug detail record
+     */
+    private function createDrugDetail(array $rowData, int $index): DrugDetail
+    {
+        // Validate required fields
+        if (empty($rowData['generic_name'])) {
+            throw new \Exception("Drug: Generic Name is required for Drug detail type");
+        }
+
+        return DrugDetail::create([
+            'generic_name' => $rowData['generic_name'],
+            'brand_name' => $rowData['brand_name'] ?? null,
+            'dosage_form' => $rowData['dosage_form'] ?? null,
+            'strength' => $rowData['strength'] ?? null,
+            'pack_description' => $rowData['pack_description'] ?? null,
+            'route_of_administration' => $rowData['route_of_administration'] ?? null,
+            'manufacturer' => $rowData['manufacturer'] ?? null,
+            'drug_class' => $rowData['drug_class'] ?? null,
+            'nafdac_number' => $rowData['nafdac_number'] ?? null,
+        ]);
+    }
+
+    /**
+     * Create Laboratory detail record
+     */
+    private function createLaboratoryDetail(array $rowData, int $index): LaboratoryDetail
+    {
+        // Validate required fields
+        if (empty($rowData['test_name'])) {
+            throw new \Exception("Lab: Test Name is required for Laboratory detail type");
+        }
+
+        return LaboratoryDetail::create([
+            'test_name' => $rowData['test_name'],
+            'test_code' => $rowData['test_code'] ?? null,
+            'specimen_type' => $rowData['specimen_type'] ?? null,
+            'test_category' => $rowData['test_category'] ?? null,
+            'turnaround_time' => !empty($rowData['turnaround_time_hours']) ? (int) $rowData['turnaround_time_hours'] : null,
+            'fasting_required' => $this->convertToBoolean($rowData['fasting_required'] ?? 'No'),
+        ]);
+    }
+
+    /**
+     * Create Radiology detail record
+     */
+    private function createRadiologyDetail(array $rowData, int $index): RadiologyDetail
+    {
+        // Validate required fields
+        if (empty($rowData['examination_name'])) {
+            throw new \Exception("Radiology: Exam Name is required for Radiology detail type");
+        }
+
+        return RadiologyDetail::create([
+            'examination_name' => $rowData['examination_name'],
+            'examination_code' => $rowData['examination_code'] ?? null,
+            'modality' => $rowData['modality'] ?? null,
+            'body_part' => $rowData['body_part'] ?? null,
+            'contrast_required' => $this->convertToBoolean($rowData['contrast_required'] ?? 'No'),
+            'pregnancy_safe' => $this->convertToBoolean($rowData['pregnancy_safe'] ?? 'No'),
+        ]);
+    }
+
+    /**
+     * Create Professional Service detail record
+     */
+    private function createProfessionalServiceDetail(array $rowData, int $index): ProfessionalServiceDetail
+    {
+        // Validate required fields
+        if (empty($rowData['service_name'])) {
+            throw new \Exception("ProfService: Service Name is required for Professional Service detail type");
+        }
+
+        return ProfessionalServiceDetail::create([
+            'service_name' => $rowData['service_name'],
+            'service_code' => $rowData['service_code'] ?? null,
+            'specialty' => $rowData['specialty'] ?? null,
+            'duration_minutes' => !empty($rowData['duration_minutes']) ? (int) $rowData['duration_minutes'] : null,
+            'provider_type' => $rowData['provider_type'] ?? null,
+            'anesthesia_required' => $this->convertToBoolean($rowData['anesthesia_required'] ?? 'No'),
+        ]);
+    }
+
+    /**
+     * Create Consultation detail record
+     */
+    private function createConsultationDetail(array $rowData, int $index): ConsultationDetail
+    {
+        // Validate required fields
+        if (empty($rowData['consultation_type'])) {
+            throw new \Exception("Consultation: Type is required for Consultation detail type");
+        }
+
+        return ConsultationDetail::create([
+            'consultation_type' => $rowData['consultation_type'],
+            'specialty' => $rowData['consultation_specialty'] ?? null,
+            'provider_level' => $rowData['consultation_provider_level'] ?? null,
+            'duration_minutes' => !empty($rowData['consultation_duration']) ? (int) $rowData['consultation_duration'] : null,
+            'consultation_mode' => $rowData['consultation_mode'] ?? null,
+        ]);
+    }
+
+    /**
+     * Create Consumable detail record
+     */
+    private function createConsumableDetail(array $rowData, int $index): ConsumableDetail
+    {
+        // Validate required fields
+        if (empty($rowData['item_name'])) {
+            throw new \Exception("Consumable: Item Name is required for Consumable detail type");
+        }
+
+        return ConsumableDetail::create([
+            'item_name' => $rowData['item_name'],
+            'item_code' => $rowData['item_code'] ?? null,
+            'category' => $rowData['category'] ?? null,
+            'unit_of_measure' => $rowData['unit_of_measure'] ?? null,
+            'units_per_pack' => !empty($rowData['units_per_pack']) ? (int) $rowData['units_per_pack'] : null,
+            'sterile' => $this->convertToBoolean($rowData['sterile'] ?? 'No'),
+        ]);
     }
 }
 

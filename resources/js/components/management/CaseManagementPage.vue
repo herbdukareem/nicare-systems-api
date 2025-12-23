@@ -932,15 +932,25 @@
             <div class="text-body-2">
               <strong>Import Instructions:</strong>
               <ul class="mt-2">
-                <li>Download the template file first</li>
+                <li>Select the type of cases you want to import</li>
+                <li>Download the appropriate template file</li>
                 <li>Fill in the required fields (marked with *)</li>
-                <li>For <strong>Bundle Services</strong>: Set "Is Bundle" to "Yes", provide "Bundle Price" and "ICD-10 Code"</li>
-                <li>For <strong>FFS Services</strong>: Set "Is Bundle" to "No" or leave blank</li>
                 <li>Upload the completed file</li>
                 <li>Supported formats: .xlsx, .xls, .csv</li>
               </ul>
             </div>
           </v-alert>
+
+          <v-select
+            v-model="selectedDetailType"
+            :items="detailTypeOptions"
+            label="Select Case Type *"
+            variant="outlined"
+            density="comfortable"
+            class="mb-4"
+            hint="Choose the type of cases you want to import"
+            persistent-hint
+          ></v-select>
 
           <v-btn
             color="primary"
@@ -950,8 +960,9 @@
             class="mb-4"
             @click="downloadTemplate"
             :loading="downloadingTemplate"
+            :disabled="!selectedDetailType"
           >
-            Download Template
+            Download {{ selectedDetailType ? detailTypeOptions.find(t => t.value === selectedDetailType)?.title : '' }} Template
           </v-btn>
 
           <v-file-input
@@ -1047,6 +1058,17 @@ const importFile = ref(null);
 const importErrors = ref([]);
 const importSuccess = ref(false);
 const importSuccessMessage = ref('');
+const selectedDetailType = ref('drug');
+
+const detailTypeOptions = [
+  { title: 'Drug Cases', value: 'drug' },
+  { title: 'Laboratory Tests', value: 'laboratory' },
+  { title: 'Radiology Examinations', value: 'radiology' },
+  { title: 'Professional Services', value: 'professional_service' },
+  { title: 'Consultations', value: 'consultation' },
+  { title: 'Consumables', value: 'consumable' },
+  { title: 'Bundle Services', value: 'bundle' },
+];
 
 const statistics = reactive({
   total: 0,
@@ -1413,6 +1435,7 @@ const openImportDialog = () => {
   importErrors.value = [];
   importSuccess.value = false;
   importSuccessMessage.value = '';
+  selectedDetailType.value = 'drug'; // Default to drug
   importDialog.value = true;
 };
 
@@ -1428,13 +1451,28 @@ const downloadTemplate = async () => {
   downloadingTemplate.value = true;
   try {
     const response = await api.get('/cases-template', {
+      params: {
+        detail_type: selectedDetailType.value
+      },
       responseType: 'blob'
     });
+
+    // Generate filename based on detail type
+    const filenameMap = {
+      drug: 'drug_cases_template.xlsx',
+      laboratory: 'laboratory_cases_template.xlsx',
+      radiology: 'radiology_cases_template.xlsx',
+      professional_service: 'professional_service_cases_template.xlsx',
+      consultation: 'consultation_cases_template.xlsx',
+      consumable: 'consumable_cases_template.xlsx',
+      bundle: 'bundle_cases_template.xlsx',
+    };
+    const filename = filenameMap[selectedDetailType.value] || 'cases_import_template.xlsx';
 
     const url = window.URL.createObjectURL(new Blob([response.data]));
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', 'cases_import_template.xlsx');
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     link.remove();

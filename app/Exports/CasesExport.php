@@ -30,44 +30,15 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
     public function collection()
     {
         if ($this->isTemplate) {
-            // Return sample data for template with only import fields
+            // Return sample data for template with all detail types
             return collect([
-                (object) [
-                    'case_name' => 'General Consultation',
-                    'service_description' => 'General Consultation - Primary Level',
-                    'level_of_care' => 'Primary',
-                    'price' => 1000.00,
-                    'group' => 'GENERAL CONSULTATION',
-                    'pa_required' => 'No',
-                    'referable' => 'Yes',
-                    'is_bundle' => 'No',
-                    'bundle_price' => '',
-                    'diagnosis_icd10' => ''
-                ],
-                (object) [
-                    'case_name' => 'Paediatric Consultation',
-                    'service_description' => 'Paediatric Consultation - Secondary Level',
-                    'level_of_care' => 'Secondary',
-                    'price' => 2000.00,
-                    'group' => 'PAEDIATRICS',
-                    'pa_required' => 'Yes',
-                    'referable' => 'Yes',
-                    'is_bundle' => 'No',
-                    'bundle_price' => '',
-                    'diagnosis_icd10' => ''
-                ],
-                (object) [
-                    'case_name' => 'Normal Delivery Bundle',
-                    'service_description' => 'Normal Delivery - Complete Package',
-                    'level_of_care' => 'Secondary',
-                    'price' => 0.00,
-                    'group' => 'OBSTETRICS & GYNAECOLOGY',
-                    'pa_required' => 'Yes',
-                    'referable' => 'Yes',
-                    'is_bundle' => 'Yes',
-                    'bundle_price' => 50000.00,
-                    'diagnosis_icd10' => 'O80'
-                ]
+                $this->getDrugSample(),
+                $this->getLabSample(),
+                $this->getRadiologySample(),
+                $this->getProfessionalServiceSample(),
+                $this->getConsultationSample(),
+                $this->getConsumableSample(),
+                $this->getBundleSample(),
             ]);
         }
 
@@ -100,16 +71,70 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
     {
         if ($this->isTemplate) {
             return [
+                // Basic Case Information
                 'Case Name *',
                 'Service Description *',
                 'Level of Care *',
-                'Price (₦) *',
+                'Price (₦)',
                 'Group *',
                 'PA Required',
                 'Referable',
                 'Is Bundle',
                 'Bundle Price (₦)',
-                'ICD-10 Code'
+                'ICD-10 Code',
+
+                // Detail Type Selection
+                'Detail Type',
+
+                // Drug Detail Fields
+                'Drug: Generic Name',
+                'Drug: Brand Name',
+                'Drug: Dosage Form',
+                'Drug: Strength',
+                'Drug: Pack Description',
+                'Drug: Route',
+                'Drug: Manufacturer',
+                'Drug: Drug Class',
+                'Drug: NAFDAC Number',
+
+                // Laboratory Detail Fields
+                'Lab: Test Name',
+                'Lab: Test Code',
+                'Lab: Specimen Type',
+                'Lab: Test Category',
+                'Lab: Turnaround Time (hrs)',
+                'Lab: Fasting Required',
+
+                // Radiology Detail Fields
+                'Radiology: Exam Name',
+                'Radiology: Exam Code',
+                'Radiology: Modality',
+                'Radiology: Body Part',
+                'Radiology: Contrast Required',
+                'Radiology: Pregnancy Safe',
+
+                // Professional Service Detail Fields
+                'ProfService: Service Name',
+                'ProfService: Service Code',
+                'ProfService: Specialty',
+                'ProfService: Duration (min)',
+                'ProfService: Provider Type',
+                'ProfService: Anesthesia Required',
+
+                // Consultation Detail Fields
+                'Consultation: Type',
+                'Consultation: Specialty',
+                'Consultation: Provider Level',
+                'Consultation: Duration (min)',
+                'Consultation: Mode',
+
+                // Consumable Detail Fields
+                'Consumable: Item Name',
+                'Consumable: Item Code',
+                'Consumable: Category',
+                'Consumable: Unit of Measure',
+                'Consumable: Units Per Pack',
+                'Consumable: Sterile',
             ];
         }
 
@@ -125,6 +150,7 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
             'Is Bundle',
             'Bundle Price (₦)',
             'ICD-10 Code',
+            'Detail Type',
             'Status',
             'Created Date',
             'Created By'
@@ -137,18 +163,70 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
     public function map($case): array
     {
         if ($this->isTemplate) {
-            // For template, return as-is since we already have Yes/No strings
+            // For template, return all fields including detail type fields
             return [
+                // Basic fields
                 $case->case_name,
                 $case->service_description,
                 $case->level_of_care,
                 $case->price,
                 $case->group,
-                $case->pa_required,  // Already 'Yes' or 'No'
-                $case->referable,    // Already 'Yes' or 'No'
-                $case->is_bundle,    // Already 'Yes' or 'No'
-                $case->bundle_price, // Empty string or number
-                $case->diagnosis_icd10 // Empty string or ICD-10 code
+                $case->pa_required,
+                $case->referable,
+                $case->is_bundle,
+                $case->bundle_price,
+                $case->diagnosis_icd10,
+                $case->detail_type ?? '',
+
+                // Drug fields
+                $case->drug_generic_name ?? '',
+                $case->drug_brand_name ?? '',
+                $case->drug_dosage_form ?? '',
+                $case->drug_strength ?? '',
+                $case->drug_pack_description ?? '',
+                $case->drug_route ?? '',
+                $case->drug_manufacturer ?? '',
+                $case->drug_drug_class ?? '',
+                $case->drug_nafdac_number ?? '',
+
+                // Lab fields
+                $case->lab_test_name ?? '',
+                $case->lab_test_code ?? '',
+                $case->lab_specimen_type ?? '',
+                $case->lab_test_category ?? '',
+                $case->lab_turnaround_time ?? '',
+                $case->lab_fasting_required ?? '',
+
+                // Radiology fields
+                $case->radiology_exam_name ?? '',
+                $case->radiology_exam_code ?? '',
+                $case->radiology_modality ?? '',
+                $case->radiology_body_part ?? '',
+                $case->radiology_contrast_required ?? '',
+                $case->radiology_pregnancy_safe ?? '',
+
+                // Professional Service fields
+                $case->profservice_service_name ?? '',
+                $case->profservice_service_code ?? '',
+                $case->profservice_specialty ?? '',
+                $case->profservice_duration ?? '',
+                $case->profservice_provider_type ?? '',
+                $case->profservice_anesthesia_required ?? '',
+
+                // Consultation fields
+                $case->consultation_type ?? '',
+                $case->consultation_specialty ?? '',
+                $case->consultation_provider_level ?? '',
+                $case->consultation_duration ?? '',
+                $case->consultation_mode ?? '',
+
+                // Consumable fields
+                $case->consumable_item_name ?? '',
+                $case->consumable_item_code ?? '',
+                $case->consumable_category ?? '',
+                $case->consumable_unit_of_measure ?? '',
+                $case->consumable_units_per_pack ?? '',
+                $case->consumable_sterile ?? '',
             ];
         }
 
@@ -257,6 +335,413 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
                     }
                 }
             },
+        ];
+    }
+
+    /**
+     * Get sample data for Drug detail type
+     */
+    private function getDrugSample(): object
+    {
+        return (object) [
+            'case_name' => 'Paracetamol 500mg Tablets',
+            'service_description' => 'Paracetamol 500mg Tablets - Pack of 20',
+            'level_of_care' => 'Primary',
+            'price' => 500.00,
+            'group' => 'DRUGS',
+            'pa_required' => 'No',
+            'referable' => 'No',
+            'is_bundle' => 'No',
+            'bundle_price' => '',
+            'diagnosis_icd10' => '',
+            'detail_type' => 'Drug',
+            'drug_generic_name' => 'Paracetamol',
+            'drug_brand_name' => 'Panadol',
+            'drug_dosage_form' => 'Tablet',
+            'drug_strength' => '500mg',
+            'drug_pack_description' => 'Pack of 20 tablets',
+            'drug_route' => 'Oral',
+            'drug_manufacturer' => 'GSK',
+            'drug_drug_class' => 'Analgesic',
+            'drug_nafdac_number' => 'A4-1234',
+            // Empty other detail fields
+            'lab_test_name' => '',
+            'lab_test_code' => '',
+            'lab_specimen_type' => '',
+            'lab_test_category' => '',
+            'lab_turnaround_time' => '',
+            'lab_fasting_required' => '',
+            'radiology_exam_name' => '',
+            'radiology_exam_code' => '',
+            'radiology_modality' => '',
+            'radiology_body_part' => '',
+            'radiology_contrast_required' => '',
+            'radiology_pregnancy_safe' => '',
+            'profservice_service_name' => '',
+            'profservice_service_code' => '',
+            'profservice_specialty' => '',
+            'profservice_duration' => '',
+            'profservice_provider_type' => '',
+            'profservice_anesthesia_required' => '',
+            'consultation_type' => '',
+            'consultation_specialty' => '',
+            'consultation_provider_level' => '',
+            'consultation_duration' => '',
+            'consultation_mode' => '',
+            'consumable_item_name' => '',
+            'consumable_item_code' => '',
+            'consumable_category' => '',
+            'consumable_unit_of_measure' => '',
+            'consumable_units_per_pack' => '',
+            'consumable_sterile' => '',
+        ];
+    }
+
+    /**
+     * Get sample data for Laboratory detail type
+     */
+    private function getLabSample(): object
+    {
+        return (object) [
+            'case_name' => 'Full Blood Count (FBC)',
+            'service_description' => 'Complete blood count with differential',
+            'level_of_care' => 'Primary',
+            'price' => 2500.00,
+            'group' => 'LABORATORY',
+            'pa_required' => 'No',
+            'referable' => 'No',
+            'is_bundle' => 'No',
+            'bundle_price' => '',
+            'diagnosis_icd10' => '',
+            'detail_type' => 'Laboratory',
+            'drug_generic_name' => '',
+            'drug_brand_name' => '',
+            'drug_dosage_form' => '',
+            'drug_strength' => '',
+            'drug_pack_description' => '',
+            'drug_route' => '',
+            'drug_manufacturer' => '',
+            'drug_drug_class' => '',
+            'drug_nafdac_number' => '',
+            'lab_test_name' => 'Full Blood Count',
+            'lab_test_code' => 'FBC001',
+            'lab_specimen_type' => 'Whole Blood',
+            'lab_test_category' => 'Hematology',
+            'lab_turnaround_time' => '2',
+            'lab_fasting_required' => 'No',
+            'radiology_exam_name' => '',
+            'radiology_exam_code' => '',
+            'radiology_modality' => '',
+            'radiology_body_part' => '',
+            'radiology_contrast_required' => '',
+            'radiology_pregnancy_safe' => '',
+            'profservice_service_name' => '',
+            'profservice_service_code' => '',
+            'profservice_specialty' => '',
+            'profservice_duration' => '',
+            'profservice_provider_type' => '',
+            'profservice_anesthesia_required' => '',
+            'consultation_type' => '',
+            'consultation_specialty' => '',
+            'consultation_provider_level' => '',
+            'consultation_duration' => '',
+            'consultation_mode' => '',
+            'consumable_item_name' => '',
+            'consumable_item_code' => '',
+            'consumable_category' => '',
+            'consumable_unit_of_measure' => '',
+            'consumable_units_per_pack' => '',
+            'consumable_sterile' => '',
+        ];
+    }
+
+    /**
+     * Get sample data for Radiology detail type
+     */
+    private function getRadiologySample(): object
+    {
+        return (object) [
+            'case_name' => 'Chest X-Ray',
+            'service_description' => 'Chest X-Ray - PA View',
+            'level_of_care' => 'Secondary',
+            'price' => 5000.00,
+            'group' => 'RADIOLOGY',
+            'pa_required' => 'Yes',
+            'referable' => 'Yes',
+            'is_bundle' => 'No',
+            'bundle_price' => '',
+            'diagnosis_icd10' => '',
+            'detail_type' => 'Radiology',
+            'drug_generic_name' => '',
+            'drug_brand_name' => '',
+            'drug_dosage_form' => '',
+            'drug_strength' => '',
+            'drug_pack_description' => '',
+            'drug_route' => '',
+            'drug_manufacturer' => '',
+            'drug_drug_class' => '',
+            'drug_nafdac_number' => '',
+            'lab_test_name' => '',
+            'lab_test_code' => '',
+            'lab_specimen_type' => '',
+            'lab_test_category' => '',
+            'lab_turnaround_time' => '',
+            'lab_fasting_required' => '',
+            'radiology_exam_name' => 'Chest X-Ray',
+            'radiology_exam_code' => 'XR001',
+            'radiology_modality' => 'X-Ray',
+            'radiology_body_part' => 'Chest',
+            'radiology_contrast_required' => 'No',
+            'radiology_pregnancy_safe' => 'No',
+            'profservice_service_name' => '',
+            'profservice_service_code' => '',
+            'profservice_specialty' => '',
+            'profservice_duration' => '',
+            'profservice_provider_type' => '',
+            'profservice_anesthesia_required' => '',
+            'consultation_type' => '',
+            'consultation_specialty' => '',
+            'consultation_provider_level' => '',
+            'consultation_duration' => '',
+            'consultation_mode' => '',
+            'consumable_item_name' => '',
+            'consumable_item_code' => '',
+            'consumable_category' => '',
+            'consumable_unit_of_measure' => '',
+            'consumable_units_per_pack' => '',
+            'consumable_sterile' => '',
+        ];
+    }
+
+    /**
+     * Get sample data for Professional Service detail type
+     */
+    private function getProfessionalServiceSample(): object
+    {
+        return (object) [
+            'case_name' => 'Minor Surgery - Wound Suturing',
+            'service_description' => 'Minor surgical procedure for wound closure',
+            'level_of_care' => 'Secondary',
+            'price' => 15000.00,
+            'group' => 'PROFESSIONAL SERVICES',
+            'pa_required' => 'Yes',
+            'referable' => 'Yes',
+            'is_bundle' => 'No',
+            'bundle_price' => '',
+            'diagnosis_icd10' => '',
+            'detail_type' => 'ProfessionalService',
+            'drug_generic_name' => '',
+            'drug_brand_name' => '',
+            'drug_dosage_form' => '',
+            'drug_strength' => '',
+            'drug_pack_description' => '',
+            'drug_route' => '',
+            'drug_manufacturer' => '',
+            'drug_drug_class' => '',
+            'drug_nafdac_number' => '',
+            'lab_test_name' => '',
+            'lab_test_code' => '',
+            'lab_specimen_type' => '',
+            'lab_test_category' => '',
+            'lab_turnaround_time' => '',
+            'lab_fasting_required' => '',
+            'radiology_exam_name' => '',
+            'radiology_exam_code' => '',
+            'radiology_modality' => '',
+            'radiology_body_part' => '',
+            'radiology_contrast_required' => '',
+            'radiology_pregnancy_safe' => '',
+            'profservice_service_name' => 'Wound Suturing',
+            'profservice_service_code' => 'PS001',
+            'profservice_specialty' => 'General Surgery',
+            'profservice_duration' => '30',
+            'profservice_provider_type' => 'Specialist',
+            'profservice_anesthesia_required' => 'Yes',
+            'consultation_type' => '',
+            'consultation_specialty' => '',
+            'consultation_provider_level' => '',
+            'consultation_duration' => '',
+            'consultation_mode' => '',
+            'consumable_item_name' => '',
+            'consumable_item_code' => '',
+            'consumable_category' => '',
+            'consumable_unit_of_measure' => '',
+            'consumable_units_per_pack' => '',
+            'consumable_sterile' => '',
+        ];
+    }
+
+    /**
+     * Get sample data for Consultation detail type
+     */
+    private function getConsultationSample(): object
+    {
+        return (object) [
+            'case_name' => 'Specialist Consultation - Cardiology',
+            'service_description' => 'Cardiology specialist consultation',
+            'level_of_care' => 'Tertiary',
+            'price' => 10000.00,
+            'group' => 'CONSULTATIONS',
+            'pa_required' => 'Yes',
+            'referable' => 'Yes',
+            'is_bundle' => 'No',
+            'bundle_price' => '',
+            'diagnosis_icd10' => '',
+            'detail_type' => 'Consultation',
+            'drug_generic_name' => '',
+            'drug_brand_name' => '',
+            'drug_dosage_form' => '',
+            'drug_strength' => '',
+            'drug_pack_description' => '',
+            'drug_route' => '',
+            'drug_manufacturer' => '',
+            'drug_drug_class' => '',
+            'drug_nafdac_number' => '',
+            'lab_test_name' => '',
+            'lab_test_code' => '',
+            'lab_specimen_type' => '',
+            'lab_test_category' => '',
+            'lab_turnaround_time' => '',
+            'lab_fasting_required' => '',
+            'radiology_exam_name' => '',
+            'radiology_exam_code' => '',
+            'radiology_modality' => '',
+            'radiology_body_part' => '',
+            'radiology_contrast_required' => '',
+            'radiology_pregnancy_safe' => '',
+            'profservice_service_name' => '',
+            'profservice_service_code' => '',
+            'profservice_specialty' => '',
+            'profservice_duration' => '',
+            'profservice_provider_type' => '',
+            'profservice_anesthesia_required' => '',
+            'consultation_type' => 'Initial',
+            'consultation_specialty' => 'Cardiology',
+            'consultation_provider_level' => 'Consultant',
+            'consultation_duration' => '45',
+            'consultation_mode' => 'In-person',
+            'consumable_item_name' => '',
+            'consumable_item_code' => '',
+            'consumable_category' => '',
+            'consumable_unit_of_measure' => '',
+            'consumable_units_per_pack' => '',
+            'consumable_sterile' => '',
+        ];
+    }
+
+    /**
+     * Get sample data for Consumable detail type
+     */
+    private function getConsumableSample(): object
+    {
+        return (object) [
+            'case_name' => 'Surgical Gloves - Sterile',
+            'service_description' => 'Sterile surgical gloves - Size 7.5',
+            'level_of_care' => 'Primary',
+            'price' => 1500.00,
+            'group' => 'CONSUMABLES',
+            'pa_required' => 'No',
+            'referable' => 'No',
+            'is_bundle' => 'No',
+            'bundle_price' => '',
+            'diagnosis_icd10' => '',
+            'detail_type' => 'Consumable',
+            'drug_generic_name' => '',
+            'drug_brand_name' => '',
+            'drug_dosage_form' => '',
+            'drug_strength' => '',
+            'drug_pack_description' => '',
+            'drug_route' => '',
+            'drug_manufacturer' => '',
+            'drug_drug_class' => '',
+            'drug_nafdac_number' => '',
+            'lab_test_name' => '',
+            'lab_test_code' => '',
+            'lab_specimen_type' => '',
+            'lab_test_category' => '',
+            'lab_turnaround_time' => '',
+            'lab_fasting_required' => '',
+            'radiology_exam_name' => '',
+            'radiology_exam_code' => '',
+            'radiology_modality' => '',
+            'radiology_body_part' => '',
+            'radiology_contrast_required' => '',
+            'radiology_pregnancy_safe' => '',
+            'profservice_service_name' => '',
+            'profservice_service_code' => '',
+            'profservice_specialty' => '',
+            'profservice_duration' => '',
+            'profservice_provider_type' => '',
+            'profservice_anesthesia_required' => '',
+            'consultation_type' => '',
+            'consultation_specialty' => '',
+            'consultation_provider_level' => '',
+            'consultation_duration' => '',
+            'consultation_mode' => '',
+            'consumable_item_name' => 'Surgical Gloves',
+            'consumable_item_code' => 'CONS001',
+            'consumable_category' => 'Gloves',
+            'consumable_unit_of_measure' => 'Pair',
+            'consumable_units_per_pack' => '50',
+            'consumable_sterile' => 'Yes',
+        ];
+    }
+
+    /**
+     * Get sample data for Bundle
+     */
+    private function getBundleSample(): object
+    {
+        return (object) [
+            'case_name' => 'Normal Delivery Bundle',
+            'service_description' => 'Normal Delivery - Complete Package',
+            'level_of_care' => 'Secondary',
+            'price' => 0.00,
+            'group' => 'OBSTETRICS & GYNAECOLOGY',
+            'pa_required' => 'Yes',
+            'referable' => 'Yes',
+            'is_bundle' => 'Yes',
+            'bundle_price' => 50000.00,
+            'diagnosis_icd10' => 'O80',
+            'detail_type' => '',
+            'drug_generic_name' => '',
+            'drug_brand_name' => '',
+            'drug_dosage_form' => '',
+            'drug_strength' => '',
+            'drug_pack_description' => '',
+            'drug_route' => '',
+            'drug_manufacturer' => '',
+            'drug_drug_class' => '',
+            'drug_nafdac_number' => '',
+            'lab_test_name' => '',
+            'lab_test_code' => '',
+            'lab_specimen_type' => '',
+            'lab_test_category' => '',
+            'lab_turnaround_time' => '',
+            'lab_fasting_required' => '',
+            'radiology_exam_name' => '',
+            'radiology_exam_code' => '',
+            'radiology_modality' => '',
+            'radiology_body_part' => '',
+            'radiology_contrast_required' => '',
+            'radiology_pregnancy_safe' => '',
+            'profservice_service_name' => '',
+            'profservice_service_code' => '',
+            'profservice_specialty' => '',
+            'profservice_duration' => '',
+            'profservice_provider_type' => '',
+            'profservice_anesthesia_required' => '',
+            'consultation_type' => '',
+            'consultation_specialty' => '',
+            'consultation_provider_level' => '',
+            'consultation_duration' => '',
+            'consultation_mode' => '',
+            'consumable_item_name' => '',
+            'consumable_item_code' => '',
+            'consumable_category' => '',
+            'consumable_unit_of_measure' => '',
+            'consumable_units_per_pack' => '',
+            'consumable_sterile' => '',
         ];
     }
 }
