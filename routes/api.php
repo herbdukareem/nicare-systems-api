@@ -234,6 +234,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('bundle-components', BundleComponentController::class);
     Route::post('bundle-components/bulk', [BundleComponentController::class, 'bulkStore']);
     Route::get('bundle-components-statistics', [BundleComponentController::class, 'statistics']);
+    Route::get('bundle-components-export', [BundleComponentController::class, 'export']);
+    Route::get('bundle-components-template', [BundleComponentController::class, 'downloadTemplate']);
+    Route::post('bundle-components-import', [BundleComponentController::class, 'import']);
 
     // Service Type and Case Type routes
     Route::apiResource('case-types', CaseTypeController::class)->only(['index', 'show']);

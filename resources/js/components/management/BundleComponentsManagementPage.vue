@@ -113,6 +113,10 @@
                     <v-icon left>mdi-plus-box-multiple</v-icon>
                     Bulk Add
                   </v-btn>
+                  <v-btn color="secondary" @click="openImportDialog">
+                    <v-icon left>mdi-upload</v-icon>
+                    Import
+                  </v-btn>
                   <v-btn color="info" @click="exportComponents">
                     <v-icon left>mdi-download</v-icon>
                     Export
@@ -401,6 +405,83 @@
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Import Dialog -->
+    <v-dialog v-model="importDialog" max-width="600px" persistent>
+      <v-card>
+        <v-card-title class="bg-grey-lighten-4">
+          <span class="text-h6">Import Bundle Components</span>
+        </v-card-title>
+        <v-card-text class="pt-4">
+          <v-alert variant="outlined" type="info" class="mb-4">
+            <div class="text-body-2">
+              <strong>Import Instructions:</strong>
+              <ul class="mt-2">
+                <li>Download the template file first</li>
+                <li>Fill in the required fields:
+                  <ul>
+                    <li><strong>Bundle NiCare Code</strong> - The NiCare code of the bundle</li>
+                    <li><strong>Component NiCare Code</strong> - The NiCare code of the component (drug, lab, etc.)</li>
+                    <li><strong>Max Quantity</strong> - Maximum quantity covered by the bundle</li>
+                    <li><strong>Item Type</strong> - DRUG, LABORATORY, RADIOLOGY, etc.</li>
+                  </ul>
+                </li>
+                <li>Upload the completed file</li>
+                <li>Supported formats: .xlsx, .xls, .csv</li>
+              </ul>
+            </div>
+          </v-alert>
+
+          <v-btn
+            color="primary"
+            variant="outlined"
+            prepend-icon="mdi-download"
+            block
+            class="mb-4"
+            @click="downloadTemplate"
+            :loading="downloadingTemplate"
+          >
+            Download Template
+          </v-btn>
+
+          <v-file-input
+            v-model="importFile"
+            label="Select File"
+            accept=".xlsx,.xls,.csv"
+            variant="outlined"
+            density="comfortable"
+            prepend-inner-icon="mdi-file-excel"
+            show-size
+            clearable
+          ></v-file-input>
+
+          <v-alert v-if="importErrors.length > 0" type="error" class="mt-4">
+            <div class="text-body-2">
+              <strong>Import Errors:</strong>
+              <ul class="mt-2">
+                <li v-for="(error, index) in importErrors" :key="index">{{ error }}</li>
+              </ul>
+            </div>
+          </v-alert>
+
+          <v-alert v-if="importSuccess" type="success" class="mt-4">
+            {{ importSuccessMessage }}
+          </v-alert>
+        </v-card-text>
+        <v-card-actions class="px-6 pb-4">
+          <v-spacer></v-spacer>
+          <v-btn text @click="closeImportDialog">Cancel</v-btn>
+          <v-btn
+            color="primary"
+            @click="importComponents"
+            :loading="importing"
+            :disabled="!importFile"
+          >
+            Import
+          </v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
     </div>
   </AdminLayout>
 </template>
@@ -433,9 +514,16 @@ const itemTypeFilter = ref(null);
 const showCreateDialog = ref(false);
 const showBulkAddDialog = ref(false);
 const showDeleteDialog = ref(false);
+const importDialog = ref(false);
 const editMode = ref(false);
 const componentForm = ref(null);
 const bulkForm = ref(null);
+const importFile = ref(null);
+const importErrors = ref([]);
+const importSuccess = ref(false);
+const importSuccessMessage = ref('');
+const importing = ref(false);
+const downloadingTemplate = ref(false);
 const componentToDelete = ref(null);
 
 const formData = ref({
@@ -790,6 +878,100 @@ const exportComponents = async () => {
     showSuccess('Bundle components exported successfully');
   } catch (err) {
     showError('Failed to export bundle components');
+  }
+};
+
+// Import functions
+const openImportDialog = () => {
+  importDialog.value = true;
+  importFile.value = null;
+  importErrors.value = [];
+  importSuccess.value = false;
+  importSuccessMessage.value = '';
+};
+
+const closeImportDialog = () => {
+  importDialog.value = false;
+  importFile.value = null;
+  importErrors.value = [];
+  importSuccess.value = false;
+  importSuccessMessage.value = '';
+};
+
+const downloadTemplate = async () => {
+  try {
+    downloadingTemplate.value = true;
+    const response = await api.get('/bundle-components-template', {
+      responseType: 'blob'
+    });
+
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', 'bundle_components_template.xlsx');
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    showSuccess('Template downloaded successfully');
+  } catch (err) {
+    showError('Failed to download template');
+  } finally {
+    downloadingTemplate.value = false;
+  }
+};
+
+const importComponents = async () => {
+  // Check if file is selected (handle both array and single file)
+  const file = Array.isArray(importFile.value) ? importFile.value[0] : importFile.value;
+
+  if (!file) {
+    showError('Please select a file to import');
+    return;
+  }
+
+  try {
+    importing.value = true;
+    importErrors.value = [];
+    importSuccess.value = false;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await api.post('/bundle-components-import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    });
+
+    if (response.data.success) {
+      importSuccess.value = true;
+      importSuccessMessage.value = response.data.message;
+
+      if (response.data.data.errors && response.data.data.errors.length > 0) {
+        importErrors.value = response.data.data.errors;
+      }
+
+      // Reload components after successful import
+      await loadComponents();
+
+      // Close dialog after 2 seconds if no errors
+      if (importErrors.value.length === 0) {
+        setTimeout(() => {
+          closeImportDialog();
+        }, 2000);
+      }
+    } else {
+      importErrors.value = [response.data.message];
+    }
+  } catch (err) {
+    if (err.response?.data?.data?.errors) {
+      importErrors.value = err.response.data.data.errors;
+    } else {
+      importErrors.value = [err.response?.data?.message || 'Failed to import bundle components'];
+    }
+  } finally {
+    importing.value = false;
   }
 };
 </script>

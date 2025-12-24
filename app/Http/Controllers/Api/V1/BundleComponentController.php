@@ -10,6 +10,9 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use App\Exports\BundleComponentsExport;
+use App\Imports\BundleComponentsImport;
+use Maatwebsite\Excel\Facades\Excel;
 
 class BundleComponentController extends Controller
 {
@@ -339,6 +342,118 @@ class BundleComponentController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to fetch statistics',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Export bundle components to Excel
+     */
+    public function export(Request $request)
+    {
+        try {
+            $query = BundleComponent::with(['serviceBundle', 'caseRecord']);
+
+            // Apply filters
+            if ($request->has('service_bundle_id') && $request->service_bundle_id) {
+                $query->where('service_bundle_id', $request->service_bundle_id);
+            }
+
+            if ($request->has('item_type') && $request->item_type) {
+                $query->where('item_type', $request->item_type);
+            }
+
+            $components = $query->get()->map(function ($component) {
+                return (object) [
+                    'bundle_nicare_code' => $component->serviceBundle->nicare_code ?? '',
+                    'bundle_name' => $component->serviceBundle->case_name ?? '',
+                    'component_nicare_code' => $component->caseRecord->nicare_code ?? '',
+                    'component_name' => $component->caseRecord->case_name ?? '',
+                    'max_quantity' => $component->max_quantity,
+                    'item_type' => $component->item_type,
+                ];
+            });
+
+            return Excel::download(
+                new BundleComponentsExport($components, false),
+                'bundle_components_export_' . date('Y-m-d') . '.xlsx'
+            );
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to export bundle components',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Download bundle components import template
+     */
+    public function downloadTemplate()
+    {
+        try {
+            return Excel::download(
+                new BundleComponentsExport([], true),
+                'bundle_components_template.xlsx'
+            );
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to download template',
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Import bundle components from Excel file
+     */
+    public function import(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'file' => 'required|file|mimes:xlsx,xls,csv|max:10240'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $file = $request->file('file');
+            $import = new BundleComponentsImport();
+
+            Excel::import($import, $file);
+
+            $errors = $import->getErrors();
+            $imported = $import->getImported();
+
+            if (count($errors) > 0 && $imported === 0) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Import failed with errors',
+                    'errors' => $errors
+                ], 422);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => "Imported {$imported} bundle component(s) successfully",
+                'data' => [
+                    'imported' => $imported,
+                    'errors' => $errors
+                ]
+            ], 200);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to import bundle components',
                 'error' => $e->getMessage()
             ], 500);
         }
