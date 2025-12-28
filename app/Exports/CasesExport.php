@@ -80,7 +80,7 @@ class CasesExport implements FromCollection, WithHeadings, WithMapping, ShouldAu
                 'PA Required',
                 'Referable',
                 'Is Bundle',
-                'Bundle Price (₦)',
+                'Price (₦)',
                 'ICD-10 Code',
 
                 // Detail Type Selection

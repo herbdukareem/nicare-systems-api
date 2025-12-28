@@ -58,7 +58,6 @@ class CasesImport implements ToCollection, WithHeadingRow
                     'pa_required' => 'nullable|in:Yes,No,true,false,1,0,YES,NO',
                     'referable' => 'nullable|in:Yes,No,true,false,1,0,YES,NO',
                     'is_bundle' => 'nullable|in:Yes,No,true,false,1,0,YES,NO',
-                    'bundle_price' => 'nullable|numeric|min:0|max:999999999',
                     'diagnosis_icd10' => 'nullable|string|max:20',
                 ]);
 
@@ -74,15 +73,17 @@ class CasesImport implements ToCollection, WithHeadingRow
 
                 // Validate bundle-specific fields
                 if ($isBundle) {
-                    if (empty($rowData['bundle_price']) || !is_numeric($rowData['bundle_price'])) {
-                        $this->errors[] = "Row " . ($index + 2) . ": Bundle Price is required for bundle cases";
-                        continue;
-                    }
+                   
                     if (empty($rowData['diagnosis_icd10'])) {
                         $this->errors[] = "Row " . ($index + 2) . ": ICD-10 Code is required for bundle cases";
                         continue;
                     }
                 }
+
+                //  if ((empty($rowData['price']) || !is_numeric($rowData['price'])) && (empty($rowData['bundle_price']) || !is_numeric($rowData['bundle_price']))) {
+                //         $this->errors[] = "Row " . ($index + 2) . ": Price is required for  cases";
+                //         continue;
+                //     }
 
                 // Generate NiCare code automatically
                 $nicareCode = CaseRecord::generateNiCareCode(
@@ -91,20 +92,8 @@ class CasesImport implements ToCollection, WithHeadingRow
                 );
 
                 // Determine price based on whether it's a bundle or FFS service
-                // For bundles: price can be 0 (bundle_price is used instead)
-                // For FFS: price is required
-                $price = 0; // Default to 0
-                if ($isBundle) {
-                    // For bundles, price is typically 0 (bundle_price is used)
-                    $price = !empty($rowData['price']) ? (float) $rowData['price'] : 0;
-                } else {
-                    // For FFS services, price is required
-                    if (empty($rowData['price'])) {
-                        $this->errors[] = "Row " . ($index + 2) . ": Price is required for FFS services";
-                        continue;
-                    }
-                    $price = (float) $rowData['price'];
-                }
+                $price = isset($rowData['bundle_price']) ?? $rowData['price'] ?? 0;
+                $price = !empty($price) ? (float) $price : 0;
 
                 // Prepare case record data
                 $caseData = [
@@ -114,7 +103,6 @@ class CasesImport implements ToCollection, WithHeadingRow
                     'level_of_care' => $rowData['level_of_care'],
                     'price' => $price,
                     'group' => $rowData['group'],
-                    // Note: case_category column doesn't exist in database, skip it
                     'pa_required' => $paRequired,
                     'referable' => $referable,
                     'is_bundle' => $isBundle,
@@ -135,8 +123,10 @@ class CasesImport implements ToCollection, WithHeadingRow
 
                 // Add bundle-specific fields if it's a bundle
                 if ($isBundle) {
-                    $caseData['bundle_price'] = (float) $rowData['bundle_price'];
+                    $caseData['bundle_price'] = (float) $price;
                     $caseData['diagnosis_icd10'] = trim($rowData['diagnosis_icd10']);
+                }else{
+                       $caseData['price'] = (float) $price;
                 }
 
                 // Check for duplicate case_name
@@ -246,14 +236,7 @@ class CasesImport implements ToCollection, WithHeadingRow
             }
         }
 
-        // Clean up bundle_price strings like "₦50,000" -> "50000"
-        if (isset($normalized['bundle_price']) && is_string($normalized['bundle_price'])) {
-            $normalized['bundle_price'] = preg_replace('/[^0-9.]/', '', $normalized['bundle_price']);
-            // If bundle_price becomes empty after cleaning, set to null
-            if ($normalized['bundle_price'] === '') {
-                $normalized['bundle_price'] = null;
-            }
-        }
+      
 
         // Normalize ICD-10 code field
         if (!array_key_exists('diagnosis_icd10', $normalized)) {
@@ -382,7 +365,7 @@ class CasesImport implements ToCollection, WithHeadingRow
         $columns = array_keys($row->toArray());
 
         // Check for bundle-specific columns
-        if (in_array('bundle_price', $columns) && in_array('diagnosis_icd10', $columns)) {
+        if (in_array('price', $columns) && in_array('diagnosis_icd10', $columns)) {
             return 'Bundle';
         }
 

@@ -1061,7 +1061,7 @@ const importSuccessMessage = ref('');
 const selectedDetailType = ref('drug');
 
 const detailTypeOptions = [
-  { title: 'Drug Cases', value: 'drug' },
+  { title: 'Drug', value: 'drug' },
   { title: 'Laboratory Tests', value: 'laboratory' },
   { title: 'Radiology Examinations', value: 'radiology' },
   { title: 'Professional Services', value: 'professional_service' },

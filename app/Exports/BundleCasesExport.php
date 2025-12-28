@@ -70,7 +70,7 @@ class BundleCasesExport implements FromCollection, WithHeadings, WithMapping, Sh
             'PA Required',
             'Referable',
             'Is Bundle',
-            'Bundle Price (₦) *',
+            'Price (₦) *',
             'ICD-10 Code *',
         ];
     }
