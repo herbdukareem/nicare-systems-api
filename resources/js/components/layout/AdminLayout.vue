@@ -474,24 +474,8 @@ const managementMenu = {
       icon: 'mdi-view-dashboard-outline',
       roles: ['admin', 'Super Admin', 'tariff_manager'],
     },
-    {
-      name: 'Drugs Management',
-      path: '/management/drugs',
-      icon: 'mdi-pill',
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-    },
-    {
-      name: 'Laboratories',
-      path: '/management/laboratories',
-      icon: 'mdi-test-tube',
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-    },
-    {
-      name: 'Professional Services',
-      path: '/management/professional-services',
-      icon: 'mdi-medical-bag',
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-    },
+
+   
     {
       name: 'Case Management',
       path: '/management/cases',

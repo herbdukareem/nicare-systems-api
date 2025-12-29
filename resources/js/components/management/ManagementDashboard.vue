@@ -125,27 +125,6 @@ const statistics = ref({
 
 const navigationCards = ref([
   {
-    title: 'Drugs Management',
-    description: 'Manage drug tariff items and pricing',
-    icon: 'mdi-pill',
-    color: 'green',
-    route: '/management/drugs',
-  },
-  {
-    title: 'Laboratories Management',
-    description: 'Manage laboratory test tariff items',
-    icon: 'mdi-test-tube',
-    color: 'blue',
-    route: '/management/laboratories',
-  },
-  {
-    title: 'Professional Services',
-    description: 'Manage professional services (consultations, procedures)',
-    icon: 'mdi-medical-bag',
-    color: 'teal',
-    route: '/management/professional-services',
-  },
-  {
     title: 'Case Management',
     description: 'Manage case records, service tariffs, and bundles',
     icon: 'mdi-file-document-multiple-outline',
