@@ -129,12 +129,31 @@ class CasesImport implements ToCollection, WithHeadingRow
                        $caseData['price'] = (float) $price;
                 }
 
-                // Check for duplicate case_name
-                $existingCase = CaseRecord::where('case_name', $rowData['case_name'])->first();
-                if ($existingCase) {
-                    $this->errors[] = "Row " . ($index + 2) . ": Case with name '{$rowData['case_name']}' already exists";
-                    continue;
-                }
+                // Check for duplicate case_name if not drug
+                if ($this->detectedDetailType !== 'Drug') {
+                        $existingCase = CaseRecord::where('case_name', $rowData['case_name'])->first();
+                        if ($existingCase) {
+                            $this->errors[] = "Row " . ($index + 2) . ": Case with name '{$rowData['case_name']}' already exists";
+                            continue;
+                        }
+
+                    }else{
+                        if( $this->detectedDetailType === 'Drug'){
+                         // check for duplicate drug combination (name, dosage form, strength, presentation, pack description)
+                            $existingDrug = DrugDetail::where('generic_name', $rowData['generic_name'])
+                                // ->where('brand_name', $rowData['brand_name'] ?? null)
+                                ->where('dosage_form', $rowData['dosage_form'] ?? null)
+                                ->where('strength', $rowData['strength'] ?? null)
+                                ->where('pack_description', $rowData['pack_description'] ?? null)
+                                ->first();
+                                
+
+                            if ($existingDrug) {
+                                 $this->errors[] = "Row " . ($index + 2) . ": Drug with same combination'{$rowData['case_name']}' already exists";
+                                 continue;
+                            } 
+                        }
+                    }
 
                 // Create case record and detail record in a transaction
                 DB::transaction(function () use ($caseData, $rowData, $index, $isBundle) {
@@ -450,6 +469,8 @@ class CasesImport implements ToCollection, WithHeadingRow
         if (empty($rowData['generic_name'])) {
             throw new \Exception("Drug: Generic Name is required for Drug detail type");
         }
+
+         
 
         return DrugDetail::create([
             'generic_name' => $rowData['generic_name'],
