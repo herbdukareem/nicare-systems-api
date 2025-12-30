@@ -47,6 +47,7 @@ class CasesImport implements ToCollection, WithHeadingRow
 
                 // Convert boolean fields first to determine validation rules
                 $isBundle = $this->convertToBoolean($rowData['is_bundle'] ?? 'No');
+                
 
                 // Validate row data
                 $validator = Validator::make($rowData, [
@@ -80,25 +81,15 @@ class CasesImport implements ToCollection, WithHeadingRow
                     }
                 }
 
-                //  if ((empty($rowData['price']) || !is_numeric($rowData['price'])) && (empty($rowData['bundle_price']) || !is_numeric($rowData['bundle_price']))) {
-                //         $this->errors[] = "Row " . ($index + 2) . ": Price is required for  cases";
-                //         continue;
-                //     }
-
-                // Generate NiCare code automatically
-                $nicareCode = CaseRecord::generateNiCareCode(
-                    $rowData['case_name'],
-                    $rowData['level_of_care']
-                );
-
+      
                 // Determine price based on whether it's a bundle or FFS service
-                $price = isset($rowData['bundle_price']) ?? $rowData['price'] ?? 0;
+                $price = isset($rowData['bundle_price']) ? $rowData['bundle_price'] :  $rowData['price'];
                 $price = !empty($price) ? (float) $price : 0;
 
                 // Prepare case record data
                 $caseData = [
                     'case_name' => $rowData['case_name'],
-                    'nicare_code' => $nicareCode,
+                    'nicare_code' => $rowData['nicare_code'],
                     'service_description' => $rowData['service_description'],
                     'level_of_care' => $rowData['level_of_care'],
                     'price' => $price,
@@ -144,12 +135,13 @@ class CasesImport implements ToCollection, WithHeadingRow
                                 // ->where('brand_name', $rowData['brand_name'] ?? null)
                                 ->where('dosage_form', $rowData['dosage_form'] ?? null)
                                 ->where('strength', $rowData['strength'] ?? null)
+                                ->where('route_of_administration', $rowData['route_of_administration'] ?? null)
                                 ->where('pack_description', $rowData['pack_description'] ?? null)
                                 ->first();
                                 
 
                             if ($existingDrug) {
-                                 $this->errors[] = "Row " . ($index + 2) . ": Drug with same combination'{$rowData['case_name']}' already exists";
+                                 $this->errors[] = "Row " . ($index + 2) . ": Drug with same combination '{$rowData['case_name']}' already exists";
                                  continue;
                             } 
                         }
