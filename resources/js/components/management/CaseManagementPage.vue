@@ -1067,7 +1067,7 @@ const detailTypeOptions = [
   { title: 'Professional Services', value: 'professional_service' },
   { title: 'Consultations', value: 'consultation' },
   { title: 'Consumables', value: 'consumable' },
-  { title: 'Bundle Services', value: 'bundle' },
+  { title: 'Services', value: 'bundle' },
 ];
 
 const statistics = reactive({
