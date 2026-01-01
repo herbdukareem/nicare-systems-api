@@ -8,17 +8,51 @@ use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Maatwebsite\Excel\Concerns\ToCollection;
 use Maatwebsite\Excel\Concerns\WithHeadingRow;
+use Maatwebsite\Excel\Concerns\WithMultipleSheets;
 
-class BundleComponentsImport implements ToCollection, WithHeadingRow
+class BundleComponentsImport implements WithMultipleSheets
 {
     protected $errors = [];
     protected $imported = 0;
 
+    /**
+     * Return an array of sheets to import.
+     * We only want to import the first sheet (index 0).
+     */
+    public function sheets(): array
+    {
+        return [
+            0 => new BundleComponentsSheetImport($this->errors, $this->imported),
+        ];
+    }
+
+    public function getErrors(): array
+    {
+        return $this->errors;
+    }
+
+    public function getImported(): int
+    {
+        return $this->imported;
+    }
+}
+
+/**
+ * Import handler for the bundle components sheet
+ */
+class BundleComponentsSheetImport implements ToCollection, WithHeadingRow
+{
+    protected $errors;
+    protected $imported;
+
+    public function __construct(&$errors, &$imported)
+    {
+        $this->errors = &$errors;
+        $this->imported = &$imported;
+    }
+
     public function collection(Collection $rows)
     {
-        $this->errors = [];
-        $this->imported = 0;
-
         // Cache for nicare_code lookups to avoid repeated queries
         $bundleCache = [];
         $componentCache = [];
@@ -106,16 +140,6 @@ class BundleComponentsImport implements ToCollection, WithHeadingRow
                 $this->errors[] = "Row {$rowNumber}: " . $e->getMessage();
             }
         }
-    }
-
-    public function getErrors(): array
-    {
-        return $this->errors;
-    }
-
-    public function getImported(): int
-    {
-        return $this->imported;
     }
 }
 

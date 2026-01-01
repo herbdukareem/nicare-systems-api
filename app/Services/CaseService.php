@@ -71,7 +71,7 @@ class CaseService
         }
 
         // Apply sorting
-        $sortBy = $filters['sort_by'] ?? 'created_at';
+        $sortBy = $filters['sort_by'] ?? 'case_name';
         $sortDirection = $filters['sort_direction'] ?? 'desc';
         
         $allowedSortFields = ['id', 'nicare_code', 'service_description', 'level_of_care', 'price', 'group', 'status', 'created_at'];
