@@ -733,7 +733,12 @@ const fetchCaseRecords = async () => {
   loadingCaseRecords.value = true;
   try {
     const response = await api.get('/cases', {
-      params: { status: 'active', is_bundle: false}
+      params: { 
+        status: true, 
+        is_bundle: false,
+        pa_required: true,
+        per_page: 5000
+      }
     });
     const records = response.data.data || response.data;
     caseRecords.value = records.map(record => ({
@@ -756,12 +761,14 @@ const fetchServiceBundles = async () => {
     const response = await api.get('/cases', {
       params: {
         is_bundle: true,
+        per_page: 5000,
+        pa_required: true,
         status: true
       }
     });
     serviceBundles.value = (response.data.data || response.data).map(bundle => ({
       ...bundle,
-      display_name: `${bundle.service_description || bundle.case_name} - ₦${Number(bundle.bundle_price || bundle.price).toLocaleString()}`,
+      display_name: `${bundle.case_name} - ₦${Number(bundle.bundle_price || bundle.price).toLocaleString()}`,
       description: bundle.service_description,
       name: bundle.case_name,
       fixed_price: bundle.bundle_price || bundle.price
