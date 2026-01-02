@@ -307,18 +307,7 @@
                                 hint="Select a pre-defined service bundle"
                                 persistent-hint
                               >
-                                <template v-slot:item="{ item, props }">
-                                  <v-list-item v-bind="props">
-                                    <template v-slot:prepend>
-                                      <v-icon>mdi-package-variant</v-icon>
-                                    </template>
-                                    <!-- <v-list-item-title>{{ item.raw.description }}</v-list-item-title> -->
-                                    <v-list-item-subtitle>
-                                      {{ item.raw.description }} | ₦{{ Number(item.raw.fixed_price).toLocaleString() }}
-                                      <span v-if="item.raw.diagnosis_icd10"> | ICD-10: {{ item.raw.diagnosis_icd10 }}</span>
-                                    </v-list-item-subtitle>
-                                  </v-list-item>
-                                </template>
+                              
                               </v-autocomplete>
                             </v-col>
                           </v-row>
@@ -366,17 +355,6 @@
                                 hint="Select FFS services"
                                 persistent-hint
                               >
-                                <template v-slot:item="{ item, props }">
-                                  <v-list-item v-bind="props">
-                                    <template v-slot:prepend>
-                                      <v-icon>{{ getCaseRecordIcon(item.raw.detail_type) }}</v-icon>
-                                    </template>
-                                    <v-list-item-title>{{ item.raw.case_name }}</v-list-item-title>
-                                    <v-list-item-subtitle>
-                                      {{ item.raw.nicare_code }} | {{ item.raw.detail_type }}
-                                    </v-list-item-subtitle>
-                                  </v-list-item>
-                                </template>
                               </v-autocomplete>
                             </v-col>
                           </v-row>
@@ -892,6 +870,8 @@ const fetchServiceBundles = async () => {
     const response = await api.get('/cases', {
       params: {
         is_bundle: true,
+        referable: true,
+        per_page: 5000, // Fetch all bundles
         status: true // status is boolean in case_records
       }
     });
@@ -915,6 +895,8 @@ const fetchCaseRecords = async () => {
     const response = await api.get('/cases', {
       params: {
         is_bundle: false,
+         referable: true,
+        per_page: 5000,
         status: true // status is boolean in case_records
       }
     });
