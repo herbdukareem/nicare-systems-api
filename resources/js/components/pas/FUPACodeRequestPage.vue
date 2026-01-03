@@ -604,11 +604,12 @@ const serviceSelectionTypes = [
 // Service type filter
 const detailTypeFilter = ref(null);
 const detailTypeOptions = [
-  { value: 'Procedure', text: 'Procedure' },
-  { value: 'Investigation', text: 'Investigation' },
-  { value: 'Consumable', text: 'Consumable' },
-  { value: 'Medication', text: 'Medication' },
-  { value: 'Accommodation', text: 'Accommodation' },
+  { text: 'All Types', value: null },
+  { text: 'Drug', value: 'drug' },
+  { text: 'Laboratory', value: 'laboratory' },
+  { text: 'Professional Service', value: 'professional_service' },
+  { text: 'Radiology', value: 'radiology' },
+  { text: 'Consumable', value: 'consumable' },
 ];
 
 const formData = ref({
@@ -629,7 +630,11 @@ const filteredCaseRecords = computed(() => {
   if (!detailTypeFilter.value) {
     return caseRecords.value;
   }
-  return caseRecords.value.filter(record => record.detail_type === detailTypeFilter.value);
+  return caseRecords.value.filter(record => {
+    // Convert detail_type to match the filter format
+    const recordDetailType = record.detail_type?.replace('App\\Models\\', '').replace('Detail', '').toLowerCase();
+    return recordDetailType === detailTypeFilter.value;
+  });
 });
 
 const canSubmit = computed(() => {

@@ -902,7 +902,7 @@ const fetchCaseRecords = async () => {
     });
     caseRecords.value = (response.data.data || response.data).map(record => ({
       ...record,
-      display_name: `${record.case_name} (${record.nicare_code})`
+      display_name: `${record.case_name}`
     }));
   } catch (err) {
     showError('Failed to load services');

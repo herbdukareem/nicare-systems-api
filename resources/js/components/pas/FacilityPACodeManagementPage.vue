@@ -376,21 +376,68 @@
                   />
 
                   <!-- Direct Services Selection -->
-                  <v-autocomplete
-                    v-if="formData.service_selection_type === 'direct'"
-                    v-model="formData.case_record_ids"
-                    label="Select Services (Case Records)"
-                    :items="caseRecords"
-                    item-title="display_name"
-                    item-value="id"
-                    :loading="loadingCaseRecords"
-                    variant="outlined"
-                    density="comfortable"
-                    multiple
-                    chips
-                    :rules="[v => (v && v.length > 0) || 'At least one service is required']"
-                    class="mt-4"
-                  />
+                  <div v-if="formData.service_selection_type === 'direct'" class="mt-4">
+                    <!-- Service Type Filter -->
+                    <v-select
+                      v-model="detailTypeFilter"
+                      label="Filter by Service Type (Optional)"
+                      :items="detailTypeOptions"
+                      item-title="text"
+                      item-value="value"
+                      variant="outlined"
+                      density="comfortable"
+                      clearable
+                      hint="Filter FFS services by type"
+                      persistent-hint
+                      prepend-inner-icon="mdi-filter"
+                      @update:model-value="onDetailTypeFilterChange"
+                      class="mb-4"
+                    />
+
+                    <!-- Services Autocomplete -->
+                    <v-autocomplete
+                      v-model="formData.case_record_ids"
+                      label="Select Services (Case Records)"
+                      :items="filteredCaseRecords"
+                      item-title="display_name"
+                      item-value="id"
+                      :loading="loadingCaseRecords"
+                      variant="outlined"
+                      density="comfortable"
+                      multiple
+                      chips
+                      closable-chips
+                      :rules="[v => (v && v.length > 0) || 'At least one service is required']"
+                    >
+                      <template v-slot:item="{ item, props }">
+                        <v-list-item v-bind="props">
+                          <template v-slot:prepend>
+                            <v-icon :color="getCaseRecordColor(item.raw.detail_type)">
+                              {{ getCaseRecordIcon(item.raw.detail_type) }}
+                            </v-icon>
+                          </template>
+                          <v-list-item-subtitle class="mt-1">
+                            <div class="text-caption">
+                              <v-icon size="12">mdi-barcode</v-icon> {{ item.raw.nicare_code }} |
+                              <v-chip size="x-small" :color="getCaseRecordColor(item.raw.detail_type)" variant="flat">
+                                {{ getCaseTypeLabel(item.raw.detail_type) }}
+                              </v-chip>
+                            </div>
+                          </v-list-item-subtitle>
+                        </v-list-item>
+                      </template>
+                      <template v-slot:chip="{ item, props }">
+                        <v-chip
+                          v-bind="props"
+                          :color="getCaseRecordColor(item.raw.detail_type)"
+                          closable
+                        >
+                          <v-icon start :icon="getCaseRecordIcon(item.raw.detail_type)"></v-icon>
+                          {{ item.raw.case_name }}
+                        </v-chip>
+                      </template>
+                    </v-autocomplete>
+                  </div>
                 </v-card-text>
               </v-card>
 
@@ -569,6 +616,17 @@ const formData = ref({
   case_record_ids: [],
 });
 
+// Service type filter
+const detailTypeFilter = ref(null);
+const detailTypeOptions = [
+  { text: 'Medical Cases', value: null },
+  { text: 'Drug', value: 'drug' },
+  { text: 'Laboratory', value: 'laboratory' },
+  { text: 'Professional Service', value: 'professional_service' },
+  { text: 'Radiology', value: 'radiology' },
+  { text: 'Consumable', value: 'consumable' },
+];
+
 // Filter options
 const statusOptions = [
   { title: 'Pending', value: 'PENDING' },
@@ -616,6 +674,39 @@ const filteredPACodes = computed(() => {
 
     return matchesSearch && matchesStatus && matchesType;
   });
+});
+
+// Filtered case records for service selection
+const filteredCaseRecords = computed(() => {
+  if (!detailTypeFilter.value) {
+    return caseRecords.value;
+  }
+  return caseRecords.value.filter(record => {
+    // Convert detail_type to match the filter format
+    const recordDetailType = record.detail_type?.replace('App\\Models\\', '').replace('Detail', '').toLowerCase();
+    return recordDetailType === detailTypeFilter.value;
+  });
+});
+
+// Can submit request validation
+const canSubmitRequest = computed(() => {
+  if (!selectedReferral.value || claimCheckStatus.value !== 'none' || !formData.value.clinical_justification || submitting.value) {
+    return false;
+  }
+
+  if (!formData.value.service_selection_type) {
+    return false;
+  }
+
+  if (formData.value.service_selection_type === 'bundle' && !formData.value.service_bundle_id) {
+    return false;
+  }
+
+  if (formData.value.service_selection_type === 'direct' && (!formData.value.case_record_ids || formData.value.case_record_ids.length === 0)) {
+    return false;
+  }
+
+  return true;
 });
 
 // Fetch PA codes
@@ -1058,30 +1149,55 @@ const closeRequestDialog = () => {
   if (requestForm.value) {
     requestForm.value.reset();
   }
+
+  // Reset filter
+  detailTypeFilter.value = null;
 };
 
-// Computed: Can submit form
-const canSubmitRequest = computed(() => {
-  if (!selectedReferral.value || claimCheckStatus.value !== 'none') {
-    return false;
-  }
+// Handle detail type filter change
+const onDetailTypeFilterChange = () => {
+  // Clear selected services when filter changes
+  formData.value.case_record_ids = [];
+};
 
-  
+// Get case record icon
+const getCaseRecordIcon = (detailType) => {
+  const iconMap = {
+    'App\\Models\\DrugDetail': 'mdi-pill',
+    'App\\Models\\LaboratoryDetail': 'mdi-flask',
+    'App\\Models\\ProfessionalServiceDetail': 'mdi-stethoscope',
+    'App\\Models\\RadiologyDetail': 'mdi-radioactive',
+    'App\\Models\\ConsultationDetail': 'mdi-doctor',
+    'App\\Models\\ConsumableDetail': 'mdi-package-variant-closed',
+  };
+  return iconMap[detailType] || 'mdi-medical-bag';
+};
 
-  if (!formData.value.service_selection_type) {
-    return false;
-  }
+// Get case record color
+const getCaseRecordColor = (detailType) => {
+  const colorMap = {
+    'App\\Models\\DrugDetail': 'blue',
+    'App\\Models\\LaboratoryDetail': 'purple',
+    'App\\Models\\ProfessionalServiceDetail': 'green',
+    'App\\Models\\RadiologyDetail': 'orange',
+    'App\\Models\\ConsultationDetail': 'teal',
+    'App\\Models\\ConsumableDetail': 'brown',
+  };
+  return colorMap[detailType] || 'grey';
+};
 
-  if (formData.value.service_selection_type === 'bundle' && !formData.value.service_bundle_id) {
-    return false;
-  }
-
-  if (formData.value.service_selection_type === 'direct' && (!formData.value.case_record_ids || formData.value.case_record_ids.length === 0)) {
-    return false;
-  }
-
-  return true;
-});
+// Get case type label
+const getCaseTypeLabel = (detailType) => {
+  const labelMap = {
+    'App\\Models\\DrugDetail': 'Drug',
+    'App\\Models\\LaboratoryDetail': 'Laboratory',
+    'App\\Models\\ProfessionalServiceDetail': 'Professional Service',
+    'App\\Models\\RadiologyDetail': 'Radiology',
+    'App\\Models\\ConsultationDetail': 'Consultation',
+    'App\\Models\\ConsumableDetail': 'Consumable',
+  };
+  return labelMap[detailType] || detailType;
+};
 
 // Lifecycle
 onMounted(() => {
