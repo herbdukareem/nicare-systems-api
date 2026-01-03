@@ -79,9 +79,28 @@ class ReferralController extends BaseController
             ]);
         }
 
-        // BUSINESS RULE 1: Check if enrollee has pending referral without submitted claim
+        // BUSINESS RULE 1: Check if enrollee has an active admission/episode
         $enrolleeId = $request->input('enrollee_id');
         if ($enrolleeId) {
+            // Check for active admission first (episode not completed/closed)
+            $activeAdmission = \App\Models\Admission::where('enrollee_id', $enrolleeId)
+                ->where('status', 'active')
+                ->first();
+
+            if ($activeAdmission) {
+                return $this->sendError(
+                    'This enrollee has an active admission/episode (Admission Code: ' . $activeAdmission->admission_code . '). The current episode must be closed/completed (patient discharged) before a new referral can be created.',
+                    ['active_admission' => [
+                        'id' => $activeAdmission->id,
+                        'admission_code' => $activeAdmission->admission_code,
+                        'admission_date' => $activeAdmission->admission_date,
+                        'status' => $activeAdmission->status,
+                    ]],
+                    422
+                );
+            }
+
+            // BUSINESS RULE 2: Check if enrollee has pending referral without submitted claim
             $pendingReferral = Referral::where('enrollee_id', $enrolleeId)
                 ->where('status', 'APPROVED')
                 ->where('claim_submitted', false)
@@ -234,7 +253,7 @@ class ReferralController extends BaseController
         ]);
 
         // Auto-create PA code if referral has service bundle selected
-        // BUSINESS RULE 2: Only one bundle PA per referral
+        // BUSINESS RULE 3: Only one bundle PA per referral
         if ($referral->service_bundle_id && !$referral->hasBundlePACode()) {
             \App\Models\PACode::create([
                 'enrollee_id' => $referral->enrollee_id,

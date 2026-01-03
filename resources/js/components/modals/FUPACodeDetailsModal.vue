@@ -143,6 +143,58 @@
 
           <v-divider></v-divider>
 
+          <!-- Clinical Information from Referral -->
+          <v-row class="pa-4" v-if="paCode.referral">
+            <v-col cols="12">
+              <h3 class="text-h6 mb-3">
+                <v-icon color="primary" class="mr-2">mdi-stethoscope</v-icon>
+                Clinical Information (From Referral)
+              </h3>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-card variant="outlined" class="mb-3">
+                <v-card-subtitle class="font-weight-bold">Presenting Complaints</v-card-subtitle>
+                <v-card-text>{{ paCode.referral.presenting_complains || 'N/A' }}</v-card-text>
+              </v-card>
+              <v-card variant="outlined" class="mb-3">
+                <v-card-subtitle class="font-weight-bold">Preliminary Diagnosis</v-card-subtitle>
+                <v-card-text>{{ paCode.referral.preliminary_diagnosis || 'N/A' }}</v-card-text>
+              </v-card>
+              <v-card variant="outlined" class="mb-3">
+                <v-card-subtitle class="font-weight-bold">Examination Findings</v-card-subtitle>
+                <v-card-text>{{ paCode.referral.examination_findings || 'N/A' }}</v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-card variant="outlined" class="mb-3">
+                <v-card-subtitle class="font-weight-bold">Reasons for Referral</v-card-subtitle>
+                <v-card-text>{{ paCode.referral.reasons_for_referral || 'N/A' }}</v-card-text>
+              </v-card>
+              <v-card variant="outlined" class="mb-3">
+                <v-card-subtitle class="font-weight-bold">Treatments Given</v-card-subtitle>
+                <v-card-text>{{ paCode.referral.treatments_given || 'N/A' }}</v-card-text>
+              </v-card>
+              <v-card variant="outlined" class="mb-3">
+                <v-card-subtitle class="font-weight-bold">Investigations Done</v-card-subtitle>
+                <v-card-text>{{ paCode.referral.investigations_done || 'N/A' }}</v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-card variant="outlined" class="mb-3">
+                <v-card-subtitle class="font-weight-bold">Medical History</v-card-subtitle>
+                <v-card-text>{{ paCode.referral.medical_history || 'N/A' }}</v-card-text>
+              </v-card>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-card variant="outlined" class="mb-3">
+                <v-card-subtitle class="font-weight-bold">Medication History</v-card-subtitle>
+                <v-card-text>{{ paCode.referral.medication_history || 'N/A' }}</v-card-text>
+              </v-card>
+            </v-col>
+          </v-row>
+
+          <v-divider v-if="paCode.referral"></v-divider>
+
           <!-- Facility Information -->
           <v-row class="pa-4">
             <v-col cols="12">
@@ -284,12 +336,98 @@
 
           <v-divider></v-divider>
 
+          <!-- Referral Documents -->
+          <v-row class="pa-4" v-if="paCode.referral && paCode.referral.documents && paCode.referral.documents.length > 0">
+            <v-col cols="12">
+              <h3 class="text-h6 mb-3">
+                <v-icon color="primary" class="mr-2">mdi-file-document-multiple</v-icon>
+                Referral Documents
+                <v-chip size="small" class="ml-2" color="primary">{{ paCode.referral.documents.length }}</v-chip>
+              </h3>
+            </v-col>
+            <v-col cols="12">
+              <v-row>
+                <v-col
+                  v-for="doc in paCode.referral.documents"
+                  :key="doc.id"
+                  cols="12"
+                  md="6"
+                  lg="4"
+                >
+                  <v-card variant="outlined" class="h-100">
+                    <v-card-title class="text-subtitle-2 d-flex align-center bg-grey-lighten-4">
+                      <v-icon :color="getFileTypeColor(doc.file_type)" class="mr-2">
+                        {{ getFileTypeIcon(doc.file_type) }}
+                      </v-icon>
+                      <span class="text-truncate">{{ doc.file_name }}</span>
+                    </v-card-title>
+                    <v-card-text>
+                      <div class="mb-2">
+                        <div class="text-caption text-grey">Document Type</div>
+                        <v-chip size="small" variant="tonal" color="indigo">{{ doc.document_type }}</v-chip>
+                      </div>
+                      <div v-if="doc.document_requirement" class="mb-2">
+                        <div class="text-caption text-grey">Requirement</div>
+                        <div class="text-body-2">{{ doc.document_requirement.name }}</div>
+                      </div>
+                      <div class="mb-2">
+                        <div class="text-caption text-grey">File Size</div>
+                        <div class="text-body-2">{{ doc.file_size_human }}</div>
+                      </div>
+                      <div v-if="doc.uploader" class="mb-2">
+                        <div class="text-caption text-grey">Uploaded By</div>
+                        <div class="text-body-2">{{ doc.uploader.name }}</div>
+                      </div>
+                      <div class="mb-2">
+                        <div class="text-caption text-grey">Upload Date</div>
+                        <div class="text-body-2">{{ formatDate(doc.created_at) }}</div>
+                      </div>
+                      <div v-if="doc.is_required" class="d-flex align-center">
+                        <v-chip
+                          size="small"
+                          variant="outlined"
+                          color="error"
+                        >
+                          Required
+                        </v-chip>
+                      </div>
+                    </v-card-text>
+                    <v-card-actions>
+                      <v-btn
+                        :href="doc.url"
+                        target="_blank"
+                        size="small"
+                        variant="tonal"
+                        color="primary"
+                        prepend-icon="mdi-download"
+                      >
+                        Download
+                      </v-btn>
+                      <v-btn
+                        :href="doc.url"
+                        target="_blank"
+                        size="small"
+                        variant="text"
+                        color="primary"
+                        prepend-icon="mdi-eye"
+                      >
+                        View
+                      </v-btn>
+                    </v-card-actions>
+                  </v-card>
+                </v-col>
+              </v-row>
+            </v-col>
+          </v-row>
+
+          <v-divider v-if="paCode.referral && paCode.referral.documents && paCode.referral.documents.length > 0"></v-divider>
+
           <!-- PA Documents -->
           <v-row class="pa-4" v-if="paCode.documents && paCode.documents.length > 0">
             <v-col cols="12">
               <h3 class="text-h6 mb-3">
                 <v-icon color="primary" class="mr-2">mdi-file-document-multiple</v-icon>
-                Supporting Documents
+                FU-PA Supporting Documents
               </h3>
             </v-col>
             <v-col cols="12">
@@ -757,6 +895,42 @@ const formatDateShort = (date) => {
     month: 'short',
     day: 'numeric',
   });
+};
+
+const getFileTypeIcon = (fileType) => {
+  const icons = {
+    pdf: 'mdi-file-pdf-box',
+    doc: 'mdi-file-word',
+    docx: 'mdi-file-word',
+    xls: 'mdi-file-excel',
+    xlsx: 'mdi-file-excel',
+    jpg: 'mdi-file-image',
+    jpeg: 'mdi-file-image',
+    png: 'mdi-file-image',
+    gif: 'mdi-file-image',
+    txt: 'mdi-file-document',
+    zip: 'mdi-folder-zip',
+    rar: 'mdi-folder-zip',
+  };
+  return icons[fileType?.toLowerCase()] || 'mdi-file';
+};
+
+const getFileTypeColor = (fileType) => {
+  const colors = {
+    pdf: 'red',
+    doc: 'blue',
+    docx: 'blue',
+    xls: 'green',
+    xlsx: 'green',
+    jpg: 'purple',
+    jpeg: 'purple',
+    png: 'purple',
+    gif: 'purple',
+    txt: 'grey',
+    zip: 'orange',
+    rar: 'orange',
+  };
+  return colors[fileType?.toLowerCase()] || 'grey';
 };
 </script>
 

@@ -364,11 +364,32 @@
 
             <!-- FFS Service Selection (Multiple) -->
             <v-row v-if="formData.service_selection_type === 'direct'">
+              <!-- Detail Type Filter -->
+              <v-col cols="12" md="6">
+                <v-select
+                  v-model="detailTypeFilter"
+                  label="Filter by Service Type (Optional)"
+                  :items="detailTypeOptions"
+                  item-title="text"
+                  item-value="value"
+                  variant="outlined"
+                  density="comfortable"
+                  clearable
+                  hint="Filter FFS services by type"
+                  persistent-hint
+                  @update:model-value="onDetailTypeFilterChange"
+                >
+                  <template v-slot:prepend-inner>
+                    <v-icon>mdi-filter</v-icon>
+                  </template>
+                </v-select>
+              </v-col>
+
               <v-col cols="12">
                 <v-autocomplete
                   v-model="formData.case_record_ids"
                   label="Select FFS Services * (Multiple allowed)"
-                  :items="caseRecords"
+                  :items="filteredCaseRecords"
                   item-title="display_name"
                   item-value="id"
                   variant="outlined"
@@ -580,6 +601,16 @@ const serviceSelectionTypes = [
   { value: 'direct', text: 'Fee-For-Service (FFS)' },
 ];
 
+// Service type filter
+const detailTypeFilter = ref(null);
+const detailTypeOptions = [
+  { value: 'Procedure', text: 'Procedure' },
+  { value: 'Investigation', text: 'Investigation' },
+  { value: 'Consumable', text: 'Consumable' },
+  { value: 'Medication', text: 'Medication' },
+  { value: 'Accommodation', text: 'Accommodation' },
+];
+
 const formData = ref({
   referral_id: null,
   enrollee_id: null,
@@ -594,6 +625,13 @@ const formData = ref({
 });
 
 // Computed properties
+const filteredCaseRecords = computed(() => {
+  if (!detailTypeFilter.value) {
+    return caseRecords.value;
+  }
+  return caseRecords.value.filter(record => record.detail_type === detailTypeFilter.value);
+});
+
 const canSubmit = computed(() => {
   if (!selectedReferral.value || claimCheckStatus.value !== 'none' || !formData.value.clinical_justification || submitting.value) {
     return false;
@@ -706,6 +744,12 @@ const fetchServiceBundles = async () => {
 // Handle service type change
 const onServiceTypeChange = () => {
   formData.value.service_bundle_id = null;
+  formData.value.case_record_ids = [];
+};
+
+// Handle detail type filter change
+const onDetailTypeFilterChange = () => {
+  // Clear selected services when filter changes
   formData.value.case_record_ids = [];
 };
 

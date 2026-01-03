@@ -93,7 +93,15 @@ class PACodeController extends Controller
      */
     public function show(PACode $paCode)
     {
-        $paCode->load(['enrollee', 'facility', 'referral', 'admission', 'serviceBundle']);
+        $paCode->load([
+            'enrollee',
+            'facility',
+            'referral.documents.documentRequirement',
+            'referral.documents.uploader',
+            'admission',
+            'serviceBundle',
+            'documents'
+        ]);
 
         return response()->json(['data' => $paCode]);
     }

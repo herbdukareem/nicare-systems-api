@@ -202,6 +202,73 @@ class Referral extends Model
             ->where('claim_submitted', false);
     }
 
+    /**
+     * Check if this referral has an active admission.
+     */
+    public function hasActiveAdmission(): bool
+    {
+        return $this->admissions()
+            ->where('status', 'active')
+            ->exists();
+    }
+
+    /**
+     * Get the active admission for this referral.
+     */
+    public function getActiveAdmission()
+    {
+        return $this->admissions()
+            ->where('status', 'active')
+            ->first();
+    }
+
+    /**
+     * Check if the episode is completed (all admissions discharged and claim submitted).
+     */
+    public function isEpisodeCompleted(): bool
+    {
+        return !$this->hasActiveAdmission() && $this->claim_submitted;
+    }
+
+    /**
+     * Check if an enrollee can receive a new referral.
+     * Returns array with 'can_refer' boolean and 'reason' string.
+     */
+    public static function canEnrolleeBeReferred(int $enrolleeId): array
+    {
+        // Check for active admission first (episode not completed/closed)
+        $activeAdmission = \App\Models\Admission::where('enrollee_id', $enrolleeId)
+            ->where('status', 'active')
+            ->first();
+
+        if ($activeAdmission) {
+            return [
+                'can_refer' => false,
+                'reason' => 'Enrollee has an active admission/episode (Admission Code: ' . $activeAdmission->admission_code . '). The current episode must be closed/completed (patient discharged) before a new referral can be created.',
+                'active_admission' => $activeAdmission
+            ];
+        }
+
+        // Check if enrollee has pending referral without submitted claim
+        $pendingReferral = self::where('enrollee_id', $enrolleeId)
+            ->where('status', 'APPROVED')
+            ->where('claim_submitted', false)
+            ->first();
+
+        if ($pendingReferral) {
+            return [
+                'can_refer' => false,
+                'reason' => 'Enrollee has an approved referral (UTN: ' . $pendingReferral->utn . ') without a submitted claim. Please submit a claim for that referral before creating a new one.',
+                'pending_referral' => $pendingReferral
+            ];
+        }
+
+        return [
+            'can_refer' => true,
+            'reason' => 'Enrollee is eligible for a new referral.'
+        ];
+    }
+
     protected $appends = [
         'case_records_data'
     ];

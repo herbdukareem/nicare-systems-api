@@ -128,6 +128,46 @@ class ReferralController extends Controller
             ], 422);
         }
 
+        // BUSINESS RULE 1: Check if enrollee has an active admission/episode
+        $enrolleeId = $request->input('enrollee_id');
+        if ($enrolleeId) {
+            // Check for active admission first (episode not completed/closed)
+            $activeAdmission = \App\Models\Admission::where('enrollee_id', $enrolleeId)
+                ->where('status', 'active')
+                ->first();
+
+            if ($activeAdmission) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This enrollee has an active admission/episode (Admission Code: ' . $activeAdmission->admission_code . '). The current episode must be closed/completed (patient discharged) before a new referral can be created.',
+                    'active_admission' => [
+                        'id' => $activeAdmission->id,
+                        'admission_code' => $activeAdmission->admission_code,
+                        'admission_date' => $activeAdmission->admission_date,
+                        'status' => $activeAdmission->status,
+                    ]
+                ], 422);
+            }
+
+            // BUSINESS RULE 2: Check if enrollee has pending referral without submitted claim
+            $pendingReferral = Referral::where('enrollee_id', $enrolleeId)
+                ->where('status', 'APPROVED')
+                ->where('claim_submitted', false)
+                ->first();
+
+            if ($pendingReferral) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'This enrollee has an approved referral (UTN: ' . $pendingReferral->utn . ') without a submitted claim. Please submit a claim for that referral before creating a new one.',
+                    'pending_referral' => [
+                        'id' => $pendingReferral->id,
+                        'utn' => $pendingReferral->utn,
+                        'referral_code' => $pendingReferral->referral_code,
+                    ]
+                ], 422);
+            }
+        }
+
         try {
             DB::beginTransaction();
 
