@@ -82,13 +82,13 @@ class DOFacilityController extends Controller
                 'facility_id' => 'required|exists:facilities,id',
             ]);
 
-            // Check if user has desk_officer, facility_admin, or facility_user role
+            // Check if user has permission to be assigned to facilities
             $user = User::with('roles')->find($validated['user_id']);
-            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
+            if (!$user->hasPermission('facilities.view')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User must have facility role to be assigned to facilities',
-                    'errors' => ['user_id' => ['Selected user is not a Desk Officer']]
+                    'message' => 'User must have facility permissions to be assigned to facilities',
+                    'errors' => ['user_id' => ['Selected user does not have required permissions']]
                 ], 422);
             }
 
@@ -168,13 +168,13 @@ class DOFacilityController extends Controller
                 'facility_id' => 'required|exists:facilities,id',
             ]);
 
-            // Check if user has desk_officer, facility_admin, or facility_user role
+            // Check if user has permission to be assigned to facilities
             $user = User::with('roles')->find($validated['user_id']);
-            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
+            if (!$user->hasPermission('facilities.view')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User must have facility role to be assigned to facilities',
-                    'errors' => ['user_id' => ['Selected user is not a Desk Officer']]
+                    'message' => 'User must have facility permissions to be assigned to facilities',
+                    'errors' => ['user_id' => ['Selected user does not have required permissions']]
                 ], 422);
             }
 

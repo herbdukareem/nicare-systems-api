@@ -520,9 +520,14 @@ const allModuleOptions = [
 const moduleOptions = computed(() => {
   const availableModules = authStore.availableModules || [];
 
-  // If no modules specified or user is admin, show all
-  if (availableModules.length === 0 || authStore.hasRole('admin') || authStore.hasRole('Super Admin')) {
+  // Super Admin can access all modules
+  if (authStore.hasRole('Super Admin')) {
     return allModuleOptions;
+  }
+
+  // If no modules specified, default to general only
+  if (availableModules.length === 0) {
+    return [{ value: 'general', label: 'Core & Admin' }];
   }
 
   // Filter to only show modules user has access to
@@ -532,6 +537,14 @@ const moduleOptions = computed(() => {
 const selectedModule = computed({
   get: () => uiStore.currentModule,
   set: (value) => {
+    // Validate that user has access to this module
+    const availableModuleValues = moduleOptions.value.map(m => m.value);
+
+    if (!availableModuleValues.includes(value)) {
+      success('You do not have access to this module');
+      return;
+    }
+
     uiStore.setModule(value);
     switch (value) {
       case 'pas':

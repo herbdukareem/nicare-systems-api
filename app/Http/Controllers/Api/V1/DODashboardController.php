@@ -240,12 +240,12 @@ class DODashboardController extends Controller
             }
 
             $user = Auth::user();
-            
-            //check if user has role of desk_officer, facility_admin, or facility_user
-            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
+
+            // Check if user has permission to validate UTN
+            if (!$user->hasPermission('utn.validate')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Access denied. Facility role required.'
+                    'message' => 'Access denied. You do not have permission to validate UTN.'
                 ], 403);
             }
 

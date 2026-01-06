@@ -39,7 +39,7 @@ const routes = [
     component: () => import('../components/do/DODashboard.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['desk_officer', 'Super Admin'],
+      permissions: ['dashboard.desk_officer.view'],
       title: 'DO Dashboard',
       description: 'Desk Officer dashboard for managing assigned facilities',
       breadcrumb: 'DO Dashboard'
@@ -51,7 +51,7 @@ const routes = [
     component: () => import('../components/dashboard/FacilityDashboard.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'],
+      permissions: ['dashboard.facility.view'],
       title: 'Facility Dashboard',
       description: 'Facility dashboard for managing operations and requests',
       breadcrumb: 'Facility Dashboard'
@@ -63,7 +63,7 @@ const routes = [
     component: () => import('../components/do/DOAssignedReferralsPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['desk_officer', 'facility_admin', 'facility_user', 'Super Admin'],
+      permissions: ['referrals.view'],
       title: 'Assigned Facilities Referrals',
       description: 'View referrals for your assigned facilities',
       breadcrumb: 'Assigned Referrals'
@@ -223,7 +223,7 @@ const routes = [
     component: () => import('../components/pas/DocumentRequirementsPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'claims_officer'],
+      permissions: ['documents.manage'],
       title: 'Document Requirements',
       description: 'Manage document requirements for referrals and PA codes',
       breadcrumb: 'Document Requirements'
@@ -235,7 +235,7 @@ const routes = [
     component: () => import('../components/pas/DOFacilityAssignmentPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin'],
+      permissions: ['facilities.assign'],
       title: 'DO Facility Assignments',
       description: 'Assign facilities to desk officers',
       breadcrumb: 'DO Facility Assignments'
@@ -247,7 +247,7 @@ const routes = [
     component: () => import('../components/pas/UTNValidationPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['facility_admin', 'facility_user', 'desk_officer', 'Super Admin'],
+      permissions: ['utn.validate'],
       title: 'Validate UTN',
       description: 'Validate Unique Transaction Numbers for approved referrals',
       breadcrumb: 'UTN Validation'
@@ -259,7 +259,7 @@ const routes = [
     component: () => import('../components/pas/FUPACodeRequestPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['facility_admin', 'facility_user', 'Super Admin'],
+      permissions: ['pa_codes.request'],
       title: 'Request FU-PA Code',
       description: 'Request Follow-Up PA Code for FFS services',
       breadcrumb: 'FU-PA Code Request'
@@ -271,7 +271,7 @@ const routes = [
     component: () => import('../components/pas/FUPACodeApprovalPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'claims_officer'],
+      permissions: ['pa_codes.approve', 'pa_codes.reject'],
       title: 'FU-PA Code Approval',
       description: 'Approve or reject FU-PA Code requests',
       breadcrumb: 'FU-PA Code Approval'
@@ -283,7 +283,7 @@ const routes = [
     component: () => import('../components/pas/FacilityPACodeManagementPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['desk_officer', 'facility_admin', 'facility_user'],
+      permissions: ['pa_codes.view', 'pa_codes.request'],
       title: 'FU-PA Code Management',
       description: 'View and manage your FU-PA Code requests',
       breadcrumb: 'FU-PA Code Management'
@@ -295,7 +295,7 @@ const routes = [
     component: () => import('../components/pas/ReferralManagementPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'claims_officer', 'desk_officer', 'facility_admin', 'facility_user'],
+      permissions: ['referrals.view'],
       title: 'Referral Management',
       description: 'View, approve, reject, and print referrals',
       breadcrumb: 'Referral Management'
@@ -322,7 +322,7 @@ const routes = [
     component: () => import('../components/claims/ReferralSubmissionPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'claims_officer'],
+      permissions: ['referrals.create', 'referrals.submit'],
       title: 'Submit Referral to Pre-Authorization System (PAS)',
       description: 'Submit referrals on behalf of primary facilities to PAS',
       breadcrumb: 'Submit Referral to PAS'
@@ -334,7 +334,7 @@ const routes = [
     component: () => import('../components/claims/ReferralSubmissionPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['primary_facility', 'facility_admin', 'admin'],
+      permissions: ['referrals.create', 'referrals.submit'],
       title: 'Referral Request to Pre-Authorization System (PAS)',
       description: 'Submit referral requests for your facility to PAS',
       breadcrumb: 'Referral Request to PAS'
@@ -357,7 +357,7 @@ const routes = [
     component: () => import('../components/claims/ClaimsApprovalPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'claims_officer'],
+      permissions: ['claims.approve'],
       title: 'Approve Claims',
       description: 'Batch approve submitted claims with shared payment code and comments',
       breadcrumb: 'Approve Claims'
@@ -615,6 +615,26 @@ const router = createRouter({
   routes,
 });
 
+// Helper function to determine which module a route belongs to
+const getModuleForRoute = (path) => {
+  if (path.startsWith('/claims/automation')) return 'automation';
+  if (path.startsWith('/claims')) return 'claims';
+  if (path.startsWith('/management')) return 'management';
+  if (
+    path.startsWith('/pas') ||
+    path.startsWith('/tariff-items') ||
+    path.startsWith('/case-categories') ||
+    path.startsWith('/service-categories') ||
+    path.startsWith('/do-facilities') ||
+    path.startsWith('/do/assigned-referrals') ||
+    path.startsWith('/document-requirements') ||
+    path.startsWith('/feedback')
+  ) {
+    return 'pas';
+  }
+  return 'general';
+};
+
 // Navigation guard for authentication and role-based routing
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
@@ -626,6 +646,29 @@ router.beforeEach(async (to, _from, next) => {
     }
 
     if (authStore.isAuthenticated) {
+      // Check module access first
+      const requiredModule = getModuleForRoute(to.path);
+      const availableModules = authStore.availableModules || [];
+
+      // Super Admin can access all modules
+      const isSuperAdmin = authStore.hasRole('Super Admin');
+
+      // Check if user has access to the required module
+      if (!isSuperAdmin && requiredModule !== 'general' && availableModules.length > 0) {
+        if (!availableModules.includes(requiredModule)) {
+          // User doesn't have access to this module, redirect to appropriate dashboard
+          const userRole = authStore.userRoles[0]?.name;
+          if (userRole === 'desk_officer') {
+            next({ path: '/do-dashboard', replace: true });
+          } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
+            next({ path: '/facility-dashboard', replace: true });
+          } else {
+            next({ path: '/dashboard', replace: true });
+          }
+          return;
+        }
+      }
+
       // Check permission-based access first (preferred method)
       const requiredPermissions = to.meta.permissions || (to.meta.permission ? [to.meta.permission] : null);
 

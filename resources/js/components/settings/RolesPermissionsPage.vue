@@ -323,7 +323,59 @@
             </div>
 
             <div>
-              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-3">Permissions</h4>
+              <div class="tw-flex tw-items-start tw-justify-between tw-mb-3">
+                <div>
+                  <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">Permissions</h4>
+                  <p class="tw-text-sm tw-text-gray-600 tw-mt-1">
+                    Select permissions for this role. Users assigned this role will automatically inherit these permissions.
+                  </p>
+                </div>
+                <v-chip
+                  color="primary"
+                  variant="outlined"
+                  size="small"
+                  prepend-icon="mdi-shield-check"
+                >
+                  {{ roleForm.permissions.length }} selected
+                </v-chip>
+              </div>
+
+              <!-- Info Alert -->
+              <v-alert
+                type="info"
+                variant="tonal"
+                density="compact"
+                class="tw-mb-4"
+                icon="mdi-information"
+              >
+                <div class="tw-text-sm">
+                  <strong>Auto-Inheritance:</strong> Any user assigned to this role will automatically have all selected permissions.
+                  No need to assign permissions individually to users.
+                </div>
+              </v-alert>
+
+              <!-- Quick Actions -->
+              <div class="tw-flex tw-gap-2 tw-mb-4">
+                <v-btn
+                  size="small"
+                  variant="outlined"
+                  color="primary"
+                  prepend-icon="mdi-checkbox-multiple-marked"
+                  @click="selectAllPermissions"
+                >
+                  Select All
+                </v-btn>
+                <v-btn
+                  size="small"
+                  variant="outlined"
+                  color="error"
+                  prepend-icon="mdi-checkbox-multiple-blank-outline"
+                  @click="clearAllPermissions"
+                >
+                  Clear All
+                </v-btn>
+              </div>
+
               <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
                 <div v-for="cat in permissionCategories" :key="cat.name">
                   <div class="tw-flex tw-items-center tw-justify-between tw-mb-1.5">
@@ -611,10 +663,19 @@ const toggleCategory = (cat) => {
   roleForm.value.permissions = Array.from(current);
 };
 
+const selectAllPermissions = () => {
+  roleForm.value.permissions = allPermissions.value.map(p => p.id);
+};
+
+const clearAllPermissions = () => {
+  roleForm.value.permissions = [];
+};
+
 const saveRole = async () => {
   try {
     const payload = {
       name: roleForm.value.name,
+      label: roleForm.value.name,
       description: roleForm.value.description,
       status: roleForm.value.status,
       modules: roleForm.value.modules,

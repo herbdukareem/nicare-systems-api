@@ -653,6 +653,7 @@ import AdminLayout from '../layout/AdminLayout.vue';
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import { usePermissions } from '../../composables/usePermissions';
 import api, { doFacilityAPI } from '../../utils/api';
 import { useAuthStore } from '../../stores/auth';
 import { storeToRefs } from 'pinia';
@@ -687,12 +688,9 @@ const loadingDocumentRequirements = ref(false);
 
 const showSuccessDialog = ref(false);
 const assignedPrimaryFacilities = ref([]);
-const isFacilityRole = computed(() => {
-  const user_roles = user.value?.roles || []
-  const user_role_names = user_roles.map(role => role.name);
 
-  return user_role_names.some(role => ['facility_admin', 'facility_user', 'desk_officer'].includes(role));
-});
+// Use permission-based access control instead of hard-coded roles
+const { isFacilityRole, canCreateReferral } = usePermissions();
 
 const severityLevels = [
   { title: 'Routine', value: 'Routine' },
