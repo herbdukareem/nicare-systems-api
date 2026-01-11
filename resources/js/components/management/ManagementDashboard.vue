@@ -74,7 +74,7 @@
           <h2 class="text-h6 mb-4">Management Tools</h2>
         </v-col>
 
-        <v-col cols="12" md="6" lg="3" v-for="card in navigationCards" :key="card.route">
+        <v-col cols="12" md="6" lg="3" v-for="card in filteredNavigationCards" :key="card.route">
           <v-card
             class="navigation-card"
             hover
@@ -107,14 +107,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';
+import { useAuthStore } from '../../stores/auth';
 import api from '../../utils/api';
 import AdminLayout from '../layout/AdminLayout.vue';
 
 const router = useRouter();
 const { showError } = useToast();
+const authStore = useAuthStore();
 
 const statistics = ref({
   total_drugs: 0,
@@ -130,6 +132,7 @@ const navigationCards = ref([
     icon: 'mdi-file-document-multiple-outline',
     color: 'indigo',
     route: '/management/cases',
+    permissions: ['cases.view', 'cases.manage'],
   },
     {
     title: 'Bundle Components',
@@ -137,8 +140,28 @@ const navigationCards = ref([
     icon: 'mdi-package-variant',
     color: 'purple',
     route: '/management/bundle-components',
+    permissions: ['bundle_components.view', 'bundle_components.manage'],
   },
 ]);
+
+// Filter navigation cards based on user permissions
+const filteredNavigationCards = computed(() => {
+  return navigationCards.value.filter(card => {
+    // Check permissions first (preferred method)
+    if (card.permissions && card.permissions.length > 0) {
+      // User needs at least one of the specified permissions
+      return card.permissions.some(permission => authStore.hasPermission(permission));
+    }
+
+    // Fallback to role-based check for backward compatibility
+    if (card.roles && card.roles.length > 0) {
+      return card.roles.some(role => authStore.hasRole(role));
+    }
+
+    // Show if no restrictions
+    return true;
+  });
+});
 
 onMounted(async () => {
   await loadStatistics();

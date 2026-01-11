@@ -245,6 +245,14 @@
                 </template>
               </v-tooltip>
 
+              <v-tooltip text="Manage Permissions">
+                <template #activator="{ props }">
+                  <v-btn v-bind="props" icon size="small" variant="text" color="purple" @click="managePermissions(item)">
+                    <v-icon size="16">mdi-shield-plus</v-icon>
+                  </v-btn>
+                </template>
+              </v-tooltip>
+
               <v-tooltip :text="item.status === 1 ? 'Suspend User' : 'Activate User'">
                 <template #activator="{ props }">
                   <v-btn
@@ -487,18 +495,148 @@
     </v-dialog>
 
     <!-- Manage Roles -->
-    <v-dialog v-model="showRolesDialog" max-width="520px" persistent>
+    <v-dialog v-model="showRolesDialog" max-width="800px" persistent>
       <v-card v-if="managingUser">
         <v-card-title>
           <span class="tw-text-xl tw-font-semibold">Manage Roles — {{ managingUser.name }}</span>
         </v-card-title>
-        <v-card-text>
+        <v-card-text class="tw-space-y-4">
           <v-select v-model="selectedRoles" :items="roleOptions" label="Select Roles" variant="outlined" multiple chips />
+
+          <!-- Show permissions from selected roles -->
+          <div v-if="selectedRolesPermissions.length > 0" class="tw-mt-4">
+            <h4 class="tw-font-semibold tw-text-gray-700 tw-mb-2">
+              <v-icon size="small" class="tw-mr-1">mdi-shield-account</v-icon>
+              Permissions from Selected Roles ({{ selectedRolesPermissions.length }})
+            </h4>
+            <v-chip-group column>
+              <v-chip
+                v-for="perm in selectedRolesPermissions"
+                :key="perm.id || perm.name"
+                size="small"
+                variant="tonal"
+                color="blue-grey"
+              >
+                {{ perm.label || perm.name }}
+              </v-chip>
+            </v-chip-group>
+          </div>
         </v-card-text>
         <v-card-actions>
           <v-spacer />
-          <v-btn variant="text" @click="showRolesDialog = false">Cancel</v-btn>
+          <v-btn variant="text" @click="showRolesDialog = false; selectedRoles = []">Cancel</v-btn>
           <v-btn color="primary" @click="updateUserRoles">Update Roles</v-btn>
+        </v-card-actions>
+      </v-card>
+    </v-dialog>
+
+    <!-- Manage Permissions -->
+    <v-dialog v-model="showPermissionsDialog" max-width="800px" persistent scrollable>
+      <v-card v-if="managingUser">
+        <v-card-title>
+          <span class="tw-text-xl tw-font-semibold">Manage Direct Permissions — {{ managingUser.name }}</span>
+        </v-card-title>
+        <v-card-subtitle class="tw-pt-2">
+          <v-alert type="info" density="compact" variant="tonal" class="tw-mb-2">
+            <strong>How it works:</strong> Permissions from roles are auto-selected and disabled (cannot be removed here).
+            You can add additional direct permissions that will be assigned specifically to this user.
+          </v-alert>
+        </v-card-subtitle>
+        <v-divider />
+        <v-card-text style="max-height: 500px;">
+          <div class="tw-space-y-4">
+            <!-- Loading State -->
+            <div v-if="loadingPermissions" class="tw-text-center tw-py-8">
+              <v-progress-circular indeterminate color="primary" />
+              <p class="tw-mt-2 tw-text-gray-600">Loading permissions...</p>
+            </div>
+
+            <!-- Permissions List -->
+            <div v-else>
+              <!-- Role Permissions (Read-only) -->
+              <div v-if="Array.isArray(rolePermissionsList) && rolePermissionsList.length > 0" class="tw-mb-6">
+                <h4 class="tw-font-semibold tw-text-gray-700 tw-mb-2">
+                  <v-icon size="small" class="tw-mr-1">mdi-shield-account</v-icon>
+                  Permissions from Roles ({{ Array.isArray(rolePermissionsList) ? rolePermissionsList.length : 0 }})
+                </h4>
+                <v-chip-group column>
+                  <v-chip
+                    v-for="perm in (Array.isArray(rolePermissionsList) ? rolePermissionsList : [])"
+                    :key="'role-' + perm.id"
+                    size="small"
+                    variant="tonal"
+                    color="blue-grey"
+                    disabled
+                  >
+                    {{ perm.label || perm.name }}
+                  </v-chip>
+                </v-chip-group>
+              </div>
+
+              <!-- Direct Permissions (Editable) -->
+              <div>
+                <h4 class="tw-font-semibold tw-text-gray-700 tw-mb-2">
+                  <v-icon size="small" class="tw-mr-1">mdi-shield-plus</v-icon>
+                  All Permissions
+                  <span class="tw-text-sm tw-font-normal tw-text-gray-600">
+                    ({{ selectedPermissions.length }} total: {{ rolePermissionsList.length }} from roles + {{ directPermissionsCount }} direct)
+                  </span>
+                </h4>
+                <p class="tw-text-sm tw-text-gray-600 tw-mb-3">
+                  ✓ Checked & Disabled = From roles (cannot be removed here)<br>
+                  ✓ Checked & Enabled = Direct permissions (can be removed)<br>
+                  ☐ Unchecked = Available to add
+                </p>
+
+                <!-- Search/Filter -->
+                <v-text-field
+                  v-model="permissionSearch"
+                  label="Search permissions"
+                  prepend-inner-icon="mdi-magnify"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                  class="tw-mb-3"
+                />
+
+                <!-- Permission Categories -->
+                <div v-for="category in filteredPermissionCategories" :key="category.name" class="tw-mb-4">
+                  <h5 class="tw-font-medium tw-text-sm tw-text-gray-600 tw-mb-2">{{ category.name }}</h5>
+                  <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-2">
+                    <div v-for="perm in category.permissions" :key="perm.id" class="tw-flex tw-items-center tw-gap-1">
+                      <v-checkbox
+                        v-model="selectedPermissions"
+                        :value="perm.id"
+                        :label="perm.label || perm.name"
+                        :hint="perm.description"
+                        density="compact"
+                        hide-details
+                        :disabled="isPermissionFromRole(perm.id)"
+                        class="tw-flex-1"
+                      />
+                      <v-chip
+                        v-if="isPermissionFromRole(perm.id)"
+                        size="x-small"
+                        color="blue-grey"
+                        variant="tonal"
+                        class="tw-ml-1"
+                      >
+                        Role
+                      </v-chip>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </v-card-text>
+        <v-divider />
+        <v-card-actions>
+          <v-spacer />
+          <v-btn variant="text" @click="closePermissionsDialog">Cancel</v-btn>
+          <v-btn color="primary" @click="updateUserPermissions" :loading="savingPermissions">
+            Update Permissions
+          </v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -572,7 +710,7 @@
 import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import AdminLayout from '../layout/AdminLayout.vue'
 import { useToast } from '../../composables/useToast'
-import { userAPI, roleAPI, departmentAPI, designationAPI } from '../../utils/api'
+import { userAPI, roleAPI, departmentAPI, designationAPI, permissionAPI } from '../../utils/api'
 
 const { success, error } = useToast()
 
@@ -581,11 +719,13 @@ const loading = ref(false)
 const searchQuery = ref('')
 const showCreateUserDialog = ref(false)
 const showRolesDialog = ref(false)
+const showPermissionsDialog = ref(false)
 const showBulkActionsDialog = ref(false)
 const showImportDialog = ref(false)
 const editingUser = ref(null)
 const managingUser = ref(null)
 const selectedRoles = ref([])
+const selectedPermissions = ref([])
 const selectedUsers = ref([]) // array of IDs
 const itemsPerPage = ref(15)
 const currentPage = ref(1)
@@ -594,6 +734,11 @@ const users = ref([])
 const roles = ref([])
 const departments = ref([])
 const designations = ref([])
+const allPermissions = ref([])
+const rolePermissionsList = ref([])
+const loadingPermissions = ref(false)
+const savingPermissions = ref(false)
+const permissionSearch = ref('')
 const validationErrors = ref({})
 const importFile = ref(null)
 const importing = ref(false)
@@ -658,6 +803,63 @@ const headers = [
 const roleOptions = computed(() => roles.value.map(r => ({ title: r.label || r.name, value: r.id })))
 const departmentOptions = computed(() => departments.value.map(d => ({ name: d.name, id: d.id })))
 const designationOptions = computed(() => designations.value.map(d => ({ title: d.title, id: d.id })))
+
+// Permission categories for the permissions dialog
+const permissionCategories = computed(() => {
+  const categories = new Map()
+
+  allPermissions.value.forEach(perm => {
+    const category = perm.category || 'General'
+    if (!categories.has(category)) {
+      categories.set(category, [])
+    }
+    categories.get(category).push(perm)
+  })
+
+  return Array.from(categories.entries()).map(([name, permissions]) => ({
+    name,
+    permissions
+  }))
+})
+
+// Filtered permission categories based on search
+const filteredPermissionCategories = computed(() => {
+  if (!permissionSearch.value) {
+    return permissionCategories.value
+  }
+
+  const search = permissionSearch.value.toLowerCase()
+  return permissionCategories.value
+    .map(category => ({
+      name: category.name,
+      permissions: category.permissions.filter(perm =>
+        (perm.label || perm.name).toLowerCase().includes(search) ||
+        (perm.description || '').toLowerCase().includes(search)
+      )
+    }))
+    .filter(category => category.permissions.length > 0)
+})
+
+// Count of direct permissions only (excluding role permissions)
+const directPermissionsCount = computed(() => {
+  const rolePermIds = Array.isArray(rolePermissionsList.value)
+    ? rolePermissionsList.value.map(p => p.id)
+    : [];
+  return selectedPermissions.value.filter(permId => !rolePermIds.includes(permId)).length;
+});
+
+// Permissions from selected roles in the manage roles dialog
+const selectedRolesPermissions = computed(() => {
+  if (!selectedRoles.value || selectedRoles.value.length === 0) return [];
+  const permissions = new Set();
+  selectedRoles.value.forEach(roleId => {
+    const role = roles.value.find(r => r.id === roleId);
+    if (role && role.permissions) {
+      role.permissions.forEach(perm => permissions.add(perm));
+    }
+  });
+  return Array.from(permissions);
+});
 
 // Server-side pagination - no client-side filtering needed
 const filteredUsers = computed(() => users.value)
@@ -874,11 +1076,90 @@ const updateUserRoles = async () => {
     await userAPI.syncRoles(managingUser.value.id, selectedRoles.value)
     success('User roles updated successfully')
     showRolesDialog.value = false
+    selectedRoles.value = []
     fetchUsers()
   } catch (e) {
     error('Failed to update user roles')
     console.error(e)
   }
+}
+
+// Permissions Management
+const managePermissions = async (user) => {
+  managingUser.value = user
+  showPermissionsDialog.value = true
+  await loadUserPermissions(user.id)
+}
+
+const loadUserPermissions = async (userId) => {
+  try {
+    loadingPermissions.value = true
+
+    // Load all available permissions
+    const permissionsResponse = await permissionAPI.getAll({ per_page: 1000 })
+    const permissionsData = permissionsResponse.data
+    allPermissions.value = permissionsData.data?.data || permissionsData.data || []
+
+    // Load user's current permissions
+    const userPermsResponse = await userAPI.getPermissions(userId)
+    const userPermsData = userPermsResponse.data
+
+    if (userPermsData.success) {
+      rolePermissionsList.value = Array.isArray(userPermsData.data.role_permissions) ? userPermsData.data.role_permissions : []
+      const directPerms = Array.isArray(userPermsData.data.direct_permissions) ? userPermsData.data.direct_permissions : []
+      const rolePerms = Array.isArray(userPermsData.data.role_permissions) ? userPermsData.data.role_permissions : []
+
+      // Auto-select both direct permissions AND role permissions
+      // This shows users what they already have
+      const directPermIds = directPerms.map(p => p.id)
+      const rolePermIds = rolePerms.map(p => p.id)
+
+      // Combine both, but role permissions will be disabled via isPermissionFromRole()
+      selectedPermissions.value = [...new Set([...directPermIds, ...rolePermIds])]
+    }
+  } catch (e) {
+    console.error('Failed to load permissions:', e)
+    error('Failed to load permissions')
+  } finally {
+    loadingPermissions.value = false
+  }
+}
+
+const updateUserPermissions = async () => {
+  try {
+    savingPermissions.value = true
+
+    // Filter out role permissions - only send direct permissions
+    const rolePermIds = Array.isArray(rolePermissionsList.value) ? rolePermissionsList.value.map(p => p.id) : []
+    const directPermissionsOnly = selectedPermissions.value.filter(
+      permId => !rolePermIds.includes(permId)
+    )
+
+    await userAPI.syncPermissions(managingUser.value.id, directPermissionsOnly)
+    success('User permissions updated successfully')
+    closePermissionsDialog()
+    fetchUsers()
+  } catch (e) {
+    console.error('Failed to update permissions:', e)
+    error('Failed to update user permissions')
+  } finally {
+    savingPermissions.value = false
+  }
+}
+
+const closePermissionsDialog = () => {
+  showPermissionsDialog.value = false
+  managingUser.value = null
+  selectedPermissions.value = []
+  rolePermissionsList.value = []
+  permissionSearch.value = ''
+}
+
+const isPermissionFromRole = (permissionId) => {
+  if (!rolePermissionsList.value || !Array.isArray(rolePermissionsList.value)) {
+    return false;
+  }
+  return rolePermissionsList.value.some(p => p.id === permissionId);
 }
 const saveUser = () => (editingUser.value ? updateUser() : createUser())
 const closeUserDialog = () => {

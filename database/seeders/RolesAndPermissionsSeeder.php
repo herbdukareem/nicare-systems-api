@@ -11,7 +11,7 @@ class RolesAndPermissionsSeeder extends Seeder
     public function run(): void
     {
 
-        // ---- Permissions (same list you had in the migration) ----
+        // ---- Permissions (cleaned up and organized) ----
         $permissions = [
             // Dashboard Access
             'dashboard.view',
@@ -33,25 +33,20 @@ class RolesAndPermissionsSeeder extends Seeder
             'facilities.create',
             'facilities.edit',
             'facilities.delete',
-            'facilities.assign_desk_officer',
+            'facilities.assign',
 
             // User Management
             'users.view',
             'users.create',
             'users.edit',
             'users.delete',
-            'users.assign_roles',
 
             // Role & Permission Management
             'roles.view',
             'roles.create',
             'roles.edit',
             'roles.delete',
-            'roles.assign_permissions',
             'permissions.view',
-            'permissions.create',
-            'permissions.edit',
-            'permissions.delete',
 
             // Referral Management
             'referrals.create',
@@ -81,7 +76,6 @@ class RolesAndPermissionsSeeder extends Seeder
             // UTN Management
             'utn.validate',
             'utn.view',
-            'utn.generate',
 
             // Claim Management
             'claims.create',
@@ -91,8 +85,14 @@ class RolesAndPermissionsSeeder extends Seeder
             'claims.submit',
             'claims.withdraw',
             'claims.process',
+            'claims.automate',
+            'claims.review',
+            'claims.confirm',
+            'claims.approve',
+            'claims.reject',
+            'claims.dashboard.view',
 
-            // Claim Review Workflow
+            // Claim Review Workflow (Legacy - kept for backward compatibility)
             'claims.reviewer.review',
             'claims.reviewer.approve',
             'claims.reviewer.reject',
@@ -104,6 +104,12 @@ class RolesAndPermissionsSeeder extends Seeder
             'claims.approver.reject',
             'claims.payment.authorize',
 
+            // Payment Batch Management
+            'payment_batches.view',
+            'payment_batches.manage',
+            'payment_batches.create',
+            'payment_batches.approve',
+
             // Tariff & Bundle Management
             'tariffs.view',
             'tariffs.create',
@@ -113,12 +119,20 @@ class RolesAndPermissionsSeeder extends Seeder
             'bundles.create',
             'bundles.edit',
             'bundles.delete',
+            'bundles.manage',
+            'bundle_services.view',
+            'bundle_services.manage',
+            'bundle_components.view',
+            'bundle_components.manage',
+            'cases.view',
+            'cases.manage',
 
             // Document Management
             'documents.view',
             'documents.upload',
             'documents.download',
             'documents.delete',
+            'documents.manage',
             'documents.requirements.manage',
 
             // Reporting & Analytics
@@ -330,7 +344,46 @@ class RolesAndPermissionsSeeder extends Seeder
                 'bundles.create',
                 'bundles.edit',
                 'bundles.delete',
+                'bundles.manage',
+                'bundle_services.view',
+                'bundle_services.manage',
+                'bundle_components.view',
+                'bundle_components.manage',
+                'cases.view',
+                'cases.manage',
                 'reports.view',
+                ],
+            ],
+            'PA Officer' => [
+                'modules' => ['general', 'pas', 'claims'],
+                'permissions' => [
+                'dashboard.pas.view',
+                'dashboard.view',
+                'referrals.create',
+                'referrals.view',
+                'referrals.submit',
+                'referrals.approve',
+                'referrals.reject',
+                'referrals.print',
+                'referrals.manage',
+                'pa_codes.view',
+                'pa_codes.request',
+                'pa_codes.approve',
+                'pa_codes.reject',
+                'pa_codes.manage',
+                'admissions.view',
+                'admissions.manage',
+                'utn.validate',
+                'utn.view',
+                'claims.view',
+                'claims.submit',
+                'documents.view',
+                'documents.upload',
+                'documents.download',
+                'documents.manage',
+                'reports.view',
+                'feedback.view',
+                'feedback.create',
                 ],
             ],
             // admin gets everything

@@ -101,13 +101,30 @@ class User extends Authenticatable
     }
 
     /**
-     * The permissions that belong directly to the user's roles.
+     * Direct permissions assigned to the user (many-to-many).
      */
-    public function permissions()
+    public function directPermissions()
+    {
+        return $this->belongsToMany(Permission::class, 'permission_user')
+                    ->withTimestamps();
+    }
+
+    /**
+     * The permissions that belong to the user's roles.
+     */
+    public function rolePermissions()
     {
         return $this->roles()->with('permissions')->get()->flatMap(function ($role) {
             return $role->permissions;
         })->unique('id');
+    }
+
+    /**
+     * Alias for backward compatibility - returns role permissions.
+     */
+    public function permissions()
+    {
+        return $this->rolePermissions();
     }
 
     /**
@@ -129,14 +146,20 @@ class User extends Authenticatable
     }
 
     /**
-     * Determine if the user has a given permission via roles.
+     * Determine if the user has a given permission (via roles or direct assignment).
      *
      * @param  string  $permissionName
      * @return bool
      */
     public function hasPermission(string $permissionName): bool
     {
-        return $this->permissions()->contains(function ($permission) use ($permissionName) {
+        // Check direct permissions first
+        if ($this->directPermissions()->where('name', $permissionName)->exists()) {
+            return true;
+        }
+
+        // Check role permissions
+        return $this->rolePermissions()->contains(function ($permission) use ($permissionName) {
             return $permission->name === $permissionName;
         });
     }
@@ -199,9 +222,28 @@ class User extends Authenticatable
     }
 
     /**
-     * Get all permissions for this user through roles
+     * Get all permissions for this user (both role-based and direct)
      */
     public function getAllPermissions()
+    {
+        // Get permissions from roles
+        $rolePermissions = $this->roles()
+            ->with('permissions')
+            ->get()
+            ->pluck('permissions')
+            ->flatten();
+
+        // Get direct permissions
+        $directPermissions = $this->directPermissions;
+
+        // Merge and remove duplicates
+        return $rolePermissions->merge($directPermissions)->unique('id');
+    }
+
+    /**
+     * Get only role-based permissions
+     */
+    public function getRolePermissions()
     {
         return $this->roles()
             ->with('permissions')
@@ -209,6 +251,14 @@ class User extends Authenticatable
             ->pluck('permissions')
             ->flatten()
             ->unique('id');
+    }
+
+    /**
+     * Get only direct permissions
+     */
+    public function getDirectPermissions()
+    {
+        return $this->directPermissions;
     }
 
     // determine if the user 

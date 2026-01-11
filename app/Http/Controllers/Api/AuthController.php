@@ -57,8 +57,8 @@ class AuthController extends Controller
             // Create new token
             $token = $user->createToken('api-token', ['*'], now()->addDays(30))->plainTextToken;
 
-            // Load user relationships
-            $user->load(['roles']);
+            // Load user relationships with modules
+            $user->load(['roles', 'currentRole']);
 
             return response()->json([
                 'success' => true,
@@ -67,6 +67,8 @@ class AuthController extends Controller
                     'user' => $user,
                     'roles' => $user->roles->pluck('name'),
                     'permissions' => $user->getAllPermissions()->pluck('name'),
+                    'current_role' => $user->currentRole,
+                    'available_modules' => $user->getAvailableModules(),
                     'token' => $token,
                 ],
             ]);
@@ -219,8 +221,9 @@ class AuthController extends Controller
  public function user(Request $request): \Illuminate\Http\JsonResponse
 {
     $user = $request->user()->load([
-        'roles:id,name,label',
+        'roles:id,name,label,description,modules', // Include modules column
         'roles.permissions:id,name,label', // load perms through roles
+        'currentRole:id,name,label,description,modules', // Load current role with modules
     ]);
 
     // build a flat unique collection of permissions

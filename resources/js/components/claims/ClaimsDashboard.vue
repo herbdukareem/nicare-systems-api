@@ -129,14 +129,15 @@ const statistics = ref({
 });
 
 const navigationCards = ref([
- 
+
   {
     title: 'Review Claims',
     description: 'Review  submitted claims',
     icon: 'mdi-file-check',
     color: 'warning',
     route: '/claims/review',
-    roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'],
+    permissions: ['claims.review', 'claims.confirm', 'claims.approve'],
+    roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'], // Fallback
   },
    {
     title: 'Claims Approval',
@@ -144,7 +145,8 @@ const navigationCards = ref([
     icon: 'mdi-file-check',
     color: 'warning',
     route: '/claims/approval',
-    roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'],
+    permissions: ['claims.approve'],
+    roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'], // Fallback
   },
   {
     title: 'Payment Batches',
@@ -152,7 +154,8 @@ const navigationCards = ref([
     icon: 'mdi-cash-multiple',
     color: 'success',
     route: '/claims/payment-batches',
-    roles: ['admin', 'Super Admin', 'claims_officer', 'claim_approver'],
+    permissions: ['payment_batches.view', 'payment_batches.manage'],
+    roles: ['admin', 'Super Admin', 'claims_officer', 'claim_approver'], // Fallback
   },
   {
     title: 'Claims History',
@@ -160,6 +163,7 @@ const navigationCards = ref([
     icon: 'mdi-history',
     color: 'purple',
     route: '/claims/history',
+    permissions: ['claims.view'],
   },
   {
     title: 'Admission Management',
@@ -167,6 +171,7 @@ const navigationCards = ref([
     icon: 'mdi-bed-empty',
     color: 'teal',
     route: '/claims/automation/admissions',
+    permissions: ['admissions.view', 'admissions.manage'],
   },
   {
     title: 'Claims Processing',
@@ -174,21 +179,26 @@ const navigationCards = ref([
     icon: 'mdi-cog-outline',
     color: 'orange',
     route: '/claims/automation/process',
+    permissions: ['claims.process', 'claims.automate'],
   },
 ]);
 
-// Filter navigation cards based on user roles
+// Filter navigation cards based on user permissions (preferred) or roles (fallback)
 const filteredNavigationCards = computed(() => {
-  const userRoles = authStore.userRoles.map(role => role.name);
-
   return navigationCards.value.filter(card => {
-    // If card has no role restrictions, show it to everyone
-    if (!card.roles || card.roles.length === 0) {
-      return true;
+    // Check permissions first (preferred method)
+    if (card.permissions && card.permissions.length > 0) {
+      // User needs at least one of the specified permissions
+      return card.permissions.some(permission => authStore.hasPermission(permission));
     }
 
-    // Check if user has any of the required roles
-    return card.roles.some(role => userRoles.includes(role));
+    // Fallback to role-based check for backward compatibility
+    if (card.roles && card.roles.length > 0) {
+      return card.roles.some(role => authStore.hasRole(role));
+    }
+
+    // Show if no restrictions
+    return true;
   });
 });
 

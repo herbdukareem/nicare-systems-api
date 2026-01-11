@@ -199,6 +199,40 @@ class UserController extends BaseController
     }
 
     /**
+     * Sync direct permissions to a user (in addition to role permissions).
+     */
+    public function syncPermissions(Request $request, User $user)
+    {
+        $validated = $request->validate([
+            'permissions' => 'required|array',
+            'permissions.*' => 'exists:permissions,id',
+        ]);
+
+        $user->directPermissions()->sync($validated['permissions']);
+
+        return $this->sendResponse(
+            new UserResource($user->load(['roles', 'directPermissions'])),
+            'User permissions synced successfully'
+        );
+    }
+
+    /**
+     * Get user's permissions (both role-based and direct).
+     */
+    public function getPermissions(User $user)
+    {
+        $rolePermissions = $user->getRolePermissions();
+        $directPermissions = $user->getDirectPermissions();
+        $allPermissions = $user->getAllPermissions();
+
+        return $this->sendResponse([
+            'role_permissions' => $rolePermissions,
+            'direct_permissions' => $directPermissions,
+            'all_permissions' => $allPermissions,
+        ], 'User permissions retrieved successfully');
+    }
+
+    /**
      * Get all users with their roles for management
      */
     public function withRoles(Request $request)

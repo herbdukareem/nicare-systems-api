@@ -286,19 +286,22 @@ const dashboardMenu = {
       name: 'Enrollee Dashboard',
       path: '/dashboard',
       icon: 'mdi-account-group',
-      roles: ['admin', 'doctor', 'pharmacist', 'reviewer', 'confirmer', 'approver', 'Super Admin'],
+      permissions: ['dashboard.view'],
+      roles: ['admin', 'doctor', 'pharmacist', 'reviewer', 'confirmer', 'approver', 'Super Admin'], // Fallback
     },
     {
       name: 'DO Dashboard',
       path: '/do-dashboard',
       icon: 'mdi-desk',
-      roles: ['desk_officer', 'Super Admin'],
+      permissions: ['dashboard.desk_officer.view'],
+      roles: ['desk_officer', 'Super Admin'], // Fallback
     },
     {
       name: 'Facility Dashboard',
       path: '/facility-dashboard',
       icon: 'mdi-hospital-building',
-      roles: ['facility_admin', 'facility_user', 'Super Admin'],
+      permissions: ['dashboard.facility.view'],
+      roles: ['facility_admin', 'facility_user', 'Super Admin'], // Fallback
     },
   ],
 };
@@ -311,13 +314,15 @@ const userManagementMenu = {
       name: 'Users',
       path: '/settings/users',
       icon: 'mdi-account-multiple',
-      roles: ['admin', 'Super Admin'],
+      permissions: ['users.view'],
+      roles: ['admin', 'Super Admin'], // Fallback
     },
     {
       name: 'Roles & Permissions',
       path: '/settings/roles',
       icon: 'mdi-shield-account',
-      roles: ['admin', 'Super Admin'],
+      permissions: ['roles.view', 'permissions.view'],
+      roles: ['admin', 'Super Admin'], // Fallback
     },
   ],
 };
@@ -330,61 +335,71 @@ const pasMenu = {
       name: 'PAS Dashboard',
       path: '/pas',
       icon: 'mdi-view-dashboard',
-      roles: ['admin', 'Super Admin', 'claims_officer'],
+      permissions: ['pas.dashboard.view'],
+      roles: ['admin', 'Super Admin', 'claims_officer'], // Fallback
     },
     {
       name: 'DO Facility Assignments',
       path: '/do-facilities',
       icon: 'mdi-hospital-marker',
-      roles: ['admin', 'Super Admin'],
+      permissions: ['facilities.assign'],
+      roles: ['admin', 'Super Admin'], // Fallback
     },
     {
       name: 'Assigned Facilities Referrals',
       path: '/do/assigned-referrals',
       icon: 'mdi-file-document-multiple',
-      roles: ['desk_officer', 'facility_admin', 'facility_user', 'Super Admin'],
+      permissions: ['referrals.view'],
+      roles: ['desk_officer', 'facility_admin', 'facility_user', 'Super Admin'], // Fallback
     },
     {
       name: 'Validate UTN',
       path: '/pas/validate-utn',
       icon: 'mdi-shield-check',
-      roles: ['facility_admin', 'facility_user', 'desk_officer', 'Super Admin'],
+      permissions: ['utn.validate'],
+      roles: ['facility_admin', 'facility_user', 'desk_officer', 'Super Admin'], // Fallback
     },
     {
       name: 'Admission Management',
       path: '/facility/admissions',
       icon: 'mdi-hospital-box',
-      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'],
+      permissions: ['admissions.view', 'admissions.manage'],
+      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'], // Fallback
     },
     {
       name: 'FU-PA Code Management',
       path: '/pas/facility-pa-codes',
       icon: 'mdi-shield-check',
-      roles: ['desk_officer', 'facility_admin', 'facility_user', 'Super Admin'],
+      permissions: ['pa_codes.request', 'pa_codes.view'],
+      roles: ['desk_officer', 'facility_admin', 'facility_user', 'Super Admin'], // Fallback
     },
     {
       name: 'Submit Claim',
       path: '/facility/claims/submit',
       icon: 'mdi-file-document-plus',
-      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'],
+      permissions: ['claims.submit'],
+      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'], // Fallback
     },
     {
       name: 'FU-PA Code Approval',
       path: '/pas/fu-pa-approval',
       icon: 'mdi-check-decagram',
-      roles: ['admin', 'Super Admin', 'claims_officer'],
+      permissions: ['pa_codes.approve', 'pa_codes.reject'],
+      roles: ['admin', 'Super Admin', 'claims_officer'], // Fallback
     },
     {
       name: 'Referral Management',
       path: '/pas/referral-management',
       icon: 'mdi-file-document-check',
-      roles: ['admin', 'Super Admin', 'claims_officer', 'desk_officer', 'facility_admin', 'facility_user'],
+      permissions: ['referrals.view'],
+      roles: ['admin', 'Super Admin', 'claims_officer', 'desk_officer', 'facility_admin', 'facility_user'], // Fallback
     },
     {
       name: 'Document Requirements',
       path: '/document-requirements',
       icon: 'mdi-file-document-multiple',
-      roles: ['admin', 'Super Admin', 'claims_officer'],
+      permissions: ['documents.view', 'documents.manage'],
+      roles: ['admin', 'Super Admin', 'claims_officer'], // Fallback
     },
   ],
 };
@@ -397,13 +412,15 @@ const pasFeedbackMenu = {
       name: 'Feedback List',
       path: '/feedback',
       icon: 'mdi-comment-text',
-      roles: ['admin', 'Super Admin', 'claims_officer', 'facility_admin', 'facility_user'],
+      permissions: ['feedback.view'],
+      roles: ['admin', 'Super Admin', 'claims_officer', 'facility_admin', 'facility_user'], // Fallback
     },
     {
       name: 'Create Feedback',
       path: '/feedback/create',
       icon: 'mdi-message-plus',
-      roles: ['admin', 'Super Admin', 'claims_officer', 'desk_officer'],
+      permissions: ['feedback.create'],
+      roles: ['admin', 'Super Admin', 'claims_officer', 'desk_officer'], // Fallback
     },
   ],
 };
@@ -416,25 +433,29 @@ const claimsMenu = {
       name: 'Claims Dashboard',
       path: '/claims',
       icon: 'mdi-view-dashboard',
-      roles: ['admin', 'Super Admin', 'claims_officer', 'claim_reviewer', 'claim_confirmer', 'claim_approver'],
+      permissions: ['claims.dashboard.view'],
+      roles: ['admin', 'Super Admin', 'claims_officer', 'claim_reviewer', 'claim_confirmer', 'claim_approver'], // Fallback
     },
     {
       name: 'Submit Referral to PAS',
       path: '/claims/referrals',
       icon: 'mdi-account-arrow-right',
-      roles: ['admin', 'Super Admin', 'claims_officer'],
+      permissions: ['referrals.create', 'referrals.submit'],
+      roles: ['admin', 'Super Admin', 'claims_officer'], // Fallback
     },
     {
       name: 'Review Claims',
       path: '/claims/review',
       icon: 'mdi-file-check',
-      roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'],
+      permissions: ['claims.review', 'claims.confirm', 'claims.approve'],
+      roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'], // Fallback
     },
     {
       name: 'Payment Batches',
       path: '/claims/payment-batches',
       icon: 'mdi-cash-multiple',
-      roles: ['admin', 'Super Admin', 'claims_officer', 'claim_approver'],
+      permissions: ['payment_batches.view', 'payment_batches.manage'],
+      roles: ['admin', 'Super Admin', 'claims_officer', 'claim_approver'], // Fallback
     },
   ],
 };
@@ -447,19 +468,22 @@ const claimsAutomationMenu = {
       name: 'Admission Management',
       path: '/claims/automation/admissions',
       icon: 'mdi-hospital-building',
-      roles: ['admin', 'Super Admin', 'claims_officer'],
+      permissions: ['admissions.view', 'admissions.manage'],
+      roles: ['admin', 'Super Admin', 'claims_officer'], // Fallback
     },
     {
       name: 'Claims Processing',
       path: '/claims/automation/process',
       icon: 'mdi-cog-transfer',
-      roles: ['admin', 'Super Admin', 'claims_officer', 'claim_reviewer'],
+      permissions: ['claims.process', 'claims.automate'],
+      roles: ['admin', 'Super Admin', 'claims_officer', 'claim_reviewer'], // Fallback
     },
     {
       name: 'Bundle Management',
       path: '/claims/automation/bundles',
       icon: 'mdi-package-variant-closed',
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      permissions: ['bundles.view', 'bundles.manage'],
+      roles: ['admin', 'Super Admin', 'tariff_manager'], // Fallback
     },
   ],
 };
@@ -472,27 +496,31 @@ const managementMenu = {
       name: 'Management Dashboard',
       path: '/management',
       icon: 'mdi-view-dashboard-outline',
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      permissions: ['management.dashboard.view'],
+      roles: ['admin', 'Super Admin', 'tariff_manager'], // Fallback
     },
 
-   
+
     {
       name: 'Case Management',
       path: '/management/cases',
       icon: 'mdi-file-document-multiple-outline',
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      permissions: ['cases.view', 'cases.manage'],
+      roles: ['admin', 'Super Admin', 'tariff_manager'], // Fallback
     },
     {
       name: 'Bundle Services',
       path: '/management/bundle-services',
       icon: 'mdi-package-variant',
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      permissions: ['bundle_services.view', 'bundle_services.manage'],
+      roles: ['admin', 'Super Admin', 'tariff_manager'], // Fallback
     },
     {
       name: 'Bundle Components',
       path: '/management/bundle-components',
       icon: 'mdi-package-variant-closed',
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      permissions: ['bundle_components.view', 'bundle_components.manage'],
+      roles: ['admin', 'Super Admin', 'tariff_manager'], // Fallback
     },
   ],
 };
@@ -520,18 +548,29 @@ const allModuleOptions = [
 const moduleOptions = computed(() => {
   const availableModules = authStore.availableModules || [];
 
+  console.log('[AdminLayout] Computing moduleOptions:', {
+    availableModules,
+    currentRole: authStore.currentRole,
+    userRoles: authStore.user?.roles,
+    isSuperAdmin: authStore.hasRole('Super Admin')
+  });
+
   // Super Admin can access all modules
   if (authStore.hasRole('Super Admin')) {
+    console.log('[AdminLayout] User is Super Admin - showing all modules');
     return allModuleOptions;
   }
 
   // If no modules specified, default to general only
   if (availableModules.length === 0) {
+    console.log('[AdminLayout] No modules available - defaulting to general only');
     return [{ value: 'general', label: 'Core & Admin' }];
   }
 
   // Filter to only show modules user has access to
-  return allModuleOptions.filter(option => availableModules.includes(option.value));
+  const filtered = allModuleOptions.filter(option => availableModules.includes(option.value));
+  console.log('[AdminLayout] Filtered modules:', filtered);
+  return filtered;
 });
 
 const selectedModule = computed({
@@ -574,14 +613,25 @@ const activeModuleMenuItems = computed(
 const userName = computed(() => authStore.userName);
 const userRoles = computed(() => authStore.userRoles);
 
-// Filter menu items based on user roles
+// Filter menu items based on user permissions (preferred) or roles (fallback)
 const filteredMenuItems = computed(() => {
   return activeModuleMenuItems.value
     .map((item) => {
       if (item.children) {
         const filteredChildren = item.children.filter((child) => {
-          if (!child.roles) return true; // Show if no role restriction
-          return child.roles.some((role) => authStore.hasRole(role));
+          // Check permissions first (preferred method)
+          if (child.permissions && child.permissions.length > 0) {
+            // User needs at least one of the specified permissions
+            return child.permissions.some((permission) => authStore.hasPermission(permission));
+          }
+
+          // Fallback to role-based check for backward compatibility
+          if (child.roles && child.roles.length > 0) {
+            return child.roles.some((role) => authStore.hasRole(role));
+          }
+
+          // Show if no restrictions
+          return true;
         });
 
         return {
@@ -590,9 +640,19 @@ const filteredMenuItems = computed(() => {
         };
       }
 
-      // For items without children, check role restriction
-      if (!item.roles) return item; // Show if no role restriction
-      return item.roles.some((role) => authStore.hasRole(role)) ? item : null;
+      // For items without children, check permission/role restriction
+      // Check permissions first (preferred method)
+      if (item.permissions && item.permissions.length > 0) {
+        return item.permissions.some((permission) => authStore.hasPermission(permission)) ? item : null;
+      }
+
+      // Fallback to role-based check
+      if (item.roles && item.roles.length > 0) {
+        return item.roles.some((role) => authStore.hasRole(role)) ? item : null;
+      }
+
+      // Show if no restrictions
+      return item;
     })
     .filter((item) => item && (!item.children || item.children.length > 0));
 });

@@ -19,13 +19,35 @@ export const useAuthStore = defineStore('auth', {
     getUserAvailableRoles: (state) => state.availableRoles || [],
     getUserCurrentRole: (state) => state.currentRole,
 
-    // New getter: currentRole - returns the currently active role
-    currentRole: (state) => state.currentRole || (state.user?.current_role) || null,
-
     // New getter: availableModules - returns modules for current role
     availableModules: (state) => {
-      const role = state.currentRole || state.user?.current_role;
-      return role?.modules || [];
+      // Priority: 1) state.currentRole, 2) user.current_role, 3) first role in user.roles array
+      let role = null;
+      let source = 'none';
+
+      if (state.currentRole && state.currentRole.modules) {
+        role = state.currentRole;
+        source = 'state.currentRole';
+      } else if (state.user?.current_role && state.user.current_role.modules) {
+        role = state.user.current_role;
+        source = 'user.current_role';
+      } else if (state.user?.roles && state.user.roles.length > 0) {
+        role = state.user.roles[0];
+        source = 'user.roles[0]';
+      }
+
+      const modules = role?.modules || [];
+
+      console.log('[Auth Store] availableModules getter:', {
+        source,
+        currentRole: state.currentRole,
+        userCurrentRole: state.user?.current_role,
+        userRoles: state.user?.roles,
+        selectedRole: role,
+        modules
+      });
+
+      return modules;
     },
 
     currentRolePermissions: (state) => {
@@ -60,7 +82,9 @@ export const useAuthStore = defineStore('auth', {
 
           // Initialize role switching
           this.availableRoles = user.roles || [];
-          this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
+
+          // Use current_role from user if available, otherwise use first available role
+          this.currentRole = user.current_role || (this.availableRoles.length > 0 ? this.availableRoles[0] : null);
 
           // Store token, user data, and current role in localStorage
           localStorage.setItem('token', token);
@@ -127,19 +151,29 @@ export const useAuthStore = defineStore('auth', {
           // Initialize role switching
           this.availableRoles = this.user.roles || [];
 
-          // Restore current role from localStorage or set default
-          const savedRole = localStorage.getItem('currentRole');
-          if (savedRole) {
-            try {
-              const parsedRole = JSON.parse(savedRole);
-              // Verify the saved role is still available
-              const roleExists = this.availableRoles.find(role => role.id === parsedRole.id);
-              this.currentRole = roleExists || (this.availableRoles.length > 0 ? this.availableRoles[0] : null);
-            } catch {
-              this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
-            }
+          // Priority: 1) user.current_role from backend, 2) saved role from localStorage, 3) first available role
+          if (this.user.current_role) {
+            // Use current_role from backend (most authoritative)
+            this.currentRole = this.user.current_role;
+            console.log('[Auth] Using current_role from backend:', this.currentRole);
           } else {
-            this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
+            // Restore current role from localStorage or set default
+            const savedRole = localStorage.getItem('currentRole');
+            if (savedRole) {
+              try {
+                const parsedRole = JSON.parse(savedRole);
+                // Verify the saved role is still available
+                const roleExists = this.availableRoles.find(role => role.id === parsedRole.id);
+                this.currentRole = roleExists || (this.availableRoles.length > 0 ? this.availableRoles[0] : null);
+                console.log('[Auth] Using saved role from localStorage:', this.currentRole);
+              } catch {
+                this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
+                console.log('[Auth] Using first available role (localStorage parse failed):', this.currentRole);
+              }
+            } else {
+              this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
+              console.log('[Auth] Using first available role (no saved role):', this.currentRole);
+            }
           }
 
           // Update currentRole in localStorage if it changed

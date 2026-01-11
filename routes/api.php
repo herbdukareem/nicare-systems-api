@@ -157,9 +157,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
     Route::post('users/bulk-update-status', [UserController::class, 'bulkUpdateStatus']);
     Route::delete('users/bulk-delete', [UserController::class, 'bulkDelete']);
+    // User permissions routes
+    Route::post('users/{user}/permissions', [UserController::class, 'syncPermissions']);
+    Route::get('users/{user}/permissions', [UserController::class, 'getPermissions']);
     // Profile management routes
     Route::get('users/{user}/activities', [UserController::class, 'activities']);
-    Route::post('users/{user}/roles', [UserController::class, 'updateRoles']);
     Route::post('users/{user}/avatar', [UserController::class, 'uploadAvatar']);
     Route::patch('users/{user}/toggle-2fa', [UserController::class, 'toggle2FA']);
     Route::post('users/{user}/revoke-sessions', [UserController::class, 'revokeAllSessions']);

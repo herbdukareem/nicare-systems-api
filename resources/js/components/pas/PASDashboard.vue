@@ -74,7 +74,7 @@
           <h2 class="text-h6 mb-4">PAS Management Tools</h2>
         </v-col>
 
-        <v-col cols="12" md="6" lg="4" v-for="card in navigationCards" :key="card.route">
+        <v-col cols="12" md="6" lg="4" v-for="card in filteredNavigationCards" :key="card.route">
           <v-card
             class="navigation-card"
             hover
@@ -110,14 +110,16 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from '@/js/composables/useToast';
+import { useAuthStore } from '@/js/stores/auth';
 import api from '@/js/utils/api';
 import AdminLayout from '../layout/AdminLayout.vue';
 
 const router = useRouter();
 const { error: showError } = useToast();
+const authStore = useAuthStore();
 
 const statistics = ref({
   total_pa_requests: 0,
@@ -135,7 +137,8 @@ const navigationCards = ref([
     route: '/pas/referrals',
     // badge: 'Admin Only',
     badgeColor: 'primary',
-    roles: ['admin', 'Super Admin', 'claims_officer'],
+    permissions: ['referrals.create', 'referrals.submit'],
+    roles: ['admin', 'Super Admin', 'claims_officer'], // Fallback
   },
   {
     title: 'Referral Management',
@@ -143,6 +146,7 @@ const navigationCards = ref([
     icon: 'mdi-file-document-check',
     color: 'info',
     route: '/pas/referral-management',
+    permissions: ['referrals.view'],
   },
   {
     title: 'Request FU-PA Code',
@@ -150,6 +154,7 @@ const navigationCards = ref([
     icon: 'mdi-file-plus',
     color: 'success',
     route: '/pas/fu-pa-request',
+    permissions: ['pa_codes.request'],
   },
   {
     title: 'FU-PA Code Approval',
@@ -157,6 +162,7 @@ const navigationCards = ref([
     icon: 'mdi-check-decagram',
     color: 'warning',
     route: '/pas/fu-pa-approval',
+    permissions: ['pa_codes.approve', 'pa_codes.reject'],
   },
   {
     title: 'Document Requirements',
@@ -164,8 +170,28 @@ const navigationCards = ref([
     icon: 'mdi-file-document-multiple',
     color: 'primary',
     route: '/document-requirements',
+    permissions: ['documents.view', 'documents.manage'],
   },
 ]);
+
+// Filter navigation cards based on user permissions (preferred) or roles (fallback)
+const filteredNavigationCards = computed(() => {
+  return navigationCards.value.filter(card => {
+    // Check permissions first (preferred method)
+    if (card.permissions && card.permissions.length > 0) {
+      // User needs at least one of the specified permissions
+      return card.permissions.some(permission => authStore.hasPermission(permission));
+    }
+
+    // Fallback to role-based check for backward compatibility
+    if (card.roles && card.roles.length > 0) {
+      return card.roles.some(role => authStore.hasRole(role));
+    }
+
+    // Show if no restrictions
+    return true;
+  });
+});
 
 onMounted(async () => {
   await loadStatistics();

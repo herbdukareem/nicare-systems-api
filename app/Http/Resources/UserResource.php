@@ -31,6 +31,7 @@ class UserResource extends JsonResource
                 return $this->getAvailableModules();
             }),
             'permissions' => PermissionResource::collection($this->whenLoaded('permissions')),
+            'direct_permissions' => PermissionResource::collection($this->whenLoaded('directPermissions')),
             'audit_trails' => AuditTrailResource::collection($this->whenLoaded('auditTrails')),
             'last_login_at' => $this->last_login_at,
             'email_verified_at' => $this->email_verified_at,
