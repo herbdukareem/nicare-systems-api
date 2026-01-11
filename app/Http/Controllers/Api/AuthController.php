@@ -57,8 +57,13 @@ class AuthController extends Controller
             // Create new token
             $token = $user->createToken('api-token', ['*'], now()->addDays(30))->plainTextToken;
 
-            // Load user relationships with modules
-            $user->load(['roles', 'currentRole']);
+            // Load user relationships with modules and permissions
+            $user->load([
+                'roles:id,name,label,description,modules',
+                'roles.permissions:id,name,label',
+                'currentRole:id,name,label,description,modules',
+                'currentRole.permissions:id,name,label',
+            ]);
 
             return response()->json([
                 'success' => true,

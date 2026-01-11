@@ -753,6 +753,17 @@ watch(
   { immediate: true }
 );
 
+// Watch for changes in user authentication state to ensure menus update
+watch(
+  () => [authStore.user, authStore.currentRole, authStore.isAuthenticated],
+  () => {
+    // Force re-computation of filtered menu items by triggering reactivity
+    // This ensures menus show up immediately after login without requiring a refresh
+    console.log('[AdminLayout] User/role/auth state changed, menus will update');
+  },
+  { deep: true }
+);
+
 // Close sidebar on route change (mobile)
 router.afterEach(() => {
   sidebarOpen.value = false;

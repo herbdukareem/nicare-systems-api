@@ -57,12 +57,24 @@ export const useAuthStore = defineStore('auth', {
     userPermissions: (state) => {
       // If a specific role is active, return only that role's permissions
       if (state.currentRole) {
-        return state.currentRole.permissions || [];
+        const perms = state.currentRole.permissions || [];
+        console.log('[Auth Store] userPermissions from currentRole:', {
+          roleName: state.currentRole.name,
+          permissionCount: perms.length,
+          permissions: perms.map(p => p.name || p).slice(0, 5) // Show first 5
+        });
+        return perms;
       }
       // Otherwise, return all permissions from all roles
       const directPermissions = state.user?.permissions || [];
       const rolePermissions = state.user?.roles?.flatMap(role => role.permissions || []) || [];
-      return [...directPermissions, ...rolePermissions];
+      const allPerms = [...directPermissions, ...rolePermissions];
+      console.log('[Auth Store] userPermissions from all roles:', {
+        directCount: directPermissions.length,
+        roleCount: rolePermissions.length,
+        totalCount: allPerms.length
+      });
+      return allPerms;
     },
     canSwitchRoles: (state) => state.availableRoles.length > 1,
   },
@@ -338,7 +350,14 @@ export const useAuthStore = defineStore('auth', {
 
     hasPermission(permission) {
       const permissions = this.userPermissions;
-      return permissions.some(p => p.name === permission || p === permission);
+      const hasIt = permissions.some(p => p.name === permission || p === permission);
+
+      // Debug logging (can be removed in production)
+      if (!hasIt && permissions.length === 0) {
+        console.warn(`[Auth] No permissions loaded yet. Checking for: ${permission}`);
+      }
+
+      return hasIt;
     },
 
     hasRole(roleName) {
