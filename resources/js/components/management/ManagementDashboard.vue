@@ -144,13 +144,18 @@ const navigationCards = ref([
   },
 ]);
 
+
+// check if user is superadmin 
+const isSuperAdmin = computed(() => {
+  return authStore.hasRole('Super Admin');
+});
 // Filter navigation cards based on user permissions
 const filteredNavigationCards = computed(() => {
   return navigationCards.value.filter(card => {
     // Check permissions first (preferred method)
     if (card.permissions && card.permissions.length > 0) {
       // User needs at least one of the specified permissions
-      return card.permissions.some(permission => authStore.hasPermission(permission));
+      return card.permissions.some(permission => authStore.hasPermission(permission) || isSuperAdmin.value);
     }
 
     // Fallback to role-based check for backward compatibility
@@ -165,6 +170,7 @@ const filteredNavigationCards = computed(() => {
 
 onMounted(async () => {
   await loadStatistics();
+
 });
 
 const loadStatistics = async () => {

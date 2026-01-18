@@ -57,7 +57,7 @@
                     v-model="bundleFilter"
                     label="Filter by Bundle"
                     :items="bundles"
-                    item-title="service_description"
+                    item-title="case_name"
                     item-value="id"
                     clearable
                     variant="outlined"
@@ -66,7 +66,7 @@
                   >
                     <template v-slot:item="{ props, item }">
                       <v-list-item v-bind="props">
-                        <template v-slot:title>{{ item.raw.service_description }}</template>
+                        <template v-slot:title>{{ item.raw.case_name }}</template>
                         <template v-slot:subtitle>
                           {{ item.raw.case_name }}
                         </template>
@@ -144,14 +144,14 @@
               >
                 <template v-slot:item.service_bundle="{ item }">
                   <div>
-                    <div class="font-weight-medium">{{ item.service_bundle?.case_name || item.service_bundle?.service_description }}</div>
+                    <div class="font-weight-medium">{{ item.service_bundle?.case_name  }}</div>
                     <div class="text-caption text-grey">{{ item.service_bundle?.nicare_code }}</div>
                   </div>
                 </template>
 
                 <template v-slot:item.case_record="{ item }">
                   <div>
-                    <div class="font-weight-medium">{{ item.case_record?.service_description }}</div>
+                    <div class="font-weight-medium">{{ item.case_record?.case_name }}</div>
                     <div class="text-caption text-grey">{{ item.case_record?.nicare_code }}</div>
                   </div>
                 </template>
@@ -207,7 +207,7 @@
                   v-model="formData.service_bundle_id"
                   label="Service Bundle *"
                   :items="bundles"
-                  item-title="service_description"
+                  item-title="case_name"
                   item-value="id"
                   :rules="[v => !!v || 'Service bundle is required']"
                   variant="outlined"
@@ -245,7 +245,7 @@
                   v-model="formData.case_record_id"
                   label="Case Record / Service *"
                   :items="availableCaseRecords"
-                  item-title="service_description"
+                  item-title="case_name"
                   item-value="id"
                   :loading="loadingCaseRecords"
                   :rules="[v => !!v || 'Case record is required']"
@@ -257,9 +257,9 @@
                 >
                   <template v-slot:item="{ props, item }">
                     <v-list-item v-bind="props">
-                      <template v-slot:title>{{ item.raw.service_description }}</template>
+                      <template v-slot:title>{{ item.raw.case_name }}</template>
                       <template v-slot:subtitle>
-                        {{ item.raw.nicare_code }} | {{ item.raw.case_name }}
+                        {{ item.raw.nicare_code }}
                       </template>
                     </v-list-item>
                   </template>
@@ -306,7 +306,7 @@
                   v-model="bulkFormData.service_bundle_id"
                   label="Service Bundle *"
                   :items="bundles"
-                  item-title="service_description"
+                  item-title="case_name"
                   item-value="id"
                   :rules="[v => !!v || 'Service bundle is required']"
                   variant="outlined"
@@ -314,9 +314,9 @@
                 >
                   <template v-slot:item="{ props, item }">
                     <v-list-item v-bind="props">
-                      <template v-slot:title>{{ item.raw.service_description }}</template>
+                      <template v-slot:title>{{ item.raw.case_name }}</template>
                       <template v-slot:subtitle>
-                        {{ item.raw.case_name }} | ₦{{ Number(item.raw.bundle_price || item.raw.price || 0).toLocaleString() }}
+                         ₦{{ Number(item.raw.bundle_price || item.raw.price || 0).toLocaleString() }}
                       </template>
                     </v-list-item>
                   </template>
@@ -344,7 +344,7 @@
                   v-model="bulkFormData.selected_items"
                   label="Select Multiple Items *"
                   :items="caseRecords"
-                  item-title="service_description"
+                  item-title="case_name"
                   item-value="id"
                   :rules="[v => v && v.length > 0 || 'At least one item is required']"
                   :loading="loadingCaseRecords"
@@ -394,7 +394,7 @@
         </v-card-title>
         <v-card-text class="pt-4">
           <p>Are you sure you want to delete this component?</p>
-          <p class="font-weight-bold">{{ componentToDelete?.case_record?.service_description }}</p>
+          <p class="font-weight-bold">{{ componentToDelete?.case_record?.case_name }}</p>
         </v-card-text>
         <v-card-actions>
           <v-spacer />

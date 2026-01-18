@@ -166,7 +166,12 @@ public function showFullDetails($claimId): JsonResponse
                 'line_items.*.quantity' => 'required|integer|min:1',
                 'line_items.*.unit_price' => 'required|numeric|min:0',
                 'line_items.*.line_total' => 'required|numeric|min:0',
+                //tariff_type
+                'line_items.*.tariff_type' => 'required|in:BUNDLE,FFS',
+
             ]);
+
+           
 
             // 1. Validate UTN
             $utnValidation = $this->validationService->validateUTN($validated['referral_id']);
@@ -233,6 +238,7 @@ public function showFullDetails($claimId): JsonResponse
             }, 0);
 
             $totalAmount = $bundleAmount + $ffsAmount;
+             
 
             // 7. Validate at least one amount is present
             if ($totalAmount <= 0) {
@@ -264,23 +270,23 @@ public function showFullDetails($claimId): JsonResponse
                 ]);
 
                 // 9. Create claim line items for selected bundle components (for tracking)
-                foreach ($bundleComponents as $component) {
-                    $unitPrice = (float) ($component['unit_price'] ?? 0);
-                    $quantity = (int) ($component['quantity'] ?? 1);
+                // foreach ($bundleComponents as $component) {
+                //     $unitPrice = (float) ($component['unit_price'] ?? 0);
+                //     $quantity = (int) ($component['quantity'] ?? 1);
 
-                    \App\Models\ClaimLine::create([
-                        'claim_id' => $claim->id,
-                        'bundle_component_id' => $component['bundle_component_id'],
-                        'case_record_id' => $component['case_record_id'] ?? null,
-                        'service_description' => 'Bundle Component',
-                        'quantity' => $quantity,
-                        'unit_price' => $unitPrice,
-                        'line_total' => $unitPrice * $quantity, // Component cost for tracking
-                        'tariff_type' => 'BUNDLE',
-                        'service_type' => 'bundle_component',
-                        'reporting_type' => 'IN_BUNDLE',
-                    ]);
-                }
+                //     \App\Models\ClaimLine::create([
+                //         'claim_id' => $claim->id,
+                //         'bundle_component_id' => $component['bundle_component_id'],
+                //         'case_record_id' => $component['case_record_id'] ?? null,
+                //         'service_description' => 'Bundle Component',
+                //         'quantity' => $quantity,
+                //         'unit_price' => $unitPrice,
+                //         'line_total' => $unitPrice * $quantity, // Component cost for tracking
+                //         'tariff_type' => 'BUNDLE',
+                //         'service_type' => 'bundle_component',
+                //         'reporting_type' => 'IN_BUNDLE',
+                //     ]);
+                // }
 
                 // 10. Create claim line items for FFS
                 foreach ($lineItems as $lineItem) {
@@ -292,9 +298,9 @@ public function showFullDetails($claimId): JsonResponse
                         'quantity' => $lineItem['quantity'],
                         'unit_price' => $lineItem['unit_price'],
                         'line_total' => $lineItem['line_total'],
-                        'tariff_type' => 'FFS',
+                        'tariff_type' => $lineItem['tariff_type'],
                         'service_type' => 'service',
-                        'reporting_type' => 'FFS_TOP_UP',
+                        'reporting_type' => $lineItem['tariff_type'] === 'BUNDLE' ? 'IN_BUNDLE' : 'FFS_TOP_UP',
                     ]);
                 }
 
@@ -469,6 +475,7 @@ public function showFullDetails($claimId): JsonResponse
                 'lineItems.paCode',
                 'lineItems.bundleComponent.caseRecord',
             ]);
+            // dd($claim);
 
             $data = [
                 'claim' => $claim,

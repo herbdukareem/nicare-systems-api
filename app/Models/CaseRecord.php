@@ -360,5 +360,19 @@ class CaseRecord extends Model
     {
         return $query->where('case_category', self::CATEGORY_SUB_CASE);
     }
+
+    // caseRecordname
+    public function getCaseRecordNameAttribute()
+    {
+        //if drug combine, generic name , strength and dosage form and presentation
+        if($this->detail_type == 'App\Models\DrugDetail'){
+            $drug = DrugDetail::where('id', $this->detail_id)->first();
+            return $drug->generic_name . ' (' . $drug->strength . ') (' . $drug->dosage_form . ') (' . $drug->pack_description.')';
+        }
+        return $this->case_name;
+    }
+
+    // appends
+    protected $appends = ['case_record_name'];
 }
 

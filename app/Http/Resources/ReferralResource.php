@@ -88,6 +88,8 @@ class ReferralResource extends JsonResource
                                     'case_name' => $component->caseRecord->case_name,
                                     'price' => $component->caseRecord->price,
                                     'detail_type' => $component->caseRecord->detail_type,
+                                    'detail' => $component->caseRecord->detail,
+                                    'case_record_name' => $component->caseRecord->case_record_name
                                 ] : null,
                             ];
                         })
@@ -170,6 +172,7 @@ class ReferralResource extends JsonResource
                                     'id' => $cr->id,
                                     'nicare_code' => $cr->nicare_code,
                                     'case_name' => $cr->case_name,
+                                    'case_record_name' => $cr->case_record_name,
                                     'service_description' => $cr->service_description,
                                     'price' => $cr->price,
                                     'detail_type' => $cr->detail_type,

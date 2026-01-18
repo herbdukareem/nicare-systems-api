@@ -19,8 +19,8 @@ class CaseService
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
                 $q->where('nicare_code', 'like', "%{$search}%")
-                  ->orWhere('service_description', 'like', "%{$search}%")
-                  ->orWhere('group', 'like', "%{$search}%");
+                  ->orWhere('case_name', 'like', "%{$search}%")
+                  ->orWhere('service_description', 'like', "%{$search}%");
             });
         }
 

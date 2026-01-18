@@ -115,73 +115,68 @@
             </div>
         </div>
 
-        @if($bundle_items->count() > 0)
         <div class="section">
-            <div class="section-title">Bundle Services</div>
+            <div class="section-title">Claim Line Items</div>
             <table>
                 <thead>
                     <tr>
                         <th>Service Description</th>
-                        <th class="amount">Qty</th>
-                        <th class="amount">Unit Price</th>
-                        <th class="amount">Amount</th>
+                        <th style="width: 80px;">Type</th>
+                        <th class="amount" style="width: 60px;">Qty</th>
+                        <th class="amount" style="width: 100px;">Unit Price</th>
+                        <th class="amount" style="width: 120px;">Amount</th>
                     </tr>
                 </thead>
                 <tbody>
-                    @foreach($bundle_items as $item)
-                    <tr>
-                        <td>{{ $item->service_description }}</td>
-                        <td class="amount">{{ $item->quantity }}</td>
-                        <td class="amount">₦{{ number_format($item->unit_price, 2) }}</td>
-                        <td class="amount">₦{{ number_format($item->line_total, 2) }}</td>
-                    </tr>
-                    @endforeach
+                    @php
+                        $bundleTotal = 0;
+                        $ffsTotal = 0;
+                    @endphp
+
+                    @if($bundle_items->count() > 0)
+                        @foreach($bundle_items as $item)
+                        <tr>
+                            <td>{{ $item->service_description }}</td>
+                            <td><span style="background: #e3f2fd; color: #1976d2; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: bold;">BUNDLE</span></td>
+                            <td class="amount">{{ $item->quantity }}</td>
+                            <td class="amount">-</td>
+                            <td class="amount">-</td>
+                        </tr>
+                        @endforeach
+                        <tr style="background: #e3f2fd;">
+                            <td  style="text-align: right; font-weight: bold;">Bundle Fixed Price:</td>
+                            <td colspan="3" style="text-align: right; font-weight: bold;">Bundle Fixed Price:</td>
+                            <td class="amount" style="font-weight: bold;">₦{{ number_format($claim->bundle_amount, 2) }}</td>
+                        </tr>
+                        @php $bundleTotal = $claim->bundle_amount; @endphp
+                    @endif
+
+                    @if($ffs_items->count() > 0)
+                        @foreach($ffs_items as $item)
+                        <tr>
+                            <td>{{ $item->service_description }}</td>
+                            <td><span style="background: #fff3e0; color: #f57c00; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: bold;">FFS</span></td>
+                            <td class="amount">{{ $item->quantity }}</td>
+                            <td class="amount">₦{{ number_format($item->unit_price, 2) }}</td>
+                            <td class="amount">₦{{ number_format($item->line_total, 2) }}</td>
+                        </tr>
+                        @php $ffsTotal += $item->line_total; @endphp
+                        @endforeach
+                        @if($ffs_items->count() > 0)
+                        <tr style="background: #fff3e0;">
+                            <td colspan="4" style="text-align: right; font-weight: bold;">FFS Subtotal:</td>
+                            <td class="amount" style="font-weight: bold;">₦{{ number_format($ffsTotal, 2) }}</td>
+                        </tr>
+                        @endif
+                    @endif
                 </tbody>
                 <tfoot>
                     <tr class="total-row">
-                        <td colspan="3">Bundle Amount</td>
-                        <td class="amount">₦{{ number_format($claim->bundle_amount, 2) }}</td>
+                        <td colspan="4" style="text-align: right;">TOTAL CLAIM AMOUNT:</td>
+                        <td class="amount">₦{{ number_format($bundleTotal + $ffsTotal, 2) }}</td>
                     </tr>
                 </tfoot>
             </table>
-        </div>
-        @endif
-
-        @if($ffs_items->count() > 0)
-        <div class="section">
-            <div class="section-title">Fee-For-Service Items</div>
-            <table>
-                <thead>
-                    <tr>
-                        <th>Service Description</th>
-                        <th class="amount">Qty</th>
-                        <th class="amount">Unit Price</th>
-                        <th class="amount">Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach($ffs_items as $item)
-                    <tr>
-                        <td>{{ $item->service_description }}</td>
-                        <td class="amount">{{ $item->quantity }}</td>
-                        <td class="amount">₦{{ number_format($item->unit_price, 2) }}</td>
-                        <td class="amount">₦{{ number_format($item->line_total, 2) }}</td>
-                    </tr>
-                    @endforeach
-                </tbody>
-                <tfoot>
-                    <tr class="total-row">
-                        <td colspan="3">FFS Amount</td>
-                        <td class="amount">₦{{ number_format($claim->ffs_amount, 2) }}</td>
-                    </tr>
-                </tfoot>
-            </table>
-        </div>
-        @endif
-
-        <div class="summary-box">
-            <div>Total Claim Amount</div>
-            <div class="amount">₦{{ number_format($claim->total_amount, 2) }}</div>
         </div>
 
         <div class="footer">

@@ -206,7 +206,7 @@ class CaseController extends Controller
             $caseData['updated_by'] = Auth::id();
          
             // $caseData['nicare_code'] = $caseRecord->nicare_code;
-            $caseData['price'] = $caseRecord->price ?? $caseData['bundle_price'];
+            $caseData['price'] = $caseData['price'] ?? $caseData['bundle_price'] ?? 0;
 
 
 
