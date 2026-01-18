@@ -86,7 +86,7 @@
                         </div>
                         <div class="info-row">
                             <div class="info-label">Enrollee ID:</div>
-                            <div class="info-value">{{ $claim->enrollee?->enrollee_number ?? 'N/A' }}</div>
+                            <div class="info-value">{{ $claim->enrollee?->enrollee_id ?? 'N/A' }}</div>
                         </div>
                         <div class="info-row">
                             <div class="info-label">Phone:</div>
