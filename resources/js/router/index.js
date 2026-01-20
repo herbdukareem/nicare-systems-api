@@ -235,7 +235,7 @@ const routes = [
     component: () => import('../components/pas/DOFacilityAssignmentPage.vue'),
     meta: {
       requiresAuth: true,
-      permissions: ['facilities.assign'],
+      permissions: ['facilities.assign', 'facilities.assign_desk_officer'],
       title: 'DO Facility Assignments',
       description: 'Assign facilities to desk officers',
       breadcrumb: 'DO Facility Assignments'

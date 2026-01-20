@@ -342,7 +342,7 @@ const pasMenu = {
       name: 'DO Facility Assignments',
       path: '/do-facilities',
       icon: 'mdi-hospital-marker',
-      permissions: ['facilities.assign'],
+      permissions: ['facilities.assign', 'facilities.assign_desk_officer'],
       roles: ['admin', 'Super Admin'], // Fallback
     },
     {
