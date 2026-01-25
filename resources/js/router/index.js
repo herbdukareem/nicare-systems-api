@@ -357,7 +357,7 @@ const routes = [
     component: () => import('../components/claims/ClaimsApprovalPage.vue'),
     meta: {
       requiresAuth: true,
-      permissions: ['claims.approve'],
+      permissions: ['claims.approve', 'claims.approver.approve'],
       title: 'Approve Claims',
       description: 'Batch approve submitted claims with shared payment code and comments',
       breadcrumb: 'Approve Claims'

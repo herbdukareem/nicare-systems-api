@@ -74,8 +74,8 @@ class ReferralResource extends JsonResource
                     'description' => $bundle->service_description,
                     'fixed_price' => $bundle->bundle_price ?? $bundle->price,
                     'diagnosis_icd10' => $bundle->diagnosis_icd10,
-                    'components' => $bundle->load('components')
-                        ? $bundle->components->map(function ($component) {
+                    'components' => $bundle->relationLoaded('components') || $bundle->relationLoaded('bundleComponents')
+                        ? ($bundle->components ?? $bundle->bundleComponents)->map(function ($component) {
                             return [
                                 'id' => $component->id,
                                 'case_record_id' => $component->case_record_id,
@@ -110,9 +110,12 @@ class ReferralResource extends JsonResource
                 }
 
                 // Fetch all case records in a single query (prevents N+1)
+                // Also eager load the 'detail' relationship to prevent N+1 in the case_record_name accessor
                 $caseRecordsById = [];
                 if (!empty($allCaseRecordIds)) {
-                    $caseRecords = \App\Models\CaseRecord::whereIn('id', array_unique($allCaseRecordIds))->get();
+                    $caseRecords = \App\Models\CaseRecord::with('detail')
+                        ->whereIn('id', array_unique($allCaseRecordIds))
+                        ->get();
                     $caseRecordsById = $caseRecords->keyBy('id');
                 }
 

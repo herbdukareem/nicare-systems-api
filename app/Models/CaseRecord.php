@@ -366,10 +366,15 @@ class CaseRecord extends Model
     {
         //if drug combine, generic name , strength and dosage form and presentation
         if($this->detail_type == 'App\Models\DrugDetail'){
-            $drug = DrugDetail::where('id', $this->detail_id)->first();
-            return $drug->generic_name . ' (' . $drug->strength . ') (' . $drug->dosage_form . ') (' . $drug->pack_description.')';
+            // Use the polymorphic relationship instead of a direct query to prevent N+1
+            if ($this->relationLoaded('detail') && $this->detail) {
+                $drug = $this->detail;
+                return $drug->generic_name . ' (' . $drug->strength . ') (' . $drug->dosage_form . ') (' . $drug->pack_description.')';
+            }
+            // Fallback if relationship not loaded
+            return $this->case_name ?? $this->service_description;
         }
-        return $this->case_name;
+        return $this->case_name ?? $this->service_description;
     }
 
     // appends

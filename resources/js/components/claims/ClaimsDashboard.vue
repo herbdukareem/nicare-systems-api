@@ -145,7 +145,7 @@ const navigationCards = ref([
     icon: 'mdi-file-check',
     color: 'warning',
     route: '/claims/approval',
-    permissions: ['claims.approve'],
+    permissions: ['claims.approve', 'claims.approver.approve'],
     roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'], // Fallback
   },
   {

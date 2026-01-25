@@ -206,7 +206,13 @@ class ReferralController extends BaseController
             DB::commit();
 
             return $this->sendResponse(
-                new ReferralResource($referral->load(['enrollee', 'referringFacility', 'receivingFacility', 'serviceBundle', 'documents'])),
+                new ReferralResource($referral->load([
+                    'enrollee',
+                    'referringFacility',
+                    'receivingFacility',
+                    'serviceBundle.components.caseRecord',
+                    'documents'
+                ])),
                 'Referral created successfully',
                 201
             );
