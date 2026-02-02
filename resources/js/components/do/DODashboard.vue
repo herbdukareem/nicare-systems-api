@@ -138,7 +138,7 @@
                 Quick Actions
               </v-card-title>
               <v-card-text>
-                <v-row>
+                <v-row v-if="quickActions.length > 0">
                   <v-col cols="12" md="4" v-for="action in quickActions" :key="action.title">
                     <v-card
                       class="action-card"
@@ -155,6 +155,13 @@
                     </v-card>
                   </v-col>
                 </v-row>
+
+                <!-- No Actions Available -->
+                <div v-else class="text-center py-8">
+                  <v-icon size="64" color="grey-lighten-2">mdi-lightning-bolt-outline</v-icon>
+                  <p class="text-h6 text-grey mt-4">No Quick Actions Available</p>
+                  <p class="text-body-2 text-grey">You don't have permissions to access any quick actions</p>
+                </div>
               </v-card-text>
             </v-card>
           </v-col>
@@ -169,9 +176,11 @@ import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { doDashboardAPI } from '../../utils/api';
 import { useToast } from '../../composables/useToast';
+import { useAuthStore } from '../../stores/auth';
 import AdminLayout from '../layout/AdminLayout.vue';
 
 const router = useRouter();
+const authStore = useAuthStore();
 const { success: showSuccess, error: showError } = useToast();
 
 // State
@@ -201,14 +210,15 @@ const facilityHeaders = [
   { title: 'Actions', value: 'actions', key: 'actions', sortable: false },
 ];
 
-// Quick actions
-const quickActions = [
+// Quick actions with permission requirements
+const allQuickActions = [
   {
     title: 'Validate UTN',
     description: 'Validate UTN for approved referrals',
     icon: 'mdi-shield-check',
     color: 'primary',
     route: '/pas/validate-utn',
+    permissions: ['utn.validate'],
   },
   {
     title: 'View Referrals',
@@ -216,6 +226,7 @@ const quickActions = [
     icon: 'mdi-file-document-multiple',
     color: 'info',
     route: '/do/assigned-referrals',
+    permissions: ['referrals.view'],
   },
   {
     title: 'FU-PA Code Management',
@@ -223,29 +234,38 @@ const quickActions = [
     icon: 'mdi-shield-check',
     color: 'success',
     route: '/pas/facility-pa-codes',
+    permissions: ['pa_codes.view', 'pa_codes.request'],
   },
-   {
+  {
     title: 'Admit Patient',
     description: 'View and manage Admissions',
-    icon: 'mdi-hospital',
+    icon: 'mdi-hospital-box',
     color: 'success',
     route: '/facility/admissions',
+    permissions: ['admissions.view', 'admissions.create'],
   },
-   {
-    title: 'Out-Patient Claim submission',
-    description: 'View and manage Out Patient Claim submission',
-    icon: 'mdi-hospital',
-    color: 'error',
-    route: '/facility/admissions',
-  },
-   {
+  {
     title: 'Submit Claim',
     description: 'Submit a new claim for processing',
     icon: 'mdi-file-document-plus',
-    color: 'primary',
+    color: 'warning',
     route: '/facility/claims/submit',
+    permissions: ['claims.create', 'claims.submit'],
   },
 ];
+
+// Filter quick actions based on user permissions
+const quickActions = computed(() => {
+  return allQuickActions.filter(action => {
+    // If no permissions specified, show the action
+    if (!action.permissions || action.permissions.length === 0) {
+      return true;
+    }
+
+    // Check if user has at least one of the required permissions
+    return action.permissions.some(permission => authStore.hasPermission(permission));
+  });
+});
 
 // Fetch overview data
 const fetchOverview = async () => {

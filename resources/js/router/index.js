@@ -658,14 +658,22 @@ router.beforeEach(async (to, _from, next) => {
         if (!availableModules.includes(requiredModule)) {
           // User doesn't have access to this module, redirect to appropriate dashboard
           const userRole = authStore.userRoles[0]?.name;
+          let targetPath = '/dashboard';
+
           if (userRole === 'desk_officer') {
-            next({ path: '/do-dashboard', replace: true });
+            targetPath = '/do-dashboard';
           } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
-            next({ path: '/facility-dashboard', replace: true });
-          } else {
-            next({ path: '/dashboard', replace: true });
+            targetPath = '/facility-dashboard';
           }
-          return;
+
+          // Only redirect if we're not already going to the target dashboard
+          if (to.path !== targetPath) {
+            next({ path: targetPath, replace: true });
+            return;
+          }
+
+          // If we're already on the target dashboard, allow access to prevent infinite loop
+          console.warn(`[Router] User lacks module access for ${to.path}, but allowing access to prevent redirect loop`);
         }
       }
 
@@ -678,15 +686,25 @@ router.beforeEach(async (to, _from, next) => {
 
         if (!hasRequiredPermission) {
           // User doesn't have required permissions, redirect to appropriate dashboard
+          // BUT: Prevent infinite redirect loop by checking if we're already on a dashboard route
           const userRole = authStore.userRoles[0]?.name;
+          let targetPath = '/dashboard';
+
           if (userRole === 'desk_officer') {
-            next({ path: '/do-dashboard', replace: true });
+            targetPath = '/do-dashboard';
           } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
-            next({ path: '/facility-dashboard', replace: true });
-          } else {
-            next({ path: '/dashboard', replace: true });
+            targetPath = '/facility-dashboard';
           }
-          return;
+
+          // Only redirect if we're not already going to the target dashboard
+          if (to.path !== targetPath) {
+            next({ path: targetPath, replace: true });
+            return;
+          }
+
+          // If we're already on the target dashboard but don't have permission,
+          // allow access anyway (this prevents infinite loops for dashboard routes)
+          console.warn(`[Router] User lacks permission for ${to.path}, but allowing access to prevent redirect loop`);
         }
       }
 
@@ -700,14 +718,22 @@ router.beforeEach(async (to, _from, next) => {
         if (!hasRequiredRole) {
           // User doesn't have any of the required roles, redirect to appropriate dashboard
           const userRole = authStore.userRoles[0]?.name;
+          let targetPath = '/dashboard';
+
           if (userRole === 'desk_officer') {
-            next({ path: '/do-dashboard', replace: true });
+            targetPath = '/do-dashboard';
           } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
-            next({ path: '/facility-dashboard', replace: true });
-          } else {
-            next({ path: '/dashboard', replace: true });
+            targetPath = '/facility-dashboard';
           }
-          return;
+
+          // Only redirect if we're not already going to the target dashboard
+          if (to.path !== targetPath) {
+            next({ path: targetPath, replace: true });
+            return;
+          }
+
+          // If we're already on the target dashboard, allow access to prevent infinite loop
+          console.warn(`[Router] User lacks required role for ${to.path}, but allowing access to prevent redirect loop`);
         }
       }
 

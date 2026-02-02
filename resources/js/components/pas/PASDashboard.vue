@@ -170,7 +170,7 @@ const navigationCards = ref([
     icon: 'mdi-file-document-multiple',
     color: 'primary',
     route: '/document-requirements',
-    permissions: ['documents.view', 'documents.manage'],
+    permissions: [ 'documents.manage', 'documents.requirements.manage'],
   },
 ]);
 
