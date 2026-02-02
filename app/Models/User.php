@@ -223,18 +223,36 @@ class User extends Authenticatable
 
     /**
      * Get all permissions for this user (both role-based and direct)
+     * Uses already-loaded relationships if available to prevent N+1 queries
      */
     public function getAllPermissions()
     {
-        // Get permissions from roles
-        $rolePermissions = $this->roles()
-            ->with('permissions')
-            ->get()
-            ->pluck('permissions')
-            ->flatten();
+        // Get permissions from roles - use loaded relationship if available
+        if ($this->relationLoaded('roles')) {
+            // Use already-loaded roles
+            $rolePermissions = $this->roles
+                ->flatMap(function ($role) {
+                    // Check if permissions are loaded on the role
+                    if ($role->relationLoaded('permissions')) {
+                        return $role->permissions;
+                    }
+                    // Fallback: load permissions for this role only
+                    return $role->permissions()->get();
+                })
+                ->unique('id');
+        } else {
+            // Fallback: query database if roles not loaded
+            $rolePermissions = $this->roles()
+                ->with('permissions')
+                ->get()
+                ->pluck('permissions')
+                ->flatten();
+        }
 
-        // Get direct permissions
-        $directPermissions = $this->directPermissions;
+        // Get direct permissions - use loaded relationship if available
+        $directPermissions = $this->relationLoaded('directPermissions')
+            ? $this->directPermissions
+            : $this->directPermissions()->get();
 
         // Merge and remove duplicates
         return $rolePermissions->merge($directPermissions)->unique('id');
@@ -242,9 +260,23 @@ class User extends Authenticatable
 
     /**
      * Get only role-based permissions
+     * Uses already-loaded relationships if available to prevent N+1 queries
      */
     public function getRolePermissions()
     {
+        if ($this->relationLoaded('roles')) {
+            // Use already-loaded roles
+            return $this->roles
+                ->flatMap(function ($role) {
+                    if ($role->relationLoaded('permissions')) {
+                        return $role->permissions;
+                    }
+                    return $role->permissions()->get();
+                })
+                ->unique('id');
+        }
+
+        // Fallback: query database if roles not loaded
         return $this->roles()
             ->with('permissions')
             ->get()

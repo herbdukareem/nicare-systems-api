@@ -20,12 +20,18 @@ class AuthController extends Controller
     {
         try {
             Log::info('Login attempt: ' . $request->username);
+
+            // Enable query logging for debugging (can be disabled in production)
+            if (config('app.debug')) {
+                \DB::enableQueryLog();
+            }
+
             $validator = Validator::make($request->all(), [
                 'username' => 'required',
                 'password' => 'required',
             ]);
 
-           
+
             if ($validator->fails()) {
                 return response()->json([
                     'success' => false,
@@ -34,8 +40,14 @@ class AuthController extends Controller
             }
 
             // Find user by username or email
+            Log::info('Finding user: ' . $request->username);
             $user = User::where('username', $request->username)
                        ->first();
+
+            if (config('app.debug')) {
+                Log::info('User query executed', ['queries' => \DB::getQueryLog()]);
+                \DB::flushQueryLog();
+            }
 
             if (!$user || !Hash::check($request->password, $user->password)) {
                 return response()->json([
@@ -52,18 +64,29 @@ class AuthController extends Controller
             }
 
             // Delete old tokens for this user
+            Log::info('Deleting old tokens for user: ' . $user->id);
             $user->tokens()->delete();
 
             // Create new token
+            Log::info('Creating new token for user: ' . $user->id);
             $token = $user->createToken('api-token', ['*'], now()->addDays(30))->plainTextToken;
 
             // Load user relationships with modules and permissions
+            Log::info('Loading user relationships for user: ' . $user->id);
             $user->load([
                 'roles:id,name,label,description,modules',
                 'roles.permissions:id,name,label',
                 'currentRole:id,name,label,description,modules',
                 'currentRole.permissions:id,name,label',
+                'directPermissions:id,name,label', // Add direct permissions to eager loading
             ]);
+
+            Log::info('Building response data for user: ' . $user->id);
+
+            // Get permissions using the optimized method (now uses loaded relationships)
+            $allPermissions = $user->getAllPermissions();
+
+            Log::info('User login successful: ' . $user->username . ' (ID: ' . $user->id . ')');
 
             return response()->json([
                 'success' => true,
@@ -71,7 +94,7 @@ class AuthController extends Controller
                 'data' => [
                     'user' => $user,
                     'roles' => $user->roles->pluck('name'),
-                    'permissions' => $user->getAllPermissions()->pluck('name'),
+                    'permissions' => $allPermissions->pluck('name'),
                     'current_role' => $user->currentRole,
                     'available_modules' => $user->getAvailableModules(),
                     'token' => $token,
@@ -79,7 +102,8 @@ class AuthController extends Controller
             ]);
 
         } catch (\Exception $e) {
-            Log::error('Login error: ' . $e->getMessage());
+            Log::error('Login error for user ' . ($request->username ?? 'unknown') . ': ' . $e->getMessage());
+            Log::error('Stack trace: ' . $e->getTraceAsString());
 
             return response()->json([
                 'success' => false,
