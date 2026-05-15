@@ -1,6 +1,6 @@
 <template>
   <AdminLayout>
-    <div class="tw-space-y-6">
+    <div class="tw-space-y-4">
 
       <!-- ── Header Banner ──────────────────────────────────────────────────── -->
       <section
@@ -14,18 +14,24 @@
           <div class="tw-absolute tw-top-0 tw-left-1/2 tw-w-48 tw-h-48 tw-rounded-full tw-opacity-50" style="background: radial-gradient(circle, rgba(167,139,250,0.1) 0%, transparent 70%);" />
         </div>
 
-        <div class="tw-relative tw-px-6 md:tw-px-8 tw-pt-6 tw-pb-6">
-          <!-- Top row: badge + refresh -->
-          <div class="tw-flex tw-items-center tw-justify-between tw-mb-5">
-            <div class="tw-flex tw-items-center tw-gap-2.5 tw-bg-white/10 tw-backdrop-blur-sm tw-rounded-full tw-px-4 tw-py-1.5 tw-border tw-border-white/10">
-              <div class="tw-w-1.5 tw-h-1.5 tw-rounded-full tw-bg-emerald-400 tw-animate-pulse" />
-              <span class="tw-text-xs tw-font-bold tw-text-white/80 tw-uppercase tw-tracking-[0.15em]">NiCARE · Live Dashboard</span>
+        <div class="tw-relative tw-px-5 tw-pt-4 tw-pb-4">
+          <!-- Top row: title + refresh -->
+          <div class="tw-flex tw-items-center tw-justify-between tw-mb-3">
+            <div>
+              <h1 class="tw-text-xl sm:tw-text-2xl tw-font-black tw-text-white tw-tracking-tight tw-leading-none">
+                Programme Intelligence
+              </h1>
+              <p class="tw-text-white/50 tw-text-xs tw-mt-1 tw-flex tw-items-center tw-gap-1 tw-flex-wrap">
+                Coverage, equity and provider readiness overview
+                <span class="tw-text-white/30 tw-mx-1">·</span>
+                <span class="tw-text-white/80 tw-font-semibold">{{ currentMonth }}</span>
+              </p>
             </div>
             <v-btn
               color="white"
               variant="tonal"
               :loading="loading"
-              size="small"
+              size="x-small"
               prepend-icon="mdi-refresh"
               class="tw-shrink-0"
               @click="loadDashboard"
@@ -34,29 +40,16 @@
             </v-btn>
           </div>
 
-          <!-- Title block -->
-          <div class="tw-mb-6">
-            <h1 class="tw-text-3xl sm:tw-text-4xl tw-font-black tw-text-white tw-tracking-tight tw-leading-none">
-              Programme Intelligence
-            </h1>
-            <p class="tw-text-white/50 tw-text-sm tw-mt-2 tw-flex tw-items-center tw-gap-1.5 tw-flex-wrap">
-              <v-icon size="12" color="rgba(255,255,255,0.4)">mdi-calendar-month-outline</v-icon>
-              Coverage, equity and provider readiness overview
-              <span class="tw-text-white/30 tw-mx-1">·</span>
-              <span class="tw-text-white/80 tw-font-semibold">{{ currentMonth }}</span>
-            </p>
-          </div>
-
-          <!-- Quick-stat pills (4 key metrics right in the header) -->
-          <div class="tw-grid tw-grid-cols-2 sm:tw-grid-cols-4 tw-gap-2.5">
+          <!-- Quick-stat pills -->
+          <div class="tw-grid tw-grid-cols-2 sm:tw-grid-cols-4 tw-gap-2">
             <div
               v-for="pill in headerPills"
               :key="pill.label"
-              class="tw-bg-white/10 tw-backdrop-blur-sm tw-border tw-border-white/10 tw-rounded-xl tw-px-4 tw-py-3 tw-flex tw-flex-col tw-gap-0.5"
+              class="tw-bg-white/10 tw-backdrop-blur-sm tw-border tw-border-white/10 tw-px-3 tw-py-2 tw-flex tw-flex-col tw-gap-0.5"
             >
-              <p class="tw-text-[10px] tw-text-white/50 tw-font-semibold tw-uppercase tw-tracking-widest">{{ pill.label }}</p>
-              <p class="tw-text-xl sm:tw-text-2xl tw-font-black tw-text-white tw-leading-none">{{ pill.value }}</p>
-              <p v-if="pill.sub" class="tw-text-[10px] tw-text-white/40">{{ pill.sub }}</p>
+              <p class="tw-text-[9px] tw-text-white/50 tw-font-semibold tw-uppercase tw-tracking-widest">{{ pill.label }}</p>
+              <p class="tw-text-base sm:tw-text-lg tw-font-black tw-text-white tw-leading-none">{{ pill.value }}</p>
+              <p v-if="pill.sub" class="tw-text-[9px] tw-text-white/40">{{ pill.sub }}</p>
             </div>
           </div>
         </div>
@@ -64,7 +57,7 @@
 
       <!-- ── Loading State ───────────────────────────────────────────────────── -->
       <div v-if="loading" class="tw-grid tw-grid-cols-2 xl:tw-grid-cols-6 tw-gap-4">
-        <div v-for="i in 6" :key="i" class="tw-h-28 tw-bg-white tw-rounded-xl tw-border tw-border-gray-100 tw-animate-pulse" />
+        <div v-for="i in 6" :key="i" class="tw-h-20 tw-bg-white tw-border tw-border-gray-100 tw-animate-pulse" />
       </div>
 
       <template v-else>
@@ -87,7 +80,7 @@
           <div
             v-for="meter in performanceMeters"
             :key="meter.label"
-            class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-p-5 tw-flex tw-items-center tw-gap-5"
+            class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-p-5 tw-flex tw-items-center tw-gap-5"
           >
             <!-- Ring gauge -->
             <div class="tw-relative tw-w-20 tw-h-20 tw-shrink-0">
@@ -123,7 +116,7 @@
         <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-3 tw-gap-6">
 
           <!-- Progress rows -->
-          <div class="xl:tw-col-span-2 tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="xl:tw-col-span-2 tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
               <div>
                 <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Coverage Breakdown</h2>
@@ -143,7 +136,7 @@
           </div>
 
           <!-- Approval Pipeline -->
-          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
               <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Approval Pipeline</h2>
               <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Enrollee status distribution for operational follow-up</p>
@@ -194,7 +187,7 @@
         <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-3 tw-gap-6">
 
           <!-- Enrollment Trend -->
-          <div class="xl:tw-col-span-2 tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="xl:tw-col-span-2 tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between tw-gap-3 tw-flex-wrap">
               <div>
                 <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Enrollment Trend</h2>
@@ -245,7 +238,7 @@
           </div>
 
           <!-- Programme Mix -->
-          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
               <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Programme Mix</h2>
               <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Enrollee distribution across insurance programmes</p>
@@ -272,7 +265,7 @@
         <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-2 tw-gap-6">
 
           <!-- Geographic Reach -->
-          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between tw-gap-3 tw-flex-wrap">
               <div>
                 <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Geographic Reach</h2>
@@ -312,7 +305,7 @@
                 <div
                   v-for="(item, i) in (geography.top_lgas || []).slice(0, 8)"
                   :key="item.lga"
-                  class="tw-flex tw-items-center tw-gap-3 tw-cursor-pointer tw-rounded-xl tw-p-2 tw--mx-2 hover:tw-bg-teal-50 tw-transition-colors tw-group"
+                  class="tw-flex tw-items-center tw-gap-3 tw-cursor-pointer tw-p-2 tw--mx-2 hover:tw-bg-teal-50 tw-transition-colors tw-group"
                   @click="drillToLga(item)"
                 >
                   <span class="tw-text-xs tw-font-bold tw-text-gray-400 tw-w-4 tw-text-right tw-shrink-0">{{ i + 1 }}</span>
@@ -361,7 +354,7 @@
           </div>
 
           <!-- Provider Load -->
-          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
               <div>
                 <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Provider Load</h2>
@@ -416,7 +409,7 @@
         <section class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 xl:tw-grid-cols-3 tw-gap-6">
 
           <!-- Funding Sources -->
-          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
               <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Funding Sources</h2>
               <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Government and donor accountability structure</p>
@@ -435,7 +428,7 @@
           </div>
 
           <!-- Vulnerable Groups -->
-          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
               <div>
                 <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Vulnerable Groups</h2>
@@ -459,7 +452,7 @@
           </div>
 
           <!-- PIN & Invoice Signals -->
-          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
               <h2 class="tw-text-base tw-font-bold tw-text-gray-900">PIN & Invoice Signals</h2>
               <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Premium voucher movement and payment tracking</p>
@@ -496,7 +489,7 @@
         <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-3 tw-gap-6">
 
           <!-- Benefactor Participation -->
-          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
               <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Benefactor Participation</h2>
               <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Sponsored vs self-funded distribution</p>
@@ -515,7 +508,7 @@
           </div>
 
           <!-- Recent Approvals -->
-          <div class="xl:tw-col-span-2 tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="xl:tw-col-span-2 tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
               <div>
                 <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Recent Approvals</h2>
@@ -585,12 +578,12 @@ const pipeline        = computed(() => overview.value.pipeline || {})
 const totalEnrollees  = computed(() => Number(executiveCards.value[0]?.value || 0))
 const vulnerableCovered = computed(() => Number(executiveCards.value[3]?.value || 0))
 
-// ── Header pills ────────────────────────────────────────────────────────────
+// ── Header pills (performance rates — not duplicating the count KPI cards) ──
 const headerPills = computed(() => [
-  { label: 'Total Enrollees',  value: formatValue(executiveCards.value[0]?.value), sub: 'captured lives' },
-  { label: 'Active Coverage',  value: formatValue(executiveCards.value[1]?.value), sub: `${performance.value.coverage_rate || 0}% of enrolled` },
-  { label: 'Coverage Rate',    value: (performance.value.coverage_rate || 0) + '%', sub: 'eligibility rate' },
-  { label: 'Pending Approval', value: formatValue(executiveCards.value[2]?.value), sub: 'awaiting review' },
+  { label: 'Coverage Rate',      value: (performance.value.coverage_rate          || 0) + '%', sub: 'of enrolled lives active' },
+  { label: 'Approval Rate',      value: (performance.value.approval_rate          || 0) + '%', sub: 'processed for coverage' },
+  { label: 'Geographic Reach',   value: (performance.value.geographic_reach_rate  || 0) + '%', sub: 'of LGAs have enrollees' },
+  { label: 'Facility Active',    value: (performance.value.active_facility_rate   || 0) + '%', sub: 'of providers accredited' },
 ])
 
 // ── Chart colours ───────────────────────────────────────────────────────────
@@ -815,16 +808,16 @@ const KpiCard = defineComponent({
     return () => {
       const t = toneMap[props.tone] ?? toneMap.primary
       return h('div', {
-        class: `tw-bg-white tw-border ${t.border} tw-rounded-2xl tw-p-5 tw-shadow-sm hover:tw-shadow-md tw-transition-all tw-duration-200`,
+        class: `tw-bg-white tw-border ${t.border} tw-p-3.5 tw-shadow-sm hover:tw-shadow-md tw-transition-all tw-duration-200`,
       }, [
-        h('div', { class: 'tw-flex tw-items-center tw-justify-between tw-gap-2 tw-mb-3' }, [
-          h('p', { class: 'tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500' }, props.label),
-          h('div', { class: `tw-w-8 tw-h-8 tw-rounded-lg ${t.bg} tw-flex tw-items-center tw-justify-center` }, [
-            h(VIcon, { size: 18, class: t.text }, { default: () => props.icon }),
+        h('div', { class: 'tw-flex tw-items-center tw-justify-between tw-gap-2 tw-mb-2' }, [
+          h('p', { class: 'tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500' }, props.label),
+          h('div', { class: `tw-w-6 tw-h-6 tw-rounded-md ${t.bg} tw-flex tw-items-center tw-justify-center` }, [
+            h(VIcon, { size: 14, class: t.text }, { default: () => props.icon }),
           ]),
         ]),
-        h('p', { class: 'tw-text-2xl tw-font-extrabold tw-text-gray-950 tw-leading-tight' }, props.value),
-        h('p', { class: 'tw-text-xs tw-text-gray-400 tw-mt-2 tw-leading-snug' }, props.helper),
+        h('p', { class: 'tw-text-xl tw-font-extrabold tw-text-gray-950 tw-leading-tight' }, props.value),
+        h('p', { class: 'tw-text-[10px] tw-text-gray-400 tw-mt-1 tw-leading-snug' }, props.helper),
       ])
     }
   },
@@ -897,7 +890,7 @@ const FinancialTile = defineComponent({
       indigo: 'tw-bg-indigo-50 tw-border-indigo-100 tw-text-indigo-700',
     }
     return () => h('div', {
-      class: `tw-rounded-xl tw-border tw-p-3 ${colorMap[props.color] ?? colorMap.blue}`,
+      class: `tw-border tw-p-3 ${colorMap[props.color] ?? colorMap.blue}`,
     }, [
       h('div', { class: 'tw-flex tw-items-center tw-gap-2 tw-mb-1' }, [
         h(VIcon, { size: 14, class: 'tw-opacity-70' }, { default: () => props.icon }),
