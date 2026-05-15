@@ -45,7 +45,7 @@ return new class extends Migration
             $table->string('contact_person_phone')->nullable();
             $table->string('contact_person_email')->nullable();
             
-            $table->timestamp('request_date');
+            $table->dateTime('request_date');
             $table->timestamp('approval_date')->nullable();
 
             $table->string('passport_path')->nullable();

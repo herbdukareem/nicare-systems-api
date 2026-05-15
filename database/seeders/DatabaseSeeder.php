@@ -12,9 +12,8 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // Call the AdminUserSeeder to create the super admin user
-        $this->call(AdminUserSeeder::class);
         $this->call(RolesAndPermissionsSeeder::class);
+        $this->call(AdminUserSeeder::class);
         $this->call(FacilitySeeder::class);
         $this->call(CaseTypeSeeder::class);
 
@@ -23,6 +22,7 @@ class DatabaseSeeder extends Seeder
 
         // Document requirements for referral and PA code requests
         $this->call(DocumentRequirementSeeder::class);
+        $this->call(InsuranceProgrammeSeeder::class);
 
         // --class=CaseRecordsWithDetailsSeeder
         $this->call(CaseRecordsWithDetailsSeeder::class);

@@ -21,6 +21,8 @@ class WardResource extends JsonResource
             'settlement_type' => $this->settlement_type,
             'status' => $this->status,
             'lga' => new LgaResource($this->whenLoaded('lga')),
+            'facilities_count' => $this->whenCounted('facilities'),
+            'enrollees_count' => $this->whenCounted('enrollees'),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

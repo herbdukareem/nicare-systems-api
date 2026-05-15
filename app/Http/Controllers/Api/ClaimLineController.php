@@ -25,6 +25,14 @@ class ClaimLineController extends Controller
     public function addBundleTreatment(Request $request, Claim $claim): JsonResponse
     {
         try {
+            // Claim immutability: line items cannot be added once the claim is submitted
+            if ($claim->isImmutable()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Claim line items cannot be modified once the claim status is '{$claim->status}'. Only DRAFT claims can be edited.",
+                ], 403);
+            }
+
             $validated = $request->validate([
                 'pa_code_id' => 'required|integer|exists:pa_codes,id',
                 'service_description' => 'required|string',
@@ -57,6 +65,14 @@ class ClaimLineController extends Controller
     public function addFFSTreatment(Request $request, Claim $claim): JsonResponse
     {
         try {
+            // Claim immutability: line items cannot be added once the claim is submitted
+            if ($claim->isImmutable()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Claim line items cannot be modified once the claim status is '{$claim->status}'. Only DRAFT claims can be edited.",
+                ], 403);
+            }
+
             $validated = $request->validate([
                 'pa_code_id' => 'required|integer|exists:pa_codes,id',
                 'service_description' => 'required|string',
@@ -102,6 +118,14 @@ class ClaimLineController extends Controller
     public function destroy(ClaimLine $claimLine): JsonResponse
     {
         try {
+            // Claim immutability: line items cannot be removed once the claim is submitted
+            if ($claimLine->claim && $claimLine->claim->isImmutable()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Claim line items cannot be deleted once the claim status is '{$claimLine->claim->status}'. Only DRAFT claims can be edited.",
+                ], 403);
+            }
+
             $claimLine->delete();
 
             return response()->json([

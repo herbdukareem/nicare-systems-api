@@ -304,15 +304,16 @@ class UserController extends BaseController
     }
 
     /**
-     * Get available modules for current user
+     * Backward-compatible endpoint: returns permission categories.
      */
     public function getAvailableModules(Request $request)
     {
         $user = $request->user();
-        $modules = $user->getAvailableModules();
+        $categories = $user->getAvailableModules();
 
         return $this->sendResponse([
-            'modules' => $modules,
+            'modules' => $categories,
+            'permission_categories' => $categories,
             'current_role' => $user->currentRole ? [
                 'id' => $user->currentRole->id,
                 'name' => $user->currentRole->name,

@@ -52,6 +52,13 @@ class PrimaryEncounter extends Model
             if (empty($model->encounter_code)) {
                 $model->encounter_code = 'ENC' . date('Ymd') . strtoupper(Str::random(6));
             }
+
+            app(\App\Services\EligibilityService::class)
+                ->assertFacilityMatchesCoverage(
+                    $model->enrollee_id,
+                    (int) $model->facility_id,
+                    $model->encounter_date ?? now()
+                );
         });
     }
 

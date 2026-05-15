@@ -2,181 +2,104 @@
 
 namespace App\Http\Controllers\Api\V1;
 
-use App\Http\Controllers\Controller;
-use App\Services\BenefitPackageService;
+use App\Http\Resources\BenefitPackageResource;
+use App\Models\BenefitPackage;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Rule;
 
 class BenefitPackageController extends BaseController
 {
-    protected BenefitPackageService $benefitPackageService;
-
-    public function __construct(BenefitPackageService $benefitPackageService)
-    {
-        $this->benefitPackageService = $benefitPackageService;
-    }
-
-    /**
-     * Display a listing of benefit packages
-     */
     public function index(Request $request): JsonResponse
     {
-        try {
-            $filters = $request->only([
-                'search', 'status', 'sort_by', 'sort_direction', 'per_page', 'page'
-            ]);
+        $query = BenefitPackage::query()->withCount(['premiumPlans', 'enrollees']);
 
-            $benefitPackages = $this->benefitPackageService->getAll($filters);
-
-            return $this->successResponse($benefitPackages, 'Benefit packages retrieved successfully');
-        } catch (\Exception $e) {
-            return $this->errorResponse('Failed to retrieve benefit packages', 500);
+        if ($request->filled('search')) {
+            $search = $request->string('search');
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%")
+                    ->orWhere('description', 'like', "%{$search}%");
+            });
         }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->integer('status'));
+        }
+
+        $packages = $query
+            ->orderBy($request->get('sort_by', 'name'), $request->get('sort_direction', 'asc'))
+            ->paginate((int) $request->get('per_page', 25));
+
+        $response = BenefitPackageResource::collection($packages);
+        $response->additional(['meta' => [
+            'total' => $packages->total(),
+            'per_page' => $packages->perPage(),
+            'current_page' => $packages->currentPage(),
+            'last_page' => $packages->lastPage(),
+        ]]);
+
+        return $this->sendResponse($response, 'Benefit packages retrieved successfully');
     }
 
-    /**
-     * Get all benefit packages without pagination
-     */
     public function all(): JsonResponse
     {
-        try {
-            $benefitPackages = $this->benefitPackageService->getAllWithoutPagination();
-            return $this->successResponse($benefitPackages, 'Benefit packages retrieved successfully');
-        } catch (\Exception $e) {
-            return $this->errorResponse('Failed to retrieve benefit packages', 500);
-        }
+        return $this->sendResponse(BenefitPackageResource::collection(BenefitPackage::active()->orderBy('name')->get()), 'Benefit packages retrieved successfully');
     }
 
-    /**
-     * Store a newly created benefit package
-     */
     public function store(Request $request): JsonResponse
     {
-        try {
-            $validatedData = $request->validate([
-                'name' => 'required|string|max:255',
-                'code' => 'required|string|max:50|unique:benefit_packages,code',
-                'description' => 'nullable|string',
-                'status' => 'boolean'
-            ]);
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'code' => ['required', 'string', 'max:50', 'unique:benefit_packages,code'],
+            'description' => ['nullable', 'string'],
+            'status' => ['nullable', 'integer', 'in:0,1'],
+        ]);
 
-            $benefitPackage = $this->benefitPackageService->create($validatedData);
+        $data['status'] = $data['status'] ?? 1;
+        $package = BenefitPackage::create($data);
 
-            return $this->successResponse($benefitPackage, 'Benefit package created successfully', 201);
-        } catch (ValidationException $e) {
-            return $this->validationErrorResponse($e->errors());
-        } catch (\Exception $e) {
-            return $this->errorResponse('Failed to create benefit package', 500);
-        }
+        return $this->sendResponse(new BenefitPackageResource($package), 'Benefit package created successfully', 201);
     }
 
-    /**
-     * Display the specified benefit package
-     */
-    public function show(int $id): JsonResponse
+    public function show(BenefitPackage $benefitPackage): JsonResponse
     {
-        try {
-            $benefitPackage = $this->benefitPackageService->getWithEnrolleesCount($id);
-
-            if (!$benefitPackage) {
-                return $this->errorResponse('Benefit package not found', 404);
-            }
-
-            return $this->successResponse($benefitPackage, 'Benefit package retrieved successfully');
-        } catch (\Exception $e) {
-            return $this->errorResponse('Failed to retrieve benefit package', 500);
-        }
+        return $this->sendResponse(new BenefitPackageResource($benefitPackage->loadCount(['premiumPlans', 'enrollees'])), 'Benefit package retrieved successfully');
     }
 
-    /**
-     * Update the specified benefit package
-     */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(Request $request, BenefitPackage $benefitPackage): JsonResponse
     {
-        try {
-            $validatedData = $request->validate([
-                'name' => 'sometimes|required|string|max:255',
-                'code' => 'sometimes|required|string|max:50|unique:benefit_packages,code,' . $id,
-                'description' => 'nullable|string',
-                'status' => 'boolean'
-            ]);
+        $data = $request->validate([
+            'name' => ['sometimes', 'required', 'string', 'max:255'],
+            'code' => ['sometimes', 'required', 'string', 'max:50', Rule::unique('benefit_packages', 'code')->ignore($benefitPackage)],
+            'description' => ['nullable', 'string'],
+            'status' => ['nullable', 'integer', 'in:0,1'],
+        ]);
 
-            $updated = $this->benefitPackageService->update($id, $validatedData);
+        $benefitPackage->update($data);
 
-            if (!$updated) {
-                return $this->errorResponse('Benefit package not found', 404);
-            }
-
-            $benefitPackage = $this->benefitPackageService->findById($id);
-            return $this->successResponse($benefitPackage, 'Benefit package updated successfully');
-        } catch (ValidationException $e) {
-            return $this->validationErrorResponse($e->errors());
-        } catch (\Exception $e) {
-            return $this->errorResponse('Failed to update benefit package', 500);
-        }
+        return $this->sendResponse(new BenefitPackageResource($benefitPackage->fresh()), 'Benefit package updated successfully');
     }
 
-    /**
-     * Remove the specified benefit package
-     */
-    public function destroy(int $id): JsonResponse
+    public function destroy(BenefitPackage $benefitPackage): JsonResponse
     {
-        try {
-            $deleted = $this->benefitPackageService->delete($id);
-
-            if (!$deleted) {
-                return $this->errorResponse('Benefit package not found', 404);
-            }
-
-            return $this->successResponse(null, 'Benefit package deleted successfully');
-        } catch (\Exception $e) {
-            return $this->errorResponse('Failed to delete benefit package', 500);
+        if ($benefitPackage->premiumPlans()->exists() || $benefitPackage->enrollees()->exists()) {
+            $benefitPackage->update(['status' => 0]);
+            return $this->sendResponse(new BenefitPackageResource($benefitPackage), 'Benefit package is in use and was deactivated instead.');
         }
+
+        $benefitPackage->delete();
+        return $this->sendResponse([], 'Benefit package deleted successfully');
     }
 
-    /**
-     * Toggle benefit package status
-     */
-    public function toggleStatus(int $id): JsonResponse
-    {
-        try {
-            $toggled = $this->benefitPackageService->toggleStatus($id);
-
-            if (!$toggled) {
-                return $this->errorResponse('Benefit package not found', 404);
-            }
-
-            $benefitPackage = $this->benefitPackageService->findById($id);
-            return $this->successResponse($benefitPackage, 'Benefit package status updated successfully');
-        } catch (\Exception $e) {
-            return $this->errorResponse('Failed to update benefit package status', 500);
-        }
-    }
-
-    /**
-     * Get benefit packages for dropdown
-     */
     public function dropdown(): JsonResponse
     {
-        try {
-            $benefitPackages = $this->benefitPackageService->getActiveForDropdown();
-            return $this->successResponse($benefitPackages, 'Benefit packages for dropdown retrieved successfully');
-        } catch (\Exception $e) {
-            return $this->errorResponse('Failed to retrieve benefit packages for dropdown', 500);
-        }
+        return $this->all();
     }
 
-    /**
-     * Get benefit packages statistics
-     */
-    public function statistics(): JsonResponse
+    public function toggleStatus(BenefitPackage $benefitPackage): JsonResponse
     {
-        try {
-            $statistics = $this->benefitPackageService->getStatistics();
-            return $this->successResponse($statistics, 'Benefit packages statistics retrieved successfully');
-        } catch (\Exception $e) {
-            return $this->errorResponse('Failed to retrieve benefit packages statistics', 500);
-        }
+        $benefitPackage->update(['status' => (int) ! (bool) $benefitPackage->status]);
+        return $this->sendResponse(new BenefitPackageResource($benefitPackage), 'Benefit package status updated successfully');
     }
 }

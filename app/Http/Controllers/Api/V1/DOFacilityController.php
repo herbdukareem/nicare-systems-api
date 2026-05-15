@@ -82,13 +82,16 @@ class DOFacilityController extends Controller
                 'facility_id' => 'required|exists:facilities,id',
             ]);
 
-            // Check if user has permission to be assigned to facilities
-            $user = User::with('roles')->find($validated['user_id']);
-            if (!$user->hasPermission('facilities.view')) {
+            // Check if user has permission to work with facilities
+            $assignee = User::with('roles')->find($validated['user_id']);
+            $hasFacilityAccess = $assignee->hasPermission('facilities.view')
+                || $assignee->hasPermission('dashboard.desk_officer.view')
+                || $assignee->hasPermission('dashboard.facility.view');
+            if (!$hasFacilityAccess) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User must have facility permissions to be assigned to facilities',
-                    'errors' => ['user_id' => ['Selected user does not have required permissions']]
+                    'message' => 'Selected user does not have the required facility permissions.',
+                    'errors' => ['user_id' => ['User lacks facility access permissions']]
                 ], 422);
             }
 
@@ -168,13 +171,16 @@ class DOFacilityController extends Controller
                 'facility_id' => 'required|exists:facilities,id',
             ]);
 
-            // Check if user has permission to be assigned to facilities
-            $user = User::with('roles')->find($validated['user_id']);
-            if (!$user->hasPermission('facilities.view')) {
+            // Check if user has permission to work with facilities
+            $assignee = User::with('roles')->find($validated['user_id']);
+            $hasFacilityAccess = $assignee->hasPermission('facilities.view')
+                || $assignee->hasPermission('dashboard.desk_officer.view')
+                || $assignee->hasPermission('dashboard.facility.view');
+            if (!$hasFacilityAccess) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'User must have facility permissions to be assigned to facilities',
-                    'errors' => ['user_id' => ['Selected user does not have required permissions']]
+                    'message' => 'Selected user does not have the required facility permissions.',
+                    'errors' => ['user_id' => ['User lacks facility access permissions']]
                 ], 422);
             }
 

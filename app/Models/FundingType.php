@@ -26,4 +26,9 @@ class FundingType extends Model
     {
         return $this->hasMany(Enrollee::class);
     }
+
+    public function payrollBatches()
+    {
+        return $this->hasMany(PayrollBatch::class);
+    }
 }

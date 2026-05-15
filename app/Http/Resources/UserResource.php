@@ -27,8 +27,13 @@ class UserResource extends JsonResource
             'userable' => $this->whenLoaded('userable'),
             'roles' => RoleResource::collection($this->whenLoaded('roles')),
             'current_role' => new RoleResource($this->whenLoaded('currentRole')),
-            'available_modules' => $this->when($this->relationLoaded('currentRole') || $this->relationLoaded('roles'), function() {
-                return $this->getAvailableModules();
+            'permission_categories' => $this->when($this->relationLoaded('roles'), function () {
+                return $this->roles
+                    ->flatMap(fn ($role) => $role->permissions ?? collect())
+                    ->pluck('category')
+                    ->filter()
+                    ->unique()
+                    ->values();
             }),
             'permissions' => PermissionResource::collection($this->whenLoaded('permissions')),
             'direct_permissions' => PermissionResource::collection($this->whenLoaded('directPermissions')),

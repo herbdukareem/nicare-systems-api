@@ -45,6 +45,10 @@ class BenefactorService
             $query->where('phone', 'like', "%{$filters['phone']}%");
         }
 
+        if (!empty($filters['type'])) {
+            $query->where('type', $filters['type']);
+        }
+
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }

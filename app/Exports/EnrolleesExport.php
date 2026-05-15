@@ -89,7 +89,7 @@ class EnrolleesExport implements FromCollection, WithHeadings, WithMapping, Shou
             $enrollee->lga ? $enrollee->lga->name : '',
             $enrollee->ward ? $enrollee->ward->name : '',
             $enrollee->village,
-            $enrollee->premium_id,
+            $enrollee->premium_plan_id,
             $enrollee->employment_detail_id,
             $enrollee->fundingType ? $enrollee->fundingType->name : '',
             $enrollee->benefactor ? $enrollee->benefactor->name : '',

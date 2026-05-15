@@ -18,10 +18,22 @@ class StoreBenefactorRequest extends FormRequest
     {
         return [
             'name'    => 'required|string|max:255',
+            'type' => 'nullable|in:individual,principal_enrollee,employer,government,donor,institution,association,ngo,group,philanthropist',
+            'registration_number' => 'nullable|string|max:120',
+            'contact_person' => 'nullable|string|max:255',
             'email'   => 'nullable|email|max:255',
             'phone'   => 'nullable|string|max:255',
             'address' => 'nullable|string',
-            'status'  => 'nullable|in:active,inactive',
+            'status'  => 'nullable|integer|in:0,1',
+            'created_by' => 'nullable|exists:users,id',
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $this->merge([
+            'status' => $this->input('status', 1),
+            'created_by' => $this->input('created_by', auth()->id()),
+        ]);
     }
 }

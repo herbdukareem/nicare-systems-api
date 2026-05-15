@@ -21,8 +21,8 @@ class UpdateWardRequest extends FormRequest
             'lga_id'          => 'sometimes|exists:lgas,id',
             'enrollment_cap'  => 'nullable|integer',
             'total_enrolled'  => 'nullable|integer',
-            'settlement_type' => 'nullable|in:Urban,Rural',
-            'status'          => 'nullable|in:active,inactive',
+            'settlement_type' => 'nullable|integer|in:0,1,2',
+            'status'          => 'nullable|integer|in:0,1',
         ];
     }
 }

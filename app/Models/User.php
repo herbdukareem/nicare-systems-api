@@ -90,14 +90,23 @@ class User extends Authenticatable
     }
 
     /**
-     * Get the modules available to the user based on current role.
+     * Backward-compatible category access derived from permissions.
      *
      * @return array
      */
     public function getAvailableModules(): array
     {
         $role = $this->currentRole ?? $this->roles()->first();
-        return $role ? ($role->modules ?? []) : [];
+        if (!$role) {
+            return [];
+        }
+
+        return $role->permissions()
+            ->pluck('category')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
     /**

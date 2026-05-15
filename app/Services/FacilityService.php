@@ -28,6 +28,7 @@ class FacilityService
             $search = $filters['search'];
             $query->where(function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('hcp_code', 'like', "%{$search}%")
                   ->orWhere('address', 'like', "%{$search}%")
                   ->orWhere('phone', 'like', "%{$search}%");
             });
@@ -41,8 +42,12 @@ class FacilityService
             $query->where('type', $filters['type']);
         }
 
+        if (!empty($filters['ownership'])) {
+            $query->where('ownership', $filters['ownership']);
+        }
+
         if (!empty($filters['category'])) {
-            $query->where('category', $filters['category']);
+            $query->where('ownership', $filters['category']);
         }
 
         if (!empty($filters['lga_id'])) {
@@ -51,6 +56,14 @@ class FacilityService
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
+        }
+
+        if (!empty($filters['ward_id'])) {
+            $query->where('ward_id', $filters['ward_id']);
+        }
+
+        if (!empty($filters['accreditation_status'])) {
+            $query->where('accreditation_status', $filters['accreditation_status']);
         }
 
         if (!empty($filters['level_of_care'])) {

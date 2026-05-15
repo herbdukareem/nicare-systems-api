@@ -71,14 +71,14 @@ class AuthController extends Controller
             Log::info('Creating new token for user: ' . $user->id);
             $token = $user->createToken('api-token', ['*'], now()->addDays(30))->plainTextToken;
 
-            // Load user relationships with modules and permissions
+            // Load user relationships with permission categories.
             Log::info('Loading user relationships for user: ' . $user->id);
             $user->load([
-                'roles:id,name,label,description,modules',
-                'roles.permissions:id,name,label',
-                'currentRole:id,name,label,description,modules',
-                'currentRole.permissions:id,name,label',
-                'directPermissions:id,name,label', // Add direct permissions to eager loading
+                'roles:id,name,label,description',
+                'roles.permissions:id,name,label,category',
+                'currentRole:id,name,label,description',
+                'currentRole.permissions:id,name,label,category',
+                'directPermissions:id,name,label,category',
             ]);
 
             Log::info('Building response data for user: ' . $user->id);
@@ -96,7 +96,7 @@ class AuthController extends Controller
                     'roles' => $user->roles->pluck('name'),
                     'permissions' => $allPermissions->pluck('name'),
                     'current_role' => $user->currentRole,
-                    'available_modules' => $user->getAvailableModules(),
+                    'permission_categories' => $allPermissions->pluck('category')->filter()->unique()->values(),
                     'token' => $token,
                 ],
             ]);
@@ -250,14 +250,17 @@ class AuthController extends Controller
  public function user(Request $request): \Illuminate\Http\JsonResponse
 {
     $user = $request->user()->load([
-        'roles:id,name,label,description,modules', // Include modules column
-        'roles.permissions:id,name,label', // load perms through roles
-        'currentRole:id,name,label,description,modules', // Load current role with modules
+        'roles:id,name,label,description',
+        'roles.permissions:id,name,label,category',
+        'currentRole:id,name,label,description',
+        'currentRole.permissions:id,name,label,category',
+        'directPermissions:id,name,label,category',
     ]);
 
     // build a flat unique collection of permissions
     $computedPermissions = $user->roles
         ->flatMap(fn ($role) => $role->permissions) // collect all perms
+        ->merge($user->directPermissions)
         ->unique('id')
         ->values();
 

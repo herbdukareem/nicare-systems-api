@@ -10,6 +10,8 @@ use App\Models\DocumentRequirement;
 use App\Models\ReferralDocument;
 use App\Models\Referral;
 use App\Models\CaseRecord;
+use App\Models\Enrollee;
+use App\Services\EligibilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
@@ -116,6 +118,15 @@ class ReferralController extends BaseController
                     ]],
                     422
                 );
+            }
+
+            try {
+                app(EligibilityService::class)->assertFacilityMatchesCoverage(
+                    Enrollee::findOrFail($enrolleeId),
+                    (int) $request->input('referring_facility_id')
+                );
+            } catch (\Throwable $e) {
+                return $this->sendError($e->getMessage(), [], 422);
             }
         }
 

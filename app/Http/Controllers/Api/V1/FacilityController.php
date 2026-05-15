@@ -24,13 +24,14 @@ class FacilityController extends BaseController
 
     public function index(Request $request)
     {
-        $filters = $request->only(['name', 'type', 'category', 'lga_id', 'status', 'search', 'level_of_care']);
+        $filters = $request->only(['name', 'type', 'ownership', 'category', 'lga_id', 'ward_id', 'status', 'search', 'level_of_care', 'accreditation_status']);
       
         $perPage = (int) $request->get('per_page', 500);
         $sortBy = $request->get('sort_by', 'created_at');
         $sortDirection = $request->get('sort_direction', 'desc');
 
         $facilities = $this->service->paginate($filters, $perPage, $sortBy, $sortDirection);
+        $facilities->getCollection()->loadCount('enrollees');
 
         $response = FacilityResource::collection($facilities);
         $response->additional([
@@ -49,7 +50,9 @@ class FacilityController extends BaseController
 
     public function store(StoreFacilityRequest $request)
     {
-        $facility = $this->service->create($request->validated());
+        $data = $request->validated();
+        unset($data['category']);
+        $facility = $this->service->create($data);
         return $this->sendResponse(new FacilityResource($facility), 'Facility created successfully', 201);
     }
 
@@ -61,7 +64,9 @@ class FacilityController extends BaseController
 
     public function update(UpdateFacilityRequest $request, Facility $facility)
     {
-        $facility = $this->service->update($facility, $request->validated());
+        $data = $request->validated();
+        unset($data['category']);
+        $facility = $this->service->update($facility, $data);
         return $this->sendResponse(new FacilityResource($facility), 'Facility updated successfully');
     }
 

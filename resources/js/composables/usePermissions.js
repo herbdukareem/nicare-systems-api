@@ -116,22 +116,21 @@ export function usePermissions() {
     return hasRole('claims_officer');
   });
 
-  // Module access checks
+  // Workspace access checks derived from permissions.
   const hasModuleAccess = (moduleName) => {
-    const availableModules = authStore.availableModules || [];
-
-    // Super Admin has access to all modules
     if (hasRole('Super Admin')) {
       return true;
     }
 
-    // General module is accessible to everyone
-    if (moduleName === 'general') {
-      return true;
-    }
+    const accessMap = {
+      general: ['dashboard.view', 'enrollees.view', 'facilities.view'],
+      pas: ['dashboard.pas.view', 'referrals.view', 'pa_codes.view', 'utn.validate'],
+      claims: ['claims.view', 'claims.dashboard.view', 'claims.review'],
+      automation: ['claims.automate', 'claims.process', 'admissions.manage'],
+      management: ['dashboard.management.view', 'cases.view', 'tariffs.view', 'bundles.view'],
+    };
 
-    // Check if module is in user's available modules
-    return availableModules.includes(moduleName);
+    return (accessMap[moduleName] || []).some(hasPermission);
   };
 
   const canAccessPASModule = computed(() => hasModuleAccess('pas'));
@@ -208,4 +207,3 @@ export function usePermissions() {
     isClaimsOfficer,
   };
 }
-

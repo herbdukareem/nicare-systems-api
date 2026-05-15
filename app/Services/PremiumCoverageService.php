@@ -1,0 +1,255 @@
+<?php
+
+namespace App\Services;
+
+use App\Models\Enrollee;
+use App\Models\PayrollBatch;
+use App\Models\PremiumPin;
+use App\Models\PremiumPlan;
+use App\Models\PremiumPurchase;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use InvalidArgumentException;
+
+class PremiumCoverageService
+{
+    public function __construct(private PremiumAuditService $audit)
+    {
+    }
+
+    public function generatePins(PremiumPlan $plan, int $quantity, ?PremiumPurchase $purchase = null): array
+    {
+        $batchCode = 'PIN-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(4));
+        $pins = [];
+
+        DB::transaction(function () use ($plan, $quantity, $purchase, $batchCode, &$pins) {
+            for ($i = 0; $i < $quantity; $i++) {
+                $pin = PremiumPin::create([
+                    'premium_plan_id' => $plan->id,
+                    'insurance_programme_id' => $plan->insurance_programme_id,
+                    'benefit_package_id' => $plan->benefit_package_id,
+                    'premium_purchase_id' => $purchase?->id,
+                    'batch_code' => $batchCode,
+                    'pin' => $this->uniquePin(),
+                    'serial_number' => 'SN-' . Str::upper(Str::random(12)),
+                    'amount' => $plan->amount,
+                    'status' => $purchase ? PremiumPin::STATUS_SOLD : PremiumPin::STATUS_GENERATED,
+                    'sold_at' => $purchase ? now() : null,
+                    'sold_by' => $purchase ? auth()->id() : null,
+                ]);
+                $this->audit->record($pin, 'premium_pin_generated', "Premium PIN {$pin->serial_number} generated.", [], $pin->toArray());
+                $pins[] = $pin;
+            }
+        });
+
+        return $pins;
+    }
+
+    public function createPurchase(array $data): PremiumPurchase
+    {
+        $plan = PremiumPlan::findOrFail($data['premium_plan_id']);
+        $quantity = (int) ($data['quantity'] ?? 1);
+
+        $purchase = PremiumPurchase::create(array_merge($data, [
+            'quantity' => $quantity,
+            'amount' => $data['amount'] ?? ($plan->amount * $quantity),
+            'payment_status' => $data['payment_status'] ?? 'pending',
+            'sold_by' => $data['sold_by'] ?? auth()->id(),
+        ]));
+
+        $this->audit->record($purchase, 'premium_purchase_created', "Premium purchase {$purchase->id} created.", [], $purchase->toArray());
+
+        return $purchase;
+    }
+
+    public function sellPin(PremiumPin $pin, PremiumPurchase $purchase): PremiumPin
+    {
+        $this->assertPinUsableForSale($pin);
+
+        $old = $pin->toArray();
+        $pin->update([
+            'premium_purchase_id' => $purchase->id,
+            'status' => PremiumPin::STATUS_SOLD,
+            'sold_at' => now(),
+            'sold_by' => auth()->id(),
+        ]);
+
+        $this->audit->record($pin, 'premium_pin_sold', "Premium PIN {$pin->serial_number} sold.", $old, $pin->fresh()->toArray());
+
+        return $pin->fresh();
+    }
+
+    public function validatePin(string $pinValue): PremiumPin
+    {
+        $pin = PremiumPin::with('purchase', 'plan')->where('pin', $pinValue)->first();
+
+        if (!$pin) {
+            throw new InvalidArgumentException('Premium PIN not found.');
+        }
+
+        if ($pin->isExpired()) {
+            $pin->update(['status' => PremiumPin::STATUS_EXPIRED]);
+            throw new InvalidArgumentException('BR-14 violation: Premium PIN has expired.');
+        }
+
+        if ($pin->status === PremiumPin::STATUS_USED || $pin->used_at || $pin->used_by_enrollee_id) {
+            throw new InvalidArgumentException('BR-13 violation: Premium PIN can only be used once.');
+        }
+
+        if ($pin->status !== PremiumPin::STATUS_SOLD) {
+            throw new InvalidArgumentException('BR-14 violation: Premium PIN is not paid/sold or is already unavailable.');
+        }
+
+        if (!$pin->purchase || $pin->purchase->payment_status !== 'confirmed') {
+            throw new InvalidArgumentException('BR-14 violation: Premium PIN cannot be used before payment confirmation.');
+        }
+
+        return $pin;
+    }
+
+    public function usePinForCoverage(PremiumPin $pin, Enrollee $enrollee, ?int $facilityId = null): Enrollee
+    {
+        $pin = $this->validatePin($pin->pin);
+
+        if ($pin->used_at || $pin->used_by_enrollee_id) {
+            throw new InvalidArgumentException('BR-13 violation: Premium PIN can only be used once.');
+        }
+
+        return DB::transaction(function () use ($pin, $enrollee, $facilityId) {
+            $plan = $pin->plan;
+            $approvalDate = now();
+            $start = $plan->calculateCoverageStartDate($approvalDate);
+            $end = $plan->calculateCoverageEndDate($start);
+
+            $enrollee->update([
+                'insurance_programme_id' => $plan->insurance_programme_id,
+                'premium_plan_id' => $plan->id,
+                'premium_pin_id' => $pin->id,
+                'benefit_package_id' => $plan->benefit_package_id,
+                'facility_id' => $facilityId ?? $enrollee->facility_id,
+                'coverage_start_date' => $start->toDateString(),
+                'coverage_end_date' => $end?->toDateString(),
+                'status' => 1,
+                'approval_date' => $enrollee->approval_date ?? $approvalDate,
+                'approved_by' => $enrollee->approved_by ?? auth()->id(),
+            ]);
+
+            $old = $pin->toArray();
+            $pin->update([
+                'status' => PremiumPin::STATUS_USED,
+                'used_at' => now(),
+                'expires_at' => $end,
+                'used_by_enrollee_id' => $enrollee->id,
+            ]);
+            $this->audit->record($pin, 'premium_pin_used', "Premium PIN {$pin->serial_number} used by enrollee {$enrollee->enrollee_id}.", $old, $pin->fresh()->toArray());
+
+            return $enrollee->fresh(['insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage', 'facility', 'fundingType', 'benefactor']);
+        });
+    }
+
+    public function confirmPurchase(PremiumPurchase $purchase, ?int $confirmedBy = null): PremiumPurchase
+    {
+        if ($purchase->sold_by && (int) $purchase->sold_by === (int) ($confirmedBy ?? auth()->id())) {
+            throw new InvalidArgumentException('Creator cannot approve own premium purchase where approval is required.');
+        }
+
+        $old = $purchase->toArray();
+        $purchase->update([
+            'payment_status' => 'confirmed',
+            'confirmed_by' => $confirmedBy ?? auth()->id(),
+            'confirmed_at' => now(),
+            'paid_at' => $purchase->paid_at ?? now(),
+        ]);
+
+        $this->audit->record($purchase, 'premium_purchase_confirmed', "Premium purchase {$purchase->id} confirmed.", $old, $purchase->fresh()->toArray());
+
+        return $purchase->fresh();
+    }
+
+    public function cancelPurchase(PremiumPurchase $purchase): PremiumPurchase
+    {
+        $old = $purchase->toArray();
+        $purchase->update([
+            'payment_status' => 'cancelled',
+            'cancelled_at' => now(),
+            'cancelled_by' => auth()->id(),
+        ]);
+
+        $this->audit->record($purchase, 'premium_purchase_cancelled', "Premium purchase {$purchase->id} cancelled.", $old, $purchase->fresh()->toArray());
+
+        return $purchase->fresh();
+    }
+
+    public function activatePayrollBatch(PayrollBatch $batch): int
+    {
+        if ($batch->uploaded_by && (int) $batch->uploaded_by === (int) auth()->id()) {
+            throw new InvalidArgumentException('Uploader cannot approve own payroll batch.');
+        }
+
+        $plan = PremiumPlan::findOrFail($batch->premium_plan_id);
+        $count = 0;
+
+        DB::transaction(function () use ($batch, $plan, &$count) {
+            foreach ($batch->enrollees as $row) {
+                $enrollee = $row->enrollee_id ? Enrollee::find($row->enrollee_id) : null;
+                if (!$enrollee) {
+                    $enrollee = Enrollee::create([
+                        'enrollee_id' => 'NIC' . now()->format('ymdHis') . random_int(100, 999),
+                        'nin' => $row->nin,
+                        'first_name' => $row->first_name,
+                        'last_name' => $row->last_name,
+                        'phone' => $row->phone,
+                        'facility_id' => $row->facility_id,
+                        'lga_id' => 1,
+                        'ward_id' => 1,
+                        'created_by' => auth()->id(),
+                        'status' => 1,
+                        'enrollment_date' => now(),
+                    ]);
+                }
+
+                $coverageStart = $plan->calculateCoverageStartDate(now());
+                $coverageEnd = $plan->calculateCoverageEndDate($coverageStart);
+
+                $enrollee->update([
+                    'insurance_programme_id' => $plan->insurance_programme_id,
+                    'enrollee_category_id' => $batch->enrollee_category_id,
+                    'premium_plan_id' => $plan->id,
+                    'benefit_package_id' => $plan->benefit_package_id,
+                    'facility_id' => $row->facility_id ?? $enrollee->facility_id,
+                    'benefactor_id' => $batch->benefactor_id,
+                    'funding_type_id' => $batch->funding_type_id,
+                    'coverage_start_date' => $coverageStart->toDateString(),
+                    'coverage_end_date' => $coverageEnd?->toDateString(),
+                    'status' => 1,
+                    'approval_date' => now(),
+                    'approved_by' => auth()->id(),
+                ]);
+                $row->update(['enrollee_id' => $enrollee->id, 'status' => 'covered']);
+                $count++;
+            }
+
+            $old = $batch->toArray();
+            $batch->update(['status' => 'approved', 'approved_by' => auth()->id(), 'approved_at' => now()]);
+            $this->audit->record($batch, 'payroll_batch_approved', "Payroll batch {$batch->batch_code} approved.", $old, $batch->fresh()->toArray());
+        });
+
+        return $count;
+    }
+
+    private function uniquePin(): string
+    {
+        do {
+            $pin = (string) random_int(100000000000, 999999999999);
+        } while (PremiumPin::where('pin', $pin)->exists());
+
+        return $pin;
+    }
+
+    private function assertPinUsableForSale(PremiumPin $pin): void
+    {
+        if ($pin->isExpired() || $pin->status !== PremiumPin::STATUS_GENERATED) {
+            throw new InvalidArgumentException('Premium PIN cannot be sold because it is expired, cancelled, sold, or used.');
+        }
+    }
+}

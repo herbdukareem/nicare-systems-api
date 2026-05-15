@@ -5,6 +5,7 @@ namespace App\Services\ClaimsAutomation;
 use App\Models\Admission;
 use App\Models\CaseRecord;
 use App\Models\Referral;
+use App\Services\EligibilityService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use InvalidArgumentException;
 
@@ -59,7 +60,18 @@ class AdmissionService
             );
         }
 
-     
+        // BR-04: referral UTN/PA Code must not be expired
+        if ($referral->isExpired()) {
+            throw new InvalidArgumentException(
+                "Cannot create admission: The referral UTN has expired (valid until: {$referral->valid_until}). A new referral is required."
+            );
+        }
+
+        app(EligibilityService::class)->assertFacilityMatchesCoverage(
+            $referral->enrollee_id,
+            (int) $referral->receiving_facility_id,
+            $data['admission_date'] ?? now()
+        );
 
         // Auto-match bundle from principal diagnosis ICD-10 code
         $icd10Code = $data['principal_diagnosis_icd10'] ?? null;
@@ -138,6 +150,12 @@ class AdmissionService
 
         if ($activeAdmission) {
             return ['can_admit' => false, 'reason' => "Enrollee has active admission: {$activeAdmission->admission_code}"];
+        }
+
+        try {
+            app(EligibilityService::class)->assertFacilityMatchesCoverage($referral->enrollee_id, (int) $referral->receiving_facility_id);
+        } catch (\Throwable $e) {
+            return ['can_admit' => false, 'reason' => $e->getMessage()];
         }
 
         return ['can_admit' => true, 'reason' => 'Eligible for admission'];

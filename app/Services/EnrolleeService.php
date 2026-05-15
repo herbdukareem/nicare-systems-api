@@ -26,7 +26,12 @@ class EnrolleeService
     {
         $query = Enrollee::query();
         $query = EnrolleeFilter::apply($query, $filters);
-        return $query->with(['enrolleeType', 'facility', 'lga', 'ward', 'benefactor', 'fundingType'])
+        return $query->with([
+                'enrolleeType', 'insuranceProgramme', 'enrolleeCategory', 'premiumPlan',
+                'benefitPackage', 'facility', 'lga', 'ward', 'benefactor', 'fundingType',
+                'enrollmentPhase',
+            ])
+            ->withCount('dependants')
             ->orderBy($sortBy, $sortDirection)
             ->paginate($perPage);
     }

@@ -16,10 +16,15 @@ class BenefactorResource extends JsonResource
         return [
             'id' => $this->id,
             'name' => $this->name,
+            'type' => $this->type,
+            'registration_number' => $this->registration_number,
+            'contact_person' => $this->contact_person,
             'email' => $this->email,
             'phone' => $this->phone,
             'address' => $this->address,
             'status' => $this->status,
+            'enrollees_count' => $this->whenCounted('enrollees'),
+            'enrollment_phases_count' => $this->whenCounted('enrollmentPhases'),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

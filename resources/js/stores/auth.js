@@ -19,35 +19,14 @@ export const useAuthStore = defineStore('auth', {
     getUserAvailableRoles: (state) => state.availableRoles || [],
     getUserCurrentRole: (state) => state.currentRole,
 
-    // New getter: availableModules - returns modules for current role
     availableModules: (state) => {
-      // Priority: 1) state.currentRole, 2) user.current_role, 3) first role in user.roles array
-      let role = null;
-      let source = 'none';
-
-      if (state.currentRole && state.currentRole.modules) {
-        role = state.currentRole;
-        source = 'state.currentRole';
-      } else if (state.user?.current_role && state.user.current_role.modules) {
-        role = state.user.current_role;
-        source = 'user.current_role';
-      } else if (state.user?.roles && state.user.roles.length > 0) {
-        role = state.user.roles[0];
-        source = 'user.roles[0]';
-      }
-
-      const modules = role?.modules || [];
-
-      console.log('[Auth Store] availableModules getter:', {
-        source,
-        currentRole: state.currentRole,
-        userCurrentRole: state.user?.current_role,
-        userRoles: state.user?.roles,
-        selectedRole: role,
-        modules
-      });
-
-      return modules;
+      const roles = state.currentRole ? [state.currentRole] : (state.user?.roles || []);
+      return [...new Set(
+        roles
+          .flatMap((role) => role.permissions || [])
+          .map((permission) => permission.category)
+          .filter(Boolean)
+      )];
     },
 
     currentRolePermissions: (state) => {
@@ -57,24 +36,12 @@ export const useAuthStore = defineStore('auth', {
     userPermissions: (state) => {
       // If a specific role is active, return only that role's permissions
       if (state.currentRole) {
-        const perms = state.currentRole.permissions || [];
-        console.log('[Auth Store] userPermissions from currentRole:', {
-          roleName: state.currentRole.name,
-          permissionCount: perms.length,
-          permissions: perms.map(p => p.name || p).slice(0, 5) // Show first 5
-        });
-        return perms;
+        return state.currentRole.permissions || [];
       }
       // Otherwise, return all permissions from all roles
       const directPermissions = state.user?.permissions || [];
       const rolePermissions = state.user?.roles?.flatMap(role => role.permissions || []) || [];
-      const allPerms = [...directPermissions, ...rolePermissions];
-      console.log('[Auth Store] userPermissions from all roles:', {
-        directCount: directPermissions.length,
-        roleCount: rolePermissions.length,
-        totalCount: allPerms.length
-      });
-      return allPerms;
+      return [...directPermissions, ...rolePermissions];
     },
     canSwitchRoles: (state) => state.availableRoles.length > 1,
   },
@@ -141,6 +108,17 @@ export const useAuthStore = defineStore('auth', {
       }
     },
 
+    clearSession() {
+      this.user = null;
+      this.token = null;
+      this.isAuthenticated = false;
+      this.currentRole = null;
+      this.availableRoles = [];
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('currentRole');
+    },
+
    async fetchUser() {
       if (!this.token) {
         console.warn('[Auth] fetchUser called without token');
@@ -148,9 +126,7 @@ export const useAuthStore = defineStore('auth', {
       }
 
       try {
-        console.log('[Auth] Fetching user data...');
         const response = await authAPI.getUser();
-        console.log('[Auth] User fetch response:', response?.data);
 
         // Expecting { success: true, data: { ...user } }
         if (response?.data?.success) {
@@ -167,7 +143,6 @@ export const useAuthStore = defineStore('auth', {
           if (this.user.current_role) {
             // Use current_role from backend (most authoritative)
             this.currentRole = this.user.current_role;
-            console.log('[Auth] Using current_role from backend:', this.currentRole);
           } else {
             // Restore current role from localStorage or set default
             const savedRole = localStorage.getItem('currentRole');
@@ -177,14 +152,11 @@ export const useAuthStore = defineStore('auth', {
                 // Verify the saved role is still available
                 const roleExists = this.availableRoles.find(role => role.id === parsedRole.id);
                 this.currentRole = roleExists || (this.availableRoles.length > 0 ? this.availableRoles[0] : null);
-                console.log('[Auth] Using saved role from localStorage:', this.currentRole);
               } catch {
                 this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
-                console.log('[Auth] Using first available role (localStorage parse failed):', this.currentRole);
               }
             } else {
               this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
-              console.log('[Auth] Using first available role (no saved role):', this.currentRole);
             }
           }
 
@@ -193,7 +165,6 @@ export const useAuthStore = defineStore('auth', {
             localStorage.setItem('currentRole', JSON.stringify(this.currentRole));
           }
 
-          console.log('[Auth] User authenticated successfully:', this.user.username);
           return true; // ✅ success
         }
 
@@ -239,19 +210,16 @@ export const useAuthStore = defineStore('auth', {
     // Initialize auth state from localStorage
    async initializeAuth() {
   if (this._initializing) {
-    console.log('[Auth] Already initializing, skipping...');
     return;
   }
 
   this._initializing = true;
-  console.log('[Auth] Initializing authentication...');
 
   try {
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
 
     if (token) {
-      console.log('[Auth] Token found in localStorage');
       this.token = token;
 
       // First, try to restore user from localStorage to avoid flicker
@@ -275,14 +243,12 @@ export const useAuthStore = defineStore('auth', {
           } else {
             this.currentRole = this.availableRoles.length > 0 ? this.availableRoles[0] : null;
           }
-          console.log('[Auth] Restored user from localStorage:', user.username);
         } catch (error) {
           console.error('[Auth] Failed to parse saved user:', error);
         }
       }
 
       // Then verify token is still valid by fetching fresh user data
-      console.log('[Auth] Verifying token validity...');
       const ok = await this.fetchUser();
       if (!ok) {
         console.warn('[Auth] Token validation failed - clearing auth state');
@@ -298,16 +264,13 @@ export const useAuthStore = defineStore('auth', {
         localStorage.removeItem('user');
         localStorage.removeItem('currentRole');
       } else {
-        console.log('[Auth] Token validated successfully');
       }
     } else {
-      console.log('[Auth] No token found in localStorage');
     }
   } catch (error) {
     console.error('[Auth] Error during initialization:', error);
   } finally {
     this._initializing = false;
-    console.log('[Auth] Initialization complete');
   }
 },
 
@@ -348,11 +311,21 @@ export const useAuthStore = defineStore('auth', {
       localStorage.removeItem('currentRole');
     },
 
+    isSuperAdmin() {
+      const superAdminNames = ['Super Admin', 'super-admin', 'admin'];
+      if (this.currentRole) {
+        return superAdminNames.includes(this.currentRole.name);
+      }
+      return this.userRoles.some(role => superAdminNames.includes(role.name));
+    },
+
     hasPermission(permission) {
+      // Super-admin / admin bypass: they have all permissions
+      if (this.isSuperAdmin()) return true;
+
       const permissions = this.userPermissions;
       const hasIt = permissions.some(p => p.name === permission || p === permission);
 
-      // Debug logging (can be removed in production)
       if (!hasIt && permissions.length === 0) {
         console.warn(`[Auth] No permissions loaded yet. Checking for: ${permission}`);
       }

@@ -1,421 +1,910 @@
 <template>
   <AdminLayout>
     <div class="tw-space-y-6">
-      <!-- Header / Welcome -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
-        <div class="tw-flex tw-items-center tw-justify-between tw-gap-4">
-          <div>
-            <h2 class="tw-text-2xl tw-font-bold tw-text-gray-900">Welcome back, {{ userName }}!</h2>
-            <p class="tw-text-gray-600 tw-mt-1">Your programme snapshot at a glance.</p>
-          </div>
-          <div class="tw-flex tw-items-center tw-gap-3">
-            <div class="tw-text-right">
-              <p class="tw-text-xs tw-text-gray-500">Last updated</p>
-              <p class="tw-text-sm tw-font-medium tw-text-gray-900">
-                {{ lastUpdated ? new Date(lastUpdated).toLocaleString() : new Date().toLocaleString() }}
-              </p>
+
+      <!-- ── Header Banner ──────────────────────────────────────────────────── -->
+      <section
+        class="tw-rounded-2xl tw-overflow-hidden tw-relative"
+        style="background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 55%, #0d6e6e 100%);"
+      >
+        <!-- Decorative orbs -->
+        <div class="tw-absolute tw-inset-0 tw-pointer-events-none tw-overflow-hidden">
+          <div class="tw-absolute tw--top-20 tw--right-20 tw-w-80 tw-h-80 tw-rounded-full" style="background: radial-gradient(circle, rgba(96,165,250,0.18) 0%, transparent 70%);" />
+          <div class="tw-absolute tw--bottom-16 tw--left-16 tw-w-64 tw-h-64 tw-rounded-full" style="background: radial-gradient(circle, rgba(52,211,153,0.14) 0%, transparent 70%);" />
+          <div class="tw-absolute tw-top-0 tw-left-1/2 tw-w-48 tw-h-48 tw-rounded-full tw-opacity-50" style="background: radial-gradient(circle, rgba(167,139,250,0.1) 0%, transparent 70%);" />
+        </div>
+
+        <div class="tw-relative tw-px-6 md:tw-px-8 tw-pt-6 tw-pb-6">
+          <!-- Top row: badge + refresh -->
+          <div class="tw-flex tw-items-center tw-justify-between tw-mb-5">
+            <div class="tw-flex tw-items-center tw-gap-2.5 tw-bg-white/10 tw-backdrop-blur-sm tw-rounded-full tw-px-4 tw-py-1.5 tw-border tw-border-white/10">
+              <div class="tw-w-1.5 tw-h-1.5 tw-rounded-full tw-bg-emerald-400 tw-animate-pulse" />
+              <span class="tw-text-xs tw-font-bold tw-text-white/80 tw-uppercase tw-tracking-[0.15em]">NiCARE · Live Dashboard</span>
             </div>
-            <v-btn color="primary" variant="flat" @click="refreshAll" :loading="loading">
-              <v-icon start>mdi-refresh</v-icon>
+            <v-btn
+              color="white"
+              variant="tonal"
+              :loading="loading"
+              size="small"
+              prepend-icon="mdi-refresh"
+              class="tw-shrink-0"
+              @click="loadDashboard"
+            >
               Refresh
             </v-btn>
           </div>
+
+          <!-- Title block -->
+          <div class="tw-mb-6">
+            <h1 class="tw-text-3xl sm:tw-text-4xl tw-font-black tw-text-white tw-tracking-tight tw-leading-none">
+              Programme Intelligence
+            </h1>
+            <p class="tw-text-white/50 tw-text-sm tw-mt-2 tw-flex tw-items-center tw-gap-1.5 tw-flex-wrap">
+              <v-icon size="12" color="rgba(255,255,255,0.4)">mdi-calendar-month-outline</v-icon>
+              Coverage, equity and provider readiness overview
+              <span class="tw-text-white/30 tw-mx-1">·</span>
+              <span class="tw-text-white/80 tw-font-semibold">{{ currentMonth }}</span>
+            </p>
+          </div>
+
+          <!-- Quick-stat pills (4 key metrics right in the header) -->
+          <div class="tw-grid tw-grid-cols-2 sm:tw-grid-cols-4 tw-gap-2.5">
+            <div
+              v-for="pill in headerPills"
+              :key="pill.label"
+              class="tw-bg-white/10 tw-backdrop-blur-sm tw-border tw-border-white/10 tw-rounded-xl tw-px-4 tw-py-3 tw-flex tw-flex-col tw-gap-0.5"
+            >
+              <p class="tw-text-[10px] tw-text-white/50 tw-font-semibold tw-uppercase tw-tracking-widest">{{ pill.label }}</p>
+              <p class="tw-text-xl sm:tw-text-2xl tw-font-black tw-text-white tw-leading-none">{{ pill.value }}</p>
+              <p v-if="pill.sub" class="tw-text-[10px] tw-text-white/40">{{ pill.sub }}</p>
+            </div>
+          </div>
         </div>
+      </section>
+
+      <!-- ── Loading State ───────────────────────────────────────────────────── -->
+      <div v-if="loading" class="tw-grid tw-grid-cols-2 xl:tw-grid-cols-6 tw-gap-4">
+        <div v-for="i in 6" :key="i" class="tw-h-28 tw-bg-white tw-rounded-xl tw-border tw-border-gray-100 tw-animate-pulse" />
       </div>
 
-      <!-- Loading State -->
-      <div v-if="loading" class="tw-flex tw-justify-center tw-items-center tw-py-16">
-        <div class="tw-text-center">
-          <v-progress-circular indeterminate color="primary" size="48" />
-          <p class="tw-text-gray-600 tw-mt-4">Loading dashboard data…</p>
-        </div>
-      </div>
+      <template v-else>
 
-      <!-- Statistics Cards -->
-      <div v-else class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-4 tw-gap-6">
-        <StatCard :item="stats.totalEnrollees"/>
-        <StatCard :item="stats.activeEnrollees"/>
-        <StatCard :item="stats.notActiveEnrollees"/>
-        <StatCard :item="stats.totalFacilities"/>
-      </div>
-
-      <!-- Helper Filters (quick access) -->
-      <div v-if="!loading" class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-px-6 tw-pt-4 tw-pb-2">
-        <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-3">
-          <v-select
-            class="tw-w-72"
-            :items="lgaOptions"
-            item-title="label"
-            item-value="value"
-            v-model="selectedLgaId"
-            label="Filter by LGA (affects tabs)"
-            clearable density="comfortable"
+        <!-- ── Executive KPI Cards ──────────────────────────────────────────── -->
+        <section class="tw-grid tw-grid-cols-1 sm:tw-grid-cols-2 xl:tw-grid-cols-3 2xl:tw-grid-cols-6 tw-gap-4">
+          <KpiCard
+            v-for="card in executiveCards"
+            :key="card.label"
+            :label="card.label"
+            :value="formatValue(card.value)"
+            :helper="card.helper"
+            :icon="card.icon"
+            :tone="card.tone"
           />
-          <v-select
-            class="tw-w-72"
-            :items="benefactorOptions"
-            item-title="label"
-            item-value="value"
-            v-model="selectedBenefactorId"
-            label="Filter by Benefactor (affects tabs)"
-            clearable density="comfortable"
-          />
-          <v-chip
-            v-if="selectedLgaId || selectedBenefactorId"
-            class="tw-ml-auto"
-            variant="tonal"
-            color="primary"
-            @click="clearFilters"
+        </section>
+
+        <!-- ── Coverage Performance Meters (3 cards in a row) ──────────────── -->
+        <section class="tw-grid tw-grid-cols-1 sm:tw-grid-cols-3 tw-gap-4">
+          <div
+            v-for="meter in performanceMeters"
+            :key="meter.label"
+            class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-p-5 tw-flex tw-items-center tw-gap-5"
           >
-            <v-icon start>mdi-filter-remove</v-icon> Clear filters
-          </v-chip>
-        </div>
-      </div>
+            <!-- Ring gauge -->
+            <div class="tw-relative tw-w-20 tw-h-20 tw-shrink-0">
+              <svg class="tw-w-full tw-h-full tw--rotate-90" viewBox="0 0 36 36">
+                <circle cx="18" cy="18" r="15.9" fill="none" stroke="#e5e7eb" stroke-width="3" />
+                <circle
+                  cx="18" cy="18" r="15.9"
+                  fill="none"
+                  :stroke="meter.stroke"
+                  stroke-width="3"
+                  stroke-linecap="round"
+                  :stroke-dasharray="`${meter.pct} 100`"
+                  style="transition: stroke-dasharray 0.8s ease"
+                />
+              </svg>
+              <span class="tw-absolute tw-inset-0 tw-flex tw-items-center tw-justify-center tw-text-sm tw-font-black tw-text-gray-900">{{ meter.pct }}%</span>
+            </div>
+            <!-- Text -->
+            <div class="tw-flex-1 tw-min-w-0">
+              <p class="tw-text-base tw-font-bold tw-text-gray-900 tw-leading-tight">{{ meter.label }}</p>
+              <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5 tw-mb-2">{{ meter.sub }}</p>
+              <div class="tw-w-full tw-h-1.5 tw-bg-gray-100 tw-rounded-full tw-overflow-hidden">
+                <div
+                  class="tw-h-full tw-rounded-full"
+                  :style="{ width: meter.pct + '%', backgroundColor: meter.stroke, transition: 'width 0.8s ease' }"
+                />
+              </div>
+            </div>
+          </div>
+        </section>
 
-      <!-- Main Content Tabs -->
-      <div v-if="!loading" class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100">
-        <v-tabs v-model="activeTab" color="primary" class="tw-border-b tw-border-gray-200">
-          <v-tab value="enrollees"><v-icon left>mdi-account-group</v-icon> Enrollees Statistics</v-tab>
-          <v-tab value="facilities"><v-icon left>mdi-hospital-building</v-icon> Facility Statistics</v-tab>
-        </v-tabs>
+        <!-- ── Coverage Progress + Approval Pipeline ───────────────────────── -->
+        <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-3 tw-gap-6">
 
-        <v-tabs-window v-model="activeTab" class="tw-p-6">
-          <v-tabs-window-item value="enrollees">
-            <EnrolleesTab :stats="filteredEnrolleeStats" :loading="loading" />
-          </v-tabs-window-item>
+          <!-- Progress rows -->
+          <div class="xl:tw-col-span-2 tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
+              <div>
+                <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Coverage Breakdown</h2>
+                <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Active eligibility and risk exposure across enrolled lives</p>
+              </div>
+              <div class="tw-flex tw-items-center tw-gap-2">
+                <div class="tw-w-2 tw-h-2 tw-rounded-full tw-bg-green-500 tw-animate-pulse" />
+                <span class="tw-text-xs tw-font-semibold tw-text-green-600">{{ performance.coverage_rate || 0 }}% active</span>
+              </div>
+            </div>
+            <div class="tw-p-6 tw-space-y-4">
+              <ProgressBar label="Active Coverage" :value="coverage.active" :max="totalEnrollees" color="#22c55e" />
+              <ProgressBar label="No Expiry (Permanent)" :value="coverage.no_expiry" :max="Math.max(coverage.active, 1)" color="#3b82f6" />
+              <ProgressBar label="Expiring within 30 Days" :value="coverage.expiring_30_days" :max="Math.max(coverage.active, 1)" color="#f59e0b" />
+              <ProgressBar label="Expired / Inactive" :value="coverage.expired_or_inactive" :max="totalEnrollees" color="#ef4444" />
+            </div>
+          </div>
 
-          <v-tabs-window-item value="facilities">
-            <FacilitiesTab :stats="filteredFacilityStats" :loading="loading" />
-          </v-tabs-window-item>
-        </v-tabs-window>
-      </div>
+          <!-- Approval Pipeline -->
+          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
+              <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Approval Pipeline</h2>
+              <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Enrollee status distribution for operational follow-up</p>
+            </div>
+            <div class="tw-p-6 tw-space-y-3">
+              <div
+                v-for="item in (overview.status_breakdown || [])"
+                :key="item.label"
+                class="tw-flex tw-items-center tw-gap-3"
+              >
+                <div :class="`tw-w-2 tw-h-2 tw-rounded-full tw-shrink-0 ${statusDot(item.label)}`" />
+                <div class="tw-flex-1 tw-min-w-0">
+                  <div class="tw-flex tw-items-center tw-justify-between tw-mb-1">
+                    <span class="tw-text-xs tw-font-semibold tw-text-gray-700 tw-truncate">{{ item.label }}</span>
+                    <span class="tw-text-xs tw-font-bold tw-text-gray-900 tw-ml-2 tw-shrink-0">{{ number(item.count) }}</span>
+                  </div>
+                  <div class="tw-w-full tw-h-1.5 tw-bg-gray-100 tw-rounded-full tw-overflow-hidden">
+                    <div
+                      :class="`tw-h-full tw-rounded-full ${statusBar(item.label)}`"
+                      :style="{ width: Math.min(100, Math.round((item.count / Math.max(totalEnrollees, 1)) * 100)) + '%', transition: 'width 0.8s ease' }"
+                    />
+                  </div>
+                </div>
+                <span class="tw-text-xs tw-text-gray-400 tw-shrink-0 tw-w-9 tw-text-right">{{ item.percentage || 0 }}%</span>
+              </div>
+            </div>
+            <div v-if="overview.status_breakdown?.length" class="tw-px-6 tw-pb-5">
+              <div class="tw-h-px tw-bg-gray-100 tw-mb-4" />
+              <div class="tw-flex tw-justify-around tw-text-center">
+                <div>
+                  <p class="tw-text-xs tw-text-gray-400">Total</p>
+                  <p class="tw-text-lg tw-font-extrabold tw-text-gray-900">{{ number(totalEnrollees) }}</p>
+                </div>
+                <div>
+                  <p class="tw-text-xs tw-text-gray-400">Active</p>
+                  <p class="tw-text-lg tw-font-extrabold tw-text-green-600">{{ number(coverage.active) }}</p>
+                </div>
+                <div>
+                  <p class="tw-text-xs tw-text-gray-400">Pending</p>
+                  <p class="tw-text-lg tw-font-extrabold tw-text-amber-600">{{ number(coverage.pending) }}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Enrollment Trend (Interactive: Year → Month) + Programme Mix ── -->
+        <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-3 tw-gap-6">
+
+          <!-- Enrollment Trend -->
+          <div class="xl:tw-col-span-2 tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between tw-gap-3 tw-flex-wrap">
+              <div>
+                <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Enrollment Trend</h2>
+                <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">
+                  <template v-if="trendDrillLevel === 'year'">Yearly totals — click a bar to see monthly breakdown</template>
+                  <template v-else>Monthly breakdown for <span class="tw-font-semibold tw-text-gray-700">{{ trendSelectedYear }}</span></template>
+                </p>
+              </div>
+              <div class="tw-flex tw-items-center tw-gap-2">
+                <!-- Back button in month view -->
+                <v-btn
+                  v-if="trendDrillLevel === 'month'"
+                  size="x-small"
+                  variant="tonal"
+                  color="primary"
+                  prepend-icon="mdi-arrow-left"
+                  @click="backToYears"
+                >
+                  All Years
+                </v-btn>
+                <v-chip v-if="trendDrillLevel === 'year'" size="x-small" color="blue" variant="tonal">Click a bar</v-chip>
+                <span v-else class="tw-flex tw-items-center tw-gap-1.5 tw-text-xs tw-text-gray-500">
+                  <span class="tw-inline-block tw-w-3 tw-h-0.5 tw-bg-blue-500 tw-rounded" />Enrollments
+                </span>
+              </div>
+            </div>
+            <div class="tw-p-5 tw-relative">
+              <div v-if="trendLoading" class="tw-h-60 tw-flex tw-items-center tw-justify-center">
+                <v-progress-circular indeterminate color="primary" size="32" />
+              </div>
+              <!-- Year bar chart -->
+              <BarChart
+                v-else-if="trendDrillLevel === 'year' && trendYearChartData.labels?.length"
+                :data="trendYearChartData"
+                :options="trendYearOptions"
+                :height="240"
+              />
+              <!-- Month line chart -->
+              <LineChart
+                v-else-if="trendDrillLevel === 'month' && trendMonthChartData.labels?.length"
+                :data="trendMonthChartData"
+                :height="240"
+              />
+              <div v-else class="tw-h-60 tw-flex tw-items-center tw-justify-center tw-text-gray-400 tw-text-sm">
+                No enrollment data available
+              </div>
+            </div>
+          </div>
+
+          <!-- Programme Mix -->
+          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
+              <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Programme Mix</h2>
+              <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Enrollee distribution across insurance programmes</p>
+            </div>
+            <div class="tw-p-5">
+              <DoughnutChart v-if="programmeMixData.labels?.length" :data="programmeMixData" :height="180" />
+              <p v-else class="tw-py-8 tw-text-center tw-text-gray-400 tw-text-sm">No programme data yet</p>
+              <div class="tw-mt-4 tw-space-y-2">
+                <div
+                  v-for="(item, i) in (overview.programme_mix || []).slice(0, 5)"
+                  :key="item.label"
+                  class="tw-flex tw-items-center tw-gap-2"
+                >
+                  <div class="tw-w-2 tw-h-2 tw-rounded-full tw-shrink-0" :style="{ backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }" />
+                  <span class="tw-text-xs tw-text-gray-600 tw-flex-1 tw-truncate">{{ item.label }}</span>
+                  <span class="tw-text-xs tw-font-semibold tw-text-gray-900">{{ number(item.count) }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Geographic Reach (Interactive: LGA → Wards) + Provider Load ── -->
+        <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-2 tw-gap-6">
+
+          <!-- Geographic Reach -->
+          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between tw-gap-3 tw-flex-wrap">
+              <div>
+                <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Geographic Reach</h2>
+                <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">
+                  <template v-if="geoView === 'lga'">LGA spread — click a row to see ward breakdown</template>
+                  <template v-else>Wards under <span class="tw-font-semibold tw-text-gray-700">{{ selectedLga?.lga_name }}</span></template>
+                </p>
+              </div>
+              <div class="tw-flex tw-items-center tw-gap-2">
+                <v-btn
+                  v-if="geoView === 'ward'"
+                  size="x-small"
+                  variant="tonal"
+                  color="teal"
+                  prepend-icon="mdi-arrow-left"
+                  @click="backToLgas"
+                >
+                  All LGAs
+                </v-btn>
+                <div v-else class="tw-flex tw-items-center tw-gap-2 tw-bg-teal-50 tw-border tw-border-teal-100 tw-rounded-lg tw-px-3 tw-py-1.5">
+                  <v-icon size="14" color="teal">mdi-map-marker-multiple</v-icon>
+                  <span class="tw-text-xs tw-font-bold tw-text-teal-700">
+                    {{ geography.lga_reach?.covered || 0 }} / {{ geography.lga_reach?.total || 0 }} LGAs
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div class="tw-p-5 tw-space-y-3 tw-relative">
+              <!-- Loading overlay -->
+              <div v-if="wardLoading" class="tw-flex tw-items-center tw-justify-center tw-py-10">
+                <v-progress-circular indeterminate color="teal" size="28" />
+              </div>
+
+              <!-- LGA view -->
+              <template v-else-if="geoView === 'lga'">
+                <div
+                  v-for="(item, i) in (geography.top_lgas || []).slice(0, 8)"
+                  :key="item.lga"
+                  class="tw-flex tw-items-center tw-gap-3 tw-cursor-pointer tw-rounded-xl tw-p-2 tw--mx-2 hover:tw-bg-teal-50 tw-transition-colors tw-group"
+                  @click="drillToLga(item)"
+                >
+                  <span class="tw-text-xs tw-font-bold tw-text-gray-400 tw-w-4 tw-text-right tw-shrink-0">{{ i + 1 }}</span>
+                  <div class="tw-flex-1 tw-min-w-0">
+                    <div class="tw-flex tw-justify-between tw-mb-1">
+                      <span class="tw-text-sm tw-font-medium tw-text-gray-700 tw-truncate group-hover:tw-text-teal-700">{{ item.lga }}</span>
+                      <span class="tw-text-sm tw-font-bold tw-text-teal-700 tw-ml-2 tw-shrink-0">{{ number(item.count) }}</span>
+                    </div>
+                    <div class="tw-w-full tw-h-2 tw-bg-teal-50 tw-rounded-full tw-overflow-hidden">
+                      <div
+                        class="tw-h-full tw-rounded-full tw-bg-teal-500"
+                        :style="{ width: Math.min(100, Math.round((item.count / Math.max(largest(geography.top_lgas), 1)) * 100)) + '%', transition: 'width 0.8s ease' }"
+                      />
+                    </div>
+                  </div>
+                  <v-icon size="14" color="gray" class="tw-opacity-40 group-hover:tw-opacity-80 tw-shrink-0">mdi-chevron-right</v-icon>
+                </div>
+                <p v-if="!(geography.top_lgas || []).length" class="tw-py-8 tw-text-center tw-text-gray-400 tw-text-sm">No LGA data available</p>
+              </template>
+
+              <!-- Ward view -->
+              <template v-else>
+                <div
+                  v-for="(ward, i) in wardData.slice(0, 10)"
+                  :key="ward.ward_id || ward.ward"
+                  class="tw-flex tw-items-center tw-gap-3"
+                >
+                  <span class="tw-text-xs tw-font-bold tw-text-gray-400 tw-w-4 tw-text-right tw-shrink-0">{{ i + 1 }}</span>
+                  <div class="tw-flex-1 tw-min-w-0">
+                    <div class="tw-flex tw-justify-between tw-mb-1">
+                      <span class="tw-text-sm tw-font-medium tw-text-gray-700 tw-truncate">{{ ward.ward }}</span>
+                      <span class="tw-text-sm tw-font-bold tw-text-indigo-700 tw-ml-2 tw-shrink-0">{{ number(ward.count) }}</span>
+                    </div>
+                    <div class="tw-w-full tw-h-2 tw-bg-indigo-50 tw-rounded-full tw-overflow-hidden">
+                      <div
+                        class="tw-h-full tw-rounded-full tw-bg-indigo-500"
+                        :style="{ width: Math.min(100, Math.round((ward.count / Math.max(largest(wardData), 1)) * 100)) + '%', transition: 'width 0.8s ease' }"
+                      />
+                    </div>
+                  </div>
+                  <span class="tw-text-xs tw-text-gray-400 tw-shrink-0 tw-w-9 tw-text-right">{{ ward.percentage || 0 }}%</span>
+                </div>
+                <p v-if="!wardData.length" class="tw-py-8 tw-text-center tw-text-gray-400 tw-text-sm">No ward data for this LGA</p>
+              </template>
+            </div>
+          </div>
+
+          <!-- Provider Load -->
+          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
+              <div>
+                <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Provider Load</h2>
+                <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Facilities carrying the highest active covered lives</p>
+              </div>
+              <div class="tw-flex tw-items-center tw-gap-2 tw-bg-indigo-50 tw-border tw-border-indigo-100 tw-rounded-lg tw-px-3 tw-py-1.5">
+                <v-icon size="14" color="indigo">mdi-hospital-building</v-icon>
+                <span class="tw-text-xs tw-font-bold tw-text-indigo-700">{{ facilities.summary?.active || 0 }} active</span>
+              </div>
+            </div>
+            <div class="tw-overflow-x-auto">
+              <table class="tw-w-full">
+                <thead>
+                  <tr class="tw-bg-gray-50">
+                    <th class="tw-py-3 tw-px-4 tw-text-left tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500">Facility</th>
+                    <th class="tw-py-3 tw-px-3 tw-text-left tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500">LGA</th>
+                    <th class="tw-py-3 tw-px-3 tw-text-right tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500">Lives</th>
+                    <th class="tw-py-3 tw-px-4 tw-text-right tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500">Load</th>
+                  </tr>
+                </thead>
+                <tbody class="tw-divide-y tw-divide-gray-50">
+                  <tr
+                    v-for="fac in (facilities.top_by_active_lives || []).slice(0, 8)"
+                    :key="fac.hcp_code || fac.name"
+                    class="hover:tw-bg-gray-50 tw-transition-colors"
+                  >
+                    <td class="tw-py-3 tw-px-4">
+                      <p class="tw-text-sm tw-font-semibold tw-text-gray-900 tw-leading-tight">{{ fac.name }}</p>
+                      <p class="tw-text-xs tw-text-gray-400 tw-font-mono">{{ fac.hcp_code || '—' }}</p>
+                    </td>
+                    <td class="tw-py-3 tw-px-3 tw-text-sm tw-text-gray-600">{{ fac.lga || '—' }}</td>
+                    <td class="tw-py-3 tw-px-3 tw-text-right tw-text-sm tw-font-bold tw-text-gray-900">{{ number(fac.active_lives) }}</td>
+                    <td class="tw-py-3 tw-px-4 tw-text-right">
+                      <span
+                        class="tw-inline-flex tw-items-center tw-rounded-full tw-px-2 tw-py-0.5 tw-text-xs tw-font-semibold"
+                        :class="fac.utilization > 90 ? 'tw-bg-red-50 tw-text-red-700' : fac.utilization > 70 ? 'tw-bg-amber-50 tw-text-amber-700' : 'tw-bg-green-50 tw-text-green-700'"
+                      >
+                        {{ fac.utilization || 0 }}%
+                      </span>
+                    </td>
+                  </tr>
+                  <tr v-if="!(facilities.top_by_active_lives || []).length">
+                    <td colspan="4" class="tw-py-10 tw-text-center tw-text-gray-400 tw-text-sm">No facility load data yet</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Funding + Vulnerable Groups + Financials ──────────────────────── -->
+        <section class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 xl:tw-grid-cols-3 tw-gap-6">
+
+          <!-- Funding Sources -->
+          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
+              <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Funding Sources</h2>
+              <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Government and donor accountability structure</p>
+            </div>
+            <div class="tw-p-5 tw-space-y-3">
+              <BreakdownRow
+                v-for="(item, i) in (overview.funding_mix || [])"
+                :key="item.label"
+                :label="item.label"
+                :count="item.count"
+                :pct="item.percentage || 0"
+                :color="CHART_COLORS[i % CHART_COLORS.length]"
+              />
+              <p v-if="!(overview.funding_mix || []).length" class="tw-py-8 tw-text-center tw-text-gray-400 tw-text-sm">No funding data yet</p>
+            </div>
+          </div>
+
+          <!-- Vulnerable Groups -->
+          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
+              <div>
+                <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Vulnerable Groups</h2>
+                <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Equity lens for enrollee classification</p>
+              </div>
+              <span class="tw-text-xs tw-font-bold tw-text-purple-600 tw-bg-purple-50 tw-border tw-border-purple-100 tw-rounded-full tw-px-2 tw-py-0.5">
+                {{ number(coverage.active ? vulnerableCovered : 0) }} covered
+              </span>
+            </div>
+            <div class="tw-p-5 tw-space-y-3">
+              <BreakdownRow
+                v-for="(item, i) in (overview.vulnerable_groups || [])"
+                :key="item.label"
+                :label="item.label"
+                :count="item.count"
+                :pct="item.percentage || 0"
+                :color="PURPLE_COLORS[i % PURPLE_COLORS.length]"
+              />
+              <p v-if="!(overview.vulnerable_groups || []).length" class="tw-py-8 tw-text-center tw-text-gray-400 tw-text-sm">No vulnerable group data yet</p>
+            </div>
+          </div>
+
+          <!-- PIN & Invoice Signals -->
+          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
+              <h2 class="tw-text-base tw-font-bold tw-text-gray-900">PIN & Invoice Signals</h2>
+              <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Premium voucher movement and payment tracking</p>
+            </div>
+            <div class="tw-p-5">
+              <div class="tw-grid tw-grid-cols-2 tw-gap-3">
+                <FinancialTile label="PINs Generated" :value="number(financials.pin_inventory?.total)" icon="mdi-key-chain" color="blue" />
+                <FinancialTile label="PINs Used" :value="number(financials.pin_inventory?.used)" icon="mdi-key-check" color="green" />
+                <FinancialTile label="Paid Invoices" :value="number(financials.invoices?.paid)" icon="mdi-receipt-text-check-outline" color="teal" />
+                <FinancialTile label="Paid Value" :value="money(financials.invoices?.paid_value)" icon="mdi-cash-check" color="indigo" />
+              </div>
+              <div v-if="financials.pin_inventory?.total > 0" class="tw-mt-4 tw-pt-4 tw-border-t tw-border-gray-100">
+                <div class="tw-flex tw-justify-between tw-text-xs tw-text-gray-500 tw-mb-2">
+                  <span>PIN Utilisation</span>
+                  <span class="tw-font-semibold">{{ pinUtilPct }}%</span>
+                </div>
+                <div class="tw-h-2 tw-bg-gray-100 tw-rounded-full tw-overflow-hidden">
+                  <div
+                    class="tw-h-full tw-rounded-full tw-transition-all tw-duration-700"
+                    :class="pinUtilPct > 80 ? 'tw-bg-green-500' : pinUtilPct > 50 ? 'tw-bg-blue-500' : 'tw-bg-gray-400'"
+                    :style="{ width: pinUtilPct + '%' }"
+                  />
+                </div>
+                <div class="tw-flex tw-justify-between tw-text-xs tw-text-gray-400 tw-mt-1">
+                  <span>{{ number(financials.pin_inventory?.used) }} used</span>
+                  <span>{{ number(financials.pin_inventory?.total) }} total</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ── Benefactor + Recent Approvals ───────────────────────────────── -->
+        <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-3 tw-gap-6">
+
+          <!-- Benefactor Participation -->
+          <div class="tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
+              <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Benefactor Participation</h2>
+              <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Sponsored vs self-funded distribution</p>
+            </div>
+            <div class="tw-p-5 tw-space-y-3">
+              <BreakdownRow
+                v-for="(item, i) in (overview.benefactor_mix || [])"
+                :key="item.label"
+                :label="item.label"
+                :count="item.count"
+                :pct="item.percentage || 0"
+                :color="TEAL_COLORS[i % TEAL_COLORS.length]"
+              />
+              <p v-if="!(overview.benefactor_mix || []).length" class="tw-py-8 tw-text-center tw-text-gray-400 tw-text-sm">No benefactor data yet</p>
+            </div>
+          </div>
+
+          <!-- Recent Approvals -->
+          <div class="xl:tw-col-span-2 tw-bg-white tw-rounded-2xl tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
+              <div>
+                <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Recent Approvals</h2>
+                <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Latest lives moved into active coverage</p>
+              </div>
+              <v-chip size="x-small" color="success" variant="tonal">Live feed</v-chip>
+            </div>
+            <div class="tw-divide-y tw-divide-gray-50">
+              <div
+                v-for="item in (pipeline.recent_approvals || [])"
+                :key="item.id"
+                class="tw-flex tw-items-start tw-gap-4 tw-px-6 tw-py-4 hover:tw-bg-gray-50 tw-transition-colors"
+              >
+                <div class="tw-w-9 tw-h-9 tw-rounded-full tw-bg-green-100 tw-flex tw-items-center tw-justify-center tw-shrink-0">
+                  <v-icon size="18" color="green">mdi-account-check-outline</v-icon>
+                </div>
+                <div class="tw-flex-1 tw-min-w-0">
+                  <p class="tw-text-sm tw-font-semibold tw-text-gray-900">{{ item.name || item.enrollee_id || 'Unknown' }}</p>
+                  <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">
+                    <span v-if="item.programme" class="tw-font-medium">{{ item.programme }}</span>
+                    <span v-if="item.programme && item.facility" class="tw-mx-1">·</span>
+                    <span v-if="item.facility">{{ item.facility }}</span>
+                  </p>
+                </div>
+                <div class="tw-text-right tw-shrink-0">
+                  <span class="tw-inline-flex tw-items-center tw-gap-1 tw-text-xs tw-font-semibold tw-text-green-700 tw-bg-green-50 tw-rounded-full tw-px-2 tw-py-0.5">
+                    <v-icon size="10">mdi-check</v-icon> Approved
+                  </span>
+                  <p class="tw-text-xs tw-text-gray-400 tw-mt-1">{{ item.time }}</p>
+                </div>
+              </div>
+              <div v-if="!(pipeline.recent_approvals || []).length" class="tw-py-10 tw-text-center tw-text-gray-400 tw-text-sm">
+                No recent approvals yet
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </template>
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, h, resolveComponent } from 'vue'
-import { useAuthStore } from '../../stores/auth'
+import { computed, defineComponent, h, onMounted, ref, resolveComponent } from 'vue'
+import AdminLayout from '../layout/AdminLayout.vue'
+import LineChart from '../charts/LineChart.vue'
+import BarChart from '../charts/BarChart.vue'
+import DoughnutChart from '../charts/DoughnutChart.vue'
 import { dashboardAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
-import AdminLayout from '../layout/AdminLayout.vue'
-import EnrolleesTab from './tabs/EnrolleesTab.vue'
-import FacilitiesTab from './tabs/FacilitiesTab.vue'
 
-/* Stores */
-const authStore = useAuthStore()
-const { error, success, warn } = useToast?.() || { error: console.error, success: console.log, warn: console.warn }
+const { error, success } = useToast()
 
-/* State */
-const activeTab = ref('enrollees')
-const loading = ref(false)
-const lastUpdated = ref(null)
+const loading    = ref(false)
+const overview   = ref({})
 
-const stats = ref({
-  totalEnrollees: { value: 0, change: null, title: 'Total Enrollees', icon: 'mdi-account-group', color: 'blue' },
-  activeEnrollees: { value: 0, change: null, title: 'Active Enrollees', icon: 'mdi-account-check', color: 'green' },
-  notActiveEnrollees: { value: 0, change: null, title: 'Enrollees Not Active', icon: 'mdi-clock-outline', color: 'orange' },
-  totalFacilities: { value: 0, change: null, title: 'Total Facilities', icon: 'mdi-hospital-building', color: 'purple' },
-})
+// ── Computed accessors ──────────────────────────────────────────────────────
+const currentMonth    = computed(() => new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
+const executiveCards  = computed(() => overview.value.executive_summary || [])
+const performance     = computed(() => overview.value.performance || {})
+const coverage        = computed(() => overview.value.coverage || {})
+const geography       = computed(() => overview.value.geography || {})
+const facilities      = computed(() => overview.value.facilities || {})
+const financials      = computed(() => overview.value.financials || {})
+const pipeline        = computed(() => overview.value.pipeline || {})
+const totalEnrollees  = computed(() => Number(executiveCards.value[0]?.value || 0))
+const vulnerableCovered = computed(() => Number(executiveCards.value[3]?.value || 0))
 
-const enrolleeStats = ref({
-  byGender: [],
-  byType: [],
-  byBenefactor: [],
-  byFundingType: [],
-  byWard: [],
-  byFacility: [],
-  monthlyTrend: [],
-  // send to EnrolleesTab in the shape it accepts (it supports both)
-  ageStats: { average: 0, groups: {} },
-})
+// ── Header pills ────────────────────────────────────────────────────────────
+const headerPills = computed(() => [
+  { label: 'Total Enrollees',  value: formatValue(executiveCards.value[0]?.value), sub: 'captured lives' },
+  { label: 'Active Coverage',  value: formatValue(executiveCards.value[1]?.value), sub: `${performance.value.coverage_rate || 0}% of enrolled` },
+  { label: 'Coverage Rate',    value: (performance.value.coverage_rate || 0) + '%', sub: 'eligibility rate' },
+  { label: 'Pending Approval', value: formatValue(executiveCards.value[2]?.value), sub: 'awaiting review' },
+])
 
-const facilityStats = ref({ byLga: [], byWard: [], byFacility: [], topFacilities: [] })
+// ── Chart colours ───────────────────────────────────────────────────────────
+const CHART_COLORS  = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#6366f1']
+const PURPLE_COLORS = ['#8b5cf6', '#a78bfa', '#7c3aed', '#c4b5fd', '#6d28d9']
+const TEAL_COLORS   = ['#14b8a6', '#0d9488', '#5eead4', '#0f766e', '#2dd4bf']
 
-/* Lookups */
-const lgas = ref([])
-const benefactors = ref([])
-
-/* Filters */
-const selectedLgaId = ref(null)
-const selectedBenefactorId = ref(null)
-
-/* Computed */
-const userName = computed(() => authStore.userName)
-
-const lgaById = computed(() => Object.fromEntries(lgas.value.map(l => [l.id, l])))
-const lgaOptions = computed(() => lgas.value.filter(l => l.status === 1).map(l => ({ label: l.name, value: l.id })))
-
-const benefactorById = computed(() => Object.fromEntries(benefactors.value.map(b => [b.id, b])))
-const benefactorOptions = computed(() => benefactors.value.filter(b => b.status === 1).map(b => ({ label: b.name, value: b.id })))
-
-/* Enrollee stats filtered view */
-const filteredEnrolleeStats = computed(() => {
-  const lgaName = selectedLgaId.value ? lgaById.value[selectedLgaId.value]?.name : null
-  const benefName = selectedBenefactorId.value ? benefactorById.value[selectedBenefactorId.value]?.name : null
-  const filterList = (arr, key, val) => (val ? arr.filter(x => x[key] === val) : arr)
-
+// ── Programme Mix ───────────────────────────────────────────────────────────
+const programmeMixData = computed(() => {
+  const items = overview.value.programme_mix || []
+  if (!items.length) return { labels: [], datasets: [] }
   return {
-    ...enrolleeStats.value,
-    byWard: enrolleeStats.value.byWard?.length ? filterList(enrolleeStats.value.byWard, 'lga', lgaName || undefined) : [],
-    byFacility: enrolleeStats.value.byFacility?.length ? filterList(enrolleeStats.value.byFacility, 'lga', lgaName || undefined) : [],
-    byBenefactor: benefName ? enrolleeStats.value.byBenefactor.filter(x => x.benefactor === benefName) : enrolleeStats.value.byBenefactor,
+    labels: items.map(i => i.label),
+    datasets: [{ data: items.map(i => i.count), backgroundColor: CHART_COLORS, borderWidth: 0 }],
   }
 })
 
-/* Facility stats filtered view */
-const filteredFacilityStats = computed(() => {
-  const lgaName = selectedLgaId.value ? lgaById.value[selectedLgaId.value]?.name : null
-  const filterList = (arr, key, val) => (val ? arr.filter(x => x[key] === val) : arr)
+// ── Performance meters ──────────────────────────────────────────────────────
+const performanceMeters = computed(() => [
+  { label: 'Coverage Rate',  pct: performance.value.coverage_rate  || 0, sub: 'of enrolled lives',   stroke: '#22c55e' },
+  { label: 'Approval Rate',  pct: performance.value.approval_rate  || 0, sub: 'processed so far',    stroke: '#3b82f6' },
+  { label: 'Geo Reach',      pct: performance.value.geographic_reach_rate || 0, sub: 'of LGAs reached', stroke: '#14b8a6' },
+])
 
+// ── PIN utilisation ─────────────────────────────────────────────────────────
+const pinUtilPct = computed(() => {
+  const inv = financials.value.pin_inventory
+  if (!inv?.total) return 0
+  return Math.round((inv.used / inv.total) * 100)
+})
+
+// ── Enrollment Trend: interactive year → month ──────────────────────────────
+const trendDrillLevel  = ref('year')
+const trendSelectedYear = ref(null)
+const trendYearData    = ref([])
+const trendMonthlyData = ref([])
+const trendLoading     = ref(false)
+
+const trendYearChartData = computed(() => {
+  if (!trendYearData.value.length) return { labels: [], datasets: [] }
   return {
-    ...facilityStats.value,
-    byLga: filterList(facilityStats.value.byLga, 'lga', lgaName || undefined),
-    byWard: facilityStats.value.byWard, // API items have no lga
-    byFacility: filterList(facilityStats.value.byFacility, 'lga', lgaName || undefined),
-    topFacilities: lgaName ? facilityStats.value.topFacilities.filter(f => f.lga === lgaName) : facilityStats.value.topFacilities,
+    labels: trendYearData.value.map(d => d.label || String(d.year)),
+    datasets: [{
+      label: 'Enrollments',
+      data: trendYearData.value.map(d => d.count || 0),
+      backgroundColor: trendYearData.value.map((_, i) =>
+        i === trendYearData.value.length - 1 ? '#3b82f6' : 'rgba(59,130,246,0.55)'
+      ),
+      hoverBackgroundColor: '#1d4ed8',
+      borderRadius: 8,
+    }],
   }
 })
 
-/* Helpers */
-const safePct = (n) => {
-  if (n === null || n === undefined) return null
-  const x = Number(n)
-  if (!isFinite(x) || Math.abs(x) > 1000) return null
-  return x
+const trendMonthChartData = computed(() => {
+  if (!trendMonthlyData.value.length) return { labels: [], datasets: [] }
+  return {
+    labels: trendMonthlyData.value.map(d => d.label),
+    datasets: [{
+      label: `Enrollments ${trendSelectedYear.value}`,
+      data: trendMonthlyData.value.map(d => d.count || 0),
+      borderColor: '#3b82f6',
+      backgroundColor: 'rgba(59,130,246,0.08)',
+      fill: true,
+      tension: 0.4,
+    }],
+  }
+})
+
+// Stable click handler — reads reactive state via .value, no stale closure.
+function handleTrendYearClick(event, elements) {
+  if (!elements.length || trendDrillLevel.value !== 'year') return
+  const idx  = elements[0].index
+  const year = trendYearData.value[idx]?.year
+  if (year) drillToYear(year)
 }
 
-function normalizeOverview(payload) {
-  const pick = (key, fallbackTitle) => {
-    const v = payload?.[key] || {}
-    return {
-      value: Number(v.value ?? 0),
-      change: safePct(v.change),
-      title: v.title ?? fallbackTitle,
-      icon: v.icon ?? 'mdi-information-outline',
-      color: v.color ?? 'gray',
-    }
-  }
-  return {
-    totalEnrollees: pick('totalEnrollees', 'Total Enrollees'),
-    activeEnrollees: pick('activeEnrollees', 'Active Enrollees'),
-    notActiveEnrollees: pick('notActiveEnrollees', 'Enrollees Not Active'),
-    totalFacilities: pick('totalFacilities', 'Total Facilities'),
-  }
-}
-
-function normalizeEnrolleeStats(payload) {
-  // monthlyTrend supports array or keyed object
-  let trend = []
-  const rawTrend = payload?.monthlyTrend ?? []
-  if (Array.isArray(rawTrend)) {
-    trend = rawTrend.map(t => ({ month: t.month, count: Number(t.count ?? 0) }))
-  } else {
-    trend = Object.values(rawTrend).map(t => ({ month: t.month, count: Number(t.count ?? 0) }))
-  }
-
-  return {
-    byGender: payload?.byGender ?? [],
-    byType: payload?.byType ?? [],
-    byBenefactor: payload?.byBenefactor ?? [],
-    byFundingType: payload?.byFundingType ?? [],
-    byWard: payload?.byWard ?? [],
-    byFacility: payload?.byFacility ?? [],
-    monthlyTrend: trend,
-    // send both-friendly shape; EnrolleesTab supports average or average_age, groups or age_groups
-    ageStats: {
-      average: Number(payload?.ageStats?.average_age ?? payload?.ageStats?.average ?? 0),
-      groups: payload?.ageStats?.age_groups ?? payload?.ageStats?.groups ?? {},
+const trendYearOptions = {
+  onClick: handleTrendYearClick,
+  plugins: {
+    legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: ctx => ` ${ctx.parsed.y.toLocaleString()} enrollments`,
+        footer: () => 'Click to see monthly breakdown',
+      },
     },
-  }
+  },
+  scales: {
+    x: { grid: { display: false } },
+    y: { grid: { color: 'rgba(107,114,128,0.08)' } },
+  },
+  elements: { bar: { borderRadius: 8, borderSkipped: false } },
 }
 
-function normalizeFacilityStats(payload) {
-  const toNum = (v) => (v == null ? 0 : Number(v))
-  const topFacilities = (payload?.topFacilities ?? []).map(f => ({
-    name: f.name,
-    lga: f.lga,
-    enrollees: toNum(f.enrollees),
-    capacity: toNum(f.capacity),
-    utilization: toNum(f.utilization),
-  }))
-  return {
-    byLga: payload?.byLga ?? [],
-    byWard: payload?.byWard ?? [],
-    byFacility: payload?.byFacility ?? [],
-    topFacilities,
-  }
-}
-
-function clearFilters() {
-  selectedLgaId.value = null
-  selectedBenefactorId.value = null
-}
-
-/* Loaders (each catches its own errors so partial data can render) */
-async function loadOverview() {
+async function loadTrendYears() {
   try {
-    const res = await dashboardAPI.getOverview() // /overview
-    if (res?.data?.success) {
-      stats.value = normalizeOverview(res.data.data)
-      lastUpdated.value = Date.now()
-    } else {
-      throw new Error('Overview request failed')
-    }
-  } catch (e) {
-    error('Failed to load overview.')
-    console.error(e)
+    const resp = await dashboardAPI.getEnrollmentTrend()
+    trendYearData.value = resp.data?.data || []
+  } catch (_) {
+    // non-critical
   }
 }
 
-async function loadEnrolleeStats() {
+async function drillToYear(year) {
+  trendLoading.value   = true
+  trendSelectedYear.value = year
+  trendDrillLevel.value   = 'month'
   try {
-    const res = await dashboardAPI.getEnrolleeStats() // /enrollee-stats
-    if (res?.data?.success) {
-      enrolleeStats.value = normalizeEnrolleeStats(res.data.data)
-    } else {
-      throw new Error('Enrollee stats request failed')
-    }
-  } catch (e) {
-    error('Failed to load enrollee statistics.')
-    console.error(e)
+    const resp = await dashboardAPI.getEnrollmentTrend({ year })
+    trendMonthlyData.value = resp.data?.data || []
+  } catch (_) {
+    trendMonthlyData.value = []
+  } finally {
+    trendLoading.value = false
   }
 }
 
-async function loadFacilityStats() {
+function backToYears() {
+  trendDrillLevel.value   = 'year'
+  trendSelectedYear.value = null
+  trendMonthlyData.value  = []
+}
+
+// ── Geographic Reach: interactive LGA → wards ────────────────────────────────
+const geoView     = ref('lga')
+const selectedLga = ref(null)
+const wardData    = ref([])
+const wardLoading = ref(false)
+
+async function drillToLga(item) {
+  if (!item.lga_id) return
+  wardLoading.value = true
+  geoView.value     = 'ward'
+  selectedLga.value = { lga_id: item.lga_id, lga_name: item.lga }
   try {
-    const res = await dashboardAPI.getFacilityStats() // /dashboard/facility-stats
-    if (res?.data?.success) {
-      facilityStats.value = normalizeFacilityStats(res.data.data)
-    } else {
-      throw new Error('Facility stats request failed')
-    }
-  } catch (e) {
-    error('Failed to load facility statistics.')
-    console.error(e)
+    const resp = await dashboardAPI.getWardsByLga(item.lga_id)
+    wardData.value = resp.data?.data?.wards || []
+  } catch (_) {
+    wardData.value = []
+  } finally {
+    wardLoading.value = false
   }
 }
 
-async function loadLgas() {
-  try {
-    const res = await dashboardAPI.getLgas() // /lgas
-    if (res?.data?.success) {
-      lgas.value = res.data.data ?? []
-    } else {
-      throw new Error('LGAs request failed')
-    }
-  } catch (e) {
-    warn?.('Could not load LGAs.')
-    console.error(e)
-    lgas.value = []
-  }
+function backToLgas() {
+  geoView.value     = 'lga'
+  selectedLga.value = null
+  wardData.value    = []
 }
 
-async function loadBenefactors() {
-  try {
-    const res = await dashboardAPI.getBenefactors() // /benefactors
-    if (res?.data?.success) {
-      benefactors.value = res.data.data ?? []
-    } else {
-      throw new Error('Benefactors request failed')
-    }
-  } catch (e) {
-    warn?.('Could not load benefactors.')
-    console.error(e)
-    benefactors.value = []
-  }
+// ── Helpers ─────────────────────────────────────────────────────────────────
+function number(value) {
+  return Number(value || 0).toLocaleString()
+}
+function money(value) {
+  return new Intl.NumberFormat(undefined, { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(Number(value || 0))
+}
+function formatValue(value) {
+  return typeof value === 'string' ? value : number(value)
+}
+function largest(items = []) {
+  return Math.max(...items.map(i => Number(i.count || i.enrollees || 0)), 1)
+}
+function statusDot(label) {
+  const l = label.toLowerCase()
+  if (l.includes('active'))  return 'tw-bg-green-500'
+  if (l.includes('pending')) return 'tw-bg-amber-400'
+  if (l.includes('reject'))  return 'tw-bg-red-500'
+  if (l.includes('suspend')) return 'tw-bg-orange-400'
+  return 'tw-bg-gray-400'
+}
+function statusBar(label) {
+  const l = label.toLowerCase()
+  if (l.includes('active'))  return 'tw-bg-green-500'
+  if (l.includes('pending')) return 'tw-bg-amber-400'
+  if (l.includes('reject'))  return 'tw-bg-red-500'
+  if (l.includes('suspend')) return 'tw-bg-orange-400'
+  return 'tw-bg-gray-400'
 }
 
-async function refreshAll() {
+// ── API ─────────────────────────────────────────────────────────────────────
+async function loadDashboard() {
   loading.value = true
   try {
-    const results = await Promise.allSettled([
-      loadOverview(),
-      loadEnrolleeStats(),
-      loadFacilityStats(),
-      loadLgas(),
-      loadBenefactors(),
-    ])
-    const failed = results.filter(r => r.status === 'rejected').length
-    if (failed) {
-      error(`${failed} section${failed > 1 ? 's' : ''} failed to load.`)
-    } else {
-      success('Dashboard refreshed')
-    }
+    const response = await dashboardAPI.getOverview()
+    overview.value = response.data?.data || {}
+    success('Dashboard refreshed')
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to load dashboard')
   } finally {
     loading.value = false
   }
 }
 
-onMounted(refreshAll)
+onMounted(async () => {
+  await loadDashboard()
+  loadTrendYears()
+})
 
-/* -------- Render-function components (no inline templates) -------- */
+// ── Sub-components ──────────────────────────────────────────────────────────
 
-const ChangePill = {
-  name: 'ChangePill',
-  props: { change: { type: Number, default: null } },
+const KpiCard = defineComponent({
+  name: 'KpiCard',
+  props: {
+    label:  String,
+    value:  [String, Number],
+    helper: String,
+    icon:   { type: String, default: 'mdi-chart-bar' },
+    tone:   { type: String, default: 'primary' },
+  },
   setup(props) {
     const VIcon = resolveComponent('v-icon')
+    const toneMap = {
+      primary: { bg: 'tw-bg-blue-50',   text: 'tw-text-blue-700',   border: 'tw-border-blue-100' },
+      success: { bg: 'tw-bg-green-50',  text: 'tw-text-green-700',  border: 'tw-border-green-100' },
+      warning: { bg: 'tw-bg-amber-50',  text: 'tw-text-amber-700',  border: 'tw-border-amber-100' },
+      info:    { bg: 'tw-bg-cyan-50',   text: 'tw-text-cyan-700',   border: 'tw-border-cyan-100' },
+      indigo:  { bg: 'tw-bg-indigo-50', text: 'tw-text-indigo-700', border: 'tw-border-indigo-100' },
+      teal:    { bg: 'tw-bg-teal-50',   text: 'tw-text-teal-700',   border: 'tw-border-teal-100' },
+    }
     return () => {
-      if (props.change === null || props.change === undefined) return null
-      const isUp = Number(props.change) >= 0
-      const tone = isUp
-        ? 'tw-bg-green-100 tw-text-green-700'
-        : 'tw-bg-red-100 tw-text-red-700'
-      return h(
-        'span',
-        { class: `tw-text-xs tw-font-semibold tw-rounded-full tw-px-2 tw-py-0.5 ${tone}` },
-        [
-          h(VIcon, {
-            size: 14,
-            class: 'tw-mr-1',
-            icon: isUp ? 'mdi-arrow-up' : 'mdi-arrow-down'
+      const t = toneMap[props.tone] ?? toneMap.primary
+      return h('div', {
+        class: `tw-bg-white tw-border ${t.border} tw-rounded-2xl tw-p-5 tw-shadow-sm hover:tw-shadow-md tw-transition-all tw-duration-200`,
+      }, [
+        h('div', { class: 'tw-flex tw-items-center tw-justify-between tw-gap-2 tw-mb-3' }, [
+          h('p', { class: 'tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500' }, props.label),
+          h('div', { class: `tw-w-8 tw-h-8 tw-rounded-lg ${t.bg} tw-flex tw-items-center tw-justify-center` }, [
+            h(VIcon, { size: 18, class: t.text }, { default: () => props.icon }),
+          ]),
+        ]),
+        h('p', { class: 'tw-text-2xl tw-font-extrabold tw-text-gray-950 tw-leading-tight' }, props.value),
+        h('p', { class: 'tw-text-xs tw-text-gray-400 tw-mt-2 tw-leading-snug' }, props.helper),
+      ])
+    }
+  },
+})
+
+const ProgressBar = defineComponent({
+  name: 'ProgressBar',
+  props: {
+    label: String,
+    value: { type: [String, Number], default: 0 },
+    max:   { type: [String, Number], default: 1 },
+    color: { type: String, default: '#3b82f6' },
+  },
+  setup(props) {
+    return () => {
+      const val = Number(props.value || 0)
+      const max = Math.max(Number(props.max || 1), 1)
+      const pct = Math.min(100, Math.round((val / max) * 1000) / 10)
+      return h('div', {}, [
+        h('div', { class: 'tw-flex tw-items-center tw-justify-between tw-mb-1.5' }, [
+          h('span', { class: 'tw-text-sm tw-font-medium tw-text-gray-700' }, props.label),
+          h('div', { class: 'tw-flex tw-items-center tw-gap-2' }, [
+            h('span', { class: 'tw-text-sm tw-font-extrabold tw-text-gray-950' }, val.toLocaleString()),
+            h('span', { class: 'tw-text-xs tw-text-gray-400' }, `(${pct}%)`),
+          ]),
+        ]),
+        h('div', { class: 'tw-w-full tw-h-2.5 tw-bg-gray-100 tw-rounded-full tw-overflow-hidden' }, [
+          h('div', {
+            style: { width: `${pct}%`, backgroundColor: props.color, transition: 'width 0.8s ease' },
+            class: 'tw-h-full tw-rounded-full',
           }),
-          `${Math.abs(Number(props.change) || 0).toLocaleString()}%`
-        ]
-      )
+        ]),
+      ])
     }
-  }
-}
+  },
+})
 
-const StatCard = {
-  name: 'StatCard',
-  props: { item: { type: Object, required: true } },
+const BreakdownRow = defineComponent({
+  name: 'BreakdownRow',
+  props: {
+    label: String,
+    count: { type: Number, default: 0 },
+    pct:   { type: Number, default: 0 },
+    color: { type: String, default: '#3b82f6' },
+  },
+  setup(props) {
+    return () => h('div', { class: 'tw-flex tw-items-center tw-gap-3' }, [
+      h('div', { class: 'tw-w-2 tw-h-2 tw-rounded-full tw-shrink-0', style: { backgroundColor: props.color } }),
+      h('span', { class: 'tw-text-sm tw-font-medium tw-text-gray-700 tw-flex-1 tw-min-w-0 tw-truncate' }, props.label),
+      h('span', { class: 'tw-text-sm tw-font-bold tw-text-gray-900' }, Number(props.count).toLocaleString()),
+      h('span', { class: 'tw-text-xs tw-text-gray-400 tw-w-9 tw-text-right tw-shrink-0' }, `${props.pct}%`),
+    ])
+  },
+})
+
+const FinancialTile = defineComponent({
+  name: 'FinancialTile',
+  props: {
+    label: String,
+    value: [String, Number],
+    icon:  { type: String, default: 'mdi-cash' },
+    color: { type: String, default: 'blue' },
+  },
   setup(props) {
     const VIcon = resolveComponent('v-icon')
-    return () => {
-      const item = props.item || {}
-      const bg =
-        item.color === 'blue'   ? 'tw-bg-blue-100'   :
-        item.color === 'green'  ? 'tw-bg-green-100'  :
-        item.color === 'orange' ? 'tw-bg-yellow-100' :
-        item.color === 'purple' ? 'tw-bg-purple-100' : 'tw-bg-gray-100'
-
-      return h('div',
-        { class: 'tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6 tw-transition hover:tw-shadow-md' },
-        [
-          h('div', { class: 'tw-flex tw-items-center' }, [
-            h('div', { class: `tw-p-3 tw-rounded-full ${bg}` }, [
-              h(VIcon, { color: item.color || 'gray', size: 24, icon: item.icon || 'mdi-information-outline' })
-            ]),
-            h('div', { class: 'tw-ml-4 tw-w-full' }, [
-              h('p', { class: 'tw-text-sm tw-font-medium tw-text-gray-600' }, item.title || ''),
-              h('div', { class: 'tw-flex tw-items-baseline tw-gap-2 tw-mt-1' }, [
-                h('p', { class: 'tw-text-3xl tw-font-bold tw-text-gray-900' },
-                  (Number(item.value ?? 0)).toLocaleString()
-                ),
-                h(ChangePill, { change: item.change ?? null })
-              ])
-            ])
-          ])
-        ]
-      )
+    const colorMap = {
+      blue:   'tw-bg-blue-50 tw-border-blue-100 tw-text-blue-700',
+      green:  'tw-bg-green-50 tw-border-green-100 tw-text-green-700',
+      teal:   'tw-bg-teal-50 tw-border-teal-100 tw-text-teal-700',
+      indigo: 'tw-bg-indigo-50 tw-border-indigo-100 tw-text-indigo-700',
     }
-  }
-}
-
+    return () => h('div', {
+      class: `tw-rounded-xl tw-border tw-p-3 ${colorMap[props.color] ?? colorMap.blue}`,
+    }, [
+      h('div', { class: 'tw-flex tw-items-center tw-gap-2 tw-mb-1' }, [
+        h(VIcon, { size: 14, class: 'tw-opacity-70' }, { default: () => props.icon }),
+        h('p', { class: 'tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-opacity-70' }, props.label),
+      ]),
+      h('p', { class: 'tw-text-lg tw-font-extrabold' }, props.value ?? '—'),
+    ])
+  },
+})
 </script>
-
-<style scoped>
-/* Subtle elevate on hover for cards */
-</style>

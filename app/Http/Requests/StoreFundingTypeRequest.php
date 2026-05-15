@@ -19,7 +19,7 @@ class StoreFundingTypeRequest extends FormRequest
         return [
             'name'        => 'required|string|max:255|unique:funding_types,name',
             'description' => 'nullable|string',
-            'status'      => 'nullable|in:active,inactive',
+            'status'      => 'nullable|integer|in:0,1',
         ];
     }
 }

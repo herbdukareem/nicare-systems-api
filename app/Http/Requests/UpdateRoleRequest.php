@@ -28,8 +28,6 @@ class UpdateRoleRequest extends FormRequest
             'name' => ['sometimes', 'string', 'max:255', 'unique:roles,name,' . $roleId],
             'label' => ['sometimes', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:1000'],
-            'modules' => ['sometimes', 'array'],
-            'modules.*' => ['string', 'in:general,pas,claims,automation,management'],
             'permissions' => ['sometimes', 'array'],
             'permissions.*' => ['exists:permissions,id'],
         ];

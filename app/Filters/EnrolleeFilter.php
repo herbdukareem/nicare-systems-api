@@ -64,6 +64,18 @@ class EnrolleeFilter
                         $query->where('facility_id', $value);
                     }
                     break;
+                case 'insurance_programme_id':
+                case 'enrollee_category_id':
+                case 'premium_plan_id':
+                case 'funding_type_id':
+                case 'benefactor_id':
+                case 'enrollment_phase_id':
+                    if (is_array($value)) {
+                        $query->whereIn($key, $value);
+                    } else {
+                        $query->where($key, $value);
+                    }
+                    break;
                 case 'lga_id':
                     if (is_array($value)) {
                         $query->whereIn('lga_id', $value);
@@ -108,6 +120,25 @@ class EnrolleeFilter
                     break;
                 case 'approval_date_to':
                     $query->whereDate('approval_date', '<=', $value);
+                    break;
+                case 'coverage_status':
+                    $today = now()->toDateString();
+                    if ($value === 'active') {
+                        $query->where('status', 1)
+                            ->whereDate('coverage_start_date', '<=', $today)
+                            ->where(function ($q) use ($today) {
+                                $q->whereNull('coverage_end_date')
+                                    ->orWhereDate('coverage_end_date', '>=', $today);
+                            });
+                    } elseif ($value === 'expired') {
+                        $query->whereNotNull('coverage_end_date')
+                            ->whereDate('coverage_end_date', '<', $today);
+                    } elseif ($value === 'no_expiry') {
+                        $query->whereNull('coverage_end_date')
+                            ->whereNotNull('coverage_start_date');
+                    } elseif ($value === 'future') {
+                        $query->whereDate('coverage_start_date', '>', $today);
+                    }
                     break;
                 case 'age_from':
                     $query->whereRaw('TIMESTAMPDIFF(YEAR, date_of_birth, CURDATE()) >= ?', [$value]);

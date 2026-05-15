@@ -7,14 +7,30 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\SoftDeletes;
+use InvalidArgumentException;
 
 class Claim extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
+
+    /**
+     * Statuses from which the claim is immutable (facility cannot edit).
+     */
+    public const IMMUTABLE_STATUSES = ['SUBMITTED', 'REVIEWING', 'APPROVED', 'REJECTED'];
+
+    /**
+     * Returns true when the claim can no longer be edited by the submitting facility.
+     */
+    public function isImmutable(): bool
+    {
+        return in_array($this->status, self::IMMUTABLE_STATUSES, true);
+    }
 
     protected $guarded = ['id'];
 
     protected $casts = [
+        'service_date' => 'datetime',
         'claim_date' => 'datetime',
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',

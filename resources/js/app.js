@@ -66,16 +66,42 @@ app.use(PrimeVue);
 app.use(ToastService);
 
 // 🔐 Restore auth BEFORE mounting to avoid logout-on-refresh flicker
+const bootLoader = document.createElement('div');
+bootLoader.id = 'app-boot-loader';
+bootLoader.innerHTML = `
+  <div style="position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#fff;font-family:Inter,Arial,sans-serif">
+    <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
+      <div style="height:92px;width:92px;border-radius:999px;border:4px solid #dff3f7;display:grid;place-items:center;position:relative">
+        <div style="position:absolute;inset:-4px;border-radius:999px;border:4px solid transparent;border-top-color:#0885AB;animation:nicare-spin .8s linear infinite"></div>
+        <img src="/logo.png" alt="NGSCHA Logo" style="height:60px;width:60px;object-fit:contain" />
+      </div>
+      <div style="text-align:center">
+        <div style="font-size:14px;font-weight:700;color:#0f172a">Loading NiCare</div>
+        <div style="font-size:12px;color:#64748b">Preparing your workspace</div>
+      </div>
+    </div>
+  </div>
+`;
+const bootStyle = document.createElement('style');
+bootStyle.textContent = '@keyframes nicare-spin{to{transform:rotate(360deg)}}';
+document.head.appendChild(bootStyle);
+document.body.appendChild(bootLoader);
+
 const authStore = useAuthStore();
 authStore.initializeAuth().finally(() => {
+  bootLoader.remove();
   app.mount('#app');
 });
 
 // (Optional) Central listener for unauthorized events fired by api.js
-window.addEventListener('auth:unauthorized', async () => {
-  // Prevent double work if we're already initializing
-  if (!authStore._initializing) {
-    await authStore.logout();
+window.addEventListener('auth:unauthorized', () => {
+  if (authStore._initializing) {
+    return;
+  }
+
+  authStore.clearSession();
+
+  if (router.currentRoute.value.name !== 'login') {
     router.replace('/login');
   }
 });

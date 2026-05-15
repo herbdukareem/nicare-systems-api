@@ -23,18 +23,23 @@ class BenefactorController extends BaseController
 
     public function index(Request $request)
     {
-        $filters = $request->only(['name', 'email', 'phone', 'status', 'search']);
+        $filters = $request->only(['name', 'type', 'email', 'phone', 'status', 'search']);
         $perPage = (int) $request->get('per_page', 15);
         $sortBy = $request->get('sort_by', 'created_at');
         $sortDirection = $request->get('sort_direction', 'desc');
 
-        // $benefactors = $this->service->paginate($filters, $perPage, $sortBy, $sortDirection);
+        $benefactors = $this->service->paginate($filters, $perPage, $sortBy, $sortDirection);
+        $response = BenefactorResource::collection($benefactors);
+        $response->additional([
+            'meta' => [
+                'total' => $benefactors->total(),
+                'per_page' => $benefactors->perPage(),
+                'current_page' => $benefactors->currentPage(),
+                'last_page' => $benefactors->lastPage(),
+            ],
+        ]);
 
-       
-          return response()->json([
-                'success' => true,
-                'data' => BenefactorResource::collection(Benefactor::all()),
-          ]);
+        return $this->sendResponse($response, 'Benefactors retrieved successfully');
     }
 
     public function store(StoreBenefactorRequest $request)
@@ -45,8 +50,7 @@ class BenefactorController extends BaseController
 
     public function show(Benefactor $benefactor)
     {
-        $benefactor->load('enrollees');
-        return $this->sendResponse(new BenefactorResource($benefactor), 'Benefactor retrieved successfully');
+        return $this->sendResponse(new BenefactorResource($benefactor->loadCount(['enrollees', 'enrollmentPhases'])), 'Benefactor retrieved successfully');
     }
 
     public function update(UpdateBenefactorRequest $request, Benefactor $benefactor)
@@ -57,6 +61,11 @@ class BenefactorController extends BaseController
 
     public function destroy(Benefactor $benefactor)
     {
+        if ($benefactor->enrollees()->exists() || $benefactor->enrollmentPhases()->exists()) {
+            $benefactor->update(['status' => 0]);
+            return $this->sendResponse(new BenefactorResource($benefactor), 'Benefactor is in use and was deactivated instead.');
+        }
+
         $this->service->delete($benefactor);
         return $this->sendResponse([], 'Benefactor deleted successfully');
     }

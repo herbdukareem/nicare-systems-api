@@ -15,9 +15,9 @@ use App\Http\Controllers\Api\V1\UserController;
 use App\Http\Controllers\Api\V1\EnrolleeTypeController;
 use App\Http\Controllers\Api\V1\BankController;
 use App\Http\Controllers\Api\V1\FacilityController;
-use App\Http\Controllers\Api\V1\PremiumController;
 use App\Http\Controllers\Api\V1\FundingTypeController;
 use App\Http\Controllers\Api\V1\BenefactorController;
+use App\Http\Controllers\Api\V1\BenefitPackageController;
 use App\Http\Controllers\Api\V1\FeedbackController;
 use App\Http\Controllers\Api\V1\TaskController;
 use App\Http\Controllers\Api\V1\ProjectController;
@@ -51,7 +51,22 @@ use App\Http\Controllers\Api\ClaimLineController;
 use App\Http\Controllers\Api\PaymentController;
 use App\Http\Controllers\Api\PaymentBatchController;
 use App\Http\Controllers\Api\ReportingController;
+use App\Http\Controllers\Api\EligibilityLookupController;
+use App\Http\Controllers\Api\PayrollBatchController;
+use App\Http\Controllers\Api\PremiumDashboardController;
+use App\Http\Controllers\Api\PremiumMetadataController;
+use App\Http\Controllers\Api\PremiumPinController;
+use App\Http\Controllers\Api\PremiumPlanController;
+use App\Http\Controllers\Api\PremiumPurchaseController;
 use App\Http\Controllers\PAS\PACodeController;
+use App\Http\Controllers\Api\FinanceDashboardController;
+use App\Http\Controllers\Api\FacilityDashboardController;
+use App\Http\Controllers\Api\ClaimsDashboardController;
+use App\Http\Controllers\Api\CapitationController;
+use App\Http\Controllers\Api\MobileSyncController;
+use App\Http\Controllers\Api\EnrolleeImportController;
+use App\Http\Controllers\Api\EnrolleeController as EnrolleeApiController;
+use App\Http\Controllers\Api\ExtendedReportingController;
 
 /*
 |--------------------------------------------------------------------------
@@ -90,19 +105,23 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard/chart-data', [DashboardController::class, 'chartData']);
     Route::get('dashboard/recent-activities', [DashboardController::class, 'recentActivities']);
     Route::get('dashboard/status-options', [DashboardController::class, 'getStatusOptions']);
+    Route::get('dashboard/enrollment-trend', [DashboardController::class, 'enrollmentTrend']);
+    Route::get('dashboard/wards-by-lga', [DashboardController::class, 'wardsByLga']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {
 
 
     // DOFacility Management - Specific routes must come before apiResource
-    Route::get('do-facilities/desk-officers', [DOFacilityController::class, 'getDeskOfficers']);
-    Route::get('do-facilities/facilities', [DOFacilityController::class, 'getFacilities']);
-    Route::get('do-facilities/user/{userId}/facilities', [DOFacilityController::class, 'getUserFacilities']);
-    Route::apiResource('do-facilities', DOFacilityController::class);
+    Route::middleware('permission:facilities.assign')->group(function () {
+        Route::get('do-facilities/desk-officers', [DOFacilityController::class, 'getDeskOfficers']);
+        Route::get('do-facilities/facilities', [DOFacilityController::class, 'getFacilities']);
+        Route::get('do-facilities/user/{userId}/facilities', [DOFacilityController::class, 'getUserFacilities']);
+        Route::apiResource('do-facilities', DOFacilityController::class);
+    });
 
-    // DO Dashboard routes (for desk officers)
-    Route::prefix('do-dashboard')->middleware('claims.role:desk_officer,facility_admin,facility_user')->group(function () {
+    // DO Dashboard routes (desk officers, facility admins, facility users)
+    Route::prefix('do-dashboard')->middleware('permission:dashboard.desk_officer.view,dashboard.facility.view')->group(function () {
         Route::get('overview', [DODashboardController::class, 'overview']);
         Route::get('referrals', [DODashboardController::class, 'getReferrals']);
         Route::get('pa-codes', [DODashboardController::class, 'getPACodes']);
@@ -110,18 +129,24 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Enrollee routes
-    Route::apiResource('enrollees', EnrolleeController::class);
-    Route::post('enrollees/{enrollee}/upload-passport', [EnrolleeController::class, 'uploadPassport']);
-    Route::put('enrollees/{enrollee}/status', [EnrolleeController::class, 'updateStatus']);
-    Route::get('enrollees/{enrollee}/statistics', [EnrolleeController::class, 'getStatistics']);
-    Route::get('enrollees-export', function (Request $request) {
+    Route::middleware('permission:enrollees.view,enrollees.create,enrollees.update')->group(function () {
+        Route::get('enrollees/pending-approval', [EnrolleeController::class, 'pendingApproval']);
+        Route::get('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip']);
+        Route::post('enrollees/{enrollee}/approve', [EnrolleeController::class, 'approve']);
+        Route::get('enrollees/{enrollee}/id-card', [EnrolleeController::class, 'idCard']);
+        Route::apiResource('enrollees', EnrolleeController::class);
+        Route::post('enrollees/{enrollee}/upload-passport', [EnrolleeController::class, 'uploadPassport']);
+        Route::put('enrollees/{enrollee}/status', [EnrolleeController::class, 'updateStatus']);
+        Route::get('enrollees/{enrollee}/statistics', [EnrolleeController::class, 'getStatistics']);
+    });
+    Route::middleware('permission:enrollees.export')->get('enrollees-export', function (Request $request) {
         $filename = 'enrollees_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
         return Excel::download(new EnrolleesExport($request), $filename);
     });
     Route::get('enrollees/{enrollee}/export-pdf', function (Enrollee $enrollee) {
         $enrollee->load([
             'enrolleeType', 'facility', 'lga', 'ward', 'village',
-            'premium', 'employmentDetail', 'fundingType', 'benefactor',
+            'premiumPlan', 'premiumPin', 'employmentDetail', 'fundingType', 'benefactor',
             'creator', 'approver'
         ]);
 
@@ -132,22 +157,21 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Role and permission routes
-    Route::apiResource('roles', RoleController::class);
-    Route::apiResource('permissions', PermissionController::class);
-
-    // Role management routes
-    Route::post('roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
-    Route::get('roles-with-user-counts', [RoleController::class, 'withUserCounts']);
-    Route::post('roles/{role}/clone', [RoleController::class, 'clone']);
-    Route::delete('roles/bulk-delete', [RoleController::class, 'bulkDelete']);
-
-    // Permission management routes
-    Route::get('permissions/by-category', [PermissionController::class, 'byCategory']);
-    Route::post('permissions/bulk-create', [PermissionController::class, 'bulkCreate']);
-    Route::delete('permissions/bulk-delete', [PermissionController::class, 'bulkDelete']);
+    Route::middleware('permission:roles.view,permissions.view')->group(function () {
+        Route::apiResource('roles', RoleController::class);
+        Route::apiResource('permissions', PermissionController::class);
+        Route::post('roles/{role}/permissions', [RoleController::class, 'syncPermissions']);
+        Route::get('roles-with-user-counts', [RoleController::class, 'withUserCounts']);
+        Route::post('roles/{role}/clone', [RoleController::class, 'clone']);
+        Route::delete('roles/bulk-delete', [RoleController::class, 'bulkDelete']);
+        Route::get('permissions/by-category', [PermissionController::class, 'byCategory']);
+        Route::post('permissions/bulk-create', [PermissionController::class, 'bulkCreate']);
+        Route::delete('permissions/bulk-delete', [PermissionController::class, 'bulkDelete']);
+    });
 
     // User routes
-    Route::apiResource('users', UserController::class);
+    Route::middleware('permission:users.view,users.create')->group(function () {
+        Route::apiResource('users', UserController::class);
     Route::get('users-with-roles', [UserController::class, 'withRoles']);
     Route::post('users/{user}/roles', [UserController::class, 'syncRoles']);
     Route::post('users/{user}/switch-role', [UserController::class, 'switchRole']);
@@ -171,19 +195,43 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('users/export', [UserController::class, 'export']);
     Route::post('users/import', [UserController::class, 'import']);
     Route::get('users/{user}/activity-stats', [UserController::class, 'activityStats']);
+    }); // end users group
 
     Route::apiResource('enrollee-types', EnrolleeTypeController::class);
     Route::apiResource('banks', BankController::class);
-    // Route::apiResource('facilities', FacilityController::class);
-    Route::get('facilities', [FacilityController::class, 'index']);
     Route::get('facilities/{facility}/enrollees', [FacilityController::class, 'enrollees']);
+    Route::apiResource('facilities', FacilityController::class);
     Route::apiResource('referrals', ReferralController::class)->only(['index', 'store', 'show']);
     Route::post('referrals/{referral}/approve', [ReferralController::class, 'approve']);
     Route::post('referrals/{referral}/reject', [ReferralController::class, 'reject']);
-    Route::apiResource('premiums', PremiumController::class);
+    Route::prefix('premium')->group(function () {
+        Route::get('dashboard', [PremiumDashboardController::class, 'index']);
+        Route::get('metadata', [PremiumMetadataController::class, 'index']);
+        Route::apiResource('plans', PremiumPlanController::class)->parameters(['plans' => 'premiumPlan']);
+
+        Route::get('pins', [PremiumPinController::class, 'index']);
+        Route::post('pins/generate', [PremiumPinController::class, 'generate']);
+        Route::post('pins/validate', [PremiumPinController::class, 'validatePin']);
+        Route::get('pins/{premiumPin}', [PremiumPinController::class, 'show']);
+        Route::post('pins/{premiumPin}/sell', [PremiumPinController::class, 'sell']);
+        Route::post('pins/{premiumPin}/use', [PremiumPinController::class, 'use']);
+        Route::post('pins/{premiumPin}/cancel', [PremiumPinController::class, 'cancel']);
+
+        Route::apiResource('purchases', PremiumPurchaseController::class)->only(['index', 'store', 'show'])->parameters(['purchases' => 'premiumPurchase']);
+        Route::post('purchases/{premiumPurchase}/confirm', [PremiumPurchaseController::class, 'confirm']);
+        Route::post('purchases/{premiumPurchase}/cancel', [PremiumPurchaseController::class, 'cancel']);
+
+        Route::apiResource('payroll-batches', PayrollBatchController::class)->only(['index', 'store'])->parameters(['payroll-batches' => 'payrollBatch']);
+        Route::post('payroll-batches/{payrollBatch}/approve', [PayrollBatchController::class, 'approve']);
+
+        Route::get('eligibility', [EligibilityLookupController::class, 'show']);
+    });
+
     Route::apiResource('funding-types', FundingTypeController::class);
     Route::apiResource('benefactors', BenefactorController::class);
+    Route::apiResource('benefit-packages', BenefitPackageController::class)->parameters(['benefit-packages' => 'benefitPackage']);
     Route::apiResource('lgas', LgaController::class);
+    Route::get('lgas/{lga}/wards', [LgaController::class, 'wards']);
     Route::apiResource('wards', WardController::class);
     Route::apiResource('villages', VillageController::class);
     Route::apiResource('account-details', AccountDetailController::class);
@@ -324,8 +372,52 @@ Route::middleware('auth:sanctum')->group(function () {
         });
     });
 
+    // ─── Phase 2: Specialist Dashboards ─────────────────────────────────────────
+    Route::get('dashboard/finance', [FinanceDashboardController::class, 'index']);
+    Route::get('dashboard/facility', [FacilityDashboardController::class, 'index']);
+    Route::get('dashboard/claims', [ClaimsDashboardController::class, 'index']);
+
+    // ─── Phase 2: Capitation ─────────────────────────────────────────────────────
+    Route::prefix('capitation')->middleware('permission:capitation.view,capitation.create')->group(function () {
+        Route::get('periods', [CapitationController::class, 'index']);
+        Route::post('periods', [CapitationController::class, 'store']);
+        Route::get('periods/{capitation}', [CapitationController::class, 'show']);
+        Route::post('periods/{capitation}/compute', [CapitationController::class, 'compute']);
+        Route::get('periods/{capitation}/breakdown', [CapitationController::class, 'breakdown']);
+        Route::post('periods/{capitation}/finalise', [CapitationController::class, 'finalise']);
+        Route::post('periods/{capitation}/pay', [CapitationController::class, 'pay']);
+        Route::get('periods/{capitation}/export', [CapitationController::class, 'export']);
+        Route::get('facilities/{facility}/capitation-history', [CapitationController::class, 'facilityHistory']);
+    });
+
+    // ─── Phase 2: Mobile Sync ────────────────────────────────────────────────────
+    Route::prefix('mobile-sync')->middleware('permission:mobile-sync.push,mobile-sync.status')->group(function () {
+        Route::post('push', [MobileSyncController::class, 'push']);
+        Route::get('status/{syncBatchId}', [MobileSyncController::class, 'status']);
+        Route::get('failed', [MobileSyncController::class, 'failed']);
+        Route::post('retry/{record}', [MobileSyncController::class, 'retry']);
+    });
+
+    // ─── Phase 2: Enrollee Import ────────────────────────────────────────────────
+    // These must come BEFORE apiResource('enrollees') to avoid {enrollee} capture
+    Route::post('enrollees/import', [EnrolleeImportController::class, 'upload']);
+    Route::get('enrollees/import-template', [EnrolleeImportController::class, 'template']);
+    Route::get('enrollees/import/{batch}', [EnrolleeImportController::class, 'status']);
+
+    // ─── Phase 2: Enrollee Duplicates ────────────────────────────────────────────
+    Route::get('enrollees/duplicates', [EnrolleeApiController::class, 'listDuplicates']);
+    Route::post('enrollees/duplicates/{flag}/resolve', [EnrolleeApiController::class, 'resolveDuplicate']);
+
+    // ─── Phase 2: Enrollee Facility Transfers ────────────────────────────────────
+    Route::post('enrollees/{enrollee}/transfer', [EnrolleeApiController::class, 'transfer']);
+    Route::post('enrollees/transfers/{transfer}/approve', [EnrolleeApiController::class, 'approveTransfer']);
+    Route::get('enrollees/{enrollee}/transfers', [EnrolleeApiController::class, 'getTransferHistory']);
+
+    // ─── Phase 2: Extended Reports (unified endpoint) ────────────────────────────
+    Route::get('reports/{type}', [ExtendedReportingController::class, '__invoke']);
+
     // Feedback Management
-    Route::prefix('feedback')->group(function () {
+    Route::prefix('feedback')->middleware('permission:feedback.view,feedback.create')->group(function () {
         Route::get('/', [FeedbackController::class, 'index']);
         Route::post('/', [FeedbackController::class, 'store']);
         Route::get('/statistics', [FeedbackController::class, 'getStatistics']);
@@ -340,7 +432,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Task Management
-    Route::prefix('task-management')->group(function () {
+    Route::prefix('task-management')->middleware('permission:tasks.view,tasks.create')->group(function () {
         // Task Categories
         Route::apiResource('categories', TaskCategoryController::class);
         Route::post('categories/sort-order', [TaskCategoryController::class, 'updateSortOrder']);
@@ -362,7 +454,7 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // PAS (Pre-Authorization System) routes
-Route::middleware(['auth:sanctum'])->prefix('pas')->group(function () {
+Route::middleware(['auth:sanctum', 'permission:referrals.view,pa_codes.view,admissions.view,utn.validate'])->prefix('pas')->group(function () {
 
     // PA Code Management
     Route::apiResource('pa-codes', PACodeController::class)->only(['index', 'store', 'show']);

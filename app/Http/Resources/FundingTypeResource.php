@@ -18,6 +18,8 @@ class FundingTypeResource extends JsonResource
             'name' => $this->name,
             'description' => $this->description,
             'status' => $this->status,
+            'enrollees_count' => $this->whenCounted('enrollees'),
+            'payroll_batches_count' => $this->whenCounted('payrollBatches'),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

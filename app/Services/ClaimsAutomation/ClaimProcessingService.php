@@ -3,11 +3,14 @@
 namespace App\Services\ClaimsAutomation;
 
 use App\Models\Admission;
+use App\Models\AuditTrail;
 use App\Models\Claim;
 use App\Models\ClaimLine;
 use App\Services\ClaimValidationService;
+use App\Services\EligibilityService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Request;
 use InvalidArgumentException;
 
 /**
@@ -43,6 +46,13 @@ class ClaimProcessingService
             throw new InvalidArgumentException("Admission must be active to create a claim");
         }
 
+        $serviceDate = $data['service_date'] ?? $data['claim_date'] ?? now();
+        app(EligibilityService::class)->assertFacilityMatchesCoverage(
+            $admission->enrollee_id,
+            (int) $admission->facility_id,
+            $serviceDate
+        );
+
         // Check no claim exists for this admission
         if ($admission->claim) {
             throw new InvalidArgumentException("Claim already exists for this admission");
@@ -58,6 +68,7 @@ class ClaimProcessingService
             'utn' => $utn, // Denormalized for faster lookups
             'status' => 'DRAFT',
             'claim_date' => $data['claim_date'] ?? now(),
+            'service_date' => $serviceDate,
             'submitted_by' => auth()->id(),
         ]);
 
@@ -104,6 +115,19 @@ class ClaimProcessingService
             throw new InvalidArgumentException("UTN must be validated before creating a claim");
         }
 
+        // BR-04: referral UTN must not be expired at claim creation
+        if ($admission->referral->isExpired()) {
+            throw new InvalidArgumentException(
+                "Cannot create claim: The referral UTN has expired (valid until: {$admission->referral->valid_until}). A new referral is required."
+            );
+        }
+
+        app(EligibilityService::class)->assertFacilityMatchesCoverage(
+            $admission->enrollee_id,
+            (int) $admission->facility_id,
+            $claimDate
+        );
+
         // Use transaction to ensure atomicity
         return DB::transaction(function () use ($admission, $utn, $claimDate, $lineItems) {
             // Create the claim
@@ -114,6 +138,7 @@ class ClaimProcessingService
                 'utn' => $utn,
                 'status' => 'DRAFT',
                 'claim_date' => $claimDate,
+                'service_date' => $claimDate,
                 'claim_number' => 'CLM-' . strtoupper(uniqid()),
                 'submitted_by' => auth()->id(),
             ]);
@@ -155,7 +180,7 @@ class ClaimProcessingService
                 'total_amount_claimed' => $bundleAmount + $ffsAmount,
             ]);
 
-            return $claim->fresh(['lineItems', 'admission', 'enrollee', 'facility']);
+            return $claim->fresh(['lineItems', 'admission', 'coveragePeriod', 'enrollee', 'facility']);
         });
     }
 
@@ -176,6 +201,12 @@ class ClaimProcessingService
             throw new InvalidArgumentException("Claim must have at least one line item");
         }
 
+        app(EligibilityService::class)->assertFacilityMatchesCoverage(
+            $claim->enrollee_id,
+            (int) $claim->facility_id,
+            $claim->service_date ?? $claim->claim_date ?? now()
+        );
+
         $claim->update([
             'status' => 'SUBMITTED',
             'submitted_at' => now(),
@@ -185,6 +216,18 @@ class ClaimProcessingService
         if ($claim->referral) {
             $claim->referral->markClaimSubmitted();
         }
+
+        // BR-09: write audit trail entry
+        AuditTrail::create([
+            'auditable_type' => Claim::class,
+            'auditable_id'   => $claim->id,
+            'action'         => 'claim_submitted',
+            'description'    => "Claim {$claim->claim_number} submitted for review",
+            'user_id'        => auth()->id(),
+            'old_values'     => ['status' => 'DRAFT'],
+            'new_values'     => ['status' => 'SUBMITTED'],
+            'ip_address'     => Request::ip(),
+        ]);
 
         return $claim;
     }
@@ -201,12 +244,10 @@ class ClaimProcessingService
     }
 
     /**
-     * Approve a claim
-     * 
-     * @param Claim $claim
-     * @param array $data - approval_comments, etc.
-     * @return Claim
-     * @throws InvalidArgumentException
+     * Approve a claim.
+     *
+     * BR-06: The user who submitted the claim cannot be the one who approves it.
+     * BR-09: Every state change is written to the audit trail.
      */
     public function approveClaim(Claim $claim, array $data = []): Claim
     {
@@ -216,6 +257,15 @@ class ClaimProcessingService
             );
         }
 
+        // BR-06: four-eyes principle — submitter cannot approve their own claim
+        if ($claim->submitted_by && $claim->submitted_by === auth()->id()) {
+            throw new InvalidArgumentException(
+                "BR-06 violation: The user who submitted this claim cannot approve it. A different officer must approve."
+            );
+        }
+
+        $oldStatus = $claim->status;
+
         $claim->update([
             'status' => 'APPROVED',
             'approved_at' => now(),
@@ -223,16 +273,26 @@ class ClaimProcessingService
             'approval_comments' => $data['approval_comments'] ?? null,
         ]);
 
+        // BR-09: write audit trail entry
+        AuditTrail::create([
+            'auditable_type' => Claim::class,
+            'auditable_id'   => $claim->id,
+            'action'         => 'claim_approved',
+            'description'    => "Claim {$claim->claim_number} approved. Previous status: {$oldStatus}",
+            'user_id'        => auth()->id(),
+            'old_values'     => ['status' => $oldStatus],
+            'new_values'     => ['status' => 'APPROVED', 'approval_comments' => $data['approval_comments'] ?? null],
+            'ip_address'     => Request::ip(),
+        ]);
+
         return $claim;
     }
 
     /**
-     * Reject a claim
-     * 
-     * @param Claim $claim
-     * @param array $data - rejection_reason, etc.
-     * @return Claim
-     * @throws InvalidArgumentException
+     * Reject a claim.
+     *
+     * BR-06: The user who submitted the claim cannot be the one who rejects it.
+     * BR-09: Every state change is written to the audit trail.
      */
     public function rejectClaim(Claim $claim, array $data = []): Claim
     {
@@ -242,11 +302,36 @@ class ClaimProcessingService
             );
         }
 
+        // BR-06: four-eyes principle — submitter cannot reject their own claim
+        if ($claim->submitted_by && $claim->submitted_by === auth()->id()) {
+            throw new InvalidArgumentException(
+                "BR-06 violation: The user who submitted this claim cannot reject it. A different officer must adjudicate."
+            );
+        }
+
+        if (empty($data['rejection_reason'])) {
+            throw new InvalidArgumentException("A rejection reason is mandatory when rejecting a claim.");
+        }
+
+        $oldStatus = $claim->status;
+
         $claim->update([
             'status' => 'REJECTED',
             'rejected_at' => now(),
             'rejected_by' => auth()->id(),
-            'rejection_reason' => $data['rejection_reason'] ?? null,
+            'rejection_reason' => $data['rejection_reason'],
+        ]);
+
+        // BR-09: write audit trail entry
+        AuditTrail::create([
+            'auditable_type' => Claim::class,
+            'auditable_id'   => $claim->id,
+            'action'         => 'claim_rejected',
+            'description'    => "Claim {$claim->claim_number} rejected. Reason: {$data['rejection_reason']}",
+            'user_id'        => auth()->id(),
+            'old_values'     => ['status' => $oldStatus],
+            'new_values'     => ['status' => 'REJECTED', 'rejection_reason' => $data['rejection_reason']],
+            'ip_address'     => Request::ip(),
         ]);
 
         return $claim;
@@ -297,4 +382,3 @@ class ClaimProcessingService
         ];
     }
 }
-

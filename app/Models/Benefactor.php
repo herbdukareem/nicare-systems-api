@@ -21,4 +21,31 @@ class Benefactor extends Model
     {
         return $this->hasMany(Enrollee::class);
     }
+
+    public function fundedEnrollees()
+    {
+        return $this->belongsToMany(Enrollee::class, 'benefactor_enrollees')
+            ->withPivot(['premium_purchase_id', 'relationship', 'status'])
+            ->withTimestamps();
+    }
+
+    public function purchases()
+    {
+        return $this->hasMany(PremiumPurchase::class);
+    }
+
+    public function enrollmentPhases()
+    {
+        return $this->hasMany(EnrollmentPhase::class);
+    }
+
+    public function payrollBatches()
+    {
+        return $this->hasMany(PayrollBatch::class);
+    }
+
+    public function groups()
+    {
+        return $this->hasMany(EnrollmentGroup::class);
+    }
 }

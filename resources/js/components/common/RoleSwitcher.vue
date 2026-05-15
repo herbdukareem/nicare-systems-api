@@ -70,7 +70,7 @@
             {{ role.label || role.name }}
           </v-list-item-title>
           <v-list-item-subtitle class="tw-text-xs">
-            {{ role.modules?.length ? role.modules.join(', ') : getPermissionCount(role) + ' permissions' }}
+            {{ getRoleSummary(role) }}
           </v-list-item-subtitle>
           <template v-slot:append v-if="currentRole?.id === role.id">
             <v-icon color="primary" size="16">mdi-check</v-icon>
@@ -156,6 +156,15 @@ const getRoleColor = (roleName) => {
 
 const getPermissionCount = (role) => {
   return role.permissions?.length || 0;
+};
+
+const getRoleSummary = (role) => {
+  const categories = role.permission_categories || [];
+  if (categories.length > 0) {
+    return categories.slice(0, 2).join(', ') + (categories.length > 2 ? ` +${categories.length - 2}` : '');
+  }
+
+  return `${getPermissionCount(role)} permissions`;
 };
 
 const switchRole = async (role) => {

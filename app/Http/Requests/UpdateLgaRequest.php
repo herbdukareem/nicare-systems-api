@@ -29,7 +29,7 @@ class UpdateLgaRequest extends FormRequest
             'zone'           => 'nullable|integer',
             'baseline'       => 'nullable|integer',
             'total_enrolled' => 'nullable|integer',
-            'status'         => 'nullable|in:active,inactive',
+            'status'         => 'nullable|integer|in:0,1',
         ];
     }
 }

@@ -5,7 +5,10 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 
 use App\Http\Resources\ReferralResource;
+use App\Models\Enrollee;
+use App\Models\AuditTrail;
 use App\Models\Referral;
+use App\Services\EligibilityService;
 use App\Services\FileUploadService;
 use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
@@ -166,6 +169,18 @@ class ReferralController extends Controller
                     ]
                 ], 422);
             }
+
+            try {
+                app(EligibilityService::class)->assertFacilityMatchesCoverage(
+                    Enrollee::findOrFail($enrolleeId),
+                    (int) $request->input('referring_facility_id')
+                );
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
         }
 
         try {
@@ -279,33 +294,65 @@ class ReferralController extends Controller
     
     /**
      * Handles POST /v1/pas/referrals/{id}/approve: Approves a Referral.
+     *
+     * BR-06: The user who created the referral cannot be the one who approves it.
+     * BR-03: UTN is auto-generated at creation; PA Code is auto-generated here on approval.
+     * BR-09: State change written to audit trail.
      */
-    public function approve(Referral $referral)
+    public function approve(Request $request, Referral $referral)
     {
+        // BR-06: four-eyes — referral creator cannot approve their own referral
+        if ($referral->created_by && $referral->created_by === auth()->id()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'BR-06 violation: The user who created this referral cannot approve it. A different PA officer must review.',
+            ], 403);
+        }
+
+        if ($referral->status !== 'pending' && strtolower($referral->status) !== 'pending') {
+            return response()->json([
+                'success' => false,
+                'message' => 'Only pending referrals can be approved.',
+            ], 400);
+        }
+
         $referral->update(['status' => 'APPROVED', 'approval_date' => now()]);
 
-        // Auto-create PA code if referral has service bundle selected
+        // Auto-create PA code if referral has service bundle selected (BR-03)
         if ($referral->service_bundle_id) {
             \App\Models\PACode::create([
-                'enrollee_id' => $referral->enrollee_id,
-                'facility_id' => $referral->receiving_facility_id,
-                'referral_id' => $referral->id,
-                'admission_id' => null, // Will be linked when admission is created
-                'code' => 'PA-REF-' . $referral->id,
-                'type' => \App\Models\PACode::TYPE_BUNDLE,
-                'status' => 'APPROVED',
-                'justification' => 'Auto-generated from approved referral with service bundle',
-                'requested_services' => [],
+                'enrollee_id'            => $referral->enrollee_id,
+                'facility_id'            => $referral->receiving_facility_id,
+                'referral_id'            => $referral->id,
+                'admission_id'           => null,
+                'code'                   => 'PA-REF-' . $referral->id,
+                'type'                   => \App\Models\PACode::TYPE_BUNDLE,
+                'status'                 => 'APPROVED',
+                'justification'          => 'Auto-generated from approved referral with service bundle',
+                'requested_services'     => [],
                 'service_selection_type' => 'bundle',
-                'service_bundle_id' => $referral->service_bundle_id,
-                'case_record_ids' => null,
+                'service_bundle_id'      => $referral->service_bundle_id,
+                'case_record_ids'        => null,
             ]);
         }
 
+        // BR-09: write audit trail entry
+        AuditTrail::create([
+            'auditable_type' => Referral::class,
+            'auditable_id'   => $referral->id,
+            'action'         => 'referral_approved',
+            'description'    => "Referral {$referral->referral_code} approved. UTN: {$referral->utn}",
+            'user_id'        => auth()->id(),
+            'old_values'     => ['status' => 'pending'],
+            'new_values'     => ['status' => 'APPROVED', 'approval_date' => now()->toDateTimeString()],
+            'ip_address'     => $request->ip(),
+        ]);
+
         return response()->json([
-            'message' => 'Referral PA approved. Receiving facility can now request Follow-up PA Codes.',
-            'referral_code' => $referral->referral_code,
-            'utn' => $referral->utn
+            'success'        => true,
+            'message'        => 'Referral approved. Receiving facility can now create an admission.',
+            'referral_code'  => $referral->referral_code,
+            'utn'            => $referral->utn,
         ]);
     }
 
@@ -378,6 +425,18 @@ class ReferralController extends Controller
             }
 
             $referral->deny(Auth::user(), $request->comments);
+
+            // BR-09: write audit trail entry for denial
+            AuditTrail::create([
+                'auditable_type' => Referral::class,
+                'auditable_id'   => $referral->id,
+                'action'         => 'referral_denied',
+                'description'    => "Referral {$referral->referral_code} denied. Reason: {$request->comments}",
+                'user_id'        => auth()->id(),
+                'old_values'     => ['status' => 'pending'],
+                'new_values'     => ['status' => 'DENIED', 'denial_comments' => $request->comments],
+                'ip_address'     => $request->ip(),
+            ]);
 
             return response()->json([
                 'success' => true,

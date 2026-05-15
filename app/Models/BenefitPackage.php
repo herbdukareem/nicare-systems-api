@@ -25,9 +25,14 @@ class BenefitPackage extends Model
         return $this->hasMany(Enrollee::class, 'benefit_package_id', 'id');
     }
 
-    public function premiums()
+    public function premiumPlans()
     {
-        return $this->hasMany(Premium::class, 'benefit_package_id', 'id');
+        return $this->hasMany(PremiumPlan::class, 'benefit_package_id', 'id');
+    }
+
+    public function premiumPins()
+    {
+        return $this->hasMany(PremiumPin::class, 'benefit_package_id', 'id');
     }
 
     // Scopes

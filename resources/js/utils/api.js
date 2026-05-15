@@ -39,8 +39,10 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error?.response?.status;
+    const requestUrl = error?.config?.url || '';
+    const authEndpoint = ['/login', '/logout', '/user'].some((endpoint) => requestUrl.endsWith(endpoint));
 
-    if (status === 401) {
+    if (status === 401 && !authEndpoint) {
       // Let the auth store decide how to handle this.
       // We'll just emit a lightweight event the app can listen to.
       window.dispatchEvent(new Event('auth:unauthorized'));
@@ -65,8 +67,12 @@ export const enrolleeAPI = {
   getAll: (params) => api.get('/enrollees', { params }),
   getById: (id) => api.get(`/enrollees/${id}`),
   create: (data) => api.post('/enrollees', data),
+  approve: (id, data = {}) => api.post(`/enrollees/${id}/approve`, data),
+  pendingApproval: (params) => api.get('/enrollees/pending-approval', { params }),
   update: (id, data) => api.put(`/enrollees/${id}`, data),
   delete: (id) => api.delete(`/enrollees/${id}`),
+  idCard: (id) => api.get(`/enrollees/${id}/id-card`, { responseType: 'blob' }),
+  bulkEnrollmentSlip: (params) => api.get('/enrollees/bulk-enrollment-slip', { params, responseType: 'blob' }),
   getStatsByFacility: (facilityId) => api.get(`/enrollees/stats/facility/${facilityId}`),
   getActivity: (id) => api.get(`/enrollees/${id}/activity`),
   getMedicalSummary: (id) => api.get(`/enrollees/${id}/medical-summary`),
@@ -87,6 +93,19 @@ export const dashboardAPI = {
   getRecentActivities: () => api.get('/dashboard/recent-activities'),
   getLgas: () => api.get('/lgas'),
   getBenefactors: () => api.get('/benefactors'),
+  getEnrollmentTrend: (params) => api.get('/dashboard/enrollment-trend', { params }),
+  getWardsByLga: (lgaId) => api.get('/dashboard/wards-by-lga', { params: { lga_id: lgaId } }),
+};
+
+export const capitationAPI = {
+  periods: (params) => api.get('/capitation/periods', { params }),
+  createPeriod: (data) => api.post('/capitation/periods', data),
+  showPeriod: (id) => api.get(`/capitation/periods/${id}`),
+  compute: (id) => api.post(`/capitation/periods/${id}/compute`),
+  breakdown: (id) => api.get(`/capitation/periods/${id}/breakdown`),
+  finalise: (id) => api.post(`/capitation/periods/${id}/finalise`),
+  pay: (id, payload) => api.post(`/capitation/periods/${id}/pay`, payload),
+  export: (id) => api.get(`/capitation/periods/${id}/export`, { responseType: 'blob' }),
 };
 
 export const facilityAPI = {
@@ -101,6 +120,18 @@ export const facilityAPI = {
 export const lgaAPI = {
   getAll: (params) => api.get('/lgas', { params }),
   getById: (id) => api.get(`/lgas/${id}`),
+  create: (data) => api.post('/lgas', data),
+  update: (id, data) => api.put(`/lgas/${id}`, data),
+  delete: (id) => api.delete(`/lgas/${id}`),
+  wards: (id) => api.get(`/lgas/${id}/wards`),
+};
+
+export const wardAPI = {
+  getAll: (params) => api.get('/wards', { params }),
+  getById: (id) => api.get(`/wards/${id}`),
+  create: (data) => api.post('/wards', data),
+  update: (id, data) => api.put(`/wards/${id}`, data),
+  delete: (id) => api.delete(`/wards/${id}`),
 };
 
 export const userAPI = {
@@ -151,6 +182,46 @@ export const benefactorAPI = {
   create: (data) => api.post('/benefactors', data),
   update: (id, data) => api.put(`/benefactors/${id}`, data),
   delete: (id) => api.delete(`/benefactors/${id}`),
+};
+
+export const fundingTypeAPI = {
+  getAll: (params) => api.get('/funding-types', { params }),
+  getById: (id) => api.get(`/funding-types/${id}`),
+  create: (data) => api.post('/funding-types', data),
+  update: (id, data) => api.put(`/funding-types/${id}`, data),
+  delete: (id) => api.delete(`/funding-types/${id}`),
+};
+
+export const benefitPackageAPI = {
+  getAll: (params) => api.get('/benefit-packages', { params }),
+  getById: (id) => api.get(`/benefit-packages/${id}`),
+  create: (data) => api.post('/benefit-packages', data),
+  update: (id, data) => api.put(`/benefit-packages/${id}`, data),
+  delete: (id) => api.delete(`/benefit-packages/${id}`),
+};
+
+export const premiumAPI = {
+  dashboard: () => api.get('/premium/dashboard'),
+  metadata: () => api.get('/premium/metadata'),
+  plans: (params) => api.get('/premium/plans', { params }),
+  createPlan: (data) => api.post('/premium/plans', data),
+  updatePlan: (id, data) => api.put(`/premium/plans/${id}`, data),
+  deletePlan: (id) => api.delete(`/premium/plans/${id}`),
+  pins: (params) => api.get('/premium/pins', { params }),
+  getPin: (id) => api.get(`/premium/pins/${id}`),
+  generatePins: (data) => api.post('/premium/pins/generate', data),
+  sellPin: (id, data) => api.post(`/premium/pins/${id}/sell`, data),
+  validatePin: (data) => api.post('/premium/pins/validate', data),
+  usePin: (id, data) => api.post(`/premium/pins/${id}/use`, data),
+  cancelPin: (id) => api.post(`/premium/pins/${id}/cancel`),
+  purchases: (params) => api.get('/premium/purchases', { params }),
+  createPurchase: (data) => api.post('/premium/purchases', data),
+  confirmPurchase: (id) => api.post(`/premium/purchases/${id}/confirm`),
+  cancelPurchase: (id) => api.post(`/premium/purchases/${id}/cancel`),
+  payrollBatches: (params) => api.get('/premium/payroll-batches', { params }),
+  createPayrollBatch: (data) => api.post('/premium/payroll-batches', data),
+  approvePayrollBatch: (id) => api.post(`/premium/payroll-batches/${id}/approve`),
+  eligibility: (params) => api.get('/premium/eligibility', { params }),
 };
 
 export const roleAPI = {

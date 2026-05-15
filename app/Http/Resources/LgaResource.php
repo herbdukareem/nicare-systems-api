@@ -21,6 +21,9 @@ class LgaResource extends JsonResource
             'baseline' => $this->baseline,
             'total_enrolled' => $this->total_enrolled,
             'status' => $this->status,
+            'wards_count' => $this->whenCounted('wards'),
+            'facilities_count' => $this->whenCounted('facilities'),
+            'enrollees_count' => $this->whenCounted('enrollees'),
             'created_at' => $this->created_at,
             'updated_at' => $this->updated_at,
         ];

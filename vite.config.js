@@ -20,7 +20,13 @@ export default defineConfig({
   build: {
     rollupOptions: {
       output: {
-        manualChunks: undefined,
+        manualChunks: {
+          vue: ['vue', 'vue-router', 'pinia'],
+          vuetify: ['vuetify'],
+          charts: ['chart.js', 'vue-chartjs'],
+          primevue: ['primevue/config', 'primevue/toastservice'],
+          lodash: ['lodash', 'lodash-es'],
+        },
       },
     },
     minify: 'terser',

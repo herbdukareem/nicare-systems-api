@@ -1,19 +1,35 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useUiStore } from '../stores/ui';
+import { firstAccessiblePath } from '../navigation';
 
-// Components
-import LoginPage from '../components/auth/LoginPage.vue';
-import Dashboard from '../components/dashboard/Dashboard.vue';
-import EnrolleesPage from '../components/enrollees/EnrolleesPage.vue';
-import EnrolleeProfilePage from '../components/enrollees/EnrolleeProfilePage.vue';
-import FacilitiesPage from '../components/facilities/FacilitiesPage.vue';
-import UsersPage from '../components/settings/UsersPage.vue';
-import BenefactorsPage from '../components/settings/BenefactorsPage.vue';
-import RolesPermissionsPage from '../components/settings/RolesPermissionsPage.vue';
-import ComingSoonPage from '../components/common/ComingSoonPage.vue';
-import PendingEnrolleesPage from '../components/enrollees/PendingEnrolleesPage.vue';
+const LoginPage = () => import('../components/auth/LoginPage.vue');
+const Dashboard = () => import('../components/dashboard/Dashboard.vue');
+const EnrolleesPage = () => import('../components/enrollees/EnrolleesPage.vue');
+const EnrolleeProfilePage = () => import('../components/enrollees/EnrolleeProfilePage.vue');
+const FacilitiesPage = () => import('../components/facilities/FacilitiesPage.vue');
+const UsersPage = () => import('../components/settings/UsersPage.vue');
+const BenefactorsPage = () => import('../components/settings/BenefactorsPage.vue');
+const RolesPermissionsPage = () => import('../components/settings/RolesPermissionsPage.vue');
+const PendingEnrolleesPage = () => import('../components/enrollees/PendingEnrolleesPage.vue');
+const EnrollmentApprovalPage = () => import('../components/enrollees/EnrollmentApprovalPage.vue');
+const BulkEnrollmentSlipPage = () => import('../components/enrollees/BulkEnrollmentSlipPage.vue');
+const SetupWorkspace = () => import('../components/setup/SetupWorkspace.vue');
+
+// Helper: returns the best landing page for a user given their permissions
+const getDefaultDashboard = (authStore) => {
+  const path = firstAccessiblePath(authStore);
+  if (path) return path;
+  if (authStore.hasPermission('dashboard.view'))              return '/dashboard';
+  if (authStore.hasPermission('dashboard.desk_officer.view')) return '/do-dashboard';
+  if (authStore.hasPermission('dashboard.facility.view'))    return '/facility-dashboard';
+  if (authStore.hasPermission('dashboard.pas.view'))         return '/pas';
+  if (authStore.hasPermission('claims.dashboard.view'))      return '/claims';
+  return '/dashboard';
+};
 
 const routes = [
+  // ── Auth ───────────────────────────────────────────────────────────────────
   {
     path: '/login',
     name: 'login',
@@ -21,16 +37,16 @@ const routes = [
     meta: { requiresAuth: false },
   },
 
-  // Dashboard Routes
+  // ── Dashboards ─────────────────────────────────────────────────────────────
   {
     path: '/dashboard',
     name: 'dashboard',
     component: Dashboard,
     meta: {
       requiresAuth: true,
+      permissions: ['dashboard.view'],
       title: 'Dashboard',
-      description: 'Overview of enrollees and system statistics',
-      breadcrumb: 'Dashboard'
+      breadcrumb: 'Dashboard',
     },
   },
   {
@@ -41,8 +57,7 @@ const routes = [
       requiresAuth: true,
       permissions: ['dashboard.desk_officer.view'],
       title: 'DO Dashboard',
-      description: 'Desk Officer dashboard for managing assigned facilities',
-      breadcrumb: 'DO Dashboard'
+      breadcrumb: 'DO Dashboard',
     },
   },
   {
@@ -53,8 +68,158 @@ const routes = [
       requiresAuth: true,
       permissions: ['dashboard.facility.view'],
       title: 'Facility Dashboard',
-      description: 'Facility dashboard for managing operations and requests',
-      breadcrumb: 'Facility Dashboard'
+      breadcrumb: 'Facility Dashboard',
+    },
+  },
+
+  // ── Enrollment ─────────────────────────────────────────────────────────────
+  {
+    path: '/enrollees',
+    name: 'enrollees',
+    component: EnrolleesPage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.view'],
+      title: 'Enrollees',
+      breadcrumb: 'Enrollees',
+    },
+  },
+  {
+    path: '/enrollees/pending',
+    name: 'pending-enrollees',
+    component: PendingEnrolleesPage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.view'],
+      title: 'Pending Enrollees',
+      breadcrumb: 'Pending Enrollees',
+    },
+  },
+  {
+    path: '/enrollees/approval',
+    name: 'enrollee-approval',
+    component: EnrollmentApprovalPage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.update', 'enrollee.approve'],
+      title: 'Pending Approval',
+      breadcrumb: 'Pending Approval',
+    },
+  },
+  {
+    path: '/enrollees/bulk-enrollment-slip',
+    name: 'bulk-enrollment-slip',
+    component: BulkEnrollmentSlipPage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.view', 'enrollee.print-bulk-slip'],
+      title: 'Bulk Enrollment Slip',
+      breadcrumb: 'Bulk Enrollment Slip',
+    },
+  },
+  {
+    path: '/enrollees/demo-enrollment',
+    name: 'demo-enrollee-enrollment',
+    component: () => import('../components/enrollees/DemoEnrollmentPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.create'],
+      title: 'Demo Enrollee Enrollment',
+      breadcrumb: 'Demo Enrollment',
+    },
+  },
+  {
+    path: '/enrollees/:id',
+    name: 'enrollee-profile',
+    component: EnrolleeProfilePage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.view'],
+      title: 'Enrollee Profile',
+      breadcrumb: 'Enrollee Profile',
+    },
+  },
+  {
+    path: '/enrollment/mobile-sync',
+    name: 'enrollment-mobile-sync',
+    component: () => import('../components/common/ComingSoonPage.vue'),
+    props: { title: 'Mobile Sync', subtitle: 'Sync mobile enrollment data', icon: 'mdi-cellphone-sync' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['mobile-sync.push', 'mobile-sync.status'],
+      title: 'Mobile Sync',
+      breadcrumb: 'Mobile Sync',
+    },
+  },
+  {
+    path: '/enrollment/change-facility',
+    name: 'enrollment-change-facility',
+    component: () => import('../components/common/ComingSoonPage.vue'),
+    props: { title: 'Change of Facility', subtitle: 'Manage facility changes for enrollees', icon: 'mdi-hospital-marker' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.update'],
+      title: 'Change of Facility',
+      breadcrumb: 'Change of Facility',
+    },
+  },
+  {
+    path: '/enrollment/id-cards',
+    name: 'enrollment-id-cards',
+    component: () => import('../components/common/ComingSoonPage.vue'),
+    props: { title: 'ID Card Printing', subtitle: 'Print and manage ID cards', icon: 'mdi-card-account-details' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.view'],
+      title: 'ID Card Printing',
+      breadcrumb: 'ID Cards',
+    },
+  },
+
+  // ── Facilities ─────────────────────────────────────────────────────────────
+  {
+    path: '/facilities',
+    name: 'facilities',
+    component: FacilitiesPage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['facilities.view'],
+      title: 'Facilities',
+      breadcrumb: 'Facilities',
+    },
+  },
+
+  {
+    path: '/setup',
+    name: 'setup-workspace',
+    component: SetupWorkspace,
+    meta: {
+      requiresAuth: true,
+      permissions: ['setup.lga.view', 'setup.ward.view', 'setup.facility.view', 'setup.benefit-package.view', 'setup.funding-type.view', 'setup.benefactor.view', 'facilities.view', 'benefactor.view'],
+      title: 'Setup',
+      breadcrumb: 'Setup',
+    },
+  },
+  {
+    path: '/setup/:section',
+    name: 'setup-section',
+    component: SetupWorkspace,
+    meta: {
+      requiresAuth: true,
+      permissions: ['setup.lga.view', 'setup.ward.view', 'setup.facility.view', 'setup.benefit-package.view', 'setup.funding-type.view', 'setup.benefactor.view', 'facilities.view', 'benefactor.view'],
+      title: 'Setup',
+      breadcrumb: 'Setup',
+    },
+  },
+  {
+    path: '/do-facilities',
+    name: 'do-facility-assignments',
+    component: () => import('../components/pas/DOFacilityAssignmentPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['facilities.assign'],
+      title: 'DO Facility Assignments',
+      breadcrumb: 'DO Facility Assignments',
     },
   },
   {
@@ -65,181 +230,21 @@ const routes = [
       requiresAuth: true,
       permissions: ['referrals.view'],
       title: 'Assigned Facilities Referrals',
-      description: 'View referrals for your assigned facilities',
-      breadcrumb: 'Assigned Referrals'
+      breadcrumb: 'Assigned Referrals',
     },
-  },
-  // Enrollment Routes
-  {
-    path: '/enrollees',
-    name: 'enrollees',
-    component: EnrolleesPage,
-    meta: {
-      requiresAuth: true,
-      title: 'Enrollees',
-      description: 'Manage and view all enrollee information',
-      breadcrumb: 'Enrollees List'
-    },
-  },
-    {
-    path: '/enrollees/pending',
-    name: 'enrollee-profile',
-    component: PendingEnrolleesPage,
-    meta: {
-      requiresAuth: true,
-      title: 'Enrollee Profile',
-      description: 'View and manage enrollee details',
-      breadcrumb: 'Enrollee Profile'
-    },
-  },
-  {
-    path: '/enrollees/:id',
-    name: 'enrollee-profile',
-    component: EnrolleeProfilePage,
-    meta: {
-      requiresAuth: true,
-      title: 'Enrollee Profile',
-      description: 'View and manage enrollee details',
-      breadcrumb: 'Enrollee Profile'
-    },
-  },
-  {
-    path: '/enrollment/change-facility',
-    name: 'enrollment-change-facility',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Change of Facility', subtitle: 'Manage facility changes for enrollees', icon: 'mdi-hospital-marker' }
-  },
-  {
-    path: '/enrollment/id-cards',
-    name: 'enrollment-id-cards',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'ID Card Printing', subtitle: 'Print and manage ID cards', icon: 'mdi-card-account-details' }
-  },
-  {
-    path: '/enrollment/phases',
-    name: 'enrollment-phases',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Enrollment Phases', subtitle: 'Manage enrollment phases', icon: 'mdi-timeline' }
   },
 
-  // Device Management Routes
-  {
-    path: '/devices/manage',
-    name: 'devices-manage',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Manage Device', subtitle: 'Device management and configuration', icon: 'mdi-tablet' }
-  },
-  {
-    path: '/devices/config',
-    name: 'devices-config',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Enrollment Configuration', subtitle: 'Configure enrollment settings', icon: 'mdi-cog' }
-  },
-
-  // Capitation Routes
-  {
-    path: '/capitation/generate',
-    name: 'capitation-generate',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Generate Capitation', subtitle: 'Generate capitation payments', icon: 'mdi-plus-circle' }
-  },
-  {
-    path: '/capitation/review',
-    name: 'capitation-review',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Review Capitation', subtitle: 'Review capitation calculations', icon: 'mdi-eye' }
-  },
-  {
-    path: '/capitation/approval',
-    name: 'capitation-approval',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Capitation Approval', subtitle: 'Approve capitation payments', icon: 'mdi-check-circle' }
-  },
-  {
-    path: '/capitation/payments',
-    name: 'capitation-payments',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Capitation Payment/Invoices', subtitle: 'Manage payments and invoices', icon: 'mdi-receipt' }
-  },
-  {
-    path: '/feedback',
-    name: 'feedback-management',
-    component: () => import('../components/feedback/FeedbackManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Feedback Management',
-      description: 'Manage referral and PA code feedback for claims vetting',
-      breadcrumb: 'Feedback Management'
-    }
-  },
-  {
-    path: '/feedback/create',
-    name: 'feedback-create',
-    component: () => import('../components/feedback/FeedbackCreationPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Create Feedback',
-      description: 'Create feedback for approved referrals',
-      breadcrumb: 'Create Feedback'
-    }
-  },
-  {
-    path: '/task-management',
-    name: 'task-management',
-    component: () => import('../components/task-management/TaskManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      title: 'Task Management',
-      description: 'Manage projects, tasks, and team collaboration',
-      breadcrumb: 'Task Management'
-    }
-  },
- 
-
-  // Pre-Authorization (PAS) Module Dashboard
+  // ── PAS ────────────────────────────────────────────────────────────────────
   {
     path: '/pas',
     name: 'pas-dashboard',
     component: () => import('../components/pas/PASDashboard.vue'),
     meta: {
       requiresAuth: true,
+      permissions: ['dashboard.pas.view', 'referrals.view', 'pa_codes.view'],
       title: 'Pre-Authorization System',
-      description: 'Manage pre-authorizations, referrals, and PA codes',
-      breadcrumb: 'PAS Dashboard'
-    }
-  },
-  {
-    path: '/document-requirements',
-    name: 'document-requirements-management',
-    component: () => import('../components/pas/DocumentRequirementsPage.vue'),
-    meta: {
-      requiresAuth: true,
-      permissions: ['documents.manage'],
-      title: 'Document Requirements',
-      description: 'Manage document requirements for referrals and PA codes',
-      breadcrumb: 'Document Requirements'
-    }
-  },
-  {
-    path: '/do-facilities',
-    name: 'do-facility-assignments',
-    component: () => import('../components/pas/DOFacilityAssignmentPage.vue'),
-    meta: {
-      requiresAuth: true,
-      permissions: ['facilities.assign', 'facilities.assign_desk_officer'],
-      title: 'DO Facility Assignments',
-      description: 'Assign facilities to desk officers',
-      breadcrumb: 'DO Facility Assignments'
-    }
+      breadcrumb: 'PAS Dashboard',
+    },
   },
   {
     path: '/pas/validate-utn',
@@ -249,45 +254,19 @@ const routes = [
       requiresAuth: true,
       permissions: ['utn.validate'],
       title: 'Validate UTN',
-      description: 'Validate Unique Transaction Numbers for approved referrals',
-      breadcrumb: 'UTN Validation'
-    }
+      breadcrumb: 'UTN Validation',
+    },
   },
   {
-    path: '/pas/fu-pa-request',
-    name: 'fu-pa-code-request',
-    component: () => import('../components/pas/FUPACodeRequestPage.vue'),
+    path: '/claims/referral-request',
+    name: 'claims-referral-request',
+    component: () => import('../components/claims/ReferralSubmissionPage.vue'),
     meta: {
       requiresAuth: true,
-      permissions: ['pa_codes.request'],
-      title: 'Request FU-PA Code',
-      description: 'Request Follow-Up PA Code for FFS services',
-      breadcrumb: 'FU-PA Code Request'
-    }
-  },
-  {
-    path: '/pas/fu-pa-approval',
-    name: 'fu-pa-code-approval',
-    component: () => import('../components/pas/FUPACodeApprovalPage.vue'),
-    meta: {
-      requiresAuth: true,
-      permissions: ['pa_codes.approve', 'pa_codes.reject'],
-      title: 'FU-PA Code Approval',
-      description: 'Approve or reject FU-PA Code requests',
-      breadcrumb: 'FU-PA Code Approval'
-    }
-  },
-  {
-    path: '/pas/facility-pa-codes',
-    name: 'facility-pa-codes',
-    component: () => import('../components/pas/FacilityPACodeManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      permissions: ['pa_codes.view', 'pa_codes.request'],
-      title: 'FU-PA Code Management',
-      description: 'View and manage your FU-PA Code requests',
-      breadcrumb: 'FU-PA Code Management'
-    }
+      permissions: ['referrals.create'],
+      title: 'Submit Referral to PAS',
+      breadcrumb: 'Submit Referral',
+    },
   },
   {
     path: '/pas/referral-management',
@@ -297,48 +276,87 @@ const routes = [
       requiresAuth: true,
       permissions: ['referrals.view'],
       title: 'Referral Management',
-      description: 'View, approve, reject, and print referrals',
-      breadcrumb: 'Referral Management'
-    }
+      breadcrumb: 'Referral Management',
+    },
+  },
+  {
+    path: '/facility/admissions',
+    name: 'facility-admissions',
+    component: () => import('../components/facility/FacilityAdmissionManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['admissions.view', 'admissions.create'],
+      title: 'Admission Management',
+      breadcrumb: 'Admission Management',
+    },
+  },
+  {
+    path: '/pas/facility-pa-codes',
+    name: 'facility-pa-codes',
+    component: () => import('../components/pas/FacilityPACodeManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['pa_codes.view', 'pa_codes.request'],
+      title: 'FU-PA Code Management',
+      breadcrumb: 'FU-PA Code Management',
+    },
+  },
+  {
+    path: '/pas/fu-pa-request',
+    name: 'fu-pa-code-request',
+    component: () => import('../components/pas/FUPACodeRequestPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['pa_codes.request'],
+      title: 'Request FU-PA Code',
+      breadcrumb: 'FU-PA Code Request',
+    },
+  },
+  {
+    path: '/pas/fu-pa-approval',
+    name: 'fu-pa-code-approval',
+    component: () => import('../components/pas/FUPACodeApprovalPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['pa_codes.approve', 'pa_codes.reject'],
+      title: 'FU-PA Code Approval',
+      breadcrumb: 'FU-PA Code Approval',
+    },
+  },
+  {
+    path: '/document-requirements',
+    name: 'document-requirements-management',
+    component: () => import('../components/pas/DocumentRequirementsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['documents.manage', 'documents.requirements.manage'],
+      title: 'Document Requirements',
+      breadcrumb: 'Document Requirements',
+    },
   },
 
-  // Claims Module Dashboard
+  // ── Claims ─────────────────────────────────────────────────────────────────
   {
     path: '/claims',
     name: 'claims-dashboard',
     component: () => import('../components/claims/ClaimsDashboard.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Claims Module',
-      description: 'Manage referrals, claims submission, and review',
-      breadcrumb: 'Claims Dashboard'
-    }
-  },
-
-  // Claims Routes
-  {
-    path: '/pas/referrals',
-    name: 'pas-referrals',
-    component: () => import('../components/claims/ReferralSubmissionPage.vue'),
-    meta: {
-      requiresAuth: true,
-      permissions: ['referrals.create', 'referrals.submit'],
-      title: 'Submit Referral to Pre-Authorization System (PAS)',
-      description: 'Submit referrals on behalf of primary facilities to PAS',
-      breadcrumb: 'Submit Referral to PAS'
-    }
+      permissions: ['claims.dashboard.view', 'claims.view'],
+      title: 'Claims Dashboard',
+      breadcrumb: 'Claims Dashboard',
+    },
   },
   {
-    path: '/claims/referral-request',
-    name: 'claims-referral-request',
-    component: () => import('../components/claims/ReferralSubmissionPage.vue'),
+    path: '/facility/claims/submit',
+    name: 'facility-claim-submission',
+    component: () => import('../components/facility/FacilityClaimSubmissionPage.vue'),
     meta: {
       requiresAuth: true,
-      permissions: ['referrals.create', 'referrals.submit'],
-      title: 'Referral Request to Pre-Authorization System (PAS)',
-      description: 'Submit referral requests for your facility to PAS',
-      breadcrumb: 'Referral Request to PAS'
-    }
+      permissions: ['claims.create', 'claims.submit'],
+      title: 'Submit Claim',
+      breadcrumb: 'Submit Claim',
+    },
   },
   {
     path: '/claims/review',
@@ -346,10 +364,10 @@ const routes = [
     component: () => import('../components/claims/ClaimsReviewPage.vue'),
     meta: {
       requiresAuth: true,
+      permissions: ['claims.review', 'claims.confirm', 'claims.approve'],
       title: 'Review Claims',
-      description: 'Review and approve submitted claims',
-      breadcrumb: 'Review Claims'
-    }
+      breadcrumb: 'Review Claims',
+    },
   },
   {
     path: '/claims/approval',
@@ -359,16 +377,8 @@ const routes = [
       requiresAuth: true,
       permissions: ['claims.approve', 'claims.approver.approve'],
       title: 'Approve Claims',
-      description: 'Batch approve submitted claims with shared payment code and comments',
-      breadcrumb: 'Approve Claims'
-    }
-  },
-  {
-    path: '/claims/history',
-    name: 'claims-history',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Claims History', subtitle: 'View claims history and reports', icon: 'mdi-history' }
+      breadcrumb: 'Approve Claims',
+    },
   },
   {
     path: '/claims/payment-batches',
@@ -376,47 +386,34 @@ const routes = [
     component: () => import('../components/claims/PaymentBatchManagementPage.vue'),
     meta: {
       requiresAuth: true,
+      permissions: ['payment_batches.view', 'payment_batches.manage'],
       title: 'Payment Batch Management',
-      description: 'Create and manage payment batches for approved claims',
-      breadcrumb: 'Payment Batches'
-    }
+      breadcrumb: 'Payment Batches',
+    },
+  },
+  {
+    path: '/claims/history',
+    name: 'claims-history',
+    component: () => import('../components/claims/ClaimsHistoryPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['claims.view'],
+      title: 'Claims History',
+      breadcrumb: 'Claims History',
+    },
   },
 
-  // Claims Automation Routes (Bundle/FFS Hybrid Payment Model)
+  // ── Claims Automation ──────────────────────────────────────────────────────
   {
     path: '/claims/automation/admissions',
     name: 'claims-automation-admissions',
     component: () => import('../components/claims/automation/AdmissionManagementPage.vue'),
     meta: {
       requiresAuth: true,
-      title: 'Admission Management',
-      description: 'Manage patient admissions for episode-of-care tracking',
-      breadcrumb: 'Admission Management'
-    }
-  },
-  {
-    path: '/facility/admissions',
-    name: 'facility-admissions',
-    component: () => import('../components/facility/FacilityAdmissionManagementPage.vue'),
-    meta: {
-      requiresAuth: true,
-      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'],
-      title: 'Admission Management',
-      description: 'Create admissions from validated UTNs and manage patient episodes',
-      breadcrumb: 'Admission Management'
-    }
-  },
-  {
-    path: '/facility/claims/submit',
-    name: 'facility-claim-submission',
-    component: () => import('../components/facility/FacilityClaimSubmissionPage.vue'),
-    meta: {
-      requiresAuth: true,
-      roles: ['facility_admin', 'facility_user', 'Super Admin', 'desk_officer'],
-      title: 'Submit Claim',
-      description: 'Submit claims for discharged patients with validated UTN and approved PA codes',
-      breadcrumb: 'Submit Claim'
-    }
+      permissions: ['admissions.manage'],
+      title: 'Admission Processing',
+      breadcrumb: 'Admission Processing',
+    },
   },
   {
     path: '/claims/automation/admissions/:id',
@@ -424,10 +421,10 @@ const routes = [
     component: () => import('../components/claims/automation/AdmissionDetailPage.vue'),
     meta: {
       requiresAuth: true,
+      permissions: ['admissions.manage', 'admissions.view'],
       title: 'Admission Details',
-      description: 'View admission details and linked claims',
-      breadcrumb: 'Admission Details'
-    }
+      breadcrumb: 'Admission Details',
+    },
   },
   {
     path: '/claims/automation/process',
@@ -435,10 +432,10 @@ const routes = [
     component: () => import('../components/claims/automation/ClaimsProcessingPage.vue'),
     meta: {
       requiresAuth: true,
+      permissions: ['claims.process', 'claims.automate'],
       title: 'Claims Processing',
-      description: 'Process claims with bundle classification and FFS top-ups',
-      breadcrumb: 'Claims Processing'
-    }
+      breadcrumb: 'Claims Processing',
+    },
   },
   {
     path: '/claims/automation/process/:id',
@@ -446,10 +443,10 @@ const routes = [
     component: () => import('../components/claims/automation/ClaimsProcessingPage.vue'),
     meta: {
       requiresAuth: true,
+      permissions: ['claims.process', 'claims.automate'],
       title: 'Process Claim',
-      description: 'Process and build claim sections',
-      breadcrumb: 'Process Claim'
-    }
+      breadcrumb: 'Process Claim',
+    },
   },
   {
     path: '/claims/automation/bundles',
@@ -457,53 +454,257 @@ const routes = [
     component: () => import('../components/claims/automation/BundleManagementPage.vue'),
     meta: {
       requiresAuth: true,
+      permissions: ['bundles.manage'],
       title: 'Bundle Management',
-      description: 'Manage bundle tariffs and configurations',
-      breadcrumb: 'Bundle Management'
-    }
-  },
-
-  // Facilities
-  {
-    path: '/facilities',
-    name: 'facilities',
-    component: FacilitiesPage,
-    meta: {
-      requiresAuth: true,
-      title: 'Facilities',
-      description: 'Manage healthcare facilities and providers',
-      breadcrumb: 'Facilities'
+      breadcrumb: 'Bundle Management',
     },
   },
 
-  // Management Module Dashboard
+  // ── Premium & Coverage ─────────────────────────────────────────────────────
+  {
+    path: '/premium',
+    name: 'premium-dashboard',
+    component: () => import('../components/premium/PremiumWorkspace.vue'),
+    props: { mode: 'dashboard' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['premium.plan.view', 'premium.purchase.view', 'coverage.view'],
+      title: 'Premium Dashboard',
+      breadcrumb: 'Premium Dashboard',
+    },
+  },
+  {
+    path: '/premium/plans',
+    name: 'premium-plans',
+    component: () => import('../components/premium/PremiumWorkspace.vue'),
+    props: { mode: 'plans' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['premium.plan.view'],
+      title: 'Premium Plans',
+      breadcrumb: 'Premium Plans',
+    },
+  },
+  {
+    path: '/premium/generate-pins',
+    name: 'premium-generate-pins',
+    component: () => import('../components/premium/PremiumWorkspace.vue'),
+    props: { mode: 'generate-pins' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['premium.pin.generate'],
+      title: 'Generate Premium PINs',
+      breadcrumb: 'Generate PINs',
+    },
+  },
+  {
+    path: '/premium/pins',
+    name: 'premium-pin-inventory',
+    component: () => import('../components/premium/PremiumWorkspace.vue'),
+    props: { mode: 'inventory' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['premium.pin.view'],
+      title: 'PIN Inventory',
+      breadcrumb: 'PIN Inventory',
+    },
+  },
+  {
+    path: '/premium/sell-pin',
+    name: 'premium-sell-pin',
+    component: () => import('../components/premium/PremiumWorkspace.vue'),
+    props: { mode: 'sell-pin' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['premium.pin.sell'],
+      title: 'Sell Premium PIN',
+      breadcrumb: 'Sell PIN',
+    },
+  },
+  {
+    path: '/premium/validate-pin',
+    name: 'premium-validate-pin',
+    component: () => import('../components/premium/PremiumWorkspace.vue'),
+    props: { mode: 'validate-pin' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['premium.pin.view'],
+      title: 'Validate PIN',
+      breadcrumb: 'Validate PIN',
+    },
+  },
+  {
+    path: '/premium/purchases',
+    name: 'premium-purchases',
+    component: () => import('../components/premium/PremiumWorkspace.vue'),
+    props: { mode: 'purchases' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['premium.purchase.view'],
+      title: 'Premium Purchases',
+      breadcrumb: 'Premium Purchases',
+    },
+  },
+  {
+    path: '/premium/benefactors',
+    name: 'premium-benefactors',
+    component: () => import('../components/premium/PremiumWorkspace.vue'),
+    props: { mode: 'benefactors' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['benefactor.view'],
+      title: 'Benefactor Management',
+      breadcrumb: 'Benefactors',
+    },
+  },
+  {
+    path: '/premium/payroll',
+    name: 'premium-payroll',
+    component: () => import('../components/premium/PremiumWorkspace.vue'),
+    props: { mode: 'payroll' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['payroll-upload.view'],
+      title: 'Payroll Upload',
+      breadcrumb: 'Payroll Upload',
+    },
+  },
+  {
+    path: '/premium/eligibility',
+    name: 'premium-eligibility',
+    component: () => import('../components/premium/PremiumWorkspace.vue'),
+    props: { mode: 'eligibility' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['eligibility.lookup'],
+      title: 'Coverage Eligibility Lookup',
+      breadcrumb: 'Eligibility Lookup',
+    },
+  },
+
+  // ── Capitation ─────────────────────────────────────────────────────────────
+  {
+    path: '/capitation/generate',
+    name: 'capitation-generate',
+    component: () => import('../components/capitation/CapitationWorkspace.vue'),
+    props: { mode: 'generate' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['capitation.create'],
+      title: 'Generate Capitation',
+      breadcrumb: 'Generate Capitation',
+    },
+  },
+  {
+    path: '/capitation/review',
+    name: 'capitation-review',
+    component: () => import('../components/capitation/CapitationWorkspace.vue'),
+    props: { mode: 'review' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['capitation.view'],
+      title: 'Review Capitation',
+      breadcrumb: 'Review Capitation',
+    },
+  },
+  {
+    path: '/capitation/approval',
+    name: 'capitation-approval',
+    component: () => import('../components/capitation/CapitationWorkspace.vue'),
+    props: { mode: 'approval' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['capitation.finalise'],
+      title: 'Capitation Approval',
+      breadcrumb: 'Capitation Approval',
+    },
+  },
+  {
+    path: '/capitation/payments',
+    name: 'capitation-payments',
+    component: () => import('../components/capitation/CapitationWorkspace.vue'),
+    props: { mode: 'payments' },
+    meta: {
+      requiresAuth: true,
+      permissions: ['capitation.export'],
+      title: 'Capitation Payments',
+      breadcrumb: 'Capitation Payments',
+    },
+  },
+
+  // ── Payments ───────────────────────────────────────────────────────────────
+  {
+    path: '/payments',
+    name: 'payments-overview',
+    component: () => import('../components/payments/PaymentsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['payments.view', 'payment_batches.view', 'payment_batches.manage'],
+      title: 'Payments Overview',
+      breadcrumb: 'Payments',
+    },
+  },
+  {
+    path: '/payments/process',
+    name: 'payments-process',
+    redirect: '/claims/payment-batches',
+  },
+
+  // ── Management ─────────────────────────────────────────────────────────────
   {
     path: '/management',
     name: 'management-dashboard',
     component: () => import('../components/management/ManagementDashboard.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      permissions: ['dashboard.management.view', 'cases.view', 'bundles.view', 'tariffs.view'],
       title: 'Management Module',
-      description: 'Manage tariff items, bundles, and system configurations',
-      breadcrumb: 'Management Dashboard'
-    }
+      breadcrumb: 'Management Dashboard',
+    },
   },
-
-  // Management Routes (Master Data)
-  // Note: Drug, Lab, Professional Service, Radiology, Consultation, and Consumable management
-  // is now handled through the unified Case Management page with polymorphic details
+  {
+    path: '/management/cases',
+    name: 'management-cases',
+    component: () => import('../components/management/CaseManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['cases.view', 'cases.manage'],
+      title: 'Case Management',
+      breadcrumb: 'Case Management',
+    },
+  },
+  {
+    path: '/management/bundle-services',
+    name: 'management-bundle-services',
+    component: () => import('../components/management/BundleServicesManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['bundle_services.view', 'bundle_services.manage'],
+      title: 'Bundle Services',
+      breadcrumb: 'Bundle Services',
+    },
+  },
+  {
+    path: '/management/bundle-components',
+    name: 'management-bundle-components',
+    component: () => import('../components/management/BundleComponentsManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['bundle_components.view', 'bundle_components.manage'],
+      title: 'Bundle Components',
+      breadcrumb: 'Bundle Components',
+    },
+  },
   {
     path: '/management/drugs',
     name: 'management-drugs',
     component: () => import('../components/management/DrugsManagementPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-      title: 'Drugs Management',
-      description: 'Manage drug tariff items and pricing',
-      breadcrumb: 'Drugs Management'
-    }
+      permissions: ['tariffs.view'],
+      title: 'Tariff Items',
+      breadcrumb: 'Tariff Items',
+    },
   },
   {
     path: '/management/laboratories',
@@ -511,11 +712,10 @@ const routes = [
     component: () => import('../components/management/LaboratoriesManagementPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
+      permissions: ['tariffs.view'],
       title: 'Laboratories Management',
-      description: 'Manage laboratory test tariff items',
-      breadcrumb: 'Laboratories Management'
-    }
+      breadcrumb: 'Laboratories',
+    },
   },
   {
     path: '/management/professional-services',
@@ -523,91 +723,170 @@ const routes = [
     component: () => import('../components/management/ProfessionalServicesManagementPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-      title: 'Professional Services Management',
-      description: 'Manage professional services (consultations, procedures)',
-      breadcrumb: 'Professional Services Management'
-    }
+      permissions: ['tariffs.view'],
+      title: 'Professional Services',
+      breadcrumb: 'Professional Services',
+    },
   },
 
+  // ── Reports & Analytics ────────────────────────────────────────────────────
   {
-    path: '/management/cases',
-    name: 'management-cases',
-    component: () => import('../components/management/CaseManagementPage.vue'),
+    path: '/reports',
+    name: 'reports',
+    component: () => import('../components/reports/ReportsPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-      title: 'Case Management',
-      description: 'Manage case records and service tariffs',
-      breadcrumb: 'Case Management'
-    }
+      permissions: ['reports.view', 'reports.generate', 'dashboard.view'],
+      title: 'Reports',
+      breadcrumb: 'Reports',
+    },
   },
-
   {
-    path: '/management/bundle-services',
-    name: 'management-bundle-services',
-    component: () => import('../components/management/BundleServicesManagementPage.vue'),
+    path: '/reports/financial',
+    name: 'reports-financial',
+    component: () => import('../components/reports/FinancialReportsPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-      title: 'Bundle Services Management',
-      description: 'Manage service bundles and configurations',
-      breadcrumb: 'Bundle Services'
-    }
+      permissions: ['reports.financial', 'reports.executive', 'reports.view'],
+      title: 'Financial Reports',
+      breadcrumb: 'Financial Reports',
+    },
   },
-
   {
-    path: '/management/bundle-components',
-    name: 'management-bundle-components',
-    component: () => import('../components/management/BundleComponentsManagementPage.vue'),
+    path: '/analytics',
+    name: 'analytics',
+    component: () => import('../components/reports/AnalyticsPage.vue'),
     meta: {
       requiresAuth: true,
-      roles: ['admin', 'Super Admin', 'tariff_manager'],
-      title: 'Bundle Components Management',
-      description: 'Manage components within service bundles',
-      breadcrumb: 'Bundle Components'
-    }
+      permissions: ['analytics.view', 'dashboard.view'],
+      title: 'Analytics',
+      breadcrumb: 'Analytics',
+    },
+  },
+  {
+    path: '/audit-logs',
+    name: 'audit-logs',
+    component: () => import('../components/security/AuditLogsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['audit-logs.view', 'audit.view'],
+      title: 'Audit Logs',
+      breadcrumb: 'Audit Logs',
+    },
   },
 
-  // Settings Routes
+  // ── Feedback ───────────────────────────────────────────────────────────────
+  {
+    path: '/feedback',
+    name: 'feedback-management',
+    component: () => import('../components/feedback/FeedbackManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['feedback.view'],
+      title: 'Feedback Management',
+      breadcrumb: 'Feedback',
+    },
+  },
+  {
+    path: '/feedback/create',
+    name: 'feedback-create',
+    component: () => import('../components/feedback/FeedbackCreationPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['feedback.create'],
+      title: 'Create Feedback',
+      breadcrumb: 'Create Feedback',
+    },
+  },
+
+  // ── Task Management ────────────────────────────────────────────────────────
+  {
+    path: '/task-management',
+    name: 'task-management',
+    component: () => import('../components/task-management/TaskManagementPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['tasks.view'],
+      title: 'Task Management',
+      breadcrumb: 'Task Management',
+    },
+  },
+
+  // ── Administration ─────────────────────────────────────────────────────────
   {
     path: '/settings/users',
     name: 'settings-users',
     component: UsersPage,
-    meta: { requiresAuth: true },
+    meta: {
+      requiresAuth: true,
+      permissions: ['users.view'],
+      title: 'User Management',
+      breadcrumb: 'Users',
+    },
   },
   {
     path: '/settings/benefactors',
     name: 'settings-benefactors',
     component: BenefactorsPage,
-    meta: { requiresAuth: true },
+    meta: {
+      requiresAuth: true,
+      permissions: ['benefactor.view'],
+      title: 'Benefactors',
+      breadcrumb: 'Benefactors',
+    },
   },
   {
     path: '/settings/roles',
     name: 'settings-roles',
     component: RolesPermissionsPage,
-    meta: { requiresAuth: true },
+    meta: {
+      requiresAuth: true,
+      permissions: ['roles.view', 'permissions.view'],
+      title: 'Roles & Permissions',
+      breadcrumb: 'Roles & Permissions',
+    },
   },
   {
     path: '/settings/departments',
     name: 'settings-departments',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Manage Department', subtitle: 'Manage organizational departments', icon: 'mdi-office-building' }
+    component: () => import('../components/settings/DepartmentsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['users.view', 'departments.view', 'departments.manage'],
+      title: 'Departments',
+      breadcrumb: 'Departments',
+    },
   },
   {
     path: '/settings/designations',
     name: 'settings-designations',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    meta: { requiresAuth: true },
-    props: { title: 'Manage Designation', subtitle: 'Manage job designations', icon: 'mdi-badge-account' }
+    component: () => import('../components/settings/DesignationsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['users.view', 'designations.view', 'designations.manage'],
+      title: 'Designations',
+      breadcrumb: 'Designations',
+    },
   },
 
-  // Default redirect
+  // ── Legacy / device routes ─────────────────────────────────────────────────
   {
-    path: '/',
-    redirect: '/dashboard',
+    path: '/devices/manage',
+    name: 'devices-manage',
+    component: () => import('../components/common/ComingSoonPage.vue'),
+    props: { title: 'Manage Devices', subtitle: 'Device management and configuration', icon: 'mdi-tablet' },
+    meta: { requiresAuth: true, permissions: ['users.view'], title: 'Manage Devices', breadcrumb: 'Devices' },
   },
+  {
+    path: '/devices/config',
+    name: 'devices-config',
+    component: () => import('../components/common/ComingSoonPage.vue'),
+    props: { title: 'Enrollment Configuration', subtitle: 'Configure enrollment settings', icon: 'mdi-cog' },
+    meta: { requiresAuth: true, permissions: ['users.view'], title: 'Enrollment Config', breadcrumb: 'Config' },
+  },
+
+  // ── Default ────────────────────────────────────────────────────────────────
+  { path: '/', redirect: '/dashboard' },
 ];
 
 const router = createRouter({
@@ -615,176 +894,66 @@ const router = createRouter({
   routes,
 });
 
-// Helper function to determine which module a route belongs to
-const getModuleForRoute = (path) => {
-  if (path.startsWith('/claims/automation')) return 'automation';
-  if (path.startsWith('/claims')) return 'claims';
-  if (path.startsWith('/management')) return 'management';
-  if (
-    path.startsWith('/pas') ||
-    path.startsWith('/tariff-items') ||
-    path.startsWith('/case-categories') ||
-    path.startsWith('/service-categories') ||
-    path.startsWith('/do-facilities') ||
-    path.startsWith('/do/assigned-referrals') ||
-    path.startsWith('/document-requirements') ||
-    path.startsWith('/feedback')
-  ) {
-    return 'pas';
-  }
-  return 'general';
-};
-
-// Navigation guard for authentication and role-based routing
+// ─── Navigation guard ──────────────────────────────────────────────────────────
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
+  const uiStore = useUiStore();
+  uiStore.setRouteLoading(true);
 
-  if (to.meta.requiresAuth) {
-    // Only initialize if not already authenticated
-    if (!authStore.isAuthenticated && !authStore._initializing) {
-      await authStore.initializeAuth();
-    }
-
-    if (authStore.isAuthenticated) {
-      // Check module access first
-      const requiredModule = getModuleForRoute(to.path);
-      const availableModules = authStore.availableModules || [];
-
-      // Super Admin can access all modules
-      const isSuperAdmin = authStore.hasRole('Super Admin');
-
-      // Check if user has access to the required module
-      if (!isSuperAdmin && requiredModule !== 'general' && availableModules.length > 0) {
-        if (!availableModules.includes(requiredModule)) {
-          // User doesn't have access to this module, redirect to appropriate dashboard
-          const userRole = authStore.userRoles[0]?.name;
-          let targetPath = '/dashboard';
-
-          if (userRole === 'desk_officer') {
-            targetPath = '/do-dashboard';
-          } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
-            targetPath = '/facility-dashboard';
-          }
-
-          // Only redirect if we're not already going to the target dashboard
-          if (to.path !== targetPath) {
-            next({ path: targetPath, replace: true });
-            return;
-          }
-
-          // If we're already on the target dashboard, allow access to prevent infinite loop
-          console.warn(`[Router] User lacks module access for ${to.path}, but allowing access to prevent redirect loop`);
-        }
-      }
-
-      // Check permission-based access first (preferred method)
-      const requiredPermissions = to.meta.permissions || (to.meta.permission ? [to.meta.permission] : null);
-
-      if (requiredPermissions && requiredPermissions.length > 0) {
-        // Check if user has at least one of the required permissions
-        const hasRequiredPermission = requiredPermissions.some(permission => authStore.hasPermission(permission));
-
-        if (!hasRequiredPermission) {
-          // User doesn't have required permissions, redirect to appropriate dashboard
-          // BUT: Prevent infinite redirect loop by checking if we're already on a dashboard route
-          const userRole = authStore.userRoles[0]?.name;
-          let targetPath = '/dashboard';
-
-          if (userRole === 'desk_officer') {
-            targetPath = '/do-dashboard';
-          } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
-            targetPath = '/facility-dashboard';
-          }
-
-          // Only redirect if we're not already going to the target dashboard
-          if (to.path !== targetPath) {
-            next({ path: targetPath, replace: true });
-            return;
-          }
-
-          // If we're already on the target dashboard but don't have permission,
-          // allow access anyway (this prevents infinite loops for dashboard routes)
-          console.warn(`[Router] User lacks permission for ${to.path}, but allowing access to prevent redirect loop`);
-        }
-      }
-
-      // Fallback to role-based access (for backward compatibility)
-      const requiredRoles = to.meta.roles || (to.meta.role ? [to.meta.role] : null);
-
-      if (requiredRoles && requiredRoles.length > 0) {
-        // Check if user has at least one of the required roles
-        const hasRequiredRole = requiredRoles.some(role => authStore.hasRole(role));
-
-        if (!hasRequiredRole) {
-          // User doesn't have any of the required roles, redirect to appropriate dashboard
-          const userRole = authStore.userRoles[0]?.name;
-          let targetPath = '/dashboard';
-
-          if (userRole === 'desk_officer') {
-            targetPath = '/do-dashboard';
-          } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
-            targetPath = '/facility-dashboard';
-          }
-
-          // Only redirect if we're not already going to the target dashboard
-          if (to.path !== targetPath) {
-            next({ path: targetPath, replace: true });
-            return;
-          }
-
-          // If we're already on the target dashboard, allow access to prevent infinite loop
-          console.warn(`[Router] User lacks required role for ${to.path}, but allowing access to prevent redirect loop`);
-        }
-      }
-
-      // Special handling for desk officers accessing general dashboard
-      if (to.name === 'dashboard' && authStore.hasRole('desk_officer')) {
-        // Redirect desk officers to their specialized dashboard
-        next({ path: '/do-dashboard', replace: true });
-        return;
-      }
-
-      // Special handling for facility users accessing general dashboard
-      if (to.name === 'dashboard' && (authStore.hasRole('facility_admin') || authStore.hasRole('facility_user'))) {
-        // Redirect facility users to their specialized dashboard
-        next({ path: '/facility-dashboard', replace: true });
-        return;
-      }
-
-      next();
-    } else {
-      next({ path: '/login', replace: true });
-    }
-  } else {
-    // Handle login page redirect for already authenticated users
+  try {
+  // Public routes
+  if (!to.meta.requiresAuth) {
     if (to.name === 'login' && authStore.isAuthenticated) {
-      // Redirect authenticated users away from login page
-      const userRole = authStore.userRoles[0]?.name;
-      if (userRole === 'desk_officer') {
-        next({ path: '/do-dashboard', replace: true });
-      } else if (userRole === 'facility_admin' || userRole === 'facility_user') {
-        next({ path: '/facility-dashboard', replace: true });
-      } else {
-        next({ path: '/dashboard', replace: true });
-      }
+      next({ path: getDefaultDashboard(authStore), replace: true });
       return;
     }
-
     next();
+    return;
+  }
+
+  // Ensure auth is initialized
+  if (!authStore.isAuthenticated && !authStore._initializing) {
+    await authStore.initializeAuth();
+  }
+
+  if (!authStore.isAuthenticated) {
+    next({ path: '/login', replace: true });
+    return;
+  }
+
+  // ── Permission check ────────────────────────────────────────────────────────
+  const requiredPermissions = to.meta.permissions;
+
+  if (requiredPermissions && requiredPermissions.length > 0) {
+    const hasAccess = requiredPermissions.some((p) => authStore.hasPermission(p));
+
+    if (!hasAccess) {
+      const target = getDefaultDashboard(authStore);
+      // Prevent redirect loops: if we're already going to the target, let it through
+      if (to.path !== target) {
+        next({ path: target, replace: true });
+        return;
+      }
+    }
+  }
+
+  next();
+  } catch (error) {
+    uiStore.setRouteLoading(false);
+    next(error);
   }
 });
 
-// Navigation guard for page titles
+// ─── Page titles ───────────────────────────────────────────────────────────────
 router.afterEach((to) => {
-  // Set page title based on route meta or default
-  const baseTitle = 'NGSCHA';
-  const pageTitle = to.meta?.title;
+  const uiStore = useUiStore();
+  uiStore.setRouteLoading(false);
+  document.title = to.meta?.title ? `${to.meta.title} — NGSCHA` : 'NGSCHA';
+});
 
-  if (pageTitle) {
-    document.title = `${pageTitle} - ${baseTitle}`;
-  } else {
-    document.title = baseTitle;
-  }
+router.onError(() => {
+  const uiStore = useUiStore();
+  uiStore.setRouteLoading(false);
 });
 
 export default router;

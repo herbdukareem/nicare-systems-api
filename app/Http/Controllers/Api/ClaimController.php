@@ -8,6 +8,7 @@ use App\Models\ClaimPaymentBatch;
 use App\Services\ClaimsAutomation\ClaimProcessingService;
 use App\Services\ClaimValidationService;
 use App\Services\FeedbackService;
+use App\Services\EligibilityService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -35,7 +36,7 @@ class ClaimController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Claim::with(['referral', 'admission', 'enrollee', 'facility', 'lineItems']);
+            $query = Claim::with(['referral', 'admission', 'coveragePeriod', 'enrollee', 'facility', 'lineItems']);
 
             // Filter by referral_id (direct relationship)
             if ($request->filled('referral_id')) {
@@ -184,7 +185,35 @@ public function showFullDetails($claimId): JsonResponse
 
             $referral = $utnValidation['referral'];
 
-            // 2. Check for duplicate claim
+            // 2. Get admission if provided (optional) before checking service-date coverage.
+            $admission = null;
+            if (!empty($validated['admission_id'])) {
+                $admission = \App\Models\Admission::with('serviceBundle')->find($validated['admission_id']);
+
+                if ($admission && $admission->referral_id !== $validated['referral_id']) {
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Admission does not belong to the selected referral',
+                    ], 400);
+                }
+            }
+
+            $serviceDate = $admission?->admission_date ?? ($validated['claim_date'] ?? now());
+
+            try {
+                app(EligibilityService::class)->assertFacilityMatchesCoverage(
+                    $referral->enrollee_id,
+                    (int) $referral->receiving_facility_id,
+                    $serviceDate
+                );
+            } catch (\Throwable $e) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $e->getMessage(),
+                ], 422);
+            }
+
+            // 3. Check for duplicate claim
             $duplicateCheck = $this->validationService->checkDuplicateClaim($validated['referral_id']);
             if ($duplicateCheck['exists']) {
                 return response()->json([
@@ -192,20 +221,6 @@ public function showFullDetails($claimId): JsonResponse
                     'message' => 'A claim has already been submitted for this referral (UTN: ' . $referral->utn . ')',
                     'existing_claim' => $duplicateCheck['claim'],
                 ], 400);
-            }
-
-            // 3. Get admission if provided (optional)
-            $admission = null;
-            if (!empty($validated['admission_id'])) {
-                $admission = \App\Models\Admission::with('serviceBundle')->find($validated['admission_id']);
-
-                // Validate admission belongs to the same referral
-                if ($admission && $admission->referral_id !== $validated['referral_id']) {
-                    return response()->json([
-                        'success' => false,
-                        'message' => 'Admission does not belong to the selected referral',
-                    ], 400);
-                }
             }
 
             // 4. Get bundle amount (fixed price from service bundle)
@@ -264,7 +279,7 @@ public function showFullDetails($claimId): JsonResponse
                     'total_amount_claimed' => $totalAmount,
                     'status' => 'SUBMITTED',
                     'claim_date' => $validated['claim_date'] ?? now(),
-                    'service_date' => $admission ? $admission->admission_date : now(),
+                    'service_date' => $serviceDate,
                     'submitted_at' => now(),
                     'submitted_by' => auth()->id() ?? null,
                 ]);
@@ -345,7 +360,7 @@ public function showFullDetails($claimId): JsonResponse
     {
         return response()->json([
             'success' => true,
-            'data' => $claim->load(['admission', 'enrollee', 'facility', 'lineItems', 'alerts']),
+            'data' => $claim->load(['admission', 'coveragePeriod', 'enrollee', 'facility', 'lineItems', 'alerts']),
         ]);
     }
 
@@ -757,4 +772,3 @@ public function showFullDetails($claimId): JsonResponse
         }
     }
 }
-

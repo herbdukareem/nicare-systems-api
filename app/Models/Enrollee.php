@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use App\Enums\Status;
 
 /**
  * Class Enrollee
@@ -15,6 +14,11 @@ class Enrollee extends Model
 {
     use HasFactory;
 
+    public const STATUS_PENDING = 0;
+    public const STATUS_ACTIVE = 1;
+    public const STATUS_REJECTED = 2;
+    public const STATUS_SUSPENDED = 3;
+    public const STATUS_EXPIRED = 4;
 
     /**
      * The table associated with the model.
@@ -38,8 +42,13 @@ protected $guarded = ['id'];
     protected $casts = [
         'date_of_birth' => 'date',
         'capitation_start_date' => 'date',
+        'coverage_start_date' => 'date',
+        'coverage_end_date' => 'date',
         'approval_date' => 'datetime',
-        'status' => Status::class,
+        'enrollment_date' => 'datetime',
+        'duplicate_reviewed' => 'boolean',
+        'duplicate_reviewed_at' => 'datetime',
+        'status' => 'integer',
     ];
 
     /**
@@ -90,6 +99,41 @@ protected $guarded = ['id'];
         return $this->belongsTo(FundingType::class);
     }
 
+    public function insuranceProgramme()
+    {
+        return $this->belongsTo(InsuranceProgramme::class, 'insurance_programme_id');
+    }
+
+    public function enrolleeCategory()
+    {
+        return $this->belongsTo(EnrolleeCategory::class, 'enrollee_category_id');
+    }
+
+    public function premiumPlan()
+    {
+        return $this->belongsTo(PremiumPlan::class, 'premium_plan_id');
+    }
+
+    public function premiumPin()
+    {
+        return $this->belongsTo(PremiumPin::class, 'premium_pin_id');
+    }
+
+    public function benefitPackage()
+    {
+        return $this->belongsTo(BenefitPackage::class, 'benefit_package_id');
+    }
+
+    public function vulnerableGroup()
+    {
+        return $this->belongsTo(VulnerableGroup::class, 'vulnerable_group_id');
+    }
+
+    public function enrollmentPhase()
+    {
+        return $this->belongsTo(EnrollmentPhase::class, 'enrollment_phase_id');
+    }
+
     /**
      * Enrollee has a benefactor.
      */
@@ -99,17 +143,9 @@ protected $guarded = ['id'];
     }
 
     /**
-     * Enrollee belongs to a premium (pin) if assigned.
-     */
-    public function premium()
-    {
-        return $this->belongsTo(Premium::class);
-    }
-
-    /**
      * User who created this enrollee.
      */
-    public function creator()
+    public function createdBy()
     {
         return $this->belongsTo(User::class, 'created_by');
     }
@@ -117,9 +153,24 @@ protected $guarded = ['id'];
     /**
      * User who approved this enrollee.
      */
-    public function approver()
+    public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function duplicateReviewedBy()
+    {
+        return $this->belongsTo(User::class, 'duplicate_reviewed_by');
+    }
+
+    public function creator()
+    {
+        return $this->createdBy();
+    }
+
+    public function approver()
+    {
+        return $this->approvedBy();
     }
 
     /**
@@ -168,6 +219,68 @@ protected $guarded = ['id'];
  
     public function referrals() {
         return $this->hasMany(Referral::class);
+    }
+
+    public function principal()
+    {
+        return $this->belongsTo(self::class, 'principal_enrollee_id');
+    }
+
+    public function dependants()
+    {
+        return $this->hasMany(self::class, 'principal_enrollee_id');
+    }
+
+    public function invoices()
+    {
+        return $this->morphMany(Invoice::class, 'payable');
+    }
+
+    public function isActive(): bool
+    {
+        return (int) $this->status === self::STATUS_ACTIVE;
+    }
+
+    public function hasValidCoverage(?\DateTimeInterface $date = null): bool
+    {
+        $date ??= now();
+
+        return $this->isActive()
+            && $this->coverage_start_date
+            && $this->coverage_start_date->lte($date)
+            && ($this->coverage_end_date === null || $this->coverage_end_date->gte($date));
+    }
+
+    public function isEligibleForCare(?\DateTimeInterface $date = null): bool
+    {
+        return $this->hasValidCoverage($date);
+    }
+
+    public function isCoverageActive(?\DateTimeInterface $date = null): bool
+    {
+        return $this->hasValidCoverage($date);
+    }
+
+    public function hasNoExpiryCoverage(): bool
+    {
+        return $this->coverage_start_date !== null && $this->coverage_end_date === null;
+    }
+
+    public function getCoverageLabelAttribute(): string
+    {
+        if (!$this->coverage_start_date) {
+            return 'Pending coverage';
+        }
+
+        if ($this->hasNoExpiryCoverage()) {
+            return 'No Expiry';
+        }
+
+        if ($this->coverage_end_date?->isPast() && !$this->coverage_end_date?->isToday()) {
+            return 'Expired';
+        }
+
+        return 'Active until ' . $this->coverage_end_date?->format('M d, Y');
     }
 
     /**
@@ -220,5 +333,20 @@ protected $guarded = ['id'];
         return trim($this->first_name . ' ' . $this->middle_name . ' ' . $this->last_name);
     }
 
-    protected $appends = ['age', 'full_name'];
+    public function facilityTransfers()
+    {
+        return $this->hasMany(EnrolleeFacilityTransfer::class, 'enrollee_id');
+    }
+
+    public function duplicateFlags()
+    {
+        return $this->hasMany(EnrolleeDuplicateFlag::class, 'enrollee_id');
+    }
+
+    public function matchedDuplicateFlags()
+    {
+        return $this->hasMany(EnrolleeDuplicateFlag::class, 'matched_enrollee_id');
+    }
+
+    protected $appends = ['age', 'full_name', 'coverage_label'];
 }

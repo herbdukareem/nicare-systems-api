@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Models\AuditTrail;
 use App\Models\Claim;
 use App\Models\ClaimPaymentBatch;
 use Illuminate\Http\JsonResponse;
@@ -157,6 +158,14 @@ class PaymentBatchController extends Controller
                 ], 400);
             }
 
+            // BR-06: four-eyes principle — batch creator cannot process the batch
+            if ($batch->created_by === auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'BR-06 violation: The user who created this payment batch cannot process it. A different finance officer must approve.',
+                ], 403);
+            }
+
             $batch->update([
                 'status' => ClaimPaymentBatch::STATUS_PROCESSING,
                 'payment_reference' => $validated['payment_reference'] ?? null,
@@ -165,6 +174,18 @@ class PaymentBatchController extends Controller
                 'payment_date' => $validated['payment_date'] ?? now(),
                 'processed_by' => auth()->id(),
                 'processed_at' => now(),
+            ]);
+
+            // BR-09: write audit trail entry
+            AuditTrail::create([
+                'auditable_type' => ClaimPaymentBatch::class,
+                'auditable_id'   => $batch->id,
+                'action'         => 'payment_batch_processed',
+                'description'    => "Payment batch {$batch->batch_number} moved to PROCESSING",
+                'user_id'        => auth()->id(),
+                'old_values'     => ['status' => ClaimPaymentBatch::STATUS_PENDING],
+                'new_values'     => ['status' => ClaimPaymentBatch::STATUS_PROCESSING],
+                'ip_address'     => $request->ip(),
             ]);
 
             return response()->json([
@@ -198,6 +219,14 @@ class PaymentBatchController extends Controller
                 ], 400);
             }
 
+            // BR-06: four-eyes principle — batch creator cannot mark it as paid
+            if ($batch->created_by === auth()->id()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'BR-06 violation: The user who created this payment batch cannot mark it as paid. A different finance officer must confirm payment.',
+                ], 403);
+            }
+
             DB::beginTransaction();
 
             $batch->update([
@@ -215,6 +244,18 @@ class PaymentBatchController extends Controller
                     'payment_reference' => $validated['payment_reference'],
                     'payment_processed_at' => now(),
                 ]);
+
+            // BR-09: write audit trail entry
+            AuditTrail::create([
+                'auditable_type' => ClaimPaymentBatch::class,
+                'auditable_id'   => $batch->id,
+                'action'         => 'payment_batch_paid',
+                'description'    => "Payment batch {$batch->batch_number} marked PAID. Reference: {$validated['payment_reference']}",
+                'user_id'        => auth()->id(),
+                'old_values'     => ['status' => ClaimPaymentBatch::STATUS_PROCESSING],
+                'new_values'     => ['status' => ClaimPaymentBatch::STATUS_PAID, 'payment_reference' => $validated['payment_reference']],
+                'ip_address'     => $request->ip(),
+            ]);
 
             DB::commit();
 

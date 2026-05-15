@@ -22,7 +22,14 @@ class StoreLgaRequest extends FormRequest
             'zone'           => 'nullable|integer',
             'baseline'       => 'nullable|integer',
             'total_enrolled' => 'nullable|integer',
-            'status'         => 'nullable|in:active,inactive',
+            'status'         => 'nullable|integer|in:0,1',
         ];
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if (!$this->filled('code') && $this->filled('name')) {
+            $this->merge(['code' => str($this->input('name'))->slug('_')->upper()->toString()]);
+        }
     }
 }

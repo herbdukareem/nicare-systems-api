@@ -27,54 +27,11 @@
       </div>
 
       <!-- Statistics Cards -->
-      <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-4 tw-gap-6">
-        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
-          <div class="tw-flex tw-items-center">
-            <div class="tw-p-3 tw-rounded-full tw-bg-blue-100">
-              <v-icon color="blue" size="24">mdi-hospital-building</v-icon>
-            </div>
-            <div class="tw-ml-4">
-              <p class="tw-text-sm tw-font-medium tw-text-gray-600">Total Facilities</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">342</p>
-            </div>
-          </div>
-        </div>
-        
-        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
-          <div class="tw-flex tw-items-center">
-            <div class="tw-p-3 tw-rounded-full tw-bg-green-100">
-              <v-icon color="green" size="24">mdi-check-circle</v-icon>
-            </div>
-            <div class="tw-ml-4">
-              <p class="tw-text-sm tw-font-medium tw-text-gray-600">Active</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">298</p>
-            </div>
-          </div>
-        </div>
-        
-        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
-          <div class="tw-flex tw-items-center">
-            <div class="tw-p-3 tw-rounded-full tw-bg-orange-100">
-              <v-icon color="orange" size="24">mdi-clock-outline</v-icon>
-            </div>
-            <div class="tw-ml-4">
-              <p class="tw-text-sm tw-font-medium tw-text-gray-600">Pending</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">44</p>
-            </div>
-          </div>
-        </div>
-        
-        <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
-          <div class="tw-flex tw-items-center">
-            <div class="tw-p-3 tw-rounded-full tw-bg-purple-100">
-              <v-icon color="purple" size="24">mdi-doctor</v-icon>
-            </div>
-            <div class="tw-ml-4">
-              <p class="tw-text-sm tw-font-medium tw-text-gray-600">Providers</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">1,247</p>
-            </div>
-          </div>
-        </div>
+      <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 xl:tw-grid-cols-4 tw-gap-4">
+        <AppStatCard label="Total Facilities" :value="facilityStats.total" icon="mdi-hospital-building" color="blue" :loading="statsLoading" />
+        <AppStatCard label="Active" :value="facilityStats.active" icon="mdi-check-circle" color="green" :loading="statsLoading" />
+        <AppStatCard label="Pending / Inactive" :value="facilityStats.inactive" icon="mdi-clock-outline" color="orange" :loading="statsLoading" />
+        <AppStatCard label="LGAs Covered" :value="facilityStats.lgas" icon="mdi-map-marker-multiple" color="purple" :loading="statsLoading" />
       </div>
 
       <!-- Filters -->
@@ -442,11 +399,16 @@
 import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppStatCard from '../common/AppStatCard.vue';
 import { useToast } from '../../composables/useToast';
 import { facilityAPI } from '../../utils/api';
 
 const router = useRouter();
 const { success, error } = useToast();
+
+// Stats
+const statsLoading = ref(false);
+const facilityStats = ref({ total: 0, active: 0, inactive: 0, lgas: 0 });
 
 // Reactive data
 const loading = ref(false);
@@ -768,8 +730,27 @@ watch([searchQuery, filters], () => {
   loadFacilities();
 }, { deep: true, debounce: 300 });
 
+const loadFacilityStats = async () => {
+  statsLoading.value = true;
+  try {
+    const res = await facilityAPI.getAll({ per_page: 1 });
+    const d = res.data?.data ?? res.data;
+    const meta = d?.meta ?? d;
+    facilityStats.value.total = meta?.total ?? 0;
+    const allRes = await facilityAPI.getAll({ per_page: 500, fields: 'id,status,lga_id' });
+    const allData = allRes.data?.data ?? allRes.data;
+    const list = allData?.data ?? allData ?? [];
+    facilityStats.value.active = list.filter(f => f.status === 1 || f.status === 'active').length;
+    facilityStats.value.inactive = list.filter(f => f.status !== 1 && f.status !== 'active').length;
+    facilityStats.value.lgas = new Set(list.map(f => f.lga_id).filter(Boolean)).size;
+  } catch { /* stats are non-critical */ } finally {
+    statsLoading.value = false;
+  }
+};
+
 onMounted(() => {
   loadFacilities();
+  loadFacilityStats();
 });
 </script>
 

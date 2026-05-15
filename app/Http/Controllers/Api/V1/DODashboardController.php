@@ -33,11 +33,10 @@ class DODashboardController extends Controller
         try {
             $user = Auth::user();
             
-            //check if user has role of desk_officer, facility_admin, or facility_user
-            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
+            if (!$user->hasPermission('dashboard.desk_officer.view') && !$user->hasPermission('dashboard.facility.view')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Access denied. Facility role required.'
+                    'message' => 'Access denied. Dashboard permission required.'
                 ], 403);
             }
 
@@ -92,11 +91,10 @@ class DODashboardController extends Controller
         try {
             $user = Auth::user();
             
-            //check if user has role of desk_officer, facility_admin, or facility_user
-            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
+            if (!$user->hasPermission('dashboard.desk_officer.view') && !$user->hasPermission('dashboard.facility.view')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Access denied. Facility role required.'
+                    'message' => 'Access denied. Dashboard permission required.'
                 ], 403);
             }
 
@@ -155,11 +153,10 @@ class DODashboardController extends Controller
         try {
             $user = Auth::user();
             
-            //check if user has role of desk_officer, facility_admin, or facility_user
-            if (!$user->hasRole('desk_officer') && !$user->hasRole('facility_admin') && !$user->hasRole('facility_user')) {
+            if (!$user->hasPermission('dashboard.desk_officer.view') && !$user->hasPermission('dashboard.facility.view')) {
                 return response()->json([
                     'success' => false,
-                    'message' => 'Access denied. Facility role required.'
+                    'message' => 'Access denied. Dashboard permission required.'
                 ], 403);
             }
 

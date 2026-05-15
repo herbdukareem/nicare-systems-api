@@ -217,8 +217,36 @@
           <InfoItem label="Approval Date" :value="formatDate(enrollee.approval_date)" icon="mdi-calendar-check" />
           <InfoItem label="Benefactor" :value="enrollee.benefactor?.name || 'N/A'" icon="mdi-account-heart" />
           <InfoItem label="Funding Type" :value="enrollee.funding_type?.name || 'N/A'" icon="mdi-cash-multiple" />
-          <InfoItem label="Premium ID" :value="enrollee.premium?.id || 'N/A'" icon="mdi-pound-box" />
+          <InfoItem label="Premium Plan" :value="enrollee.premium_plan?.name || enrollee.premium_plan?.id || 'N/A'" icon="mdi-clipboard-list" />
         </div>
+      </div>
+
+      <!-- Coverage & Premium -->
+      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
+        <div class="tw-flex tw-items-center tw-justify-between tw-mb-4">
+          <h2 class="tw-text-xl tw-font-semibold tw-text-gray-900">Coverage & Premium</h2>
+          <v-chip :color="activeCoverage ? 'success' : 'warning'" size="small" variant="flat">
+            {{ activeCoverage ? 'Eligible' : 'No active coverage' }}
+          </v-chip>
+        </div>
+        <div v-if="activeCoverage" class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-4">
+          <InfoItem label="Programme" :value="activeCoverage.insurance_programme?.name || 'N/A'" icon="mdi-shield-account" />
+          <InfoItem label="Category" :value="activeCoverage.enrollee_category?.name || 'N/A'" icon="mdi-account-tag" />
+          <InfoItem label="Funding Type" :value="activeCoverage.funding_type?.name || enrollee.funding_type?.name || 'N/A'" icon="mdi-cash-multiple" />
+          <InfoItem label="Benefactor / Sponsor" :value="activeCoverage.benefactor?.name || enrollee.benefactor?.name || 'Self / N/A'" icon="mdi-account-heart" />
+          <InfoItem label="Premium Plan" :value="activeCoverage.premium_plan?.name || 'N/A'" icon="mdi-clipboard-list" />
+          <InfoItem label="Payment Status" value="N/A" icon="mdi-receipt" />
+          <InfoItem label="Coverage Status" :value="activeCoverage.status" icon="mdi-check-decagram" />
+          <InfoItem label="Coverage Start" :value="formatDate(activeCoverage.coverage_start_date)" icon="mdi-calendar-start" />
+          <InfoItem label="Coverage End" :value="activeCoverage.coverage_end_date ? formatDate(activeCoverage.coverage_end_date) : 'No Expiry'" icon="mdi-calendar-end" />
+          <InfoItem label="Waiting Period" :value="waitingPeriodLabel(activeCoverage)" icon="mdi-timer-sand" />
+          <InfoItem label="Assigned HCP" :value="activeCoverage.facility?.name || enrollee.facility_name || 'N/A'" icon="mdi-hospital-building" />
+          <InfoItem label="Capitation Status" :value="activeCoverage.status === 'active' ? 'Capitable' : 'Not capitable'" icon="mdi-bank-transfer" />
+          <InfoItem label="Sponsor" :value="activeCoverage.benefactor?.name || 'N/A'" icon="mdi-account-group" />
+        </div>
+        <v-alert v-else type="warning" variant="tonal" density="comfortable">
+          This enrollee does not currently have active coverage.
+        </v-alert>
       </div>
 
       <!-- Employment -->
@@ -287,6 +315,7 @@ const statusOptions = ref([])
 
 /* Demo stats (replace with API when ready) */
 const statistics = ref({ totalClaims: 12, totalBenefits: 45000, facilitiesVisited: 3, lastVisit: 15 })
+const activeCoverage = ref(null)
 
 /* -------- Small presentational components (render functions to keep SFC lean) -------- */
 const InfoItem = defineComponent({
@@ -331,6 +360,7 @@ const loadEnrollee = async () => {
   try {
     const response = await enrolleeAPI.getById(route.params.id)
     enrollee.value = response.data.data
+    activeCoverage.value = buildActiveCoverage(enrollee.value)
   } catch (err) {
     error('Failed to load enrollee details')
   } finally {
@@ -451,6 +481,25 @@ const formatCurrency = (amount) =>
   amount
     ? new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(amount)
     : 'N/A'
+
+const waitingPeriodLabel = (coverage) => {
+  if (!coverage) return 'N/A'
+  return 'Not required'
+}
+
+const buildActiveCoverage = (record) => {
+  if (!record?.coverage_start_date || Number(record.status) !== 1) return null
+
+  const today = new Date()
+  const start = new Date(record.coverage_start_date)
+  const end = record.coverage_end_date ? new Date(record.coverage_end_date) : null
+  if (start > today || (end && end < today)) return null
+
+  return {
+    ...record,
+    status: 'active',
+  }
+}
 
 /* Lifecycle */
 onMounted(() => {

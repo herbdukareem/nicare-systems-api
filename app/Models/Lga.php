@@ -60,4 +60,9 @@ class Lga extends Model
     {
         return $this->hasMany(Enrollee::class);
     }
+
+    public function premiumPins()
+    {
+        return $this->hasMany(PremiumPin::class, 'lga_id');
+    }
 }

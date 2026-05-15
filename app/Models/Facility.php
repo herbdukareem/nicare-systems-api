@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 /**
  * Class Facility
@@ -12,7 +13,7 @@ use Illuminate\Database\Eloquent\Model;
  */
 class Facility extends Model
 {
-    use HasFactory;
+    use HasFactory, SoftDeletes;
     /**
      * The table associated with the model.
      *
@@ -84,6 +85,16 @@ class Facility extends Model
         return $this->hasMany(Enrollee::class);
     }
 
+    public function outgoingFacilityTransfers()
+    {
+        return $this->hasMany(EnrolleeFacilityTransfer::class, 'from_facility_id');
+    }
+
+    public function incomingFacilityTransfers()
+    {
+        return $this->hasMany(EnrolleeFacilityTransfer::class, 'to_facility_id');
+    }
+
     // facility capacity to count from enrollee model
     public function getFacilityCapacityAttribute()
     {
@@ -96,6 +107,22 @@ class Facility extends Model
     public function scopeByLevelOfCare($query, $level)
     {
         return $query->where('level_of_care', $level);
+    }
+
+    /**
+     * Scope: only accredited (active) facilities.
+     */
+    public function scopeAccredited($query)
+    {
+        return $query->where('accreditation_status', 'active');
+    }
+
+    /**
+     * Scope: suspended facilities.
+     */
+    public function scopeSuspended($query)
+    {
+        return $query->where('accreditation_status', 'suspended');
     }
 
     /**

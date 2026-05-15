@@ -39,11 +39,13 @@ class Admission extends Model
         'created_by',
         'serviceable_type',
         'serviceable_id',
+        'utn_expired_flagged',
     ];
 
     protected $casts = [
-        'admission_date' => 'datetime',
-        'discharge_date' => 'datetime',
+        'admission_date'      => 'datetime',
+        'discharge_date'      => 'datetime',
+        'utn_expired_flagged' => 'boolean',
     ];
 
     protected static function boot()

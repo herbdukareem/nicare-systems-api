@@ -27,6 +27,7 @@ class Permission extends Model
         'name',
         'label',
         'description',
+        'category',
     ];
 
     /**

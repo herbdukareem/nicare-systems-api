@@ -279,49 +279,6 @@
 
             <v-textarea v-model="roleForm.description" label="Description" variant="outlined" rows="3" />
 
-            <!-- Module Assignment -->
-            <div>
-              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-3">Assigned Modules</h4>
-              <p class="tw-text-sm tw-text-gray-600 tw-mb-3">Select which modules this role can access</p>
-              <div class="tw-grid tw-grid-cols-2 md:tw-grid-cols-5 tw-gap-3">
-                <v-checkbox
-                  v-model="roleForm.modules"
-                  value="general"
-                  label="General"
-                  density="compact"
-                  hide-details
-                />
-                <v-checkbox
-                  v-model="roleForm.modules"
-                  value="pas"
-                  label="PAS"
-                  density="compact"
-                  hide-details
-                />
-                <v-checkbox
-                  v-model="roleForm.modules"
-                  value="claims"
-                  label="Claims"
-                  density="compact"
-                  hide-details
-                />
-                <v-checkbox
-                  v-model="roleForm.modules"
-                  value="automation"
-                  label="Automation"
-                  density="compact"
-                  hide-details
-                />
-                <v-checkbox
-                  v-model="roleForm.modules"
-                  value="management"
-                  label="Management"
-                  density="compact"
-                  hide-details
-                />
-              </div>
-            </div>
-
             <div>
               <div class="tw-flex tw-items-start tw-justify-between tw-mb-3">
                 <div>
@@ -561,7 +518,6 @@ const roleForm = ref({
   name: '',
   description: '',
   status: 'active',
-  modules: [], // array of module names
   permissions: [] // array of permission IDs
 });
 
@@ -614,7 +570,7 @@ const formatDate = (val) => {
 // actions
 const openCreateDialog = () => {
   editingRole.value = null;
-  roleForm.value = { name: '', description: '', status: 'active', modules: [], permissions: [] };
+  roleForm.value = { name: '', description: '', status: 'active', permissions: [] };
   showCreateRoleDialog.value = true;
 };
 
@@ -630,7 +586,6 @@ const editRole = (role) => {
     name: role.name || '',
     description: role.description || '',
     status: role.status || 'active',
-    modules: role.modules || [],
     permissions: [...ids]
   };
   showViewRoleDialog.value = false;
@@ -678,7 +633,6 @@ const saveRole = async () => {
       label: roleForm.value.name,
       description: roleForm.value.description,
       status: roleForm.value.status,
-      modules: roleForm.value.modules,
       permissions: roleForm.value.permissions.map(p => typeof p === 'object' ? p.id : p)
     };
 
@@ -713,7 +667,7 @@ const saveRole = async () => {
 const closeRoleDialog = () => {
   showCreateRoleDialog.value = false;
   editingRole.value = null;
-  roleForm.value = { name: '', description: '', status: 'active', modules: [], permissions: [] };
+  roleForm.value = { name: '', description: '', status: 'active', permissions: [] };
 };
 
 // bulk
