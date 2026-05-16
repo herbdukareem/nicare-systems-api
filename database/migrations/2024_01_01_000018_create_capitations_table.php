@@ -13,9 +13,11 @@ return new class extends Migration
             $table->string('name');
             $table->unsignedTinyInteger('capitated_month');
             $table->unsignedTinyInteger('capitation_month');
-            $table->unsignedTinyInteger('year');
+            $table->unsignedSmallInteger('year');
+            $table->foreignId('funding_type_id')->nullable()->constrained()->nullOnDelete();
             $table->foreignId('user_id')->constrained();
             $table->unsignedTinyInteger('status')->default(1);
+            $table->softDeletes();
             $table->timestamps();
         });
     }

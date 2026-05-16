@@ -8,7 +8,6 @@ use App\Models\Capitation;
 use App\Models\CapitationDetail;
 use App\Models\CapitationPayment;
 use App\Models\Enrollee;
-use App\Models\Facility;
 use App\Models\FundingType;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
@@ -17,147 +16,108 @@ use Illuminate\Support\Facades\Log;
 
 class CapitationService
 {
-    /**
-     * Get all capitations with pagination and filtering
-     */
     public function getAll(array $filters = []): LengthAwarePaginator
     {
-        $query = Capitation::with('user');
+        $query = Capitation::with(['user', 'fundingType'])
+            ->withCount('capitationDetails');
 
-        // Apply search filter
         if (!empty($filters['search'])) {
             $search = $filters['search'];
-            $query->where(function ($q) use ($search) {
+            $query->where(function ($q) use ($search): void {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhereHas('user', function ($userQuery) use ($search) {
-                      $userQuery->where('name', 'like', "%{$search}%");
-                  });
+                    ->orWhereHas('user', fn ($userQuery) => $userQuery->where('name', 'like', "%{$search}%"))
+                    ->orWhereHas('fundingType', fn ($fundingQuery) => $fundingQuery->where('name', 'like', "%{$search}%"));
             });
         }
 
-        // Apply status filter
-        if (!empty($filters['status'])) {
+        if (array_key_exists('status', $filters) && $filters['status'] !== '' && $filters['status'] !== null) {
             $query->where('status', $filters['status']);
         }
 
-        // Apply year filter
         if (!empty($filters['year'])) {
             $query->where('year', $filters['year']);
         }
 
-        // Apply month filter
         if (!empty($filters['month'])) {
             $query->where('capitation_month', $filters['month']);
         }
 
-        // Apply user filter
+        if (!empty($filters['funding_type_id'])) {
+            $query->where('funding_type_id', $filters['funding_type_id']);
+        }
+
         if (!empty($filters['user_id'])) {
             $query->where('user_id', $filters['user_id']);
         }
 
-        // Apply sorting
         $sortBy = $filters['sort_by'] ?? 'created_at';
         $sortDirection = $filters['sort_direction'] ?? 'desc';
         $query->orderBy($sortBy, $sortDirection);
 
-        // Apply pagination
-        $perPage = $filters['per_page'] ?? 15;
-        $page = $filters['page'] ?? 1;
-
-        return $query->paginate($perPage, ['*'], 'page', $page);
+        return $query->paginate((int) ($filters['per_page'] ?? 15), ['*'], 'page', (int) ($filters['page'] ?? 1));
     }
 
-    /**
-     * Get all capitations without pagination
-     */
     public function getAllWithoutPagination(): Collection
     {
-        return Capitation::with('user')
+        return Capitation::with(['user', 'fundingType'])
+            ->withCount('capitationDetails')
             ->where('status', 1)
             ->orderBy('year', 'desc')
             ->orderBy('capitation_month', 'desc')
             ->get();
     }
 
-    /**
-     * Find capitation by ID
-     */
     public function findById(int $id): ?Capitation
     {
-        return Capitation::with('user')->find($id);
+        return Capitation::with(['user', 'fundingType'])
+            ->withCount('capitationDetails')
+            ->find($id);
     }
 
-    /**
-     * Create new capitation
-     */
     public function create(array $data): Capitation
     {
         return Capitation::create($data);
     }
 
-    /**
-     * Update capitation
-     */
     public function update(int $id, array $data): bool
     {
         $capitation = Capitation::find($id);
-        if (!$capitation) {
-            return false;
-        }
 
-        return $capitation->update($data);
+        return $capitation ? $capitation->update($data) : false;
     }
 
-    /**
-     * Delete capitation
-     */
     public function delete(int $id): bool
     {
         $capitation = Capitation::find($id);
-        if (!$capitation) {
-            return false;
-        }
 
-        return $capitation->delete();
+        return $capitation ? (bool) $capitation->delete() : false;
     }
 
-    /**
-     * Get capitations by year
-     */
     public function getByYear(int $year): Collection
     {
-        return Capitation::with('user')
+        return Capitation::with(['user', 'fundingType'])
             ->where('year', $year)
             ->orderBy('capitation_month')
             ->get();
     }
 
-    /**
-     * Get capitations by user
-     */
     public function getByUser(int $userId): Collection
     {
-        return Capitation::with('user')
+        return Capitation::with(['user', 'fundingType'])
             ->where('user_id', $userId)
             ->orderBy('year', 'desc')
             ->orderBy('capitation_month', 'desc')
             ->get();
     }
 
-    /**
-     * Get capitation for specific month and year
-     */
     public function getByMonthYear(int $month, int $year): Collection
     {
-        return Capitation::with('user')
+        return Capitation::with(['user', 'fundingType'])
             ->where('capitation_month', $month)
             ->where('year', $year)
             ->get();
     }
 
-    /**
-     * Toggle capitation status
-     */
     public function toggleStatus(int $id): bool
     {
         $capitation = Capitation::find($id);
@@ -165,13 +125,11 @@ class CapitationService
             return false;
         }
 
-        $capitation->status = $capitation->status == 1 ? 0 : 1;
+        $capitation->status = !$capitation->status;
+
         return $capitation->save();
     }
 
-    /**
-     * Get capitation statistics
-     */
     public function getStatistics(): array
     {
         $currentYear = date('Y');
@@ -187,9 +145,6 @@ class CapitationService
         ];
     }
 
-    /**
-     * Get available years
-     */
     public function getAvailableYears(): Collection
     {
         return Capitation::select('year')
@@ -198,9 +153,6 @@ class CapitationService
             ->pluck('year');
     }
 
-    /**
-     * Check if capitation exists for month/year
-     */
     public function existsForMonthYear(int $month, int $year, int $userId): bool
     {
         return Capitation::where('capitation_month', $month)
@@ -209,156 +161,247 @@ class CapitationService
             ->exists();
     }
 
-    // -------------------------------------------------------------------------
-    // Phase-2 additions
-    // -------------------------------------------------------------------------
-
-    /**
-     * Create a new capitation period batch.
-     */
     public function createPeriod(array $data): Capitation
     {
+        $exists = Capitation::where('capitation_month', (int) $data['capitation_month'])
+            ->where('year', (int) $data['year'])
+            ->exists();
+
+        if ($exists) {
+            throw new \InvalidArgumentException('A capitation period already exists for the selected month and year.');
+        }
+
         $periodStart = \Carbon\Carbon::create((int) $data['year'], (int) $data['capitation_month'], 1)
             ->setDay(min((int) $data['start_day'], \Carbon\Carbon::create((int) $data['year'], (int) $data['capitation_month'], 1)->daysInMonth));
+        $fundingType = !empty($data['funding_type_id'])
+            ? FundingType::findOrFail((int) $data['funding_type_id'])
+            : null;
 
         return Capitation::create([
-            'name'             => $data['name'] ?? $periodStart->format('F Y') . ' Capitation',
-            'period_start'     => $periodStart->toDateString(),
-            'period_end'       => $periodStart->copy()->endOfMonth()->toDateString(),
-            'capitated_month'  => (int) $data['capitation_month'],
-            'capitation_rate'  => 0,
-            'status'           => false,
-            'created_by'       => auth()->id(),
-            'user_id'          => auth()->id(),
+            'name' => $data['name'] ?? $periodStart->format('F Y') . ' Capitation',
+            'period_start' => $periodStart->toDateString(),
+            'period_end' => $periodStart->copy()->endOfMonth()->toDateString(),
+            'capitated_month' => (int) $data['capitation_month'],
+            'capitation_rate' => (float) ($fundingType?->capitation_rate ?? 0),
+            'status' => false,
+            'funding_type_id' => $fundingType?->id,
+            'created_by' => auth()->id(),
+            'user_id' => auth()->id(),
             'capitation_month' => (int) $data['capitation_month'],
-            'year'             => (int) $data['year'],
+            'year' => (int) $data['year'],
         ]);
     }
 
+    public function eligibleProvidersForPeriod(Capitation $capitation, ?int $fundingTypeId = null): array
+    {
+        $fundingType = $fundingTypeId
+            ? FundingType::find($fundingTypeId)
+            : $capitation->fundingType;
+
+        if (!$fundingType) {
+            return [];
+        }
+
+        return $this->eligibleProviderRows($capitation, $fundingType)
+            ->map(function ($row) use ($capitation, $fundingType): array {
+                $detail = CapitationDetail::where('capitation_id', $capitation->id)
+                    ->where('facility_id', $row->facility_id)
+                    ->where('funding_type_id', $fundingType->id)
+                    ->first();
+
+                return [
+                    'facility_id' => (int) $row->facility_id,
+                    'facility_name' => $row->facility_name,
+                    'hcp_code' => $row->hcp_code,
+                    'lga' => $row->lga_name,
+                    'total_enrollees' => (int) $row->enrollee_count,
+                    'capitation_rate' => (float) $fundingType->capitation_rate,
+                    'total_amount' => (int) $row->enrollee_count * (float) $fundingType->capitation_rate,
+                    'is_generated' => (bool) $detail,
+                    'selectable' => !$detail,
+                    'reviewed_at' => $detail?->reviewed_at,
+                    'approved_at' => $detail?->approved_at,
+                    'paid_at' => $detail?->paid_at,
+                    'status' => $detail?->status,
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
     /**
-     * Compute capitation for all facilities for a given period.
-     * BR-07: Only active, non-suspended, non-terminated enrollees enrolled before period_start.
+     * Generate capitation rows only for selected providers under the period funding type.
      *
      * @throws CapitationComputationException
      */
-    public function computeForPeriod(Capitation $capitation): array
+    public function computeForPeriod(Capitation $capitation, ?int $fundingTypeId = null, array $facilityIds = []): array
     {
-        $cutoffDate = $capitation->period_start;
+        if ($facilityIds === []) {
+            throw new CapitationComputationException('Select at least one facility to generate capitation.');
+        }
 
-        $facilities = Facility::all();
-        $results    = [];
+        $fundingType = $fundingTypeId
+            ? FundingType::find($fundingTypeId)
+            : $capitation->fundingType;
 
-        DB::transaction(function () use ($capitation, $facilities, $cutoffDate, &$results) {
-            foreach ($facilities as $facility) {
-                $facilityId = $facility->id;
+        if (!$fundingType) {
+            throw new CapitationComputationException('Select a funding type before generating capitation.');
+        }
 
-                $eligibleGroups = Enrollee::query()
-                    ->leftJoin('premium_plans', 'premium_plans.id', '=', 'enrollees.premium_plan_id')
-                    ->select(
-                        'enrollees.funding_type_id',
-                        'enrollees.benefactor_id',
-                        DB::raw('COUNT(DISTINCT enrollees.id) as enrollee_count'),
-                        DB::raw('COALESCE(SUM(premium_plans.capitation_rate), 0) as total_amount'),
-                        DB::raw('COALESCE(AVG(premium_plans.capitation_rate), 0) as capitation_rate')
-                    )
-                    ->where('enrollees.facility_id', $facilityId)
-                    ->where('enrollees.status', 1)
-                    ->whereNotNull('enrollees.benefit_package_id')
-                    ->whereDate('enrollees.coverage_start_date', '<=', $cutoffDate)
-                    ->where(function ($query) use ($cutoffDate) {
-                        $query->whereNull('enrollees.coverage_end_date')
-                            ->orWhereDate('enrollees.coverage_end_date', '>=', $cutoffDate);
-                    })
-                    ->groupBy('enrollees.funding_type_id', 'enrollees.benefactor_id')
-                    ->get();
+        $capitationRate = (float) $fundingType->capitation_rate;
+        if ($capitationRate <= 0) {
+            throw new CapitationComputationException("Funding type {$fundingType->name} does not have a capitation rate.");
+        }
 
-                $count = (int) $eligibleGroups->sum('enrollee_count');
+        $eligibleProviders = $this->eligibleProviderRows($capitation, $fundingType)
+            ->whereIn('facility_id', $facilityIds)
+            ->values();
 
-                if ($count === 0) {
-                    // Log skip but do NOT throw — we continue to next facility.
-                    Log::info("Capitation skip: no eligible enrollees for facility {$facilityId} in period.");
+        if ($eligibleProviders->isEmpty()) {
+            throw new CapitationComputationException('No eligible providers found for the selected funding type and period.');
+        }
+
+        $results = [];
+
+        DB::transaction(function () use ($capitation, $eligibleProviders, $fundingType, $capitationRate, &$results): void {
+            foreach ($eligibleProviders as $provider) {
+                $count = (int) $provider->enrollee_count;
+                $totalAmount = $count * $capitationRate;
+
+                $exists = CapitationDetail::where('capitation_id', $capitation->id)
+                    ->where('facility_id', (int) $provider->facility_id)
+                    ->where('funding_type_id', $fundingType->id)
+                    ->exists();
+
+                if ($exists) {
                     $results[] = [
-                        'facility_id'     => $facilityId,
-                        'facility_name'   => $facility->name,
-                        'enrollee_count'  => 0,
-                        'total_amount'    => 0,
-                        'skipped'         => true,
+                        'facility_id' => (int) $provider->facility_id,
+                        'facility_name' => $provider->facility_name,
+                        'enrollee_count' => $count,
+                        'total_amount' => $totalAmount,
+                        'skipped' => true,
                     ];
+
                     continue;
                 }
 
-                $totalAmount = (float) $eligibleGroups->sum('total_amount');
-                foreach ($eligibleGroups as $group) {
-                    $groupCount = (int) $group->enrollee_count;
-                    $groupRate = (float) $group->capitation_rate;
-                    $fundingTypeId = $group->funding_type_id ?? FundingType::query()->value('id');
+                CapitationDetail::create([
+                    'capitation_id' => $capitation->id,
+                    'facility_id' => (int) $provider->facility_id,
+                    'funding_type_id' => $fundingType->id,
+                    'capitated_month' => $capitation->capitation_month,
+                    'total_enrollees' => $count,
+                    'total_enrolled' => $count,
+                    'capitation_rate' => $capitationRate,
+                    'rate' => $capitationRate,
+                    'total_amount' => $totalAmount,
+                    'amount' => $totalAmount,
+                    'status' => 1,
+                ]);
 
-                    CapitationDetail::updateOrCreate(
-                        [
-                            'capitation_id' => $capitation->id,
-                            'facility_id' => $facilityId,
-                            'funding_type_id' => $fundingTypeId,
-                            'benefactor_id' => $group->benefactor_id,
-                        ],
-                        [
-                            'capitated_month'  => $capitation->capitation_month,
-                            'total_enrollees'  => $groupCount,
-                            'total_enrolled'   => $groupCount,
-                            'capitation_rate'  => $groupRate,
-                            'rate'             => $groupRate,
-                            'total_amount'     => (float) $group->total_amount,
-                            'amount'           => (float) $group->total_amount,
-                        ]
-                    );
-                }
-
-                // Log each enrollee_id to capitation_details (one row per enrollee is optional;
-                // here we store aggregates by facility, funding type, and benefactor.
-                Log::info("Capitation computed for facility {$facilityId}: {$count} enrollees = {$totalAmount}");
+                Log::info("Capitation generated for facility {$provider->facility_id}: {$count} enrollees = {$totalAmount}");
 
                 $results[] = [
-                    'facility_id'    => $facilityId,
-                    'facility_name'  => $facility->name,
+                    'facility_id' => (int) $provider->facility_id,
+                    'facility_name' => $provider->facility_name,
                     'enrollee_count' => $count,
-                    'total_amount'   => $totalAmount,
-                    'skipped'        => false,
+                    'total_amount' => $totalAmount,
+                    'skipped' => false,
                 ];
             }
 
-            // If every facility was skipped, throw BR-07 exception
-            $computed = collect($results)->where('skipped', false)->count();
-            if ($computed === 0) {
-                throw new CapitationComputationException(
-                    'No eligible enrollees found for any facility in this period.'
-                );
-            }
-
-            // Mark capitation as computed
             $capitation->update(['computed_at' => now(), 'computed_by' => auth()->id()]);
 
-            // BR-09 Audit trail
             AuditTrail::create([
                 'auditable_type' => Capitation::class,
-                'auditable_id'   => $capitation->id,
-                'action'         => 'capitation_computed',
-                'description'    => "Capitation period {$capitation->name} computed. Facilities processed: " . count($results),
-                'user_id'        => auth()->id(),
-                'new_values'     => ['facilities' => count($results), 'computed_at' => now()],
+                'auditable_id' => $capitation->id,
+                'action' => 'capitation_generated',
+                'description' => "Capitation period {$capitation->name} generated for selected providers. Facilities processed: " . count($results),
+                'user_id' => auth()->id(),
+                'new_values' => ['facilities' => count($results), 'computed_at' => now()],
             ]);
         });
 
         return $results;
     }
 
-    /**
-     * Finalise a capitation period.
-     * BR-06: finaliser must differ from creator.
-     *
-     * @throws \InvalidArgumentException
-     */
+    public function getDetailsForStage(Capitation $capitation, string $stage = 'generated', ?int $fundingTypeId = null): Collection
+    {
+        $query = $capitation->capitationDetails()
+            ->with(['facility.lga', 'fundingType'])
+            ->when($fundingTypeId, fn ($detailQuery) => $detailQuery->where('funding_type_id', $fundingTypeId));
+
+        match ($stage) {
+            'review' => $query->whereNull('reviewed_at'),
+            'approval' => $query->whereNotNull('reviewed_at')->whereNull('approved_at'),
+            'payment' => $query->whereNotNull('approved_at')->whereNull('paid_at'),
+            'paid' => $query->whereNotNull('paid_at'),
+            default => null,
+        };
+
+        return $query->orderBy('facility_id')->get();
+    }
+
+    public function reviewDetails(Capitation $capitation, array $detailIds): int
+    {
+        return $this->transitionDetails($capitation, $detailIds, 'review');
+    }
+
+    public function approveDetails(Capitation $capitation, array $detailIds): int
+    {
+        return $this->transitionDetails($capitation, $detailIds, 'approval');
+    }
+
+    public function payDetails(Capitation $capitation, array $detailIds, array $data): int
+    {
+        $details = $capitation->capitationDetails()
+            ->whereIn('id', $detailIds)
+            ->whereNotNull('approved_at')
+            ->whereNull('paid_at')
+            ->get();
+
+        if ($details->isEmpty()) {
+            throw new \InvalidArgumentException('No approved unpaid capitation details were selected for payment.');
+        }
+
+        DB::transaction(function () use ($capitation, $details, $data): void {
+            foreach ($details->groupBy('funding_type_id') as $fundingTypeId => $groupedDetails) {
+                $payment = CapitationPayment::create([
+                    'capitation_id' => $capitation->id,
+                    'funding_type_id' => $fundingTypeId ?: $capitation->funding_type_id,
+                    'amount' => (int) round($groupedDetails->sum('total_amount')),
+                    'invoice_number' => substr($data['payment_reference'], 0, 12),
+                    'description' => $data['description'] ?? "Capitation payment for {$capitation->name}",
+                    'payment_date' => $data['payment_date'] ?? now()->toDateString(),
+                    'status' => 1,
+                ]);
+
+                CapitationDetail::whereIn('id', $groupedDetails->pluck('id'))->update([
+                    'capitation_payment_id' => $payment->id,
+                    'paid_by' => auth()->id(),
+                    'paid_at' => $data['payment_date'] ?? now()->toDateString(),
+                    'status' => 4,
+                ]);
+            }
+
+            AuditTrail::create([
+                'auditable_type' => Capitation::class,
+                'auditable_id' => $capitation->id,
+                'action' => 'capitation_details_paid',
+                'description' => "Selected capitation details paid for {$capitation->name}.",
+                'user_id' => auth()->id(),
+                'new_values' => [
+                    'details' => $details->pluck('id')->values(),
+                    'payment_reference' => $data['payment_reference'],
+                ],
+            ]);
+        });
+
+        return $details->count();
+    }
+
     public function finalise(Capitation $capitation): Capitation
     {
-        // BR-06: four-eyes principle
         if (auth()->id() === (int) $capitation->created_by) {
             throw new \InvalidArgumentException(
                 'BR-06 violation: The officer who created this capitation period cannot also finalise it.'
@@ -366,27 +409,23 @@ class CapitationService
         }
 
         $capitation->update([
-            'status'       => true,
+            'status' => true,
             'finalised_at' => now(),
             'finalised_by' => auth()->id(),
         ]);
 
-        // BR-09 Audit trail
         AuditTrail::create([
             'auditable_type' => Capitation::class,
-            'auditable_id'   => $capitation->id,
-            'action'         => 'capitation_finalised',
-            'description'    => "Capitation period {$capitation->name} finalised.",
-            'user_id'        => auth()->id(),
-            'new_values'     => ['finalised_at' => now(), 'finalised_by' => auth()->id()],
+            'auditable_id' => $capitation->id,
+            'action' => 'capitation_finalised',
+            'description' => "Capitation period {$capitation->name} finalised.",
+            'user_id' => auth()->id(),
+            'new_values' => ['finalised_at' => now(), 'finalised_by' => auth()->id()],
         ]);
 
         return $capitation;
     }
 
-    /**
-     * Mark a finalised capitation period as paid and attach payment batches to detail rows.
-     */
     public function markPaid(Capitation $capitation, array $data): Capitation
     {
         if (!$capitation->status) {
@@ -399,18 +438,18 @@ class CapitationService
 
         $details = $capitation->capitationDetails()->get();
         if ($details->isEmpty()) {
-            throw new \InvalidArgumentException('Cannot pay a capitation period without computed facility breakdown.');
+            throw new \InvalidArgumentException('Cannot pay a capitation period without generated facility breakdown.');
         }
 
         if ($details->every(fn ($detail) => $detail->paid_at || $detail->capitation_payment_id)) {
             throw new \InvalidArgumentException('This capitation period has already been paid.');
         }
 
-        DB::transaction(function () use ($capitation, $details, $data) {
+        DB::transaction(function () use ($capitation, $details, $data): void {
             foreach ($details->whereNull('paid_at')->groupBy('funding_type_id') as $fundingTypeId => $groupedDetails) {
                 $payment = CapitationPayment::create([
                     'capitation_id' => $capitation->id,
-                    'funding_type_id' => $fundingTypeId ?: FundingType::query()->value('id'),
+                    'funding_type_id' => $fundingTypeId ?: $capitation->funding_type_id,
                     'amount' => (int) round($groupedDetails->sum('total_amount')),
                     'invoice_number' => substr($data['payment_reference'], 0, 12),
                     'description' => $data['description'] ?? "Capitation payment for {$capitation->name}",
@@ -442,22 +481,102 @@ class CapitationService
         return $capitation->fresh(['capitationDetails', 'capitationPayments']);
     }
 
-    /**
-     * Get the breakdown (details) for a capitation period.
-     */
-    public function getBreakdown(Capitation $capitation): Collection
+    public function getBreakdown(Capitation $capitation, string $stage = 'generated'): Collection
     {
-        return $capitation->capitationDetails()->with('facility')->get();
+        $query = $capitation->capitationDetails()->with(['facility', 'fundingType']);
+
+        match ($stage) {
+            'reviewed' => $query->whereNotNull('reviewed_at'),
+            'approved' => $query->whereNotNull('approved_at'),
+            'paid' => $query->whereNotNull('paid_at'),
+            default => null,
+        };
+
+        return $query->orderBy('facility_id')->get();
     }
 
-    /**
-     * Get capitation history for a specific facility.
-     */
     public function getFacilityHistory(int $facilityId): Collection
     {
         return CapitationDetail::where('facility_id', $facilityId)
             ->with('capitation')
             ->orderByDesc('created_at')
+            ->get();
+    }
+
+    private function transitionDetails(Capitation $capitation, array $detailIds, string $stage): int
+    {
+        $query = $capitation->capitationDetails()->whereIn('id', $detailIds);
+
+        $updates = match ($stage) {
+            'review' => [
+                'reviewed_by' => auth()->id(),
+                'reviewed_at' => now()->toDateString(),
+                'status' => 2,
+            ],
+            'approval' => [
+                'approved_by' => auth()->id(),
+                'approved_at' => now()->toDateString(),
+                'status' => 3,
+            ],
+            default => [],
+        };
+
+        if ($updates === []) {
+            throw new \InvalidArgumentException('Unsupported capitation detail action.');
+        }
+
+        if ($stage === 'review') {
+            $query->whereNull('reviewed_at');
+        }
+
+        if ($stage === 'approval') {
+            $query->whereNotNull('reviewed_at')->whereNull('approved_at');
+        }
+
+        $details = $query->get();
+        if ($details->isEmpty()) {
+            throw new \InvalidArgumentException('No eligible capitation details were selected.');
+        }
+
+        CapitationDetail::whereIn('id', $details->pluck('id'))->update($updates);
+
+        AuditTrail::create([
+            'auditable_type' => Capitation::class,
+            'auditable_id' => $capitation->id,
+            'action' => "capitation_details_{$stage}",
+            'description' => "Selected capitation details moved to {$stage} for {$capitation->name}.",
+            'user_id' => auth()->id(),
+            'new_values' => ['details' => $details->pluck('id')->values()],
+        ]);
+
+        return $details->count();
+    }
+
+    private function eligibleProviderRows(Capitation $capitation, FundingType $fundingType)
+    {
+        $cutoffDate = $capitation->period_start;
+
+        return Enrollee::query()
+            ->join('facilities', 'facilities.id', '=', 'enrollees.facility_id')
+            ->leftJoin('lgas', 'lgas.id', '=', 'facilities.lga_id')
+            ->select(
+                'facilities.id as facility_id',
+                'facilities.name as facility_name',
+                'facilities.hcp_code',
+                'lgas.name as lga_name',
+                DB::raw('COUNT(DISTINCT enrollees.id) as enrollee_count')
+            )
+            ->where('enrollees.funding_type_id', $fundingType->id)
+            ->where('enrollees.status', Enrollee::STATUS_ACTIVE)
+            ->whereNotNull('enrollees.facility_id')
+            ->whereNotNull('enrollees.coverage_start_date')
+            ->whereDate('enrollees.coverage_start_date', '<=', $cutoffDate)
+            ->where(function ($query) use ($cutoffDate): void {
+                $query->whereNull('enrollees.coverage_end_date')
+                    ->orWhereDate('enrollees.coverage_end_date', '>=', $cutoffDate);
+            })
+            ->groupBy('facilities.id', 'facilities.name', 'facilities.hcp_code', 'lgas.name')
+            ->orderBy('facilities.name')
             ->get();
     }
 }

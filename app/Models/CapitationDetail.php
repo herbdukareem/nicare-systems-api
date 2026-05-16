@@ -25,8 +25,4 @@ class CapitationDetail extends Model
     public function fundingType(){
         return $this->belongsTo(FundingType::class, 'funding_type_id', 'id');
     }
-
-    public function benefactor(){
-        return $this->belongsTo(Benefactor::class, 'benefactor_id', 'id');
-    }
 }

@@ -16,7 +16,13 @@ class FundingType extends Model
     protected $fillable = [
         'name',
         'description',
+        'capitation_rate',
         'status',
+    ];
+
+    protected $casts = [
+        'capitation_rate' => 'decimal:2',
+        'status' => 'integer',
     ];
 
     /**
@@ -30,5 +36,15 @@ class FundingType extends Model
     public function payrollBatches()
     {
         return $this->hasMany(PayrollBatch::class);
+    }
+
+    public function capitations()
+    {
+        return $this->hasMany(Capitation::class);
+    }
+
+    public function capitationDetails()
+    {
+        return $this->hasMany(CapitationDetail::class);
     }
 }

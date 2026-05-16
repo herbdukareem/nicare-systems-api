@@ -378,16 +378,21 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard/claims', [ClaimsDashboardController::class, 'index']);
 
     // ─── Phase 2: Capitation ─────────────────────────────────────────────────────
-    Route::prefix('capitation')->middleware('permission:capitation.view,capitation.create')->group(function () {
-        Route::get('periods', [CapitationController::class, 'index']);
-        Route::post('periods', [CapitationController::class, 'store']);
-        Route::get('periods/{capitation}', [CapitationController::class, 'show']);
-        Route::post('periods/{capitation}/compute', [CapitationController::class, 'compute']);
-        Route::get('periods/{capitation}/breakdown', [CapitationController::class, 'breakdown']);
-        Route::post('periods/{capitation}/finalise', [CapitationController::class, 'finalise']);
-        Route::post('periods/{capitation}/pay', [CapitationController::class, 'pay']);
-        Route::get('periods/{capitation}/export', [CapitationController::class, 'export']);
-        Route::get('facilities/{facility}/capitation-history', [CapitationController::class, 'facilityHistory']);
+    Route::prefix('capitation')->group(function () {
+        Route::get('periods', [CapitationController::class, 'index'])->middleware('permission:capitation.view,capitation.create,capitation.review,capitation.approve,capitation.pay');
+        Route::post('periods', [CapitationController::class, 'store'])->middleware('permission:capitation.create');
+        Route::get('periods/{capitation}', [CapitationController::class, 'show'])->middleware('permission:capitation.view,capitation.create,capitation.review,capitation.approve,capitation.pay');
+        Route::post('periods/{capitation}/compute', [CapitationController::class, 'compute'])->middleware('permission:capitation.compute');
+        Route::get('periods/{capitation}/eligible-providers', [CapitationController::class, 'eligibleProviders'])->middleware('permission:capitation.compute');
+        Route::get('periods/{capitation}/details', [CapitationController::class, 'details'])->middleware('permission:capitation.view,capitation.review,capitation.approve,capitation.pay');
+        Route::post('periods/{capitation}/details/review', [CapitationController::class, 'reviewDetails'])->middleware('permission:capitation.review');
+        Route::post('periods/{capitation}/details/approve', [CapitationController::class, 'approveDetails'])->middleware('permission:capitation.approve');
+        Route::post('periods/{capitation}/details/pay', [CapitationController::class, 'payDetails'])->middleware('permission:capitation.pay');
+        Route::get('periods/{capitation}/breakdown', [CapitationController::class, 'breakdown'])->middleware('permission:capitation.view,capitation.review,capitation.approve,capitation.pay');
+        Route::post('periods/{capitation}/finalise', [CapitationController::class, 'finalise'])->middleware('permission:capitation.approve,capitation.finalise');
+        Route::post('periods/{capitation}/pay', [CapitationController::class, 'pay'])->middleware('permission:capitation.pay');
+        Route::get('periods/{capitation}/export', [CapitationController::class, 'export'])->middleware('permission:capitation.export');
+        Route::get('facilities/{facility}/capitation-history', [CapitationController::class, 'facilityHistory'])->middleware('permission:capitation.view');
     });
 
     // ─── Phase 2: Mobile Sync ────────────────────────────────────────────────────

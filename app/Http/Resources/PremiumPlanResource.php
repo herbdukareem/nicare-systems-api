@@ -18,7 +18,6 @@ class PremiumPlanResource extends JsonResource
             'name' => $this->name,
             'code' => $this->code,
             'amount' => $this->amount,
-            'capitation_rate' => $this->capitation_rate,
             'consultant_fee' => $this->consultant_fee,
             'duration_days' => $this->duration_days,
             'has_no_expiry' => (bool) $this->has_no_expiry,

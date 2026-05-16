@@ -23,6 +23,7 @@ class UpdateFundingTypeRequest extends FormRequest
                 Rule::unique('funding_types', 'name')->ignore($this->funding_type),
             ],
             'description' => 'nullable|string',
+            'capitation_rate' => 'nullable|numeric|min:0',
             'status'      => 'nullable|integer|in:0,1',
         ];
     }

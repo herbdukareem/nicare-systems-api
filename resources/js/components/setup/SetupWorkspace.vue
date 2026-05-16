@@ -229,6 +229,7 @@ const sections = [
     headers: [
       { title: 'Name', key: 'name' },
       { title: 'Description', key: 'description' },
+      { title: 'Capitation Rate', key: 'capitation_rate' },
       { title: 'Enrollees', key: 'enrollees_count' },
       { title: 'Status', key: 'status' },
       { title: '', key: 'actions', align: 'end', sortable: false },
@@ -236,6 +237,7 @@ const sections = [
     fields: [
       { key: 'name', label: 'Name' },
       { key: 'description', label: 'Description', type: 'textarea' },
+      { key: 'capitation_rate', label: 'Capitation Rate', inputType: 'number' },
       { key: 'status', label: 'Status', type: 'select', items: () => statusOptions },
     ],
   },

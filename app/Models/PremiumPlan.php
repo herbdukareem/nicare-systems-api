@@ -16,7 +16,6 @@ class PremiumPlan extends Model
         'name',
         'code',
         'amount',
-        'capitation_rate',
         'consultant_fee',
         'payment_required',
         'payment_gateway',
@@ -34,7 +33,6 @@ class PremiumPlan extends Model
 
     protected $casts = [
         'amount' => 'decimal:2',
-        'capitation_rate' => 'decimal:2',
         'consultant_fee' => 'decimal:2',
         'payment_required' => 'boolean',
         'has_no_expiry' => 'boolean',

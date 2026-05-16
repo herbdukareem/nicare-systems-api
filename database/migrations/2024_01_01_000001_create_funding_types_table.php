@@ -15,7 +15,8 @@ return new class extends Migration
             $table->id();
             $table->string('name');
             $table->text('description')->nullable();
-             $table->unsignedSmallInteger('status')->default(1);
+            $table->decimal('capitation_rate', 14, 2)->default(0);
+            $table->unsignedSmallInteger('status')->default(1);
             $table->timestamps();
         });
     }

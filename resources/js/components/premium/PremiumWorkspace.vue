@@ -42,7 +42,6 @@
           <v-select v-if="mode === 'plans'" v-model="planForm.insurance_programme_id" :items="metadata.programmes" item-title="name" item-value="id" label="Programme" density="comfortable" variant="outlined" />
           <v-select v-if="mode === 'plans'" v-model="planForm.benefit_package_id" :items="metadata.benefit_packages" item-title="name" item-value="id" label="Benefit package" density="comfortable" variant="outlined" clearable />
           <v-text-field v-if="mode === 'plans'" v-model.number="planForm.amount" label="Amount" type="number" density="comfortable" variant="outlined" />
-          <v-text-field v-if="mode === 'plans'" v-model.number="planForm.capitation_rate" label="Capitation rate" type="number" density="comfortable" variant="outlined" />
           <v-text-field v-if="mode === 'plans'" v-model.number="planForm.consultant_fee" label="Consultant fee" type="number" density="comfortable" variant="outlined" />
           <v-switch v-if="mode === 'plans'" v-model="planForm.has_no_expiry" label="No expiry" color="primary" hide-details />
           <v-text-field v-if="mode === 'plans' && !planForm.has_no_expiry" v-model.number="planForm.duration_days" label="Duration days" type="number" density="comfortable" variant="outlined" />
@@ -211,7 +210,6 @@ const blankPlanForm = () => ({
   insurance_programme_id: null,
   benefit_package_id: null,
   amount: 0,
-  capitation_rate: 0,
   consultant_fee: 0,
   payment_required: false,
   payment_gateway: null,
@@ -292,7 +290,6 @@ const headers = computed(() => {
       { title: 'Name', key: 'name' },
       { title: 'Programme', key: 'programme.name' },
       { title: 'Amount', key: 'amount' },
-      { title: 'Capitation', key: 'capitation_rate' },
       { title: 'Consultant', key: 'consultant_fee' },
       { title: 'Duration', key: 'duration_label' },
       { title: 'Family', key: 'family_label' },
@@ -399,7 +396,6 @@ const editPlan = (plan) => {
     name: plan.name || '',
     code: plan.code || '',
     amount: Number(plan.amount || 0),
-    capitation_rate: Number(plan.capitation_rate || 0),
     consultant_fee: Number(plan.consultant_fee || 0),
     payment_required: Boolean(plan.payment_required),
     payment_gateway: plan.payment_gateway || null,

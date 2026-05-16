@@ -23,7 +23,6 @@ class StorePremiumPlanRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:80', Rule::unique('premium_plans', 'code')->ignore($planId)],
             'amount' => ['required', 'numeric', 'min:0'],
-            'capitation_rate' => ['required', 'numeric', 'min:0'],
             'consultant_fee' => ['required', 'numeric', 'min:0'],
             'payment_required' => ['nullable', 'boolean'],
             'payment_gateway' => ['nullable', 'string', 'max:80', Rule::in($this->supportedPaymentGateways())],
@@ -79,7 +78,6 @@ class StorePremiumPlanRequest extends FormRequest
         $data['has_no_expiry'] = (bool) ($data['has_no_expiry'] ?? false);
         $data['payment_required'] = (bool) ($data['payment_required'] ?? false);
         $data['waiting_period_days'] = (int) ($data['waiting_period_days'] ?? 0);
-        $data['capitation_rate'] = $data['capitation_rate'] ?? 0;
         $data['consultant_fee'] = $data['consultant_fee'] ?? 0;
         $data['status'] = $data['status'] ?? 'active';
 

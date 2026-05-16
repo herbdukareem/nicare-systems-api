@@ -56,7 +56,6 @@
                   <span>Amount: {{ money(selectedPlan.amount) }}</span>
                   <span>Duration: {{ selectedPlan.has_no_expiry ? 'No Expiry' : `${selectedPlan.duration_days} days` }}</span>
                   <span>Waiting: {{ selectedPlan.waiting_period_days || 0 }} days</span>
-                  <span>Capitation: {{ money(selectedPlan.capitation_rate) }}</span>
                   <span>Consultant fee: {{ money(selectedPlan.consultant_fee) }}</span>
                   <span>Family: {{ selectedPlan.is_family_plan ? `Yes, ${selectedPlan.maximum_dependants || 0} dependants` : 'No' }}</span>
                   <span>Payment: {{ selectedPlan.payment_required ? 'Required' : 'Not required' }}</span>

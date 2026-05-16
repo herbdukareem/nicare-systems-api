@@ -590,7 +590,7 @@ const routes = [
     props: { mode: 'generate' },
     meta: {
       requiresAuth: true,
-      permissions: ['capitation.create'],
+      permissions: ['capitation.create', 'capitation.compute'],
       title: 'Generate Capitation',
       breadcrumb: 'Generate Capitation',
     },
@@ -602,7 +602,7 @@ const routes = [
     props: { mode: 'review' },
     meta: {
       requiresAuth: true,
-      permissions: ['capitation.view'],
+      permissions: ['capitation.review'],
       title: 'Review Capitation',
       breadcrumb: 'Review Capitation',
     },
@@ -614,7 +614,7 @@ const routes = [
     props: { mode: 'approval' },
     meta: {
       requiresAuth: true,
-      permissions: ['capitation.finalise'],
+      permissions: ['capitation.approve', 'capitation.finalise'],
       title: 'Capitation Approval',
       breadcrumb: 'Capitation Approval',
     },
@@ -626,7 +626,7 @@ const routes = [
     props: { mode: 'payments' },
     meta: {
       requiresAuth: true,
-      permissions: ['capitation.export'],
+      permissions: ['capitation.pay'],
       title: 'Capitation Payments',
       breadcrumb: 'Capitation Payments',
     },

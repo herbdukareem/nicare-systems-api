@@ -147,7 +147,6 @@ class InsuranceProgrammeSeeder extends Seeder
                     'benefit_package_id' => $standardPackage->id,
                     'name' => $plan['name'],
                     'amount' => 0,
-                    'capitation_rate' => 0,
                     'consultant_fee' => 0,
                     'payment_required' => false,
                     'payment_gateway' => null,

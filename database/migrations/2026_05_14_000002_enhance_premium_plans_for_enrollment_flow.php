@@ -14,12 +14,8 @@ return new class extends Migration
                 $table->boolean('has_no_expiry')->default(false)->after('duration_days');
             }
 
-            if (!Schema::hasColumn('premium_plans', 'capitation_rate')) {
-                $table->decimal('capitation_rate', 14, 2)->default(0)->after('amount');
-            }
-
             if (!Schema::hasColumn('premium_plans', 'consultant_fee')) {
-                $table->decimal('consultant_fee', 14, 2)->default(0)->after('capitation_rate');
+                $table->decimal('consultant_fee', 14, 2)->default(0)->after('amount');
             }
 
             if (!Schema::hasColumn('premium_plans', 'payment_required')) {
@@ -65,10 +61,6 @@ return new class extends Migration
             DB::table('premium_plans')->whereNull('consultant_fee')->update(['consultant_fee' => 0]);
         }
 
-        if (Schema::hasColumn('premium_plans', 'capitation_rate')) {
-            DB::table('premium_plans')->whereNull('capitation_rate')->update(['capitation_rate' => 0]);
-        }
-
         if (Schema::hasColumn('premium_plans', 'payment_required')) {
             $paymentReset = ['payment_gateway' => null];
             if (Schema::hasColumn('premium_plans', 'merchant_id')) {
@@ -97,7 +89,7 @@ return new class extends Migration
                 $table->dropConstrainedForeignId('merchant_id');
             }
 
-            foreach (['consultant_fee', 'capitation_rate', 'has_no_expiry'] as $column) {
+            foreach (['consultant_fee', 'has_no_expiry'] as $column) {
                 if (Schema::hasColumn('premium_plans', $column)) {
                     $table->dropColumn($column);
                 }

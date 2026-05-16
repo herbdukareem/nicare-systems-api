@@ -25,7 +25,7 @@ class CapitationController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $filters = $request->only(['search', 'status', 'year', 'month', 'user_id', 'sort_by', 'sort_direction', 'per_page', 'page']);
+            $filters = $request->only(['search', 'status', 'year', 'month', 'funding_type_id', 'user_id', 'sort_by', 'sort_direction', 'per_page', 'page']);
             $periods = $this->service->getAll($filters);
 
             return response()->json([
@@ -51,6 +51,11 @@ class CapitationController extends Controller
                 'message' => 'Capitation period created successfully.',
                 'data'    => $capitation,
             ], 201);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
         } catch (\Throwable $e) {
             return $this->error($e->getMessage());
         }
@@ -62,7 +67,7 @@ class CapitationController extends Controller
     public function show(Capitation $capitation): JsonResponse
     {
         try {
-            $capitation->load(['user', 'capitationDetails.facility', 'capitationPayments']);
+            $capitation->load(['user', 'fundingType', 'capitationDetails.facility', 'capitationDetails.fundingType', 'capitationPayments']);
 
             return response()->json([
                 'success' => true,
@@ -79,12 +84,22 @@ class CapitationController extends Controller
      */
     public function compute(Capitation $capitation): JsonResponse
     {
+        $validated = request()->validate([
+            'funding_type_id' => ['required', 'integer', 'exists:funding_types,id'],
+            'facility_ids' => ['required', 'array', 'min:1'],
+            'facility_ids.*' => ['integer', 'exists:facilities,id'],
+        ]);
+
         try {
             if ($capitation->status) {
                 return $this->error('Cannot compute a finalised capitation period.', 422);
             }
 
-            $results = $this->service->computeForPeriod($capitation);
+            $results = $this->service->computeForPeriod(
+                $capitation,
+                (int) $validated['funding_type_id'],
+                $validated['facility_ids'] ?? []
+            );
 
             return response()->json([
                 'success' => true,
@@ -107,13 +122,127 @@ class CapitationController extends Controller
      */
     public function breakdown(Capitation $capitation): JsonResponse
     {
+        $validated = request()->validate([
+            'stage' => ['nullable', 'in:generated,reviewed,approved,paid'],
+        ]);
+
         try {
-            $details = $this->service->getBreakdown($capitation);
+            $details = $this->service->getBreakdown($capitation, $validated['stage'] ?? 'generated');
 
             return response()->json([
                 'success' => true,
                 'data'    => $details,
             ]);
+        } catch (\Throwable $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    /**
+     * GET /api/capitation/periods/{capitation}/eligible-providers
+     * Preview providers eligible under the selected funding type before generation.
+     */
+    public function eligibleProviders(Capitation $capitation): JsonResponse
+    {
+        $validated = request()->validate([
+            'funding_type_id' => ['required', 'integer', 'exists:funding_types,id'],
+        ]);
+
+        try {
+            return response()->json([
+                'success' => true,
+                'data' => $this->service->eligibleProvidersForPeriod($capitation, (int) $validated['funding_type_id']),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function details(Request $request, Capitation $capitation): JsonResponse
+    {
+        $validated = $request->validate([
+            'stage' => ['nullable', 'in:generated,review,approval,payment,paid'],
+            'funding_type_id' => ['nullable', 'integer', 'exists:funding_types,id'],
+        ]);
+
+        try {
+            return response()->json([
+                'success' => true,
+                'data' => $this->service->getDetailsForStage(
+                    $capitation,
+                    $validated['stage'] ?? 'generated',
+                    isset($validated['funding_type_id']) ? (int) $validated['funding_type_id'] : null
+                ),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function reviewDetails(Request $request, Capitation $capitation): JsonResponse
+    {
+        $validated = $request->validate([
+            'detail_ids' => ['required', 'array', 'min:1'],
+            'detail_ids.*' => ['integer', 'exists:capitation_details,id'],
+        ]);
+
+        try {
+            $count = $this->service->reviewDetails($capitation, $validated['detail_ids']);
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$count} capitation detail(s) reviewed successfully.",
+                'data' => ['count' => $count],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function approveDetails(Request $request, Capitation $capitation): JsonResponse
+    {
+        $validated = $request->validate([
+            'detail_ids' => ['required', 'array', 'min:1'],
+            'detail_ids.*' => ['integer', 'exists:capitation_details,id'],
+        ]);
+
+        try {
+            $count = $this->service->approveDetails($capitation, $validated['detail_ids']);
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$count} capitation detail(s) approved successfully.",
+                'data' => ['count' => $count],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
+        } catch (\Throwable $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function payDetails(Request $request, Capitation $capitation): JsonResponse
+    {
+        $validated = $request->validate([
+            'detail_ids' => ['required', 'array', 'min:1'],
+            'detail_ids.*' => ['integer', 'exists:capitation_details,id'],
+            'payment_reference' => ['required', 'string', 'max:120'],
+            'payment_date' => ['nullable', 'date'],
+            'description' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        try {
+            $count = $this->service->payDetails($capitation, $validated['detail_ids'], $validated);
+
+            return response()->json([
+                'success' => true,
+                'message' => "{$count} capitation detail(s) paid successfully.",
+                'data' => ['count' => $count],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         } catch (\Throwable $e) {
             return $this->error($e->getMessage());
         }

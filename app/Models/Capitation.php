@@ -29,6 +29,11 @@ class Capitation extends Model
         return $this->belongsTo(User::class);
     }
 
+    public function fundingType()
+    {
+        return $this->belongsTo(FundingType::class);
+    }
+
     public function capitationDetails()
     {
         return $this->hasMany(CapitationDetail::class);

@@ -91,10 +91,10 @@ export const navigationItems = [
     name: 'Capitation',
     icon: 'mdi-calculator-variant-outline',
     children: [
-      { name: 'Generate', path: '/capitation/generate', icon: 'mdi-plus-circle-outline', permissions: ['capitation.create'] },
-      { name: 'Review', path: '/capitation/review', icon: 'mdi-eye-outline', permissions: ['capitation.view'] },
-      { name: 'Approval', path: '/capitation/approval', icon: 'mdi-check-circle-outline', permissions: ['capitation.finalise'] },
-      { name: 'Payments', path: '/capitation/payments', icon: 'mdi-receipt-text-outline', permissions: ['capitation.export'] },
+      { name: 'Generate', path: '/capitation/generate', icon: 'mdi-plus-circle-outline', permissions: ['capitation.create', 'capitation.compute'] },
+      { name: 'Review', path: '/capitation/review', icon: 'mdi-eye-outline', permissions: ['capitation.review'] },
+      { name: 'Approval', path: '/capitation/approval', icon: 'mdi-check-circle-outline', permissions: ['capitation.approve', 'capitation.finalise'] },
+      { name: 'Payments', path: '/capitation/payments', icon: 'mdi-receipt-text-outline', permissions: ['capitation.pay'] },
     ],
   },
   {
