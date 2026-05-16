@@ -73,6 +73,7 @@ export const enrolleeAPI = {
   delete: (id) => api.delete(`/enrollees/${id}`),
   idCard: (id) => api.get(`/enrollees/${id}/id-card`, { responseType: 'blob' }),
   bulkEnrollmentSlip: (params) => api.get('/enrollees/bulk-enrollment-slip', { params, responseType: 'blob' }),
+  bulkIdCard: (params) => api.get('/enrollees/bulk-id-card', { params, responseType: 'blob', timeout: 120000 }),
   getStatsByFacility: (facilityId) => api.get(`/enrollees/stats/facility/${facilityId}`),
   getActivity: (id) => api.get(`/enrollees/${id}/activity`),
   getMedicalSummary: (id) => api.get(`/enrollees/${id}/medical-summary`),

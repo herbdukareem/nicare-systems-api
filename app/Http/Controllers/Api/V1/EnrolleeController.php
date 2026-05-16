@@ -233,6 +233,69 @@ class EnrolleeController extends BaseController
         return $this->sendResponse(EnrolleeResource::collection($items), 'Pending approval batch retrieved successfully');
     }
 
+    public function bulkIdCard(Request $request)
+    {
+        $data = $request->validate([
+            'benefactor_id'            => ['nullable', 'exists:benefactors,id'],
+            'facility_id'              => ['nullable', 'exists:facilities,id'],
+            'insurance_programme_id'   => ['nullable', 'exists:insurance_programmes,id'],
+            'enrollee_category_id'     => ['nullable', 'exists:enrollee_categories,id'],
+            'funding_type_id'          => ['nullable', 'exists:funding_types,id'],
+            'enrollment_phase_id'      => ['nullable', 'exists:enrollment_phases,id'],
+            'approval_status'          => ['nullable', 'in:pending,approved,all'],
+            'date_from'                => ['nullable', 'date'],
+            'date_to'                  => ['nullable', 'date', 'after_or_equal:date_from'],
+        ]);
+
+        $facilityId = $data['facility_id'] ?? null;
+        if (empty($data['benefactor_id']) && empty($facilityId)) {
+            return $this->sendError('Please select at least a Benefactor or Provider/Facility before generating bulk ID cards.', [], 422);
+        }
+
+        $query = Enrollee::query()->with(['premiumPlan', 'benefitPackage', 'facility']);
+
+        foreach (['benefactor_id', 'insurance_programme_id', 'enrollee_category_id', 'funding_type_id', 'enrollment_phase_id'] as $key) {
+            if (!empty($data[$key])) {
+                $query->where($key, $data[$key]);
+            }
+        }
+
+        if ($facilityId) {
+            $query->where('facility_id', $facilityId);
+        }
+
+        if (($data['approval_status'] ?? null) === 'pending') {
+            $query->where('status', Enrollee::STATUS_PENDING);
+        } elseif (($data['approval_status'] ?? null) === 'approved') {
+            $query->whereNotNull('approval_date')->where('status', Enrollee::STATUS_ACTIVE);
+        }
+
+        if (!empty($data['date_from'])) {
+            $query->whereDate('created_at', '>=', $data['date_from']);
+        }
+        if (!empty($data['date_to'])) {
+            $query->whereDate('created_at', '<=', $data['date_to']);
+        }
+
+        $enrollees = $query
+            ->orderBy('facility_id')
+            ->orderBy('last_name')
+            ->limit(200)
+            ->get();
+
+        $w = round(85.6 * 72 / 25.4, 2);
+        $h = round(54.0 * 72 / 25.4, 2);
+
+        $pdf = Pdf::setOptions(['isRemoteEnabled' => true])
+            ->loadView('pdf.bulk-id-card', [
+                'enrollees'   => $enrollees,
+                'generatedAt' => now(),
+            ])
+            ->setPaper([0, 0, $w, $h]);
+
+        return $pdf->stream('bulk_id_cards_' . now()->format('Ymd_His') . '.pdf');
+    }
+
     public function idCard(Enrollee $enrollee)
     {
         $enrollee->load([
@@ -240,12 +303,29 @@ class EnrolleeController extends BaseController
             'facility', 'lga', 'ward',
         ]);
 
-        $pdf = Pdf::loadView('pdf.enrollee-id-card', [
-            'enrollee' => $enrollee,
-            'generatedAt' => now(),
-        ])->setPaper([0, 0, 252, 396]);
+        // Fetch QR code as base64 so DomPDF can embed it without remote-URL issues
+        $qrBase64 = null;
+        try {
+            $qrData = urlencode($enrollee->enrollee_id ?: "ID-{$enrollee->id}");
+            $qrBytes = file_get_contents("https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={$qrData}");
+            if ($qrBytes !== false) {
+                $qrBase64 = 'data:image/png;base64,' . base64_encode($qrBytes);
+            }
+        } catch (\Throwable $e) {
+            // QR code is decorative; continue without it
+        }
 
-        return $pdf->download('enrollee_id_card_' . ($enrollee->enrollee_id ?: $enrollee->id) . '.pdf');
+        // CR80 landscape: 85.6 mm × 54 mm → points (72 pt/inch ÷ 25.4 mm/inch)
+        $w = round(85.6 * 72 / 25.4, 2); // 242.39
+        $h = round(54.0 * 72 / 25.4, 2); // 152.91
+
+        $pdf = Pdf::loadView('pdf.enrollee-id-card', [
+            'enrollee'    => $enrollee,
+            'qrBase64'    => $qrBase64,
+            'generatedAt' => now(),
+        ])->setPaper([0, 0, $w, $h]);
+
+        return $pdf->stream('enrollee_id_card_' . ($enrollee->enrollee_id ?: $enrollee->id) . '.pdf');
     }
 
     public function bulkEnrollmentSlip(Request $request)

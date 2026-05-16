@@ -118,6 +118,17 @@ const routes = [
     },
   },
   {
+    path: '/enrollees/bulk-id-card',
+    name: 'bulk-id-card',
+    component: () => import('../components/enrollees/BulkIdCardPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.view'],
+      title: 'Bulk ID Cards',
+      breadcrumb: 'Bulk ID Cards',
+    },
+  },
+  {
     path: '/enrollees/demo-enrollment',
     name: 'demo-enrollee-enrollment',
     component: () => import('../components/enrollees/DemoEnrollmentPage.vue'),

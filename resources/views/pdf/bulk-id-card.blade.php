@@ -14,7 +14,7 @@
     background: #ffffff;
   }
 
-  /* FRONT CARD */
+  /* FRONT */
   .front {
     width: 85.6mm;
     background: #ffffff;
@@ -69,8 +69,13 @@
   .passport { width: 19mm; height: 23mm; object-fit: cover; border: 0.5mm solid #90caf9; }
   .passport-ph { width: 19mm; height: 23mm; background: #eceff1; border: 0.5mm solid #90caf9; }
 
-  /* BACK CARD */
+  /* BACK */
   .back {
+    width: 85.6mm;
+    background: #ffffff;
+    page-break-after: always;
+  }
+  .back-last {
     width: 85.6mm;
     background: #ffffff;
     page-break-after: avoid;
@@ -88,15 +93,21 @@
 </head>
 <body>
 
-{{-- ═══════════ FRONT ═══════════ --}}
-<div class="front">
+@foreach($enrollees as $enrollee)
+@php
+  $qrData    = urlencode($enrollee->enrollee_id ?: "ID-{$enrollee->id}");
+  $qrUrl     = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={$qrData}";
+  $photoPath = $enrollee->image_url ? public_path(ltrim($enrollee->image_url, '/')) : null;
+@endphp
 
+{{-- FRONT --}}
+<div class="front">
   <div class="hdr">
     <table class="hdr-tbl">
       <tr>
         <td class="hdr-logo">
           @if(file_exists(public_path('nigeria-coat-of-arms.jpg')))
-            <img src="file://{{ public_path('state-logo.png') }}" alt="Coat of Arms">
+            <img src="file://{{ public_path('nigeria-coat-of-arms.jpg') }}" alt="Coat of Arms">
           @endif
         </td>
         <td class="hdr-txt">
@@ -111,45 +122,35 @@
       </tr>
     </table>
   </div>
-
-  <div class="badge-bar">
-    <span class="badge">NiCare ENROLEE ID CARD</span>
-  </div>
-
+  <div class="badge-bar"><span class="badge">NiCare ENROLEE ID CARD</span></div>
   <div class="body">
     <table class="body-tbl">
       <tr>
         <td class="fields-td">
           <table class="fl">
             <tr>
-              <td class="fl-lbl">NICARE NO.</td>
-              <td class="fl-col">:</td>
+              <td class="fl-lbl">NICARE NO.</td><td class="fl-col">:</td>
               <td class="fl-val-bold">{{ $enrollee->enrollee_id ?: 'N/A' }}</td>
             </tr>
             <tr>
-              <td class="fl-lbl">NAME</td>
-              <td class="fl-col">:</td>
+              <td class="fl-lbl">NAME</td><td class="fl-col">:</td>
               <td class="fl-val">{{ $enrollee->full_name ?: 'N/A' }}</td>
             </tr>
             <tr>
-              <td class="fl-lbl">SEX</td>
-              <td class="fl-col">:</td>
+              <td class="fl-lbl">SEX</td><td class="fl-col">:</td>
               <td class="fl-val">{{ (int) $enrollee->sex === 1 ? 'M' : ((int) $enrollee->sex === 2 ? 'F' : 'N/A') }}</td>
             </tr>
             <tr>
-              <td class="fl-lbl">PROVIDER</td>
-              <td class="fl-col">:</td>
+              <td class="fl-lbl">PROVIDER</td><td class="fl-col">:</td>
               <td class="fl-val">{{ $enrollee->facility->name ?? 'N/A' }}</td>
             </tr>
             <tr>
-              <td class="fl-lbl">PLAN</td>
-              <td class="fl-col">:</td>
+              <td class="fl-lbl">PLAN</td><td class="fl-col">:</td>
               <td class="fl-val">{{ $enrollee->premiumPlan->name ?? ($enrollee->benefitPackage->name ?? 'N/A') }}</td>
             </tr>
           </table>
         </td>
         <td class="photo-td">
-          @php $photoPath = $enrollee->image_url ? public_path(ltrim($enrollee->image_url, '/')) : null; @endphp
           @if($photoPath && file_exists($photoPath))
             <img class="passport" src="file://{{ $photoPath }}" alt="Photo">
           @else
@@ -159,11 +160,10 @@
       </tr>
     </table>
   </div>
-
 </div>
 
-{{-- ═══════════ BACK ═══════════ --}}
-<div class="back">
+{{-- BACK --}}
+<div class="{{ $loop->last ? 'back-last' : 'back' }}">
   <div class="back-inner">
     <table class="back-tbl">
       <tr>
@@ -173,14 +173,13 @@
           <div class="web">Visit our website: nicare.nigerstate.gov.ng</div>
         </td>
         <td class="back-qr">
-          @if($qrBase64)
-            <img class="qr-img" src="{{ $qrBase64 }}" alt="QR Code">
-          @endif
+          <img class="qr-img" src="{{ $qrUrl }}" alt="QR">
         </td>
       </tr>
     </table>
   </div>
 </div>
 
+@endforeach
 </body>
 </html>

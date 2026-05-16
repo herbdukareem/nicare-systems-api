@@ -132,6 +132,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::middleware('permission:enrollees.view,enrollees.create,enrollees.update')->group(function () {
         Route::get('enrollees/pending-approval', [EnrolleeController::class, 'pendingApproval']);
         Route::get('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip']);
+        Route::get('enrollees/bulk-id-card', [EnrolleeController::class, 'bulkIdCard']);
         Route::post('enrollees/{enrollee}/approve', [EnrolleeController::class, 'approve']);
         Route::get('enrollees/{enrollee}/id-card', [EnrolleeController::class, 'idCard']);
         Route::apiResource('enrollees', EnrolleeController::class);

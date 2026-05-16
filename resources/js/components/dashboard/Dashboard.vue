@@ -485,7 +485,7 @@
           </div>
         </section>
 
-        <!-- ── Benefactor + Recent Approvals ───────────────────────────────── -->
+        <!-- ── Benefactor Participation + Capitation Overview ──────────────── -->
         <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-3 tw-gap-6">
 
           <!-- Benefactor Participation -->
@@ -507,42 +507,77 @@
             </div>
           </div>
 
-          <!-- Recent Approvals -->
+          <!-- Capitation Overview -->
           <div class="xl:tw-col-span-2 tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
               <div>
-                <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Recent Approvals</h2>
-                <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Latest lives moved into active coverage</p>
+                <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Capitation Overview</h2>
+                <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Period pipeline, payment status and provider amounts</p>
               </div>
-              <v-chip size="x-small" color="success" variant="tonal">Live feed</v-chip>
+              <router-link to="/capitation/generate">
+                <v-chip size="x-small" color="cyan" variant="tonal" class="tw-cursor-pointer">View all</v-chip>
+              </router-link>
             </div>
-            <div class="tw-divide-y tw-divide-gray-50">
+
+            <!-- Summary stat chips -->
+            <div class="tw-grid tw-grid-cols-2 sm:tw-grid-cols-4 tw-gap-px tw-bg-gray-100 tw-border-b tw-border-gray-100">
+              <div class="tw-bg-white tw-px-5 tw-py-4">
+                <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">Total Periods</p>
+                <p class="tw-text-2xl tw-font-extrabold tw-text-gray-900 tw-mt-1">{{ capitationStats.total }}</p>
+              </div>
+              <div class="tw-bg-white tw-px-5 tw-py-4">
+                <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">Finalised</p>
+                <p class="tw-text-2xl tw-font-extrabold tw-text-green-600 tw-mt-1">{{ capitationStats.finalised }}</p>
+              </div>
+              <div class="tw-bg-white tw-px-5 tw-py-4">
+                <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">In Progress</p>
+                <p class="tw-text-2xl tw-font-extrabold tw-text-amber-600 tw-mt-1">{{ capitationStats.inProgress }}</p>
+              </div>
+              <div class="tw-bg-white tw-px-5 tw-py-4">
+                <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">Draft</p>
+                <p class="tw-text-2xl tw-font-extrabold tw-text-gray-400 tw-mt-1">{{ capitationStats.draft }}</p>
+              </div>
+            </div>
+
+            <!-- Recent periods list -->
+            <div v-if="capitationLoading" class="tw-flex tw-items-center tw-justify-center tw-py-10">
+              <v-progress-circular indeterminate color="cyan" size="28" />
+            </div>
+            <div v-else-if="capitationPeriods.length" class="tw-divide-y tw-divide-gray-50">
               <div
-                v-for="item in (pipeline.recent_approvals || [])"
-                :key="item.id"
-                class="tw-flex tw-items-start tw-gap-4 tw-px-6 tw-py-4 hover:tw-bg-gray-50 tw-transition-colors"
+                v-for="period in capitationPeriods.slice(0, 5)"
+                :key="period.id"
+                class="tw-flex tw-items-center tw-gap-4 tw-px-6 tw-py-3.5 hover:tw-bg-slate-50 tw-transition-colors"
               >
-                <div class="tw-w-9 tw-h-9 tw-rounded-full tw-bg-green-100 tw-flex tw-items-center tw-justify-center tw-shrink-0">
-                  <v-icon size="18" color="green">mdi-account-check-outline</v-icon>
+                <div
+                  class="tw-flex tw-h-9 tw-w-9 tw-flex-shrink-0 tw-items-center tw-justify-center tw-rounded-lg"
+                  :class="period.status ? 'tw-bg-green-100' : period.computed_at ? 'tw-bg-blue-100' : 'tw-bg-amber-100'"
+                >
+                  <v-icon size="18" :color="period.status ? 'green' : period.computed_at ? 'blue' : 'amber-darken-2'">
+                    {{ period.status ? 'mdi-check-decagram' : period.computed_at ? 'mdi-progress-check' : 'mdi-clock-outline' }}
+                  </v-icon>
                 </div>
                 <div class="tw-flex-1 tw-min-w-0">
-                  <p class="tw-text-sm tw-font-semibold tw-text-gray-900">{{ item.name || item.enrollee_id || 'Unknown' }}</p>
-                  <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">
-                    <span v-if="item.programme" class="tw-font-medium">{{ item.programme }}</span>
-                    <span v-if="item.programme && item.facility" class="tw-mx-1">·</span>
-                    <span v-if="item.facility">{{ item.facility }}</span>
+                  <p class="tw-text-sm tw-font-semibold tw-text-gray-900 tw-truncate">{{ period.name }}</p>
+                  <p class="tw-text-xs tw-text-gray-400 tw-mt-0.5">
+                    {{ formatCapDate(period.period_start) }} – {{ formatCapDate(period.period_end) }}
+                    <span class="tw-mx-1 tw-text-gray-300">·</span>
+                    {{ period.capitation_details_count || 0 }} facilities
                   </p>
                 </div>
                 <div class="tw-text-right tw-shrink-0">
-                  <span class="tw-inline-flex tw-items-center tw-gap-1 tw-text-xs tw-font-semibold tw-text-green-700 tw-bg-green-50 tw-rounded-full tw-px-2 tw-py-0.5">
-                    <v-icon size="10">mdi-check</v-icon> Approved
-                  </span>
-                  <p class="tw-text-xs tw-text-gray-400 tw-mt-1">{{ item.time }}</p>
+                  <span
+                    class="tw-inline-block tw-rounded-full tw-px-2 tw-py-0.5 tw-text-xs tw-font-semibold"
+                    :class="period.status ? 'tw-bg-green-50 tw-text-green-700' : period.computed_at ? 'tw-bg-blue-50 tw-text-blue-700' : 'tw-bg-amber-50 tw-text-amber-700'"
+                  >{{ period.status ? 'Finalised' : period.computed_at ? 'Computed' : 'Draft' }}</span>
+                  <p v-if="period.capitation_rate" class="tw-text-xs tw-text-gray-400 tw-mt-1 tw-font-mono">
+                    ₦{{ Number(period.capitation_rate).toLocaleString() }}/head
+                  </p>
                 </div>
               </div>
-              <div v-if="!(pipeline.recent_approvals || []).length" class="tw-py-10 tw-text-center tw-text-gray-400 tw-text-sm">
-                No recent approvals yet
-              </div>
+            </div>
+            <div v-else class="tw-py-10 tw-text-center tw-text-gray-400 tw-text-sm">
+              No capitation periods found
             </div>
           </div>
         </section>
@@ -558,7 +593,7 @@ import AdminLayout from '../layout/AdminLayout.vue'
 import LineChart from '../charts/LineChart.vue'
 import BarChart from '../charts/BarChart.vue'
 import DoughnutChart from '../charts/DoughnutChart.vue'
-import { dashboardAPI } from '../../utils/api'
+import { capitationAPI, dashboardAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
 
 const { error, success } = useToast()
@@ -708,6 +743,35 @@ function backToYears() {
   trendMonthlyData.value  = []
 }
 
+// ── Capitation stats ─────────────────────────────────────────────────────────
+const capitationPeriods = ref([])
+const capitationLoading = ref(false)
+
+const capitationStats = computed(() => {
+  const periods = capitationPeriods.value
+  return {
+    total:      periods.length,
+    finalised:  periods.filter(p => p.status).length,
+    inProgress: periods.filter(p => !p.status && p.computed_at).length,
+    draft:      periods.filter(p => !p.status && !p.computed_at).length,
+  }
+})
+
+const formatCapDate = (value) => value ? new Date(value).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '—'
+
+async function loadCapitationStats() {
+  capitationLoading.value = true
+  try {
+    const response = await capitationAPI.periods({ per_page: 20, sort: 'desc' })
+    const payload = response.data?.data
+    capitationPeriods.value = (payload?.data || payload || []).sort((a, b) => b.id - a.id)
+  } catch (_) {
+    // non-critical
+  } finally {
+    capitationLoading.value = false
+  }
+}
+
 // ── Geographic Reach: interactive LGA → wards ────────────────────────────────
 const geoView     = ref('lga')
 const selectedLga = ref(null)
@@ -782,6 +846,7 @@ async function loadDashboard() {
 onMounted(async () => {
   await loadDashboard()
   loadTrendYears()
+  loadCapitationStats()
 })
 
 // ── Sub-components ──────────────────────────────────────────────────────────

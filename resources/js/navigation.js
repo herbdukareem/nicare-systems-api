@@ -19,6 +19,7 @@ export const navigationItems = [
       { name: 'Demo Enrollment', path: '/enrollees/demo-enrollment', icon: 'mdi-account-plus-outline', permissions: ['enrollees.create'] },
       { name: 'Pending Approval', path: '/enrollees/approval', icon: 'mdi-account-check-outline', permissions: ['enrollees.update', 'enrollee.approve'] },
       { name: 'Bulk Enrollment Slip', path: '/enrollees/bulk-enrollment-slip', icon: 'mdi-file-document-multiple-outline', permissions: ['enrollees.view', 'enrollee.print-bulk-slip'] },
+      { name: 'Bulk ID Cards', path: '/enrollees/bulk-id-card', icon: 'mdi-card-account-details-star-outline', permissions: ['enrollees.view'] },
       { name: 'Mobile Sync', path: '/enrollment/mobile-sync', icon: 'mdi-cellphone-sync', permissions: ['mobile-sync.push', 'mobile-sync.status'] },
       { name: 'Change Facility', path: '/enrollment/change-facility', icon: 'mdi-hospital-marker', permissions: ['enrollees.update'] },
     ],
