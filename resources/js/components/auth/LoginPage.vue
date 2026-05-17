@@ -175,47 +175,27 @@ healthcare to all the people of Niger state</p>
     </div>
 
     <!-- Forgot Password Dialog -->
-    <v-dialog v-model="showForgotPassword" max-width="500">
-      <v-card class="tw-rounded-xl">
-        <v-card-title class="tw-text-xl tw-font-semibold bg-primary-50 tw-text-blue-800">
-          <v-icon class="tw-mr-2">mdi-lock-reset</v-icon>
-          Reset Password
-        </v-card-title>
-        <v-card-text class="tw-pt-6">
-          <p class="tw-mb-4 tw-text-gray-600">
-            Enter your username and we'll help you reset your password.
-          </p>
-          <v-text-field
-            v-model="forgotUsername"
-            type="text"
-            label="Username"
-            variant="outlined"
-            density="comfortable"
-            prepend-inner-icon="mdi-account"
-            :error-messages="forgotErrors.username"
-            color="blue"
-          />
-        </v-card-text>
-        <v-card-actions class="tw-px-6 tw-pb-6">
-          <v-spacer />
-          <v-btn
-            variant="text"
-            @click="showForgotPassword = false"
-            class="tw-text-gray-600"
-          >
-            Cancel
-          </v-btn>
-          <v-btn
-            color="blue"
-            :loading="forgotLoading"
-            @click="handleForgotPassword"
-            class="tw-px-6"
-          >
-            Send Reset Link
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppModal v-model="showForgotPassword" title="Reset Password" icon="mdi-lock-reset" size="sm">
+      <div>
+        <p class="tw-mb-4 tw-text-gray-600">
+          Enter your username and we'll help you reset your password.
+        </p>
+        <v-text-field
+          v-model="forgotUsername"
+          type="text"
+          label="Username"
+          variant="outlined"
+          density="comfortable"
+          prepend-inner-icon="mdi-account"
+          :error-messages="forgotErrors.username"
+          color="blue"
+        />
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showForgotPassword = false">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" :loading="forgotLoading" @click="handleForgotPassword">Send Reset Link</v-btn>
+      </template>
+    </AppModal>
   </div>
 </template>
 
@@ -225,6 +205,7 @@ import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { useToast } from '../../composables/useToast';
 import Logo from '../common/Logo.vue';
+import AppModal from '../common/AppModal.vue';
 import ceremonyImg from '/resources/assets/ngscha-ceremony.png';
 
 const router = useRouter();

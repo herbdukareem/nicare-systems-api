@@ -153,7 +153,7 @@
               </div>
             </v-card-title>
             <v-card-text>
-              <v-data-table
+              <AppDataTable
                 :headers="headers"
                 :items="requirements"
                 :loading="loading"
@@ -214,7 +214,7 @@
                     <v-icon size="small">mdi-delete</v-icon>
                   </v-btn>
                 </template>
-              </v-data-table>
+              </AppDataTable>
             </v-card-text>
           </v-card>
         </v-col>
@@ -222,119 +222,105 @@
     </v-container>
 
     <!-- Create/Edit Dialog -->
-    <v-dialog v-model="showCreateDialog" max-width="800px" persistent>
-      <v-card>
-        <v-card-title class="bg-primary text-white">
-          <span>{{ editMode ? 'Edit Requirement' : 'Add New Requirement' }}</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
-          <v-form ref="requirementForm">
-            <v-row>
-              <v-col cols="12" md="6">
-                <v-text-field
-                  v-model="formData.name"
-                  label="Requirement Name *"
-                  variant="outlined"
-                  dense
-                  :rules="[v => !!v || 'Requirement name is required']"
-                />
-              </v-col>
-              <v-col cols="12" md="6">
-                <v-select
-                  v-model="formData.request_type"
-                  label="Request Type *"
-                  :items="requestTypes"
-                  variant="outlined"
-                  dense
-                  :rules="[v => !!v || 'Request type is required']"
-                />
-              </v-col>
-               <v-col cols="12" md="6">
-                <v-select
-                  v-model="formData.document_type"
-                  label="Document Type *"
-                  :items="documentTypes"
-                  variant="outlined"
-                  dense
-                  :rules="[v => !!v || 'Document type is required']"
-                />
-              </v-col>
-              <v-col cols="12">
-                <v-textarea
-                  v-model="formData.description"
-                  label="Description"
-                  variant="outlined"
-                  dense
-                  rows="3"
-                />
-              </v-col>
-              <v-col cols="12" md="4">
-                <v-switch
-                  v-model="formData.is_required"
-                  label="Mandatory"
-                  color="error"
-                  hide-details
-                />
-              </v-col>
-              <v-col cols="12" md="4">
-                <v-switch
-                  v-model="formData.status"
-                  label="Active"
-                  color="success"
-                  hide-details
-                />
-              </v-col>
-              <v-col cols="12" md="4">
-                <v-text-field
-                  v-model.number="formData.display_order"
-                  label="Display Order"
-                  type="number"
-                  variant="outlined"
-                  dense
-                  hint="Order in which this requirement appears"
-                />
-              </v-col>
-            </v-row>
-          </v-form>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="closeDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="saveRequirement" :loading="saving">
-            {{ editMode ? 'Update' : 'Create' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppModal v-model="showCreateDialog" :title="editMode ? 'Edit Requirement' : 'Add New Requirement'" size="lg" :loading="saving" persistent>
+      <v-form ref="requirementForm">
+        <v-row>
+          <v-col cols="12" md="6">
+            <v-text-field
+              v-model="formData.name"
+              label="Requirement Name *"
+              variant="outlined"
+              dense
+              :rules="[v => !!v || 'Requirement name is required']"
+            />
+          </v-col>
+          <v-col cols="12" md="6">
+            <v-select
+              v-model="formData.request_type"
+              label="Request Type *"
+              :items="requestTypes"
+              variant="outlined"
+              dense
+              :rules="[v => !!v || 'Request type is required']"
+            />
+          </v-col>
+           <v-col cols="12" md="6">
+            <v-select
+              v-model="formData.document_type"
+              label="Document Type *"
+              :items="documentTypes"
+              variant="outlined"
+              dense
+              :rules="[v => !!v || 'Document type is required']"
+            />
+          </v-col>
+          <v-col cols="12">
+            <v-textarea
+              v-model="formData.description"
+              label="Description"
+              variant="outlined"
+              dense
+              rows="3"
+            />
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-switch
+              v-model="formData.is_required"
+              label="Mandatory"
+              color="error"
+              hide-details
+            />
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-switch
+              v-model="formData.status"
+              label="Active"
+              color="success"
+              hide-details
+            />
+          </v-col>
+          <v-col cols="12" md="4">
+            <v-text-field
+              v-model.number="formData.display_order"
+              label="Display Order"
+              type="number"
+              variant="outlined"
+              dense
+              hint="Order in which this requirement appears"
+            />
+          </v-col>
+        </v-row>
+      </v-form>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="saving" @click="closeDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="saveRequirement" :loading="saving">
+          {{ editMode ? 'Update' : 'Create' }}
+        </v-btn>
+      </template>
+    </AppModal>
 
     <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="showDeleteDialog" max-width="500px">
-      <v-card>
-        <v-card-title class="bg-error text-white">
-          <span>Confirm Delete</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
-          <p>Are you sure you want to delete this requirement?</p>
-          <p class="font-weight-bold">{{ requirementToDelete?.name }}</p>
-          <v-alert type="warning" class="mt-4">
-            This action cannot be undone.
-          </v-alert>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="showDeleteDialog = false">Cancel</v-btn>
-          <v-btn color="error" @click="deleteRequirement" :loading="deleting">
-            Delete
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppModal v-model="showDeleteDialog" title="Confirm Delete" color="error" size="sm">
+      <p>Are you sure you want to delete this requirement?</p>
+      <p class="font-weight-bold">{{ requirementToDelete?.name }}</p>
+      <v-alert type="warning" class="mt-4">
+        This action cannot be undone.
+      </v-alert>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="deleting" @click="showDeleteDialog = false">Cancel</v-btn>
+        <v-btn color="error" variant="flat" @click="deleteRequirement" :loading="deleting">
+          Delete
+        </v-btn>
+      </template>
+    </AppModal>
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import { ref, onMounted } from 'vue';
 import { useToast } from '../../composables/useToast';
 import api from '../../utils/api';

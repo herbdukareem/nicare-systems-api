@@ -1,12 +1,5 @@
 <template>
-  <v-dialog v-model="dialog" max-width="800px" persistent>
-    <v-card>
-      <v-card-title class="tw-bg-blue-50 tw-text-blue-800">
-        <v-icon class="tw-mr-2">mdi-plus-circle</v-icon>
-        Create Feedback Record
-      </v-card-title>
-
-      <v-card-text class="tw-p-6">
+  <AppModal v-model="dialog" title="Create Feedback Record" icon="mdi-plus-circle" size="lg" :loading="submitting" persistent>
         <v-stepper v-model="currentStep" :items="stepperItems" class="tw-elevation-0">
           <!-- Step 1: Search Enrollee -->
           <template v-slot:item.1>
@@ -185,45 +178,44 @@
             </div>
           </template>
         </v-stepper>
-      </v-card-text>
 
-      <v-card-actions class="tw-p-6 tw-bg-gray-50">
-        <v-spacer />
-        <v-btn
-          variant="outlined"
-          @click="closeDialog"
-          :disabled="submitting"
-        >
-          Cancel
-        </v-btn>
-        <v-btn
-          v-if="currentStep > 1"
-          variant="outlined"
-          @click="currentStep--"
-          :disabled="submitting"
-        >
-          Previous
-        </v-btn>
-        <v-btn
-          v-if="currentStep < 3"
-          color="primary"
-          @click="nextStep"
-          :disabled="!canProceed"
-        >
-          Next
-        </v-btn>
-        <v-btn
-          v-if="currentStep === 3"
-          color="primary"
-          @click="submitFeedback"
-          :loading="submitting"
-          :disabled="!isFormValid"
-        >
-          Create Feedback
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+    <template #actions>
+      <v-btn
+        variant="outlined"
+        @click="closeDialog"
+        :disabled="submitting"
+      >
+        Cancel
+      </v-btn>
+      <v-btn
+        v-if="currentStep > 1"
+        variant="outlined"
+        @click="currentStep--"
+        :disabled="submitting"
+      >
+        Previous
+      </v-btn>
+      <v-btn
+        v-if="currentStep < 3"
+        color="primary"
+        variant="flat"
+        @click="nextStep"
+        :disabled="!canProceed"
+      >
+        Next
+      </v-btn>
+      <v-btn
+        v-if="currentStep === 3"
+        color="primary"
+        variant="flat"
+        @click="submitFeedback"
+        :loading="submitting"
+        :disabled="!isFormValid"
+      >
+        Create Feedback
+      </v-btn>
+    </template>
+  </AppModal>
 </template>
 
 <script setup>
@@ -231,6 +223,7 @@ import { ref, computed, watch } from 'vue';
 import { feedbackAPI } from '../../../utils/api.js';
 import { useToast } from '../../../composables/useToast';
 import { debounce } from 'lodash-es';
+import AppModal from '../../common/AppModal.vue';
 
 const { success, error } = useToast();
 

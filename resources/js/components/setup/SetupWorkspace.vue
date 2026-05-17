@@ -33,7 +33,7 @@
       </div>
 
       <v-card class="tw-border tw-border-slate-200" elevation="0">
-        <v-data-table
+        <AppDataTable
           :headers="current.headers"
           :items="items"
           :loading="loading"
@@ -56,38 +56,32 @@
               <v-btn icon size="small" variant="text" color="error" @click="removeItem(item)"><v-icon size="18">mdi-delete-outline</v-icon></v-btn>
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </v-card>
 
-      <v-dialog v-model="dialog" max-width="720">
-        <v-card>
-          <v-card-title>{{ editingId ? 'Edit' : 'Create' }} {{ current.singular }}</v-card-title>
-          <v-card-text>
-            <div class="tw-grid tw-gap-3 md:tw-grid-cols-2">
-              <component
-                v-for="field in current.fields"
-                :key="field.key"
-                :is="field.type === 'textarea' ? 'v-textarea' : field.type === 'select' ? 'v-select' : 'v-text-field'"
-                v-model="form[field.key]"
-                :items="field.items ? field.items() : undefined"
-                :item-title="field.itemTitle || 'title'"
-                :item-value="field.itemValue || 'value'"
-                :label="field.label"
-                :type="field.inputType || 'text'"
-                :density="'compact'"
-                :variant="'outlined'"
-                :clearable="field.clearable !== false"
-                :rows="field.type === 'textarea' ? 3 : undefined"
-              />
-            </div>
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
-            <v-btn variant="text" @click="dialog = false">Cancel</v-btn>
-            <v-btn color="primary" :loading="saving" @click="saveItem">{{ editingId ? 'Save Changes' : 'Create' }}</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <AppModal v-model="dialog" :title="`${editingId ? 'Edit' : 'Create'} ${current.singular}`" size="md" :loading="saving">
+        <div class="tw-grid tw-gap-3 md:tw-grid-cols-2">
+          <component
+            v-for="field in current.fields"
+            :key="field.key"
+            :is="field.type === 'textarea' ? 'v-textarea' : field.type === 'select' ? 'v-select' : 'v-text-field'"
+            v-model="form[field.key]"
+            :items="field.items ? field.items() : undefined"
+            :item-title="field.itemTitle || 'title'"
+            :item-value="field.itemValue || 'value'"
+            :label="field.label"
+            :type="field.inputType || 'text'"
+            :density="'compact'"
+            :variant="'outlined'"
+            :clearable="field.clearable !== false"
+            :rows="field.type === 'textarea' ? 3 : undefined"
+          />
+        </div>
+        <template #actions>
+          <v-btn variant="outlined" @click="dialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="saving" @click="saveItem">{{ editingId ? 'Save Changes' : 'Create' }}</v-btn>
+        </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
@@ -96,6 +90,8 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import { useToast } from '../../composables/useToast';
 import { benefactorAPI, benefitPackageAPI, facilityAPI, fundingTypeAPI, lgaAPI, wardAPI } from '../../utils/api';
 

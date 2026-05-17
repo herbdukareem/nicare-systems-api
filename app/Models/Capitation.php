@@ -18,6 +18,7 @@ class Capitation extends Model
         'capitation_month' => 'integer',
         'year' => 'integer',
         'status' => 'boolean',
+        'metadata' => 'array',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime'

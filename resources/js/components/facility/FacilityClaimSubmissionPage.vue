@@ -485,7 +485,7 @@
               </v-card-title>
 
               <v-card-text class="pa-0">
-                <v-data-table
+                <AppDataTable
                   :headers="claimsTableHeaders"
                   :items="submittedClaims"
                   :loading="loadingClaims"
@@ -542,7 +542,7 @@
                       <p class="text-grey mt-2">No claims submitted yet</p>
                     </div>
                   </template>
-                </v-data-table>
+                </AppDataTable>
               </v-card-text>
             </v-card>
           </v-col>
@@ -550,44 +550,25 @@
       </v-container>
 
       <!-- Claim Submission Success Dialog -->
-      <v-dialog v-model="showSuccessDialog" max-width="500px" persistent>
-        <v-card>
-          <v-card-title class="bg-success text-white">
-            <v-icon class="mr-2">mdi-check-circle</v-icon>
-            Claim Submitted Successfully
-          </v-card-title>
-
-          <v-card-text class="pt-6 text-center">
-            <v-icon color="success" size="80" class="mb-4">mdi-file-document-check</v-icon>
-            <h3 class="text-h5 mb-2">Claim Number: {{ submittedClaim?.claim_number }}</h3>
-            <p class="text-body-1 text-grey mb-4">
-              Your claim has been submitted successfully. You can download the claim submission slip for your records.
-            </p>
-            <v-chip color="info" class="mb-4">
-              UTN: {{ submittedClaim?.utn }}
-            </v-chip>
-          </v-card-text>
-
-          <v-card-actions class="justify-center pb-4">
-            <v-btn
-              color="primary"
-              variant="elevated"
-              @click="downloadClaimSlip"
-              :loading="downloadingSlip"
-            >
-              <v-icon class="mr-1">mdi-download</v-icon>
-              Download Claim Slip
-            </v-btn>
-            <v-btn
-              color="grey"
-              variant="text"
-              @click="closeSuccessDialog"
-            >
-              Close
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <AppModal v-model="showSuccessDialog" title="Claim Submitted Successfully" icon="mdi-check-circle" size="sm" color="success" persistent>
+        <div class="text-center">
+          <v-icon color="success" size="80" class="mb-4">mdi-file-document-check</v-icon>
+          <h3 class="text-h5 mb-2">Claim Number: {{ submittedClaim?.claim_number }}</h3>
+          <p class="text-body-1 text-grey mb-4">
+            Your claim has been submitted successfully. You can download the claim submission slip for your records.
+          </p>
+          <v-chip color="info" class="mb-4">
+            UTN: {{ submittedClaim?.utn }}
+          </v-chip>
+        </div>
+        <template #actions>
+          <v-btn color="primary" variant="flat" @click="downloadClaimSlip" :loading="downloadingSlip">
+            <v-icon class="mr-1">mdi-download</v-icon>
+            Download Claim Slip
+          </v-btn>
+          <v-btn variant="outlined" @click="closeSuccessDialog">Close</v-btn>
+        </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
@@ -597,6 +578,8 @@ import { ref, computed, onMounted } from 'vue';
 import { useToast } from '../../composables/useToast';
 import api from '../../utils/api';
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 
 const { success: showSuccess, error: showError } = useToast();
 

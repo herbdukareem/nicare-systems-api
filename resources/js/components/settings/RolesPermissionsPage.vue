@@ -109,7 +109,7 @@
 
       <!-- Roles Table -->
       <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100">
-        <v-data-table
+        <AppDataTable
           v-model="selectedRoles"
           :headers="roleHeaders"
           :items="roles"
@@ -199,7 +199,7 @@
               <div class="tw-text-sm tw-text-gray-600">Try adjusting your search or create a new role.</div>
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </div>
 
       <!-- Permission Matrix -->
@@ -257,219 +257,194 @@
     </div>
 
     <!-- Create/Edit Role Dialog -->
-    <v-dialog v-model="showCreateRoleDialog" max-width="820px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">
-            {{ editingRole ? 'Edit Role' : 'Create New Role' }}
-          </span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-              <v-text-field v-model="roleForm.name" label="Role Name" variant="outlined" required />
-              <v-select
-                v-model="roleForm.status"
-                :items="['active', 'inactive']"
-                label="Status"
-                variant="outlined"
-                required
-              />
-            </div>
+    <AppModal v-model="showCreateRoleDialog" :title="editingRole ? 'Edit Role' : 'Create New Role'" size="lg">
+      <div class="tw-space-y-4">
+        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+          <v-text-field v-model="roleForm.name" label="Role Name" variant="outlined" required />
+          <v-select
+            v-model="roleForm.status"
+            :items="['active', 'inactive']"
+            label="Status"
+            variant="outlined"
+            required
+          />
+        </div>
 
-            <v-textarea v-model="roleForm.description" label="Description" variant="outlined" rows="3" />
+        <v-textarea v-model="roleForm.description" label="Description" variant="outlined" rows="3" />
 
+        <div>
+          <div class="tw-flex tw-items-start tw-justify-between tw-mb-3">
             <div>
-              <div class="tw-flex tw-items-start tw-justify-between tw-mb-3">
-                <div>
-                  <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">Permissions</h4>
-                  <p class="tw-text-sm tw-text-gray-600 tw-mt-1">
-                    Select permissions for this role. Users assigned this role will automatically inherit these permissions.
-                  </p>
-                </div>
-                <v-chip
-                  color="primary"
-                  variant="outlined"
-                  size="small"
-                  prepend-icon="mdi-shield-check"
-                >
-                  {{ roleForm.permissions.length }} selected
-                </v-chip>
-              </div>
-
-              <!-- Info Alert -->
-              <v-alert
-                type="info"
-                variant="tonal"
-                density="compact"
-                class="tw-mb-4"
-                icon="mdi-information"
-              >
-                <div class="tw-text-sm">
-                  <strong>Auto-Inheritance:</strong> Any user assigned to this role will automatically have all selected permissions.
-                  No need to assign permissions individually to users.
-                </div>
-              </v-alert>
-
-              <!-- Quick Actions -->
-              <div class="tw-flex tw-gap-2 tw-mb-4">
-                <v-btn
-                  size="small"
-                  variant="outlined"
-                  color="primary"
-                  prepend-icon="mdi-checkbox-multiple-marked"
-                  @click="selectAllPermissions"
-                >
-                  Select All
-                </v-btn>
-                <v-btn
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  prepend-icon="mdi-checkbox-multiple-blank-outline"
-                  @click="clearAllPermissions"
-                >
-                  Clear All
-                </v-btn>
-              </div>
-
-              <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-                <div v-for="cat in permissionCategories" :key="cat.name">
-                  <div class="tw-flex tw-items-center tw-justify-between tw-mb-1.5">
-                    <h5 class="tw-font-medium tw-text-gray-700">{{ cat.name }}</h5>
-                    <v-btn
-                      size="x-small"
-                      variant="text"
-                      prepend-icon="mdi-check-all"
-                      @click="toggleCategory(cat)"
-                    >Toggle</v-btn>
-                  </div>
-                  <div class="tw-space-y-1.5">
-                    <v-checkbox
-                      v-for="perm in cat.permissions"
-                      :key="perm.id"
-                      v-model="roleForm.permissions"
-                      :value="perm.id"
-                      :label="perm.name"
-                      density="compact"
-                      hide-details
-                    />
-                  </div>
-                </div>
-              </div>
+              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">Permissions</h4>
+              <p class="tw-text-sm tw-text-gray-600 tw-mt-1">
+                Select permissions for this role. Users assigned this role will automatically inherit these permissions.
+              </p>
             </div>
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="closeRoleDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="saveRole">Save Role</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- View Role Dialog -->
-    <v-dialog v-model="showViewRoleDialog" max-width="640px">
-      <v-card v-if="viewingRole">
-        <v-card-title>
-          <div class="tw-flex tw-items-center tw-justify-between tw-w-full">
-            <span class="tw-text-xl tw-font-semibold">{{ viewingRole.name }}</span>
-            <v-chip :color="viewingRole.status === 'active' ? 'success' : 'error'" size="small">
-              {{ viewingRole.status }}
+            <v-chip
+              color="primary"
+              variant="outlined"
+              size="small"
+              prepend-icon="mdi-shield-check"
+            >
+              {{ roleForm.permissions.length }} selected
             </v-chip>
           </div>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <div>
-              <h4 class="tw-font-medium tw-text-gray-700">Description</h4>
-              <p class="tw-text-gray-700">{{ viewingRole.description || 'No description provided' }}</p>
-            </div>
 
-            <div>
-              <h4 class="tw-font-medium tw-text-gray-700">Permissions ({{ countRolePermissions(viewingRole) }})</h4>
-              <div class="tw-mt-2 tw-flex tw-flex-wrap tw-gap-2">
-                <v-chip
-                  v-for="pid in normalizePermissionIds(viewingRole)"
-                  :key="pid"
-                  size="small"
-                  color="primary"
-                  variant="outlined"
-                >
-                  {{ getPermissionName(pid) }}
-                </v-chip>
+          <!-- Info Alert -->
+          <v-alert
+            type="info"
+            variant="tonal"
+            density="compact"
+            class="tw-mb-4"
+            icon="mdi-information"
+          >
+            <div class="tw-text-sm">
+              <strong>Auto-Inheritance:</strong> Any user assigned to this role will automatically have all selected permissions.
+              No need to assign permissions individually to users.
+            </div>
+          </v-alert>
+
+          <!-- Quick Actions -->
+          <div class="tw-flex tw-gap-2 tw-mb-4">
+            <v-btn
+              size="small"
+              variant="outlined"
+              color="primary"
+              prepend-icon="mdi-checkbox-multiple-marked"
+              @click="selectAllPermissions"
+            >
+              Select All
+            </v-btn>
+            <v-btn
+              size="small"
+              variant="outlined"
+              color="error"
+              prepend-icon="mdi-checkbox-multiple-blank-outline"
+              @click="clearAllPermissions"
+            >
+              Clear All
+            </v-btn>
+          </div>
+
+          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+            <div v-for="cat in permissionCategories" :key="cat.name">
+              <div class="tw-flex tw-items-center tw-justify-between tw-mb-1.5">
+                <h5 class="tw-font-medium tw-text-gray-700">{{ cat.name }}</h5>
+                <v-btn
+                  size="x-small"
+                  variant="text"
+                  prepend-icon="mdi-check-all"
+                  @click="toggleCategory(cat)"
+                >Toggle</v-btn>
               </div>
-            </div>
-
-            <div>
-              <h4 class="tw-font-medium tw-text-gray-700">Statistics</h4>
-              <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw-mt-2">
-                <div class="tw-text-center tw-p-3 tw-bg-gray-50 tw-rounded-lg">
-                  <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ viewingRole.users_count || 0 }}</p>
-                  <p class="tw-text-sm tw-text-gray-600">Users Assigned</p>
-                </div>
-                <div class="tw-text-center tw-p-3 tw-bg-gray-50 tw-rounded-lg">
-                  <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ countRolePermissions(viewingRole) }}</p>
-                  <p class="tw-text-sm tw-text-gray-600">Permissions</p>
-                </div>
+              <div class="tw-space-y-1.5">
+                <v-checkbox
+                  v-for="perm in cat.permissions"
+                  :key="perm.id"
+                  v-model="roleForm.permissions"
+                  :value="perm.id"
+                  :label="perm.name"
+                  density="compact"
+                  hide-details
+                />
               </div>
             </div>
           </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showViewRoleDialog = false">Close</v-btn>
-          <v-btn color="primary" @click="editRole(viewingRole)">Edit Role</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="closeRoleDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="saveRole">Save Role</v-btn>
+      </template>
+    </AppModal>
+
+    <!-- View Role Dialog -->
+    <AppModal v-model="showViewRoleDialog" :title="viewingRole?.name ?? 'Role Details'" size="md" color="info">
+      <div v-if="viewingRole" class="tw-space-y-4">
+        <div class="tw-flex tw-items-center tw-gap-2">
+          <v-chip :color="viewingRole.status === 'active' ? 'success' : 'error'" size="small">
+            {{ viewingRole.status }}
+          </v-chip>
+        </div>
+
+        <div>
+          <h4 class="tw-font-medium tw-text-gray-700">Description</h4>
+          <p class="tw-text-gray-700">{{ viewingRole.description || 'No description provided' }}</p>
+        </div>
+
+        <div>
+          <h4 class="tw-font-medium tw-text-gray-700">Permissions ({{ countRolePermissions(viewingRole) }})</h4>
+          <div class="tw-mt-2 tw-flex tw-flex-wrap tw-gap-2">
+            <v-chip
+              v-for="pid in normalizePermissionIds(viewingRole)"
+              :key="pid"
+              size="small"
+              color="primary"
+              variant="outlined"
+            >
+              {{ getPermissionName(pid) }}
+            </v-chip>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="tw-font-medium tw-text-gray-700">Statistics</h4>
+          <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw-mt-2">
+            <div class="tw-text-center tw-p-3 tw-bg-gray-50 tw-rounded-lg">
+              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ viewingRole.users_count || 0 }}</p>
+              <p class="tw-text-sm tw-text-gray-600">Users Assigned</p>
+            </div>
+            <div class="tw-text-center tw-p-3 tw-bg-gray-50 tw-rounded-lg">
+              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ countRolePermissions(viewingRole) }}</p>
+              <p class="tw-text-sm tw-text-gray-600">Permissions</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showViewRoleDialog = false">Close</v-btn>
+        <v-btn color="primary" variant="flat" @click="editRole(viewingRole)">Edit Role</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Bulk Actions Dialog -->
-    <v-dialog v-model="showBulkActionsDialog" max-width="520px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">
-            Bulk Actions ({{ selectedRoles.length }} roles)
-          </span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <v-select
-              v-model="bulkAction"
-              :items="bulkActionOptions"
-              label="Select Action"
-              variant="outlined"
-              required
-            />
-            <div v-if="bulkAction === 'delete'" class="tw-p-4 tw-bg-red-50 tw-rounded-lg">
-              <p class="tw-text-red-800 tw-text-sm">
-                <v-icon color="red" size="16" class="tw-mr-1">mdi-alert</v-icon>
-                This action cannot be undone. {{ selectedRoles.length }} roles will be permanently deleted.
-              </p>
-            </div>
-            <div v-if="bulkAction === 'clone'" class="tw-p-4 tw-bg-blue-50 tw-rounded-lg">
-              <p class="tw-text-blue-800 tw-text-sm">
-                <v-icon color="blue" size="16" class="tw-mr-1">mdi-information</v-icon>
-                {{ selectedRoles.length }} roles will be cloned with their permissions.
-              </p>
-            </div>
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showBulkActionsDialog = false">Cancel</v-btn>
-          <v-btn :color="bulkAction === 'delete' ? 'error' : 'primary'" @click="handleBulkAction" :disabled="!bulkAction">
-            {{ bulkAction === 'delete' ? 'Delete Roles' : 'Apply Action' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppModal v-model="showBulkActionsDialog" :title="`Bulk Actions (${selectedRoles.length} roles)`" size="md">
+      <div class="tw-space-y-4">
+        <v-select
+          v-model="bulkAction"
+          :items="bulkActionOptions"
+          label="Select Action"
+          variant="outlined"
+          required
+        />
+        <div v-if="bulkAction === 'delete'" class="tw-p-4 tw-bg-red-50 tw-rounded-lg">
+          <p class="tw-text-red-800 tw-text-sm">
+            <v-icon color="red" size="16" class="tw-mr-1">mdi-alert</v-icon>
+            This action cannot be undone. {{ selectedRoles.length }} roles will be permanently deleted.
+          </p>
+        </div>
+        <div v-if="bulkAction === 'clone'" class="tw-p-4 tw-bg-blue-50 tw-rounded-lg">
+          <p class="tw-text-blue-800 tw-text-sm">
+            <v-icon color="blue" size="16" class="tw-mr-1">mdi-information</v-icon>
+            {{ selectedRoles.length }} roles will be cloned with their permissions.
+          </p>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showBulkActionsDialog = false">Cancel</v-btn>
+        <v-btn :color="bulkAction === 'delete' ? 'error' : 'primary'" variant="flat" @click="handleBulkAction" :disabled="!bulkAction">
+          {{ bulkAction === 'delete' ? 'Delete Roles' : 'Apply Action' }}
+        </v-btn>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import { useToast } from '../../composables/useToast';
 import { roleAPI, permissionAPI } from '../../utils/api';
 

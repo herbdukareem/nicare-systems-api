@@ -148,12 +148,11 @@
     <!-- Drugs Table -->
     <v-card elevation="1">
       <v-card-text>
-        <v-data-table
+        <AppDataTable
           :headers="headers"
           :items="drugs"
           :loading="loading"
           :items-per-page="pagination.per_page"
-          hide-default-footer
           class="elevation-0"
         >
           <template #item.generic_name="{ item }">
@@ -204,7 +203,7 @@
               </v-btn>
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
 
         <!-- Pagination -->
         <div class="d-flex justify-space-between align-center mt-4">
@@ -229,6 +228,7 @@
 import { ref, reactive, onMounted, computed } from 'vue';
 import { debounce } from 'lodash';
 import AdminLayout from '@/js/components/layout/AdminLayout.vue';
+import AppDataTable from '@/js/components/common/AppDataTable.vue';
 import api from '@/js/utils/api';
 
 // State

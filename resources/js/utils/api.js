@@ -96,6 +96,7 @@ export const dashboardAPI = {
   getBenefactors: () => api.get('/benefactors'),
   getEnrollmentTrend: (params) => api.get('/dashboard/enrollment-trend', { params }),
   getWardsByLga: (lgaId) => api.get('/dashboard/wards-by-lga', { params: { lga_id: lgaId } }),
+  getCapitationSummary: () => api.get('/dashboard/capitation-summary'),
 };
 
 export const capitationAPI = {

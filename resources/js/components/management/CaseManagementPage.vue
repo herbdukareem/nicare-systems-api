@@ -135,12 +135,11 @@
     <!-- Cases Table -->
     <v-card elevation="1">
       <v-card-text>
-        <v-data-table
+        <AppDataTable
           :headers="headers"
           :items="cases"
           :loading="loading"
           :items-per-page="pagination.per_page"
-          hide-default-footer
           class="elevation-0"
         >
           <template #item.case_name="{ item }">
@@ -226,17 +225,13 @@
               ></v-pagination>
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </v-card-text>
     </v-card>
 
     <!-- Add/Edit Dialog -->
-    <v-dialog v-model="dialog" max-width="800px" persistent>
-      <v-card>
-        <v-card-title class="bg-grey-lighten-4">
-          <span class="text-h6">{{ editMode ? 'Edit Case' : 'Add New Case' }}</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="dialog" :title="editMode ? 'Edit Case' : 'Add New Case'" size="xl" :loading="saving" persistent>
+          <div>
           <v-form ref="formRef" @submit.prevent="saveCase">
             <v-row>
               <v-col cols="12" md="6">
@@ -910,24 +905,16 @@
 
             </v-row>
           </v-form>
-        </v-card-text>
-        <v-card-actions class="px-6 pb-4">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="closeDialog">Cancel</v-btn>
-          <v-btn color="primary" variant="flat" :loading="saving" @click="saveCase">
-            {{ editMode ? 'Update' : 'Save' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+          </div>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="saving" @click="closeDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" :loading="saving" @click="saveCase">{{ editMode ? 'Update' : 'Save' }}</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Import Dialog -->
-    <v-dialog v-model="importDialog" max-width="600px" persistent>
-      <v-card>
-        <v-card-title class="bg-grey-lighten-4">
-          <span class="text-h6">Import Cases</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="importDialog" title="Import Cases" size="md" :loading="importing" persistent>
+          <div>
           <v-alert variant="outlined" type="info" class="mb-4">
             <div class="text-body-2">
               <strong>Import Instructions:</strong>
@@ -988,45 +975,25 @@
           <v-alert v-if="importSuccess" variant="outlined" type="success" class="mt-4">
             {{ importSuccessMessage }}
           </v-alert>
-        </v-card-text>
-        <v-card-actions class="px-6 pb-4">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="closeImportDialog">Cancel</v-btn>
-          <v-btn
-            color="primary"
-            variant="flat"
-            :loading="importing"
-            :disabled="!importFile"
-            @click="importCases"
-          >
-            Import
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+          </div>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="importing" @click="closeImportDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" :loading="importing" :disabled="!importFile" @click="importCases">Import</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="deleteDialog" max-width="500px">
-      <v-card>
-        <v-card-title class="bg-grey-lighten-4">
-          <span class="text-h6">Confirm Delete</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="deleteDialog" title="Confirm Delete" size="sm" color="error" :loading="deleting">
           <p>Are you sure you want to delete this case?</p>
           <v-alert variant="outlined" type="warning" class="mt-4">
             <strong>{{ caseToDelete?.nicare_code }}</strong><br>
             {{ caseToDelete?.service_description }}
           </v-alert>
-        </v-card-text>
-        <v-card-actions class="px-6 pb-4">
-          <v-spacer></v-spacer>
-          <v-btn variant="text" @click="deleteDialog = false">Cancel</v-btn>
-          <v-btn color="error" variant="flat" :loading="deleting" @click="deleteCase">
-            Delete
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="deleting" @click="deleteDialog = false">Cancel</v-btn>
+        <v-btn color="error" variant="flat" :loading="deleting" @click="deleteCase">Delete</v-btn>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 
@@ -1035,6 +1002,8 @@ import { ref, reactive, onMounted, computed, watch } from 'vue';
 import { useToast } from '@/js/composables/useToast';
 import api from '@/js/utils/api';
 import AdminLayout from '@/js/components/layout/AdminLayout.vue';
+import AppModal from '@/js/components/common/AppModal.vue';
+import AppDataTable from '@/js/components/common/AppDataTable.vue';
 
 const { success: showSuccess, error: showError, info: showInfo } = useToast();
 

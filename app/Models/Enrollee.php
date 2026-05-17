@@ -3,16 +3,19 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Model;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 /**
  * Class Enrollee
  *
  * Represents an individual registered in the scheme.
  */
-class Enrollee extends Model
+class Enrollee extends Authenticatable
 {
-    use HasFactory;
+    use HasFactory, HasApiTokens;
+
+    protected $hidden = ['password'];
 
     public const STATUS_PENDING = 0;
     public const STATUS_ACTIVE = 1;

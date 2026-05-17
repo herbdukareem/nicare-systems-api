@@ -74,7 +74,7 @@
 
     <!-- Task Table -->
     <v-card variant="outlined">
-      <v-data-table
+      <AppDataTable
         :headers="headers"
         :items="tasks"
         :loading="loading"
@@ -209,13 +209,14 @@
             </v-list>
           </v-menu>
         </template>
-      </v-data-table>
+      </AppDataTable>
     </v-card>
   </div>
 </template>
 
 <script setup>
 import { ref, computed } from 'vue'
+import AppDataTable from '../../common/AppDataTable.vue'
 
 const props = defineProps({
   tasks: {

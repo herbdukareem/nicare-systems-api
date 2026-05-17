@@ -149,7 +149,7 @@
                 FU-PA Code Requests
               </v-card-title>
               <v-card-text>
-                <v-data-table
+                <AppDataTable
                   :headers="headers"
                   :items="filteredPACodes"
                   :loading="loading"
@@ -227,7 +227,7 @@
                       <p class="text-body-2 text-grey">Click "New FU-PA Request" to create your first request</p>
                     </div>
                   </template>
-                </v-data-table>
+                </AppDataTable>
               </v-card-text>
             </v-card>
           </v-col>
@@ -241,15 +241,8 @@
       />
 
       <!-- FU-PA Request Dialog -->
-      <v-dialog v-model="showRequestDialog" max-width="1200px" persistent scrollable>
-        <v-card>
-          <v-card-title class="bg-primary text-white pa-4">
-            <v-icon class="mr-2">mdi-plus-circle</v-icon>
-            Request Follow-Up PA Code
-          </v-card-title>
-
-          <v-card-text class="pa-6" style="max-height: 70vh;">
-            <v-form ref="requestForm">
+      <AppModal v-model="showRequestDialog" title="Request Follow-Up PA Code" icon="mdi-plus-circle" size="2xl" :loading="submitting" persistent>
+          <v-form ref="requestForm">
               <!-- Step 1: Select Referral -->
               <v-card class="mb-4" elevation="2">
                 <v-card-title class="bg-grey-lighten-4">
@@ -533,11 +526,7 @@
                 </v-card-text>
               </v-card>
             </v-form>
-          </v-card-text>
-
-          <v-divider></v-divider>
-
-          <v-card-actions class="pa-4">
+          <template #actions>
             <v-btn
               variant="outlined"
               @click="closeRequestDialog"
@@ -545,9 +534,9 @@
             >
               Cancel
             </v-btn>
-            <v-spacer></v-spacer>
             <v-btn
               color="primary"
+              variant="flat"
               @click="handleSubmitRequest"
               :loading="submitting"
               :disabled="!canSubmitRequest || submitting"
@@ -555,9 +544,8 @@
             >
               Submit Request
             </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+          </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
@@ -569,6 +557,8 @@ import api from '../../utils/api';
 import { useToast } from '../../composables/useToast';
 import AdminLayout from '../layout/AdminLayout.vue';
 import FUPACodeDetailsModal from '../modals/FUPACodeDetailsModal.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 
 const router = useRouter();
 const { success: showSuccess, error: showError, info: showInfo, warning: showWarning } = useToast();

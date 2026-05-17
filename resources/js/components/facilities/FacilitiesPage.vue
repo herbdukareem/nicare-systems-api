@@ -83,7 +83,7 @@
 
       <!-- Data Table -->
       <div class="tw-bg-white tw-rounded-lg tw-shadow-sm">
-        <v-data-table
+        <AppDataTable
           v-model:items-per-page="itemsPerPage"
           :headers="headers"
           :items="facilities"
@@ -93,7 +93,7 @@
           item-value="id"
         >
           <!-- Custom header -->
-          <template v-slot:top>
+          <template v-slot:toolbar>
             <div class="tw-p-4 tw-border-b tw-border-gray-200">
               <div class="tw-flex tw-items-center tw-justify-between">
                 <h3 class="tw-text-lg tw-font-semibold tw-text-gray-900">
@@ -130,268 +130,153 @@
           <!-- Actions column -->
           <template v-slot:item.actions="{ item }">
             <div class="tw-flex tw-space-x-1">
-              <v-btn
-                icon
-                size="small"
-                variant="text"
-                @click="viewFacility(item)"
-              >
+              <v-btn icon size="small" variant="text" @click="viewFacility(item)">
                 <v-icon size="16">mdi-eye</v-icon>
               </v-btn>
-              <v-btn
-                icon
-                size="small"
-                variant="text"
-                @click="editFacility(item)"
-              >
+              <v-btn icon size="small" variant="text" @click="editFacility(item)">
                 <v-icon size="16">mdi-pencil</v-icon>
               </v-btn>
-              <v-btn
-                icon
-                size="small"
-                variant="text"
-                color="error"
-                @click="deleteFacility(item)"
-              >
+              <v-btn icon size="small" variant="text" color="error" @click="deleteFacility(item)">
                 <v-icon size="16">mdi-delete</v-icon>
               </v-btn>
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </div>
     </div>
 
     <!-- Add/Edit Dialog -->
-    <v-dialog v-model="showAddDialog" max-width="900px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">
-            {{ editingFacility ? 'Edit Facility' : 'Add New Facility' }}
-          </span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
-            <v-text-field
-              v-model="facilityForm.name"
-              label="Facility Name"
-              variant="outlined"
-              required
-            />
-            <v-select
-              v-model="facilityForm.type"
-              :items="facilityTypes"
-              label="Facility Type"
-              variant="outlined"
-              required
-            />
-            <v-text-field
-              v-model="facilityForm.address"
-              label="Address"
-              variant="outlined"
-              required
-            />
-            <v-select
-              v-model="facilityForm.lga"
-              :items="lgaOptions"
-              label="LGA"
-              variant="outlined"
-              required
-            />
-            <v-text-field
-              v-model="facilityForm.phone"
-              label="Phone Number"
-              variant="outlined"
-            />
-            <v-text-field
-              v-model="facilityForm.email"
-              label="Email"
-              variant="outlined"
-            />
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="closeDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="saveFacility">Save</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppModal v-model="showAddDialog" :title="editingFacility ? 'Edit Facility' : 'Add New Facility'" icon="mdi-hospital-building" size="lg">
+      <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
+        <v-text-field v-model="facilityForm.name" label="Facility Name" variant="outlined" required />
+        <v-select v-model="facilityForm.type" :items="facilityTypes" label="Facility Type" variant="outlined" required />
+        <v-text-field v-model="facilityForm.address" label="Address" variant="outlined" required />
+        <v-select v-model="facilityForm.lga" :items="lgaOptions" label="LGA" variant="outlined" required />
+        <v-text-field v-model="facilityForm.phone" label="Phone Number" variant="outlined" />
+        <v-text-field v-model="facilityForm.email" label="Email" variant="outlined" />
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="closeDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="saveFacility">Save</v-btn>
+      </template>
+    </AppModal>
 
     <!-- View Facility Dialog -->
-    <v-dialog v-model="showViewDialog" max-width="1200px">
-      <v-card v-if="viewingFacility">
-        <v-card-title>
-          <div class="tw-flex tw-items-center tw-justify-between tw-w-full">
+    <AppModal v-model="showViewDialog" :title="viewingFacility?.name ?? 'Facility Details'" :subtitle="viewingFacility ? `${viewingFacility.type} • ${viewingFacility.lga}` : ''" size="2xl">
+      <div v-if="viewingFacility" class="tw-space-y-6">
+        <div class="tw-flex tw-justify-end">
+          <v-btn size="small" color="primary" prepend-icon="mdi-pencil" @click="editFromView(viewingFacility)">Edit Facility</v-btn>
+        </div>
+
+        <!-- Facility Information -->
+        <div>
+          <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Facility Information</h4>
+          <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-lg:tw-grid-cols-3 tw-gap-4">
             <div>
-              <h2 class="tw-text-xl tw-font-semibold">{{ viewingFacility.name }}</h2>
-              <p class="tw-text-sm tw-text-gray-600">{{ viewingFacility.type }} • {{ viewingFacility.lga }}</p>
+              <p class="tw-text-sm tw-text-gray-600">Facility Name</p>
+              <p class="tw-font-medium">{{ viewingFacility.name }}</p>
             </div>
+            <div>
+              <p class="tw-text-sm tw-text-gray-600">Type</p>
+              <v-chip size="small" color="primary" variant="outlined">{{ viewingFacility.type }}</v-chip>
+            </div>
+            <div>
+              <p class="tw-text-sm tw-text-gray-600">Status</p>
+              <v-chip size="small" :color="getStatusColor(viewingFacility.status)" variant="flat">{{ viewingFacility.status }}</v-chip>
+            </div>
+            <div>
+              <p class="tw-text-sm tw-text-gray-600">Address</p>
+              <p class="tw-font-medium">{{ viewingFacility.address }}</p>
+            </div>
+            <div>
+              <p class="tw-text-sm tw-text-gray-600">LGA</p>
+              <p class="tw-font-medium">{{ viewingFacility.lga }}</p>
+            </div>
+            <div>
+              <p class="tw-text-sm tw-text-gray-600">Phone</p>
+              <p class="tw-font-medium">{{ viewingFacility.phone || 'N/A' }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Facility Statistics -->
+        <div>
+          <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Statistics</h4>
+          <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-4 tw-gap-4">
+            <div class="tw-text-center tw-p-4 tw-bg-blue-50 tw-rounded-lg">
+              <p class="tw-text-2xl tw-font-bold tw-text-blue-600">{{ facilityEnrollees.length }}</p>
+              <p class="tw-text-sm tw-text-gray-600">Total Enrollees</p>
+            </div>
+            <div class="tw-text-center tw-p-4 tw-bg-green-50 tw-rounded-lg">
+              <p class="tw-text-2xl tw-font-bold tw-text-green-600">{{ getActiveEnrollees() }}</p>
+              <p class="tw-text-sm tw-text-gray-600">Active Enrollees</p>
+            </div>
+            <div class="tw-text-center tw-p-4 tw-bg-purple-50 tw-rounded-lg">
+              <p class="tw-text-2xl tw-font-bold tw-text-purple-600">45</p>
+              <p class="tw-text-sm tw-text-gray-600">Monthly Visits</p>
+            </div>
+            <div class="tw-text-center tw-p-4 tw-bg-orange-50 tw-rounded-lg">
+              <p class="tw-text-2xl tw-font-bold tw-text-orange-600">₦125,000</p>
+              <p class="tw-text-sm tw-text-gray-600">Monthly Claims</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Enrollees List -->
+        <div>
+          <div class="tw-flex tw-items-center tw-justify-between tw-mb-4">
+            <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">Enrollees at this Facility</h4>
             <div class="tw-flex tw-space-x-2">
-              <v-btn
-                size="small"
-                color="primary"
-                prepend-icon="mdi-pencil"
-                @click="editFromView(viewingFacility)"
-              >
-                Edit Facility
-              </v-btn>
+              <v-text-field
+                v-model="enrolleeSearchQuery"
+                label="Search enrollees..."
+                prepend-inner-icon="mdi-magnify"
+                variant="outlined"
+                density="compact"
+                clearable
+                class="tw-w-64"
+              />
+              <v-btn color="primary" variant="outlined" prepend-icon="mdi-download" @click="exportFacilityEnrollees">Export</v-btn>
             </div>
           </div>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-6">
-            <!-- Facility Information -->
-            <div>
-              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Facility Information</h4>
-              <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-lg:tw-grid-cols-3 tw-gap-4">
-                <div>
-                  <p class="tw-text-sm tw-text-gray-600">Facility Name</p>
-                  <p class="tw-font-medium">{{ viewingFacility.name }}</p>
-                </div>
-                <div>
-                  <p class="tw-text-sm tw-text-gray-600">Type</p>
-                  <v-chip size="small" color="primary" variant="outlined">
-                    {{ viewingFacility.type }}
-                  </v-chip>
-                </div>
-                <div>
-                  <p class="tw-text-sm tw-text-gray-600">Status</p>
-                  <v-chip
-                    size="small"
-                    :color="getStatusColor(viewingFacility.status)"
-                    variant="flat"
-                  >
-                    {{ viewingFacility.status }}
-                  </v-chip>
-                </div>
-                <div>
-                  <p class="tw-text-sm tw-text-gray-600">Address</p>
-                  <p class="tw-font-medium">{{ viewingFacility.address }}</p>
-                </div>
-                <div>
-                  <p class="tw-text-sm tw-text-gray-600">LGA</p>
-                  <p class="tw-font-medium">{{ viewingFacility.lga }}</p>
-                </div>
-                <div>
-                  <p class="tw-text-sm tw-text-gray-600">Phone</p>
-                  <p class="tw-font-medium">{{ viewingFacility.phone || 'N/A' }}</p>
-                </div>
+
+          <AppDataTable
+            :headers="enrolleeHeaders"
+            :items="filteredFacilityEnrollees"
+            :loading="loadingEnrollees"
+            class="tw-elevation-0 tw-border tw-border-gray-200 tw-rounded-lg"
+            item-value="id"
+            :items-per-page="10"
+          >
+            <template v-slot:item.status="{ item }">
+              <v-chip size="small" :color="getEnrolleeStatusColor(item.status)" variant="flat">{{ item.status }}</v-chip>
+            </template>
+            <template v-slot:item.type="{ item }">
+              <v-chip size="small" color="primary" variant="outlined">{{ item.type }}</v-chip>
+            </template>
+            <template v-slot:item.actions="{ item }">
+              <div class="tw-flex tw-space-x-1">
+                <v-btn icon size="small" variant="text" @click="viewEnrolleeFromFacility(item)">
+                  <v-icon size="16">mdi-eye</v-icon>
+                </v-btn>
+                <v-btn icon size="small" variant="text" @click="editEnrolleeFromFacility(item)">
+                  <v-icon size="16">mdi-pencil</v-icon>
+                </v-btn>
               </div>
-            </div>
-
-            <!-- Facility Statistics -->
-            <div>
-              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Statistics</h4>
-              <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-4 tw-gap-4">
-                <div class="tw-text-center tw-p-4 tw-bg-blue-50 tw-rounded-lg">
-                  <p class="tw-text-2xl tw-font-bold tw-text-blue-600">{{ facilityEnrollees.length }}</p>
-                  <p class="tw-text-sm tw-text-gray-600">Total Enrollees</p>
-                </div>
-                <div class="tw-text-center tw-p-4 tw-bg-green-50 tw-rounded-lg">
-                  <p class="tw-text-2xl tw-font-bold tw-text-green-600">{{ getActiveEnrollees() }}</p>
-                  <p class="tw-text-sm tw-text-gray-600">Active Enrollees</p>
-                </div>
-                <div class="tw-text-center tw-p-4 tw-bg-purple-50 tw-rounded-lg">
-                  <p class="tw-text-2xl tw-font-bold tw-text-purple-600">45</p>
-                  <p class="tw-text-sm tw-text-gray-600">Monthly Visits</p>
-                </div>
-                <div class="tw-text-center tw-p-4 tw-bg-orange-50 tw-rounded-lg">
-                  <p class="tw-text-2xl tw-font-bold tw-text-orange-600">₦125,000</p>
-                  <p class="tw-text-sm tw-text-gray-600">Monthly Claims</p>
-                </div>
+            </template>
+            <template v-slot:no-data>
+              <div class="tw-text-center tw-py-8">
+                <v-icon size="48" color="grey">mdi-account-group</v-icon>
+                <p class="tw-text-gray-500 tw-mt-2">No enrollees found for this facility</p>
               </div>
-            </div>
-
-            <!-- Enrollees List -->
-            <div>
-              <div class="tw-flex tw-items-center tw-justify-between tw-mb-4">
-                <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">Enrollees at this Facility</h4>
-                <div class="tw-flex tw-space-x-2">
-                  <v-text-field
-                    v-model="enrolleeSearchQuery"
-                    label="Search enrollees..."
-                    prepend-inner-icon="mdi-magnify"
-                    variant="outlined"
-                    density="compact"
-                    clearable
-                    class="tw-w-64"
-                  />
-                  <v-btn
-                    color="primary"
-                    variant="outlined"
-                    prepend-icon="mdi-download"
-                    @click="exportFacilityEnrollees"
-                  >
-                    Export
-                  </v-btn>
-                </div>
-              </div>
-
-              <v-data-table
-                :headers="enrolleeHeaders"
-                :items="filteredFacilityEnrollees"
-                :loading="loadingEnrollees"
-                class="tw-elevation-0 tw-border tw-border-gray-200 tw-rounded-lg"
-                item-value="id"
-                :items-per-page="10"
-              >
-                <!-- Status column -->
-                <template v-slot:item.status="{ item }">
-                  <v-chip
-                    size="small"
-                    :color="getEnrolleeStatusColor(item.status)"
-                    variant="flat"
-                  >
-                    {{ item.status }}
-                  </v-chip>
-                </template>
-
-                <!-- Type column -->
-                <template v-slot:item.type="{ item }">
-                  <v-chip size="small" color="primary" variant="outlined">
-                    {{ item.type }}
-                  </v-chip>
-                </template>
-
-                <!-- Actions column -->
-                <template v-slot:item.actions="{ item }">
-                  <div class="tw-flex tw-space-x-1">
-                    <v-btn
-                      icon
-                      size="small"
-                      variant="text"
-                      @click="viewEnrolleeFromFacility(item)"
-                    >
-                      <v-icon size="16">mdi-eye</v-icon>
-                    </v-btn>
-                    <v-btn
-                      icon
-                      size="small"
-                      variant="text"
-                      @click="editEnrolleeFromFacility(item)"
-                    >
-                      <v-icon size="16">mdi-pencil</v-icon>
-                    </v-btn>
-                  </div>
-                </template>
-
-                <!-- No data slot -->
-                <template v-slot:no-data>
-                  <div class="tw-text-center tw-py-8">
-                    <v-icon size="48" color="grey">mdi-account-group</v-icon>
-                    <p class="tw-text-gray-500 tw-mt-2">No enrollees found for this facility</p>
-                  </div>
-                </template>
-              </v-data-table>
-            </div>
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showViewDialog = false">Close</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+            </template>
+          </AppDataTable>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showViewDialog = false">Close</v-btn>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 

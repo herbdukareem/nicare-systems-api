@@ -21,8 +21,9 @@ import * as directives from 'vuetify/directives';
 // Tailwind CSS (load after Vuetify)
 import '../css/app.css';
 
-// ⬇️ NEW: auth store for pre-mount rehydration
+// ⬇️ NEW: auth stores for pre-mount rehydration
 import { useAuthStore } from './stores/auth';
+import { useEnrolleeAuthStore } from './stores/enrolleeAuth';
 
 // Create Vuetify instance
 const vuetify = createVuetify({
@@ -88,20 +89,31 @@ document.head.appendChild(bootStyle);
 document.body.appendChild(bootLoader);
 
 const authStore = useAuthStore();
-authStore.initializeAuth().finally(() => {
+const enrolleeAuthStore = useEnrolleeAuthStore();
+
+Promise.all([
+  authStore.initializeAuth(),
+  enrolleeAuthStore.initializeAuth(),
+]).finally(() => {
   bootLoader.remove();
   app.mount('#app');
 });
 
-// (Optional) Central listener for unauthorized events fired by api.js
+// Central listener for unauthorized events fired by api.js (admin/system users)
 window.addEventListener('auth:unauthorized', () => {
-  if (authStore._initializing) {
-    return;
-  }
-
+  if (authStore._initializing) return;
   authStore.clearSession();
-
   if (router.currentRoute.value.name !== 'login') {
     router.replace('/login');
+  }
+});
+
+// Central listener for unauthorized enrollee events
+window.addEventListener('enrollee:unauthorized', () => {
+  if (enrolleeAuthStore._initializing) return;
+  enrolleeAuthStore._clearSession();
+  const route = router.currentRoute.value;
+  if (route.meta?.requiresEnrolleeAuth) {
+    router.replace('/enroll/login');
   }
 });

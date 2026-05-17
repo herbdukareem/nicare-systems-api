@@ -117,7 +117,7 @@
         <v-row>
           <v-col cols="12">
             <v-card elevation="2" class="data-table-card">
-              <v-data-table
+              <AppDataTable
                 :headers="headers"
                 :items="referrals"
                 :loading="loading"
@@ -249,7 +249,7 @@
                     </v-tooltip>
                   </div>
                 </template>
-              </v-data-table>
+              </AppDataTable>
             </v-card>
           </v-col>
         </v-row>
@@ -286,34 +286,25 @@
 
 
       <!-- Reject Dialog -->
-      <v-dialog v-model="rejectDialog" max-width="500">
-        <v-card>
-          <v-card-title class="bg-error text-white d-flex align-center">
-            <v-icon left class="mr-2">mdi-close-circle</v-icon>
+      <AppModal v-model="rejectDialog" title="Reject Referral" icon="mdi-close-circle" color="error" size="sm">
+        <p class="mb-4 text-body-1">Are you sure you want to reject referral <strong>{{ selectedReferral?.referral_code }}</strong>?</p>
+        <v-textarea
+          v-model="rejectionReason"
+          label="Rejection Reason *"
+          variant="outlined"
+          rows="4"
+          hint="Provide a detailed reason for rejection"
+          persistent-hint
+          :rules="[v => !!v || 'Rejection reason is required']"
+        />
+        <template #actions>
+          <v-btn variant="outlined" :disabled="loading" @click="rejectDialog = false">Cancel</v-btn>
+          <v-btn color="error" variant="flat" @click="confirmReject" :loading="loading">
+            <v-icon left>mdi-close-circle</v-icon>
             Reject Referral
-          </v-card-title>
-          <v-card-text class="mt-4">
-            <p class="mb-4 text-body-1">Are you sure you want to reject referral <strong>{{ selectedReferral?.referral_code }}</strong>?</p>
-            <v-textarea
-              v-model="rejectionReason"
-              label="Rejection Reason *"
-              variant="outlined"
-              rows="4"
-              hint="Provide a detailed reason for rejection"
-              persistent-hint
-              :rules="[v => !!v || 'Rejection reason is required']"
-            />
-          </v-card-text>
-          <v-card-actions class="pa-4">
-            <v-spacer></v-spacer>
-            <v-btn variant="outlined" @click="rejectDialog = false">Cancel</v-btn>
-            <v-btn color="error" variant="elevated" @click="confirmReject" :loading="loading">
-              <v-icon left>mdi-close-circle</v-icon>
-              Reject Referral
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+          </v-btn>
+        </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
@@ -322,6 +313,8 @@
 import { ref, computed, onMounted } from 'vue';
 import AdminLayout from '../layout/AdminLayout.vue';
 import ReferralDetailsModal from '../modals/ReferralDetailsModal.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import api from '@/js/utils/api';
 import { useToast } from '@/js/composables/useToast';
 

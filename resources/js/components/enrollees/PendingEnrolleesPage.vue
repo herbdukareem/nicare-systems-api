@@ -67,7 +67,7 @@
 
       <!-- Data Table -->
       <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-animate-slide-up tw-animate-stagger-2">
-        <v-data-table
+        <AppDataTable
           v-model:items-per-page="itemsPerPage"
           v-model:page="currentPage"
           :headers="headers"
@@ -79,7 +79,7 @@
           item-value="id"
         >
           <!-- Top toolbar -->
-          <template #top>
+          <template #toolbar>
             <div class="tw-p-4 tw-border-b tw-border-gray-200">
               <div class="tw-flex tw-items-center tw-justify-between">
                 <div class="tw-flex tw-items-center tw-gap-4">
@@ -149,88 +149,78 @@
               <p class="tw-text-gray-500 tw-mt-2">No pending enrollees found</p>
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </div>
     </div>
 
     <!-- View Enrollee Dialog -->
-    <v-dialog v-model="showViewDialog" max-width="800px">
-      <v-card v-if="viewingEnrollee">
-        <v-card-title class="tw-flex tw-items-center tw-justify-between">
-          <span class="tw-text-xl tw-font-semibold">Enrollee Details</span>
-          <v-btn icon variant="text" @click="showViewDialog = false">
-            <v-icon>mdi-close</v-icon>
-          </v-btn>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-6">
-            <!-- Personal Information -->
+    <AppModal v-model="showViewDialog" title="Enrollee Details" size="lg">
+      <div v-if="viewingEnrollee" class="tw-space-y-6">
+        <!-- Personal Information -->
+        <div>
+          <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Personal Information</h4>
+          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
             <div>
-              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Personal Information</h4>
-              <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">Full Name</label>
-                  <p class="tw-text-gray-900">{{ viewingEnrollee.name }}</p>
-                </div>
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">Phone</label>
-                  <p class="tw-text-gray-900">{{ viewingEnrollee.phone }}</p>
-                </div>
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">Email</label>
-                  <p class="tw-text-gray-900">{{ viewingEnrollee.email || 'N/A' }}</p>
-                </div>
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">Date of Birth</label>
-                  <p class="tw-text-gray-900">{{ formatDate(viewingEnrollee.date_of_birth) }}</p>
-                </div>
-              </div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">Full Name</label>
+              <p class="tw-text-gray-900">{{ viewingEnrollee.name }}</p>
             </div>
-
-            <!-- Location Information -->
             <div>
-              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Location Information</h4>
-              <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">LGA</label>
-                  <p class="tw-text-gray-900">{{ viewingEnrollee.lga_name }}</p>
-                </div>
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">Facility</label>
-                  <p class="tw-text-gray-900">{{ viewingEnrollee.facility_name }}</p>
-                </div>
-              </div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">Phone</label>
+              <p class="tw-text-gray-900">{{ viewingEnrollee.phone }}</p>
             </div>
-
-            <!-- Status Change -->
             <div>
-              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Change Status</h4>
-              <v-select
-                v-model="selectedStatus"
-                :items="statusOptions"
-                item-title="label"
-                item-value="value"
-                label="Select New Status"
-                variant="outlined"
-                density="compact"
-              />
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">Email</label>
+              <p class="tw-text-gray-900">{{ viewingEnrollee.email || 'N/A' }}</p>
+            </div>
+            <div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">Date of Birth</label>
+              <p class="tw-text-gray-900">{{ formatDate(viewingEnrollee.date_of_birth) }}</p>
             </div>
           </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showViewDialog = false">Cancel</v-btn>
-          <v-btn 
-            color="primary" 
-            @click="updateEnrolleeStatus" 
-            :loading="updating"
-            :disabled="!selectedStatus"
-          >
-            Update Status
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        </div>
+
+        <!-- Location Information -->
+        <div>
+          <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Location Information</h4>
+          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+            <div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">LGA</label>
+              <p class="tw-text-gray-900">{{ viewingEnrollee.lga_name }}</p>
+            </div>
+            <div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">Facility</label>
+              <p class="tw-text-gray-900">{{ viewingEnrollee.facility_name }}</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Status Change -->
+        <div>
+          <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Change Status</h4>
+          <v-select
+            v-model="selectedStatus"
+            :items="statusOptions"
+            item-title="label"
+            item-value="value"
+            label="Select New Status"
+            variant="outlined"
+            density="compact"
+          />
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showViewDialog = false">Cancel</v-btn>
+        <v-btn
+          color="primary"
+          variant="flat"
+          @click="updateEnrolleeStatus"
+          :loading="updating"
+          :disabled="!selectedStatus"
+        >
+          Update Status
+        </v-btn>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 
@@ -240,6 +230,8 @@ import AdminLayout from '../layout/AdminLayout.vue';
 import { useToast } from '../../composables/useToast';
 import { enrolleeAPI } from '../../utils/api';
 import axios from 'axios';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 
 // Toasts
 const { success, error } = useToast();

@@ -133,7 +133,7 @@
                 </v-row>
 
                 <!-- Data Table -->
-                <v-data-table
+                <AppDataTable
                   :headers="headers"
                   :items="filteredAdmissions"
                   :loading="loading"
@@ -192,7 +192,7 @@
                       <p class="text-body-2 text-grey">Create your first admission from a validated UTN</p>
                     </div>
                   </template>
-                </v-data-table>
+                </AppDataTable>
               </v-card-text>
             </v-card>
           </v-col>
@@ -200,219 +200,176 @@
       </v-container>
 
       <!-- Create Admission Dialog -->
-      <v-dialog v-model="createDialog" max-width="800px" persistent>
-        <v-card>
-          <v-card-title class="bg-primary text-white">
-            <v-icon class="mr-2">mdi-plus-circle</v-icon>
-            Create New Admission
-          </v-card-title>
-
-          <v-card-text class="pt-6">
-            <v-form ref="admissionForm" @submit.prevent="createAdmission">
-              <!-- Step 1: Select Validated UTN -->
-              <v-row>
-                <v-col cols="12">
-                  <h3 class="text-h6 mb-3">Step 1: Select Validated UTN</h3>
-                  <v-autocomplete
-                    v-model="formData.referral_id"
-                    :items="validatedReferrals"
-                    :loading="loadingReferrals"
-                    item-title="utn"
-                    item-value="id"
-                    label="Select UTN (Validated Referrals Only)"
-                    variant="outlined"
-                    density="comfortable"
-                    prepend-inner-icon="mdi-shield-check"
-                    :rules="[v => !!v || 'UTN is required']"
-                    @update:model-value="onReferralSelected"
-                  >
-                    <template #item="{ props, item }">
-                      <v-list-item v-bind="props">
-                        <template #prepend>
-                          <v-icon color="success">mdi-check-circle</v-icon>
-                        </template>
-                        <template #title>
-                          <strong>{{ item.raw.utn }}</strong>
-                        </template>
-                        <template #subtitle>
-                          {{ item.raw.enrollee?.first_name }} {{ item.raw.enrollee?.last_name }} - {{ item.raw.preliminary_diagnosis }}
-                        </template>
-                      </v-list-item>
+      <AppModal v-model="createDialog" title="Create New Admission" icon="mdi-plus-circle" size="lg" :loading="submitting" persistent>
+        <v-form ref="admissionForm" @submit.prevent="createAdmission">
+          <!-- Step 1: Select Validated UTN -->
+          <v-row>
+            <v-col cols="12">
+              <h3 class="text-h6 mb-3">Step 1: Select Validated UTN</h3>
+              <v-autocomplete
+                v-model="formData.referral_id"
+                :items="validatedReferrals"
+                :loading="loadingReferrals"
+                item-title="utn"
+                item-value="id"
+                label="Select UTN (Validated Referrals Only)"
+                variant="outlined"
+                density="comfortable"
+                prepend-inner-icon="mdi-shield-check"
+                :rules="[v => !!v || 'UTN is required']"
+                @update:model-value="onReferralSelected"
+              >
+                <template #item="{ props, item }">
+                  <v-list-item v-bind="props">
+                    <template #prepend>
+                      <v-icon color="success">mdi-check-circle</v-icon>
                     </template>
-                  </v-autocomplete>
-                </v-col>
-              </v-row>
+                    <template #title>
+                      <strong>{{ item.raw.utn }}</strong>
+                    </template>
+                    <template #subtitle>
+                      {{ item.raw.enrollee?.first_name }} {{ item.raw.enrollee?.last_name }} - {{ item.raw.preliminary_diagnosis }}
+                    </template>
+                  </v-list-item>
+                </template>
+              </v-autocomplete>
+            </v-col>
+          </v-row>
 
-              <!-- Patient Details (Auto-filled) -->
-              <v-row v-if="selectedReferral">
-                <v-col cols="12">
-                  <v-divider class="my-4"></v-divider>
-                  <h3 class="text-h6 mb-3">Patient Information</h3>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    :model-value="selectedReferral.enrollee?.first_name + ' ' + selectedReferral.enrollee?.last_name"
-                    label="Patient Name"
-                    variant="outlined"
-                    density="comfortable"
-                    readonly
-                    prepend-inner-icon="mdi-account"
-                  ></v-text-field>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    :model-value="selectedReferral.nicare_number"
-                    label="NiCare Number"
-                    variant="outlined"
-                    density="comfortable"
-                    readonly
-                    prepend-inner-icon="mdi-card-account-details"
-                  ></v-text-field>
-                </v-col>
-                <v-col cols="12">
-                  <v-text-field
-                    :model-value="selectedReferral.preliminary_diagnosis"
-                    label="Preliminary Diagnosis"
-                    variant="outlined"
-                    density="comfortable"
-                    readonly
-                    prepend-inner-icon="mdi-stethoscope"
-                  ></v-text-field>
-                </v-col>
-              </v-row>
+          <!-- Patient Details (Auto-filled) -->
+          <v-row v-if="selectedReferral">
+            <v-col cols="12">
+              <v-divider class="my-4"></v-divider>
+              <h3 class="text-h6 mb-3">Patient Information</h3>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field
+                :model-value="selectedReferral.enrollee?.first_name + ' ' + selectedReferral.enrollee?.last_name"
+                label="Patient Name"
+                variant="outlined"
+                density="comfortable"
+                readonly
+                prepend-inner-icon="mdi-account"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field
+                :model-value="selectedReferral.nicare_number"
+                label="NiCare Number"
+                variant="outlined"
+                density="comfortable"
+                readonly
+                prepend-inner-icon="mdi-card-account-details"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12">
+              <v-text-field
+                :model-value="selectedReferral.preliminary_diagnosis"
+                label="Preliminary Diagnosis"
+                variant="outlined"
+                density="comfortable"
+                readonly
+                prepend-inner-icon="mdi-stethoscope"
+              ></v-text-field>
+            </v-col>
+          </v-row>
 
-              <!-- Admission Details -->
-              <v-row v-if="selectedReferral">
-                <v-col cols="12">
-                  <v-divider class="my-4"></v-divider>
-                  <h3 class="text-h6 mb-3">Step 2: Admission Details</h3>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model="formData.admission_date"
-                    label="Admission Date"
-                    type="date"
-                    variant="outlined"
-                    density="comfortable"
-                    :rules="[v => !!v || 'Admission date is required']"
-                    prepend-inner-icon="mdi-calendar"
-                  ></v-text-field>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-select
-                    v-model="formData.ward_type"
-                    :items="wardTypes"
-                    label="Ward Type"
-                    variant="outlined"
-                    density="comfortable"
-                    :rules="[v => !!v || 'Ward type is required']"
-                    prepend-inner-icon="mdi-bed"
-                  ></v-select>
-                </v-col>
-              </v-row>
-            </v-form>
-          </v-card-text>
-
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn
-              color="grey"
-              variant="text"
-              @click="closeCreateDialog"
-              :disabled="submitting"
-            >
-              Cancel
-            </v-btn>
-            <v-btn
-              color="primary"
-              variant="elevated"
-              @click="createAdmission"
-              :loading="submitting"
-              :disabled="!formData.referral_id || !formData.admission_date || !formData.ward_type"
-            >
-              Create Admission
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+          <!-- Admission Details -->
+          <v-row v-if="selectedReferral">
+            <v-col cols="12">
+              <v-divider class="my-4"></v-divider>
+              <h3 class="text-h6 mb-3">Step 2: Admission Details</h3>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field
+                v-model="formData.admission_date"
+                label="Admission Date"
+                type="date"
+                variant="outlined"
+                density="comfortable"
+                :rules="[v => !!v || 'Admission date is required']"
+                prepend-inner-icon="mdi-calendar"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-select
+                v-model="formData.ward_type"
+                :items="wardTypes"
+                label="Ward Type"
+                variant="outlined"
+                density="comfortable"
+                :rules="[v => !!v || 'Ward type is required']"
+                prepend-inner-icon="mdi-bed"
+              ></v-select>
+            </v-col>
+          </v-row>
+        </v-form>
+        <template #actions>
+          <v-btn variant="outlined" :disabled="submitting" @click="closeCreateDialog">Cancel</v-btn>
+          <v-btn
+            color="primary"
+            variant="flat"
+            @click="createAdmission"
+            :loading="submitting"
+            :disabled="!formData.referral_id || !formData.admission_date || !formData.ward_type"
+          >
+            Create Admission
+          </v-btn>
+        </template>
+      </AppModal>
 
       <!-- Discharge Admission Dialog -->
-      <v-dialog v-model="dischargeDialog" max-width="600px" persistent>
-        <v-card>
-          <v-card-title class="bg-warning text-white">
-            <v-icon class="mr-2">mdi-exit-run</v-icon>
-            Discharge Patient
-          </v-card-title>
-
-          <v-card-text class="pt-6">
-            <v-form ref="dischargeForm" @submit.prevent="submitDischarge">
-              <v-row>
-                <v-col cols="12">
-                  <p class="text-body-2 mb-2">
-                    Discharging: <strong>{{ selectedAdmission?.admission_code }}</strong>
-                    <br />
-                    Patient: {{ selectedAdmission?.enrollee?.first_name }} {{ selectedAdmission?.enrollee?.last_name }}
-                  </p>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model="dischargeData.discharge_date"
-                    label="Discharge Date"
-                    type="date"
-                    variant="outlined"
-                    density="comfortable"
-                    :rules="[v => !!v || 'Discharge date is required']"
-                    prepend-inner-icon="mdi-calendar"
-                  ></v-text-field>
-                </v-col>
-                <v-col cols="12" md="6">
-                  <v-text-field
-                    v-model.number="dischargeData.ward_days"
-                    label="Ward Days"
-                    type="number"
-                    min="1"
-                    variant="outlined"
-                    density="comfortable"
-                    :rules="[v => !!v || 'Ward days required', v => v > 0 || 'Must be at least 1']"
-                    prepend-inner-icon="mdi-bed"
-                  ></v-text-field>
-                </v-col>
-                <v-col cols="12">
-                  <v-textarea
-                    v-model="dischargeData.discharge_summary"
-                    label="Discharge Summary"
-                    variant="outlined"
-                    density="comfortable"
-                    rows="4"
-                    :rules="[v => !!v || 'Discharge summary is required']"
-                    prepend-inner-icon="mdi-file-document"
-                  ></v-textarea>
-                </v-col>
-              </v-row>
-            </v-form>
-          </v-card-text>
-
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn
-              color="grey"
-              variant="text"
-              @click="dischargeDialog = false"
-              :disabled="submitting"
-            >
-              Cancel
-            </v-btn>
-            <v-btn
-              color="warning"
-              variant="elevated"
-              @click="submitDischarge"
-              :loading="submitting"
-            >
-              Discharge
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <AppModal v-model="dischargeDialog" title="Discharge Patient" icon="mdi-exit-run" size="md" color="warning" :loading="submitting" persistent>
+        <v-form ref="dischargeForm" @submit.prevent="submitDischarge">
+          <v-row>
+            <v-col cols="12">
+              <p class="text-body-2 mb-2">
+                Discharging: <strong>{{ selectedAdmission?.admission_code }}</strong>
+                <br />
+                Patient: {{ selectedAdmission?.enrollee?.first_name }} {{ selectedAdmission?.enrollee?.last_name }}
+              </p>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field
+                v-model="dischargeData.discharge_date"
+                label="Discharge Date"
+                type="date"
+                variant="outlined"
+                density="comfortable"
+                :rules="[v => !!v || 'Discharge date is required']"
+                prepend-inner-icon="mdi-calendar"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12" md="6">
+              <v-text-field
+                v-model.number="dischargeData.ward_days"
+                label="Ward Days"
+                type="number"
+                min="1"
+                variant="outlined"
+                density="comfortable"
+                :rules="[v => !!v || 'Ward days required', v => v > 0 || 'Must be at least 1']"
+                prepend-inner-icon="mdi-bed"
+              ></v-text-field>
+            </v-col>
+            <v-col cols="12">
+              <v-textarea
+                v-model="dischargeData.discharge_summary"
+                label="Discharge Summary"
+                variant="outlined"
+                density="comfortable"
+                rows="4"
+                :rules="[v => !!v || 'Discharge summary is required']"
+                prepend-inner-icon="mdi-file-document"
+              ></v-textarea>
+            </v-col>
+          </v-row>
+        </v-form>
+        <template #actions>
+          <v-btn variant="outlined" :disabled="submitting" @click="dischargeDialog = false">Cancel</v-btn>
+          <v-btn color="warning" variant="flat" @click="submitDischarge" :loading="submitting">Discharge</v-btn>
+        </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
@@ -422,6 +379,8 @@ import { ref, computed, onMounted } from 'vue';
 import { useToast } from '../../composables/useToast';
 import api from '../../utils/api';
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 
 const { success: showSuccess, error: showError } = useToast();
 

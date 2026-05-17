@@ -317,221 +317,116 @@
     </div>
 
     <!-- Edit Profile Dialog -->
-    <v-dialog v-model="showEditDialog" max-width="600px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">Edit Profile</span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
-              <v-text-field
-                v-model="editForm.name"
-                label="Full Name"
-                variant="outlined"
-                required
-              />
-              <v-text-field
-                v-model="editForm.username"
-                label="Username"
-                variant="outlined"
-                required
-              />
-            </div>
-
-            <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
-              <v-text-field
-                v-model="editForm.email"
-                label="Email Address"
-                type="email"
-                variant="outlined"
-                required
-              />
-              <v-text-field
-                v-model="editForm.phone"
-                label="Phone Number"
-                variant="outlined"
-              />
-            </div>
-
-            <v-select
-              v-model="editForm.status"
-              :items="statusOptions"
-              label="Account Status"
-              variant="outlined"
-              required
-            />
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showEditDialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="updateProfile">Save Changes</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppModal v-model="showEditDialog" title="Edit Profile" size="md">
+      <div class="tw-space-y-4">
+        <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
+          <v-text-field v-model="editForm.name" label="Full Name" variant="outlined" required />
+          <v-text-field v-model="editForm.username" label="Username" variant="outlined" required />
+        </div>
+        <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
+          <v-text-field v-model="editForm.email" label="Email Address" type="email" variant="outlined" required />
+          <v-text-field v-model="editForm.phone" label="Phone Number" variant="outlined" />
+        </div>
+        <v-select v-model="editForm.status" :items="statusOptions" label="Account Status" variant="outlined" required />
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showEditDialog = false">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="updateProfile">Save Changes</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Change Password Dialog -->
-    <v-dialog v-model="showPasswordDialog" max-width="500px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">Change Password</span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <v-text-field
-              v-model="passwordForm.current_password"
-              label="Current Password"
-              type="password"
-              variant="outlined"
-              required
-            />
-            <v-text-field
-              v-model="passwordForm.new_password"
-              label="New Password"
-              type="password"
-              variant="outlined"
-              required
-            />
-            <v-text-field
-              v-model="passwordForm.new_password_confirmation"
-              label="Confirm New Password"
-              type="password"
-              variant="outlined"
-              required
-            />
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showPasswordDialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="changePassword">Change Password</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppModal v-model="showPasswordDialog" title="Change Password" icon="mdi-key" size="sm" color="warning">
+      <div class="tw-space-y-4">
+        <v-text-field v-model="passwordForm.current_password" label="Current Password" type="password" variant="outlined" required />
+        <v-text-field v-model="passwordForm.new_password" label="New Password" type="password" variant="outlined" required />
+        <v-text-field v-model="passwordForm.new_password_confirmation" label="Confirm New Password" type="password" variant="outlined" required />
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showPasswordDialog = false">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="changePassword">Change Password</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Manage Roles Dialog -->
-    <v-dialog v-model="showRolesDialog" max-width="600px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">Manage User Roles</span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <div>
-              <h4 class="tw-font-medium tw-text-gray-700 tw-mb-2">Current Roles</h4>
-              <div class="tw-flex tw-flex-wrap tw-gap-2">
+    <AppModal v-model="showRolesDialog" title="Manage User Roles" size="md">
+      <div class="tw-space-y-4">
+        <div>
+          <h4 class="tw-font-medium tw-text-gray-700 tw-mb-2">Current Roles</h4>
+          <div class="tw-flex tw-flex-wrap tw-gap-2">
+            <v-chip
+              v-for="role in user.roles"
+              :key="role.id"
+              size="small"
+              color="primary"
+              closable
+              @click:close="removeRole(role.id)"
+            >
+              {{ role.label || role.name }}
+            </v-chip>
+          </div>
+        </div>
+        <v-select v-model="selectedRoles" :items="availableRoles" label="Add Roles" variant="outlined" multiple chips />
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showRolesDialog = false">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="updateUserRoles">Update Roles</v-btn>
+      </template>
+    </AppModal>
+
+    <!-- Activity Log Dialog -->
+    <AppModal v-model="showActivityDialog" title="Activity Log" size="lg">
+      <div class="tw-max-h-96 tw-overflow-y-auto">
+        <div v-if="allActivities.length > 0" class="tw-space-y-3">
+          <div
+            v-for="activity in allActivities"
+            :key="activity.id"
+            class="tw-flex tw-items-start tw-space-x-3 tw-p-3 tw-border tw-border-gray-200 tw-rounded-lg"
+          >
+            <div class="tw-p-2 tw-rounded-full tw-bg-gray-100">
+              <v-icon size="16" color="grey">{{ getActivityIcon(activity.type) }}</v-icon>
+            </div>
+            <div class="tw-flex-1">
+              <p class="tw-text-sm tw-text-gray-900">{{ activity.description }}</p>
+              <p class="tw-text-xs tw-text-gray-500">{{ formatDate(activity.created_at) }}</p>
+              <div v-if="activity.properties" class="tw-mt-1">
                 <v-chip
-                  v-for="role in user.roles"
-                  :key="role.id"
-                  size="small"
-                  color="primary"
-                  closable
-                  @click:close="removeRole(role.id)"
+                  v-for="(value, key) in activity.properties"
+                  :key="key"
+                  size="x-small"
+                  variant="outlined"
+                  class="tw-mr-1"
                 >
-                  {{ role.label || role.name }}
+                  {{ key }}: {{ value }}
                 </v-chip>
               </div>
             </div>
-
-            <v-select
-              v-model="selectedRoles"
-              :items="availableRoles"
-              label="Add Roles"
-              variant="outlined"
-              multiple
-              chips
-            />
           </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showRolesDialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="updateUserRoles">Update Roles</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
-
-    <!-- Activity Log Dialog -->
-    <v-dialog v-model="showActivityDialog" max-width="800px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">Activity Log</span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-max-h-96 tw-overflow-y-auto">
-            <div v-if="allActivities.length > 0" class="tw-space-y-3">
-              <div
-                v-for="activity in allActivities"
-                :key="activity.id"
-                class="tw-flex tw-items-start tw-space-x-3 tw-p-3 tw-border tw-border-gray-200 tw-rounded-lg"
-              >
-                <div class="tw-p-2 tw-rounded-full tw-bg-gray-100">
-                  <v-icon size="16" color="grey">{{ getActivityIcon(activity.type) }}</v-icon>
-                </div>
-                <div class="tw-flex-1">
-                  <p class="tw-text-sm tw-text-gray-900">{{ activity.description }}</p>
-                  <p class="tw-text-xs tw-text-gray-500">{{ formatDate(activity.created_at) }}</p>
-                  <div v-if="activity.properties" class="tw-mt-1">
-                    <v-chip
-                      v-for="(value, key) in activity.properties"
-                      :key="key"
-                      size="x-small"
-                      variant="outlined"
-                      class="tw-mr-1"
-                    >
-                      {{ key }}: {{ value }}
-                    </v-chip>
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div v-else class="tw-text-center tw-py-8">
-              <v-icon size="48" color="grey">mdi-history</v-icon>
-              <p class="tw-text-gray-500 tw-mt-2">No activity found</p>
-            </div>
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showActivityDialog = false">Close</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        </div>
+        <div v-else class="tw-text-center tw-py-8">
+          <v-icon size="48" color="grey">mdi-history</v-icon>
+          <p class="tw-text-gray-500 tw-mt-2">No activity found</p>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showActivityDialog = false">Close</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Avatar Upload Dialog -->
-    <v-dialog v-model="showAvatarDialog" max-width="400px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">Update Avatar</span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-text-center tw-space-y-4">
-            <v-avatar size="120">
-              <v-img
-                v-if="user.avatar"
-                :src="user.avatar"
-                :alt="user.name"
-              />
-              <v-icon v-else size="60" color="grey">mdi-account</v-icon>
-            </v-avatar>
-
-            <v-file-input
-              v-model="avatarFile"
-              label="Choose Avatar"
-              accept="image/*"
-              variant="outlined"
-              prepend-icon="mdi-camera"
-            />
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showAvatarDialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="uploadAvatar">Upload</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppModal v-model="showAvatarDialog" title="Update Avatar" size="sm">
+      <div class="tw-text-center tw-space-y-4">
+        <v-avatar size="120">
+          <v-img v-if="user.avatar" :src="user.avatar" :alt="user.name" />
+          <v-icon v-else size="60" color="grey">mdi-account</v-icon>
+        </v-avatar>
+        <v-file-input v-model="avatarFile" label="Choose Avatar" accept="image/*" variant="outlined" prepend-icon="mdi-camera" />
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showAvatarDialog = false">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="uploadAvatar">Upload</v-btn>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 
@@ -541,6 +436,7 @@ import { useRoute, useRouter } from 'vue-router';
 import AdminLayout from '../layout/AdminLayout.vue';
 import { useToast } from '../../composables/useToast';
 import { userAPI, roleAPI } from '../../utils/api';
+import AppModal from '../common/AppModal.vue';
 
 const route = useRoute();
 const router = useRouter();

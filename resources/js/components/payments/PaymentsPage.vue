@@ -50,12 +50,11 @@
 
       <!-- Batches Table -->
       <v-card class="tw-border tw-border-gray-100 tw-shadow-sm tw-rounded-xl" elevation="0">
-        <v-data-table
+        <AppDataTable
           :headers="headers"
           :items="batches"
           :loading="loading"
           :items-per-page="filters.per_page"
-          hide-default-footer
           class="tw-rounded-xl"
         >
           <template #item.batch_number="{ item }">
@@ -120,7 +119,7 @@
               <v-btn color="primary" @click="$router.push('/claims/payment-batches')">Go to Payment Batches</v-btn>
             </AppEmptyState>
           </template>
-        </v-data-table>
+        </AppDataTable>
 
         <div class="tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-border-t tw-border-gray-100">
           <span class="tw-text-sm tw-text-gray-500">{{ pagination.total.toLocaleString() }} total batches</span>
@@ -135,48 +134,38 @@
       </v-card>
 
       <!-- Batch Detail Dialog -->
-      <v-dialog v-model="batchDialog" max-width="640">
-        <v-card v-if="selectedBatch" class="tw-rounded-xl" elevation="0">
-          <v-card-title class="tw-px-6 tw-pt-6 tw-pb-2 tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-lg tw-font-bold">Batch #{{ selectedBatch.batch_number ?? selectedBatch.id }}</span>
-            <v-btn icon="mdi-close" variant="text" @click="batchDialog = false" />
-          </v-card-title>
-          <v-divider />
-          <v-card-text class="tw-px-6 tw-py-4">
-            <div class="tw-grid tw-grid-cols-2 tw-gap-4">
-              <div>
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Status</p>
-                <AppStatusChip :status="selectedBatch.status" show-icon />
-              </div>
-              <div>
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Total Amount</p>
-                <p class="tw-text-sm tw-font-bold">{{ formatCurrency(selectedBatch.total_amount) }}</p>
-              </div>
-              <div>
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Claims Count</p>
-                <p class="tw-text-sm tw-font-medium">{{ selectedBatch.claims_count ?? selectedBatch.claims?.length ?? 0 }}</p>
-              </div>
-              <div>
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Created</p>
-                <p class="tw-text-sm">{{ formatDate(selectedBatch.created_at) }}</p>
-              </div>
-              <div v-if="selectedBatch.processed_at">
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Processed</p>
-                <p class="tw-text-sm">{{ formatDate(selectedBatch.processed_at) }}</p>
-              </div>
-              <div v-if="selectedBatch.paid_at">
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Paid At</p>
-                <p class="tw-text-sm">{{ formatDate(selectedBatch.paid_at) }}</p>
-              </div>
-            </div>
-          </v-card-text>
-          <v-card-actions class="tw-px-6 tw-pb-4">
-            <v-btn variant="outlined" prepend-icon="mdi-download" @click="downloadReceipt(selectedBatch)">Receipt</v-btn>
-            <v-spacer />
-            <v-btn color="primary" variant="flat" @click="batchDialog = false">Close</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <AppModal v-model="batchDialog" :title="selectedBatch ? `Batch #${selectedBatch.batch_number ?? selectedBatch.id}` : 'Batch Details'" size="md">
+        <div v-if="selectedBatch" class="tw-grid tw-grid-cols-2 tw-gap-4">
+          <div>
+            <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Status</p>
+            <AppStatusChip :status="selectedBatch.status" show-icon />
+          </div>
+          <div>
+            <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Total Amount</p>
+            <p class="tw-text-sm tw-font-bold">{{ formatCurrency(selectedBatch.total_amount) }}</p>
+          </div>
+          <div>
+            <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Claims Count</p>
+            <p class="tw-text-sm tw-font-medium">{{ selectedBatch.claims_count ?? selectedBatch.claims?.length ?? 0 }}</p>
+          </div>
+          <div>
+            <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Created</p>
+            <p class="tw-text-sm">{{ formatDate(selectedBatch.created_at) }}</p>
+          </div>
+          <div v-if="selectedBatch.processed_at">
+            <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Processed</p>
+            <p class="tw-text-sm">{{ formatDate(selectedBatch.processed_at) }}</p>
+          </div>
+          <div v-if="selectedBatch.paid_at">
+            <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-mb-1">Paid At</p>
+            <p class="tw-text-sm">{{ formatDate(selectedBatch.paid_at) }}</p>
+          </div>
+        </div>
+        <template #actions>
+          <v-btn variant="outlined" prepend-icon="mdi-download" @click="downloadReceipt(selectedBatch)">Receipt</v-btn>
+          <v-btn color="primary" variant="flat" @click="batchDialog = false">Close</v-btn>
+        </template>
+      </AppModal>
 
     </div>
   </AdminLayout>
@@ -192,6 +181,8 @@ import AppStatCard from '../common/AppStatCard.vue';
 import AppFilterBar from '../common/AppFilterBar.vue';
 import AppStatusChip from '../common/AppStatusChip.vue';
 import AppEmptyState from '../common/AppEmptyState.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import { paymentBatchAPI } from '../../utils/api';
 import { useToast } from '../../composables/useToast';
 

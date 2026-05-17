@@ -61,11 +61,10 @@
           <span class="tw-text-base tw-font-semibold">Monthly Breakdown – {{ filters.year }}</span>
         </v-card-title>
         <v-divider />
-        <v-data-table
+        <AppDataTable
           :headers="headers"
           :items="monthlyData"
           :loading="loading"
-          hide-default-footer
           :items-per-page="12"
           class="tw-rounded-xl"
         >
@@ -103,7 +102,7 @@
               </td>
             </tr>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </v-card>
 
       <!-- Revenue vs Claims Chart -->
@@ -130,6 +129,7 @@ import AdminLayout from '../layout/AdminLayout.vue';
 import AppPageHeader from '../common/AppPageHeader.vue';
 import AppStatCard from '../common/AppStatCard.vue';
 import AppEmptyState from '../common/AppEmptyState.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import BarChart from '../charts/BarChart.vue';
 import { dashboardAPI } from '../../utils/api';
 import { useToast } from '../../composables/useToast';

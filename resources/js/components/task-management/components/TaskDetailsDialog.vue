@@ -1,19 +1,6 @@
 <template>
-  <v-dialog v-model="dialog" max-width="900px" persistent>
-    <v-card v-if="task">
-      <v-card-title class="d-flex align-center justify-space-between">
-        <div class="d-flex align-center">
-          <v-chip size="small" variant="outlined" class="mr-3">
-            {{ task.task_number }}
-          </v-chip>
-          <span class="text-h6">{{ task.title }}</span>
-        </div>
-        <v-btn icon="mdi-close" variant="text" @click="close" />
-      </v-card-title>
-      
-      <v-divider />
-      
-      <v-card-text class="pa-0">
+  <AppModal v-model="dialog" :title="task ? task.title : ''" size="lg" persistent>
+      <div v-if="task">
         <v-row no-gutters>
           <!-- Main Content -->
           <v-col cols="12" md="8" class="pa-6">
@@ -197,13 +184,13 @@
             </div>
           </v-col>
         </v-row>
-      </v-card-text>
-    </v-card>
-  </v-dialog>
+      </div>
+  </AppModal>
 </template>
 
 <script setup>
 import { ref, watch, computed } from 'vue'
+import AppModal from '../../common/AppModal.vue'
 
 const props = defineProps({
   modelValue: {

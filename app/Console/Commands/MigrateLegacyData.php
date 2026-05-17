@@ -6,6 +6,9 @@ use App\Models\AccountDetail;
 use App\Models\Bank;
 use App\Models\Benefactor;
 use App\Models\BenefitPackage;
+use App\Models\Capitation;
+use App\Models\CapitationDetail;
+use App\Models\EnrollmentPhase;
 use App\Models\Facility;
 use App\Models\FundingType;
 use App\Models\Invoice;
@@ -29,7 +32,7 @@ class MigrateLegacyData extends Command
     private const LEGACY_CONNECTION = 'legacy_mysql';
 
     protected $signature = 'legacy:migrate
-        {--only=all : all, reference, pins, invoices, or enrollees}
+        {--only=all : all, reference, phases, pins, invoices, enrollees, or capitations}
         {--source=all : all, informal, or formal}
         {--dry-run : Inspect and print without writing}
         {--chunk=500 : Number of legacy enrollee rows per chunk}
@@ -48,8 +51,8 @@ class MigrateLegacyData extends Command
     public function handle(LegacyEnrolleeMigrationService $enrolleeService): int
     {
         $only = strtolower((string) $this->option('only'));
-        if (!in_array($only, ['all', 'reference', 'pins', 'invoices', 'enrollees'], true)) {
-            $this->error('--only must be one of: all, reference, pins, invoices, enrollees');
+        if (!in_array($only, ['all', 'reference', 'phases', 'pins', 'invoices', 'enrollees', 'capitations'], true)) {
+            $this->error('--only must be one of: all, reference, phases, pins, invoices, enrollees, capitations');
             return self::FAILURE;
         }
 
@@ -60,12 +63,14 @@ class MigrateLegacyData extends Command
         }
 
         $runReference = in_array($only, ['all', 'reference'], true);
+        $runPhases = $only === 'phases';
         $runPins = in_array($only, ['all', 'pins', 'enrollees'], true);
         $runInvoices = in_array($only, ['all', 'invoices', 'pins', 'enrollees'], true);
         $runEnrollees = in_array($only, ['all', 'enrollees'], true);
+        $runCapitations = in_array($only, ['all', 'capitations'], true);
         $enrolleeTables = $runEnrollees ? $this->selectedEnrolleeTables($source) : [];
 
-        if (!$this->schemaReady($runReference, $runPins || $runInvoices, $enrolleeTables)) {
+        if (!$this->schemaReady($runReference, $runPhases, $runPins || $runInvoices, $runCapitations, $enrolleeTables)) {
             return self::FAILURE;
         }
 
@@ -79,12 +84,24 @@ class MigrateLegacyData extends Command
             }
         }
 
+        if ($runPhases) {
+            if ($dryRun) {
+                $this->previewEnrollmentPhases();
+            } else {
+                $this->migrateEnrollmentPhases();
+            }
+        }
+
         if ($runInvoices) {
             $dryRun ? $this->previewLegacyInvoices() : $this->migrateLegacyInvoices();
         }
 
         if ($runPins) {
             $dryRun ? $this->previewLegacyPins() : $this->migrateLegacyPins();
+        }
+
+        if ($runCapitations) {
+            $dryRun ? $this->previewLegacyCapitations() : $this->migrateLegacyCapitations();
         }
 
         $enrolleeStats = ['failed' => 0];
@@ -112,6 +129,7 @@ class MigrateLegacyData extends Command
         $this->migrateWards();
         $this->migrateFundingTypes();
         $this->migrateBenefactors();
+        $this->migrateEnrollmentPhases();
         $this->migrateFacilities();
 
         if (!(bool) $this->option('skip-users')) {
@@ -220,6 +238,78 @@ class MigrateLegacyData extends Command
         }
 
         $this->info("Benefactors seeded from legacy reference array: {$count}");
+    }
+
+    private function migrateEnrollmentPhases(): void
+    {
+        if (!$this->legacyTableExists('enrolment_phases')) {
+            $this->warn('Skipping enrollment phases; legacy enrolment_phases table was not found.');
+            return;
+        }
+
+        $count = 0;
+        $hasLegacyId = Schema::hasColumn('enrollment_phases', 'legacy_id');
+        $hasPhase = Schema::hasColumn('enrollment_phases', 'phase');
+        $hasSponsor = Schema::hasColumn('enrollment_phases', 'sponsor');
+        $hasFunding = Schema::hasColumn('enrollment_phases', 'funding');
+        $hasIsCurrent = Schema::hasColumn('enrollment_phases', 'is_current');
+
+        DB::connection(self::LEGACY_CONNECTION)
+            ->table('enrolment_phases')
+            ->orderBy('id')
+            ->get()
+            ->each(function (object $row) use (&$count, $hasLegacyId, $hasPhase, $hasSponsor, $hasFunding, $hasIsCurrent): void {
+                $legacyId = (int) $row->id;
+                $benefactor = $this->benefactorForLegacyPhase($row);
+                $payload = [
+                    'name' => $this->string($row->name ?? null)
+                        ?? $this->string($row->phase ?? null)
+                        ?? 'Legacy Phase ' . $legacyId,
+                    'benefactor_id' => $benefactor->id,
+                    'status' => 1,
+                ];
+
+                if ($hasLegacyId) {
+                    $payload['legacy_id'] = $legacyId;
+                }
+                if ($hasPhase) {
+                    $payload['phase'] = $this->string($row->phase ?? null);
+                }
+                if ($hasSponsor) {
+                    $payload['sponsor'] = $this->string($row->sponsor ?? null);
+                }
+                if ($hasFunding) {
+                    $payload['funding'] = $this->string($row->funding ?? null);
+                }
+                if ($hasIsCurrent) {
+                    $payload['is_current'] = (bool) ($row->is_current ?? false);
+                }
+
+                EnrollmentPhase::updateOrCreate(['id' => $legacyId], $payload);
+                $count++;
+            });
+
+        $this->info("Enrollment phases migrated from enrolment_phases: {$count}");
+    }
+
+    private function benefactorForLegacyPhase(object $row): Benefactor
+    {
+        $benefactorRef = LegacyReferenceData::benefactorByLegacyValue($row->benefactor_id ?? null)
+            ?: LegacyReferenceData::benefactorByLegacyValue($row->sponsor ?? null)
+            ?: LegacyReferenceData::benefactorByFundingValue($row->funding ?? null);
+
+        $name = $benefactorRef['name'] ?? (
+            $this->string($row->sponsor ?? null)
+            ?: 'Legacy Phase Benefactor ' . ($row->benefactor_id ?? 'unknown')
+        );
+
+        return Benefactor::firstOrCreate(
+            ['name' => $name],
+            [
+                'type' => $benefactorRef['type'] ?? $this->benefactorType($name),
+                'status' => $benefactorRef['status'] ?? 1,
+            ]
+        );
     }
 
     private function migrateFacilities(): void
@@ -598,6 +688,358 @@ class MigrateLegacyData extends Command
         }
     }
 
+    private function previewLegacyCapitations(): void
+    {
+        $groups = $this->legacyTableExists('capitation_grouping')
+            ? DB::connection(self::LEGACY_CONNECTION)->table('capitation_grouping')->count()
+            : 0;
+        $details = $this->legacyTableExists('capitations')
+            ? DB::connection(self::LEGACY_CONNECTION)->table('capitations')->count()
+            : 0;
+        $programmeTypes = $this->legacyTableExists('capitations')
+            ? DB::connection(self::LEGACY_CONNECTION)
+                ->table('capitations')
+                ->select('programme_type', DB::raw('COUNT(*) as total'))
+                ->groupBy('programme_type')
+                ->orderBy('programme_type')
+                ->pluck('total', 'programme_type')
+                ->all()
+            : [];
+
+        $this->info("Legacy capitation groups available in capitation_grouping: {$groups}");
+        $this->info("Legacy capitation details available in capitations: {$details}");
+
+        if ($programmeTypes !== []) {
+            $this->table(
+                ['programme_type', 'funding type code', 'rows'],
+                collect($programmeTypes)->map(fn ($total, $programmeType): array => [
+                    $programmeType ?: '(blank)',
+                    $this->legacyCapitationFundingCode($programmeType) ?? '(unmapped)',
+                    $total,
+                ])->values()->all()
+            );
+        }
+    }
+
+    private function migrateLegacyCapitations(): void
+    {
+        if (!$this->legacyTableExists('capitation_grouping')) {
+            $this->warn('Skipping capitations; legacy capitation_grouping table was not found.');
+            return;
+        }
+
+        if (!$this->legacyTableExists('capitations')) {
+            $this->warn('Skipping capitations; legacy capitations table was not found.');
+            return;
+        }
+
+        $systemUserId = $this->systemUserId();
+        $ratesByGroup = DB::connection(self::LEGACY_CONNECTION)
+            ->table('capitations')
+            ->select('group_id', DB::raw('MAX(cap_rate) as cap_rate'))
+            ->groupBy('group_id')
+            ->pluck('cap_rate', 'group_id')
+            ->all();
+        $groupLookup = [];
+        $groupsMigrated = 0;
+
+        DB::connection(self::LEGACY_CONNECTION)
+            ->table('capitation_grouping')
+            ->orderBy('id')
+            ->chunk(200, function ($rows) use ($systemUserId, $ratesByGroup, &$groupLookup, &$groupsMigrated): void {
+                foreach ($rows as $row) {
+                    $legacyId = (int) $row->id;
+                    $cutoff = $this->legacyCarbon($row->enroled_on_before_date ?? null);
+                    $capitatedMonth = $cutoff?->month ?: (int) ($row->month ?? 1);
+                    $periodYear = (int) ($row->cap_year ?? $row->year ?? $cutoff?->year ?? now()->year);
+                    $createdAt = $this->legacyDateTime($row->date_created ?? null) ?? now()->toDateTimeString();
+                    $updatedAt = $this->legacyDateTime($row->last_modified ?? null) ?? $createdAt;
+                    $finalisedAt = $this->legacyDateTime($row->approval_date_bhcpf ?? null)
+                        ?? $this->legacyDateTime($row->approval_date_nicare ?? null);
+
+                    $payload = [
+                        'name' => $this->string($row->name ?? null) ?? 'Legacy Capitation ' . $legacyId,
+                        'period_start' => $cutoff?->copy()->startOfMonth()->toDateString(),
+                        'period_end' => $cutoff?->copy()->endOfMonth()->toDateString(),
+                        'capitation_rate' => $this->numeric($ratesByGroup[$legacyId] ?? null) ?? 0,
+                        'capitated_month' => max(1, min(12, $capitatedMonth)),
+                        'capitation_month' => max(1, min(12, (int) ($row->month ?? $capitatedMonth))),
+                        'year' => $periodYear,
+                        'funding_type_id' => null,
+                        'user_id' => $systemUserId,
+                        'created_by' => $this->legacyUserIdOrSystem($row->created_by ?? null, $systemUserId),
+                        'status' => (string) ($row->status ?? '1') === '1',
+                        'created_at' => $createdAt,
+                        'updated_at' => $updatedAt,
+                        'computed_at' => $createdAt,
+                        'computed_by' => $this->legacyUserIdOrSystem($row->created_by ?? null, $systemUserId),
+                        'finalised_at' => $finalisedAt,
+                        'finalised_by' => null,
+                        'metadata' => [
+                            'source_table' => 'capitation_grouping',
+                            'legacy_id' => $legacyId,
+                            'legacy_name' => $this->string($row->name ?? null),
+                            'legacy_year' => $row->year ?? null,
+                            'legacy_cap_year' => $row->cap_year ?? null,
+                            'legacy_month' => $row->month ?? null,
+                            'legacy_month_full' => $this->string($row->month_full ?? null),
+                            'legacy_enroled_on_before_date' => $this->legacyDateTime($row->enroled_on_before_date ?? null),
+                            'legacy_providers_string' => $this->string($row->providers_string ?? null),
+                            'legacy_cap_for' => $this->string($row->cap_for ?? null),
+                            'legacy_open_status' => $row->open_status ?? null,
+                            'legacy_status' => $row->status ?? null,
+                            'legacy_created_by' => $row->created_by ?? null,
+                            'legacy_review_message_bhcpf' => $this->string($row->review_message_bhcpf ?? null),
+                            'legacy_review_message_nicare' => $this->string($row->review_message_nicare ?? null),
+                            'legacy_review_date_bhcpf' => $this->legacyDateTime($row->review_date_bhcpf ?? null),
+                            'legacy_review_date_nicare' => $this->legacyDateTime($row->review_date_nicare ?? null),
+                            'legacy_approval_message_bhcpf' => $this->string($row->approval_message_bhcpf ?? null),
+                            'legacy_approval_message_nicare' => $this->string($row->approval_message_nicare ?? null),
+                            'legacy_approval_date_bhcpf' => $this->legacyDateTime($row->approval_date_bhcpf ?? null),
+                            'legacy_approval_date_nicare' => $this->legacyDateTime($row->approval_date_nicare ?? null),
+                            'legacy_payment_date_bhcpf' => $this->legacyDateTime($row->payment_date_bhcpf ?? null),
+                            'legacy_payment_date_nicare' => $this->legacyDateTime($row->payment_date_nicare ?? null),
+                        ],
+                    ];
+
+                    $capitation = $this->capitationForLegacyGroup($legacyId);
+                    if ($capitation) {
+                        $capitation->fill($payload)->save();
+                    } else {
+                        $capitation = Capitation::create($payload);
+                    }
+
+                    $groupLookup[$legacyId] = $capitation->id;
+                    $groupsMigrated++;
+                }
+            });
+
+        $detailsMigrated = 0;
+        $detailsSkipped = 0;
+
+        DB::connection(self::LEGACY_CONNECTION)
+            ->table('capitations')
+            ->orderBy('id')
+            ->chunk(500, function ($rows) use (&$groupLookup, &$detailsMigrated, &$detailsSkipped): void {
+                foreach ($rows as $row) {
+                    $legacyId = (int) $row->id;
+                    $legacyGroupId = (int) ($row->group_id ?? 0);
+                    $capitationId = $groupLookup[$legacyGroupId] ?? null;
+
+                    if (!$capitationId) {
+                        $capitation = $this->capitationForLegacyGroup($legacyGroupId);
+                        $capitationId = $capitation?->id;
+                        if ($capitationId) {
+                            $groupLookup[$legacyGroupId] = $capitationId;
+                        }
+                    }
+
+                    if (!$capitationId) {
+                        $detailsSkipped++;
+                        continue;
+                    }
+
+                    $capitation = Capitation::find($capitationId);
+                    $fundingType = $this->fundingTypeForLegacyCapitation($row->programme_type ?? null);
+                    $facility = $this->facilityForLegacyCapitationProvider($row->provider_id ?? null);
+                    $generatedAt = $this->legacyDateTime($row->generated_at ?? null) ?? now()->toDateTimeString();
+                    $reviewedAt = $this->legacyDateTime($row->reviewed_at ?? null);
+                    $approvedAt = $this->legacyDateTime($row->approved_at ?? null);
+                    $paidAt = $this->legacyDateTime($row->paid_at ?? null)
+                        ?? ((string) ($row->payment_status ?? '') === '1' ? ($approvedAt ?? $generatedAt) : null);
+                    $totalEnrollees = (int) ($this->numeric($row->total_enrolee ?? null) ?? 0);
+                    $capitationRate = $this->numeric($row->cap_rate ?? null) ?? 0;
+                    $totalAmount = $this->numeric($row->total_cap ?? null) ?? 0;
+
+                    $payload = [
+                        'capitation_id' => $capitationId,
+                        'facility_id' => $facility->id,
+                        'capitated_month' => $capitation?->capitated_month,
+                        'funding_type_id' => $fundingType->id,
+                        'total_enrollees' => $totalEnrollees,
+                        'capitation_rate' => $capitationRate,
+                        'total_amount' => $totalAmount,
+                        'total_enrolled' => $totalEnrollees,
+                        'rate' => $capitationRate,
+                        'amount' => $totalAmount,
+                        'reviewed_by' => $this->legacyUserIdOrNull($row->reviewed_by ?? null),
+                        'approved_by' => $this->legacyUserIdOrNull($row->approved_by ?? null),
+                        'paid_by' => $this->legacyUserIdOrNull($row->paid_by ?? null),
+                        'reviewed_at' => $reviewedAt,
+                        'approved_at' => $approvedAt,
+                        'paid_at' => $paidAt,
+                        'status' => $this->legacyCapitationDetailStatus($row),
+                        'created_at' => $generatedAt,
+                        'updated_at' => $paidAt ?? $approvedAt ?? $reviewedAt ?? $generatedAt,
+                        'metadata' => [
+                            'source_table' => 'capitations',
+                            'legacy_id' => $legacyId,
+                            'legacy_group_id' => $legacyGroupId,
+                            'legacy_programme_type' => $this->string($row->programme_type ?? null),
+                            'mapped_funding_type_code' => $this->legacyCapitationFundingCode($row->programme_type ?? null),
+                            'legacy_provider_id' => $row->provider_id ?? null,
+                            'legacy_total_enrolee' => $row->total_enrolee ?? null,
+                            'legacy_total_cap' => $row->total_cap ?? null,
+                            'legacy_generated_by' => $row->generated_by ?? null,
+                            'legacy_generated_at' => $this->legacyDateTime($row->generated_at ?? null),
+                            'legacy_review_status' => $row->review_status ?? null,
+                            'legacy_reviewed_by' => $row->reviewed_by ?? null,
+                            'legacy_reviewed_at' => $this->legacyDateTime($row->reviewed_at ?? null),
+                            'legacy_approval_status' => $row->approval_status ?? null,
+                            'legacy_audit_status' => $row->audit_status ?? null,
+                            'legacy_audited_by' => $row->audited_by ?? null,
+                            'legacy_audited_at' => $this->legacyDateTime($row->audited_at ?? null),
+                            'legacy_approved_by' => $row->approved_by ?? null,
+                            'legacy_approved_at' => $this->legacyDateTime($row->approved_at ?? null),
+                            'legacy_cap_rate' => $row->cap_rate ?? null,
+                            'legacy_payment_status' => $row->payment_status ?? null,
+                            'legacy_payment_code' => $this->string($row->payment_code ?? null),
+                            'legacy_paid_by' => $row->paid_by ?? null,
+                            'legacy_paid_at' => $this->legacyDateTime($row->paid_at ?? null),
+                            'legacy_status' => $row->status ?? null,
+                            'legacy_revoke_gen_date' => $this->legacyDateTime($row->revoke_gen_date ?? null),
+                        ],
+                    ];
+
+                    $detail = $this->capitationDetailForLegacyRow($legacyId);
+                    if ($detail) {
+                        $detail->fill($payload)->save();
+                    } else {
+                        CapitationDetail::create($payload);
+                    }
+
+                    $detailsMigrated++;
+                }
+            });
+
+        $this->info("Legacy capitation groups migrated from capitation_grouping: {$groupsMigrated}");
+        $this->info("Legacy capitation details migrated from capitations: {$detailsMigrated}");
+
+        if ($detailsSkipped > 0) {
+            $this->warn("Legacy capitation details skipped because group_id was missing in capitation_grouping: {$detailsSkipped}");
+        }
+    }
+
+    private function capitationForLegacyGroup(int $legacyId): ?Capitation
+    {
+        return Capitation::where('metadata->source_table', 'capitation_grouping')
+            ->where('metadata->legacy_id', $legacyId)
+            ->first();
+    }
+
+    private function capitationDetailForLegacyRow(int $legacyId): ?CapitationDetail
+    {
+        return CapitationDetail::where('metadata->source_table', 'capitations')
+            ->where('metadata->legacy_id', $legacyId)
+            ->first();
+    }
+
+    private function legacyCapitationFundingCode(mixed $programmeType): ?string
+    {
+        $programmeType = strtolower((string) $this->string($programmeType));
+
+        return match ($programmeType) {
+            'bhcpf' => 'bhcpf',
+            'unicef' => 'unicef',
+            'nicare-formal', 'gac' => 'formal',
+            'bhcpf-cf' => 'cf',
+            'nicare' => 'premium',
+            default => null,
+        };
+    }
+
+    private function fundingTypeForLegacyCapitation(mixed $programmeType): FundingType
+    {
+        $code = $this->legacyCapitationFundingCode($programmeType) ?? 'premium';
+        $reference = LegacyReferenceData::fundingTypeByLegacyValue($code);
+        $name = $reference['name'] ?? ucfirst($code);
+
+        return FundingType::firstOrCreate(
+            ['name' => $name],
+            [
+                'description' => 'Legacy capitation programme_type mapped to funding code: ' . $code,
+                'status' => $reference['status'] ?? 1,
+            ]
+        );
+    }
+
+    private function facilityForLegacyCapitationProvider(mixed $providerId): Facility
+    {
+        $legacyProviderId = $this->legacyIntegerId($providerId);
+
+        if ($legacyProviderId && $this->legacyTableExists('tbl_providers')) {
+            $provider = DB::connection(self::LEGACY_CONNECTION)
+                ->table('tbl_providers')
+                ->where('id', $legacyProviderId)
+                ->first();
+            $hcpCode = $this->string($provider->hcpcode ?? null);
+            if ($hcpCode) {
+                $facility = Facility::where('hcp_code', $hcpCode)->first();
+                if ($facility) {
+                    return $facility;
+                }
+            }
+        }
+
+        if ($legacyProviderId) {
+            $facility = Facility::find($legacyProviderId);
+            if ($facility) {
+                return $facility;
+            }
+        }
+
+        $unknownLga = $this->unknownLga();
+        $unknownWard = $this->unknownWard($unknownLga);
+        $hcpCode = 'LEGACY-CAP-PROVIDER-' . ($legacyProviderId ?: 'UNKNOWN');
+        $payload = [
+            'name' => 'Legacy Capitation Provider ' . ($legacyProviderId ?: 'Unknown'),
+            'ownership' => 'Public',
+            'type' => 'Primary',
+            'address' => null,
+            'phone' => null,
+            'email' => null,
+            'lga_id' => $unknownLga->id,
+            'ward_id' => $unknownWard->id,
+            'capacity' => 0,
+            'status' => 1,
+        ];
+
+        if (Schema::hasColumn('facilities', 'accreditation_status')) {
+            $payload['accreditation_status'] = 'active';
+        }
+
+        return Facility::firstOrCreate(['hcp_code' => $hcpCode], $payload);
+    }
+
+    private function legacyUserIdOrSystem(mixed $legacyUserId, int $systemUserId): int
+    {
+        return $this->legacyUserIdOrNull($legacyUserId) ?? $systemUserId;
+    }
+
+    private function legacyUserIdOrNull(mixed $legacyUserId): ?int
+    {
+        $userId = $this->legacyIntegerId($legacyUserId);
+
+        return $userId && User::whereKey($userId)->exists() ? $userId : null;
+    }
+
+    private function legacyCapitationDetailStatus(object $row): int
+    {
+        if ((string) ($row->payment_status ?? '') === '1' || $this->legacyDateTime($row->paid_at ?? null)) {
+            return 4;
+        }
+
+        if ((string) ($row->approval_status ?? '') === '1' || $this->legacyDateTime($row->approved_at ?? null)) {
+            return 3;
+        }
+
+        if ((string) ($row->review_status ?? '') === '1' || $this->legacyDateTime($row->reviewed_at ?? null)) {
+            return 2;
+        }
+
+        return (string) ($row->status ?? '1') === '1' ? 1 : 0;
+    }
+
     /**
      * @param array<int, string> $tables
      * @return array<string, int>
@@ -705,6 +1147,7 @@ class MigrateLegacyData extends Command
             ['Wards', $this->legacyTableExists('ward') ? DB::connection(self::LEGACY_CONNECTION)->table('ward')->count() : 0],
             ['Funding types', count(LegacyReferenceData::fundingTypes())],
             ['Benefactors', count(LegacyReferenceData::benefactors())],
+            ['Enrollment phases', $this->legacyTableExists('enrolment_phases') ? DB::connection(self::LEGACY_CONNECTION)->table('enrolment_phases')->count() : 0],
             ['Facilities', $this->legacyTableExists('tbl_providers') ? DB::connection(self::LEGACY_CONNECTION)->table('tbl_providers')->count() : 0],
             ['Admin users', $this->legacyTableExists('users') ? DB::connection(self::LEGACY_CONNECTION)->table('users')->where('user_role_id', 1)->count() : 0],
         ];
@@ -713,20 +1156,40 @@ class MigrateLegacyData extends Command
         $this->table(['Dataset', 'Rows'], $rows);
     }
 
+    private function previewEnrollmentPhases(): void
+    {
+        $count = $this->legacyTableExists('enrolment_phases')
+            ? DB::connection(self::LEGACY_CONNECTION)->table('enrolment_phases')->count()
+            : 0;
+
+        $this->info("Legacy enrollment phases available in enrolment_phases: {$count}");
+    }
+
     /**
      * @param array<int, string> $enrolleeTables
      */
-    private function schemaReady(bool $runReference, bool $runPremiumPinsOrInvoices, array $enrolleeTables): bool
+    private function schemaReady(
+        bool $runReference,
+        bool $runPhases,
+        bool $runPremiumPinsOrInvoices,
+        bool $runCapitations,
+        array $enrolleeTables
+    ): bool
     {
         $requiredNewTables = $runReference
-            ? ['lgas', 'wards', 'funding_types', 'benefactors', 'vulnerable_groups', 'facilities', 'banks', 'account_details', 'users', 'staff', 'roles', 'role_user']
+            ? ['lgas', 'wards', 'funding_types', 'benefactors', 'enrollment_phases', 'vulnerable_groups', 'facilities', 'banks', 'account_details', 'users', 'staff', 'roles', 'role_user']
             : [];
+
+        if ($runPhases) {
+            $requiredNewTables = array_merge($requiredNewTables, ['benefactors', 'enrollment_phases']);
+        }
 
         if ($enrolleeTables) {
             $requiredNewTables = array_merge($requiredNewTables, [
                 'enrollees',
                 'funding_types',
                 'benefactors',
+                'enrollment_phases',
                 'vulnerable_groups',
                 'benefit_packages',
                 'insurance_programmes',
@@ -748,10 +1211,31 @@ class MigrateLegacyData extends Command
             ]);
         }
 
+        if ($runCapitations) {
+            $requiredNewTables = array_merge($requiredNewTables, [
+                'capitations',
+                'capitation_details',
+                'facilities',
+                'funding_types',
+                'lgas',
+                'wards',
+                'users',
+            ]);
+        }
+
         foreach (array_unique($requiredNewTables) as $table) {
             if (!Schema::hasTable($table)) {
                 $this->error("Required new-system table [{$table}] is missing. Run php artisan migrate before legacy:migrate.");
                 return false;
+            }
+        }
+
+        if ($runCapitations) {
+            foreach (['capitations', 'capitation_details'] as $table) {
+                if (!Schema::hasColumn($table, 'metadata')) {
+                    $this->error("Required new-system column [{$table}.metadata] is missing. Run php artisan migrate before legacy:migrate --only=capitations.");
+                    return false;
+                }
             }
         }
 
@@ -760,6 +1244,11 @@ class MigrateLegacyData extends Command
                 $this->error("Required legacy table [{$table}] is missing on the " . self::LEGACY_CONNECTION . ' connection.');
                 return false;
             }
+        }
+
+        if ($runPhases && !$this->legacyTableExists('enrolment_phases')) {
+            $this->error('Required legacy table [enrolment_phases] is missing on the ' . self::LEGACY_CONNECTION . ' connection.');
+            return false;
         }
 
         foreach ($enrolleeTables as $table) {
@@ -772,6 +1261,13 @@ class MigrateLegacyData extends Command
         foreach ($runPremiumPinsOrInvoices ? ['tbl_pin_inven', 'tbl_request'] : [] as $table) {
             if (!$this->legacyTableExists($table)) {
                 $this->warn("Legacy table [{$table}] is missing on the " . self::LEGACY_CONNECTION . ' connection; that dataset will be skipped.');
+            }
+        }
+
+        foreach ($runCapitations ? ['capitation_grouping', 'capitations'] : [] as $table) {
+            if (!$this->legacyTableExists($table)) {
+                $this->error("Required legacy capitation table [{$table}] is missing on the " . self::LEGACY_CONNECTION . ' connection.');
+                return false;
             }
         }
 
@@ -1109,6 +1605,20 @@ class MigrateLegacyData extends Command
 
         try {
             return Carbon::parse($value)->toDateTimeString();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function legacyCarbon(mixed $value): ?Carbon
+    {
+        $value = $this->string($value);
+        if (!$value || in_array($value, ['0000-00-00', '0000-00-00 00:00:00'], true)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value);
         } catch (\Throwable) {
             return null;
         }

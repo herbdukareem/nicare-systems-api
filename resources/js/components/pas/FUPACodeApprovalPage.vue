@@ -41,7 +41,7 @@
                 </v-row>
 
                 <!-- PA Codes Table -->
-                <v-data-table
+                <AppDataTable
                   :headers="headers"
                   :items="filteredPACodes"
                   :loading="loading"
@@ -107,7 +107,7 @@
                       <v-icon>mdi-close</v-icon>
                     </v-btn>
                   </template>
-                </v-data-table>
+                </AppDataTable>
               </v-card-text>
             </v-card>
           </v-col>
@@ -142,32 +142,23 @@
       </FUPACodeDetailsModal>
 
       <!-- Reject Dialog -->
-      <v-dialog v-model="rejectDialog" max-width="500">
-        <v-card>
-          <v-card-title class="bg-error text-white">
-            <v-icon left>mdi-close-circle</v-icon>
-            Reject FU-PA Code Request
-          </v-card-title>
-          <v-card-text class="mt-4">
-            <p class="mb-4">Are you sure you want to reject this FU-PA Code request?</p>
-            <v-textarea
-              v-model="rejectionReason"
-              label="Rejection Reason *"
-               variant="outlined"
-              rows="4"
-              hint="Provide a reason for rejection"
-              :rules="[v => !!v || 'Rejection reason is required']"
-            />
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer></v-spacer>
-            <v-btn @click="rejectDialog = false">Cancel</v-btn>
-            <v-btn color="error" @click="confirmReject" :loading="loading">
-              Reject
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <AppModal v-model="rejectDialog" title="Reject FU-PA Code Request" icon="mdi-close-circle" color="error" size="sm">
+        <p class="mb-4">Are you sure you want to reject this FU-PA Code request?</p>
+        <v-textarea
+          v-model="rejectionReason"
+          label="Rejection Reason *"
+          variant="outlined"
+          rows="4"
+          hint="Provide a reason for rejection"
+          :rules="[v => !!v || 'Rejection reason is required']"
+        />
+        <template #actions>
+          <v-btn variant="outlined" :disabled="loading" @click="rejectDialog = false">Cancel</v-btn>
+          <v-btn color="error" variant="flat" @click="confirmReject" :loading="loading">
+            Reject
+          </v-btn>
+        </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
@@ -176,6 +167,8 @@
 import { ref, computed, onMounted } from 'vue';
 import AdminLayout from '../layout/AdminLayout.vue';
 import FUPACodeDetailsModal from '../modals/FUPACodeDetailsModal.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import api from '@/js/utils/api';
 import { useToast } from '@/js/composables/useToast';
 import { useUtils } from '@/js/utils/utils';

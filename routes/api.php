@@ -89,6 +89,18 @@ Route::get('test', function () {
     ]);
 });
 
+// ── Enrollee portal auth routes ────────────────────────────────────────────────
+use App\Http\Controllers\Api\EnrolleeAuthController;
+
+Route::post('enroll/login', [EnrolleeAuthController::class, 'login']);
+Route::get('enroll/plans', [EnrolleeAuthController::class, 'plans']);
+
+Route::middleware(['auth:sanctum', 'enrollee'])->prefix('enroll')->group(function () {
+    Route::post('logout',           [EnrolleeAuthController::class, 'logout']);
+    Route::get('me',                [EnrolleeAuthController::class, 'me']);
+    Route::post('change-password',  [EnrolleeAuthController::class, 'changePassword']);
+});
+
 // Auth routes (without middleware to avoid CSRF issues)
 Route::post('login', [AuthController::class, 'login'])->withoutMiddleware(['web']);
 Route::post('register', [AuthController::class, 'register']);
@@ -107,6 +119,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('dashboard/status-options', [DashboardController::class, 'getStatusOptions']);
     Route::get('dashboard/enrollment-trend', [DashboardController::class, 'enrollmentTrend']);
     Route::get('dashboard/wards-by-lga', [DashboardController::class, 'wardsByLga']);
+    Route::get('dashboard/capitation-summary', [DashboardController::class, 'capitationSummary']);
 });
 
 Route::middleware('auth:sanctum')->group(function () {

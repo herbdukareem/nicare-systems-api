@@ -108,7 +108,7 @@
           />
         </v-card-title>
         <v-card-text>
-          <v-data-table
+          <AppDataTable
             :headers="headers"
             :items="feedbacks"
             :loading="loading"
@@ -202,7 +202,7 @@
                 />
               </div>
             </template>
-          </v-data-table>
+          </AppDataTable>
         </v-card-text>
       </v-card>
     </div>
@@ -242,6 +242,7 @@ import CreateFeedbackDialog from './components/CreateFeedbackDialog.vue';
 import ViewFeedbackDialog from './components/ViewFeedbackDialog.vue';
 import EditFeedbackDialog from './components/EditFeedbackDialog.vue';
 import AssignFeedbackDialog from './components/AssignFeedbackDialog.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import { feedbackAPI } from '../../utils/api.js';
 import { useToast } from '../../composables/useToast';
 import { debounce } from 'lodash-es';

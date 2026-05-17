@@ -93,7 +93,7 @@
                 Assigned Facilities
               </v-card-title>
               <v-card-text>
-                <v-data-table
+                <AppDataTable
                   :headers="facilityHeaders"
                   :items="facilities"
                   :loading="loading"
@@ -123,7 +123,7 @@
                       <p class="text-body-2 text-grey">Contact admin to assign facilities to your account</p>
                     </div>
                   </template>
-                </v-data-table>
+                </AppDataTable>
               </v-card-text>
             </v-card>
           </v-col>
@@ -178,6 +178,7 @@ import { doDashboardAPI } from '../../utils/api';
 import { useToast } from '../../composables/useToast';
 import { useAuthStore } from '../../stores/auth';
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 
 const router = useRouter();
 const authStore = useAuthStore();

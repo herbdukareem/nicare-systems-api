@@ -1,16 +1,6 @@
 <template>
-  <v-dialog v-model="isOpen" max-width="1200" scrollable @update:model-value="handleClose">
-    <v-card v-if="paCode">
-      <v-card-title class="bg-primary text-white d-flex align-center pa-4">
-        <v-icon left class="mr-2">mdi-shield-check</v-icon>
-        <span class="text-h6">FU-PA Code Details</span>
-        <v-spacer></v-spacer>
-        <v-btn icon variant="text" @click="handleClose" color="white">
-          <v-icon>mdi-close</v-icon>
-        </v-btn>
-      </v-card-title>
-
-      <v-card-text class="pa-0">
+  <AppModal v-model="isOpen" title="FU-PA Code Details" icon="mdi-shield-check" size="2xl">
+      <div v-if="paCode">
         <v-container fluid>
           <!-- Header Info -->
           <v-row class="bg-grey-lighten-4 pa-4">
@@ -452,29 +442,26 @@
             </v-col>
           </v-row>
         </v-container>
-      </v-card-text>
+      </div>
 
-      <v-divider></v-divider>
-
-      <v-card-actions class="pa-4">
-        <v-btn
-          color="purple"
-          variant="elevated"
-          @click="printPASlip"
-          prepend-icon="mdi-printer"
-        >
-          Print Slip
-        </v-btn>
-        <v-spacer></v-spacer>
-        <slot name="actions"></slot>
-        <v-btn variant="outlined" @click="handleClose">Close</v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+    <template #actions>
+      <v-btn
+        color="purple"
+        variant="elevated"
+        @click="printPASlip"
+        prepend-icon="mdi-printer"
+      >
+        Print Slip
+      </v-btn>
+      <slot name="actions"></slot>
+      <v-btn variant="outlined" @click="handleClose">Close</v-btn>
+    </template>
+  </AppModal>
 </template>
 
 <script setup>
 import { computed } from 'vue';
+import AppModal from '../common/AppModal.vue';
 
 const props = defineProps({
   modelValue: Boolean,

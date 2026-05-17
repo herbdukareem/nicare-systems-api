@@ -140,6 +140,7 @@ class MigrateLegacyEnrolleesCommand extends Command
             'enrollees',
             'funding_types',
             'benefactors',
+            'enrollment_phases',
             'insurance_programmes',
             'enrollee_categories',
             'premium_plans',

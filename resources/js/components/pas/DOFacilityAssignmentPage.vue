@@ -47,7 +47,7 @@
           <v-col cols="12">
             <v-card elevation="2">
               <v-card-text>
-                <v-data-table
+                <AppDataTable
                   :headers="headers"
                   :items="filteredAssignments"
                   :loading="loading"
@@ -91,91 +91,83 @@
                       <p class="text-body-2 text-grey">Click "Assign Facility" to create a new assignment</p>
                     </div>
                   </template>
-                </v-data-table>
+                </AppDataTable>
               </v-card-text>
             </v-card>
           </v-col>
         </v-row>
 
         <!-- Create/Edit Dialog -->
-        <v-dialog v-model="showDialog" max-width="600px" persistent>
-          <v-card>
-            <v-card-title class="bg-primary text-white">
-              <v-icon start>mdi-hospital-marker</v-icon>
-              Assign Facility to User
-            </v-card-title>
-            <v-card-text class="pt-4">
-              <v-form ref="assignmentForm">
-                <v-autocomplete
-                  v-model="form.user_id"
-                  label="User"
-                  :items="deskOfficers"
-                  :loading="loadingUsers"
-                  item-title="name"
-                  item-value="id"
-                  variant="outlined"
-                  density="comfortable"
-                  prepend-inner-icon="mdi-account"
-                  :rules="[v => !!v || 'User is required']"
-                  class="mb-4"
-                >
-                  <template v-slot:item="{ props, item }">
-                    <v-list-item v-bind="props">
-                      <template v-slot:title>
-                        {{ item.raw.name }}
-                      </template>
-                      <template v-slot:subtitle>
-                        {{ item.raw.username }} - {{ item.raw.email }}
-                      </template>
-                    </v-list-item>
+        <AppModal v-model="showDialog" title="Assign Facility to User" icon="mdi-hospital-marker" size="md" :loading="saving" persistent>
+          <v-form ref="assignmentForm">
+            <v-autocomplete
+              v-model="form.user_id"
+              label="User"
+              :items="deskOfficers"
+              :loading="loadingUsers"
+              item-title="name"
+              item-value="id"
+              variant="outlined"
+              density="comfortable"
+              prepend-inner-icon="mdi-account"
+              :rules="[v => !!v || 'User is required']"
+              class="mb-4"
+            >
+              <template v-slot:item="{ props, item }">
+                <v-list-item v-bind="props">
+                  <template v-slot:title>
+                    {{ item.raw.name }}
                   </template>
-                </v-autocomplete>
+                  <template v-slot:subtitle>
+                    {{ item.raw.username }} - {{ item.raw.email }}
+                  </template>
+                </v-list-item>
+              </template>
+            </v-autocomplete>
 
-                <v-autocomplete
-                  v-model="form.facility_id"
-                  label="Facility"
-                  :items="availableFacilities"
-                  item-title="name"
-                  item-value="id"
-                  variant="outlined"
-                  density="comfortable"
-                  prepend-inner-icon="mdi-hospital-building"
-                  :rules="[v => !!v || 'Facility is required']"
-                >
-                  <template v-slot:item="{ props, item }">
-                    <v-list-item v-bind="props">
-                      <template v-slot:title>
-                        {{ item.raw.name }}
-                      </template>
-                      <template v-slot:subtitle>
-                        {{ item.raw.level_of_care }} - {{ item.raw.lga?.name }}
-                      </template>
-                    </v-list-item>
+            <v-autocomplete
+              v-model="form.facility_id"
+              label="Facility"
+              :items="availableFacilities"
+              item-title="name"
+              item-value="id"
+              variant="outlined"
+              density="comfortable"
+              prepend-inner-icon="mdi-hospital-building"
+              :rules="[v => !!v || 'Facility is required']"
+            >
+              <template v-slot:item="{ props, item }">
+                <v-list-item v-bind="props">
+                  <template v-slot:title>
+                    {{ item.raw.name }}
                   </template>
-                </v-autocomplete>
-              </v-form>
-            </v-card-text>
-            <v-divider></v-divider>
-            <v-card-actions class="pa-4">
-              <v-spacer></v-spacer>
-              <v-btn
-                color="secondary"
-                variant="outlined"
-                @click="closeDialog"
-              >
-                Cancel
-              </v-btn>
-              <v-btn
-                color="primary"
-                @click="saveAssignment"
-                :loading="saving"
-              >
-                <v-icon start>mdi-check</v-icon>
-                Assign
-              </v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-dialog>
+                  <template v-slot:subtitle>
+                    {{ item.raw.level_of_care }} - {{ item.raw.lga?.name }}
+                  </template>
+                </v-list-item>
+              </template>
+            </v-autocomplete>
+          </v-form>
+          <template #actions>
+            <v-btn
+              color="secondary"
+              variant="outlined"
+              :disabled="saving"
+              @click="closeDialog"
+            >
+              Cancel
+            </v-btn>
+            <v-btn
+              color="primary"
+              variant="flat"
+              @click="saveAssignment"
+              :loading="saving"
+            >
+              <v-icon start>mdi-check</v-icon>
+              Assign
+            </v-btn>
+          </template>
+        </AppModal>
       </v-container>
     </div>
   </AdminLayout>
@@ -186,6 +178,8 @@ import { ref, computed, onMounted } from 'vue';
 import { doFacilityAPI } from '../../utils/api';
 import { useToast } from '../../composables/useToast';
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 
 const { success: showSuccess, error: showError } = useToast();
 

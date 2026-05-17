@@ -83,32 +83,24 @@
       </v-card>
 
       <!-- Report Generate Dialog -->
-      <v-dialog v-model="reportDialog" max-width="500">
-        <v-card class="tw-rounded-xl" elevation="0">
-          <v-card-title class="tw-px-6 tw-pt-6 tw-pb-2 tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-lg tw-font-bold">{{ selectedReport?.title }}</span>
-            <v-btn icon="mdi-close" variant="text" @click="reportDialog = false" />
-          </v-card-title>
-          <v-divider />
-          <v-card-text class="tw-px-6 tw-py-4 tw-space-y-4">
-            <p class="tw-text-sm tw-text-gray-600">{{ selectedReport?.description }}</p>
-            <v-text-field label="Start Date" type="date" variant="outlined" density="compact" v-model="reportForm.date_from" />
-            <v-text-field label="End Date" type="date" variant="outlined" density="compact" v-model="reportForm.date_to" />
-            <v-select
-              label="Format"
-              :items="selectedReport?.formats ?? []"
-              v-model="reportForm.format"
-              variant="outlined"
-              density="compact"
-            />
-          </v-card-text>
-          <v-card-actions class="tw-px-6 tw-pb-4 tw-gap-2">
-            <v-spacer />
-            <v-btn variant="outlined" @click="reportDialog = false">Cancel</v-btn>
-            <v-btn color="primary" variant="flat" prepend-icon="mdi-download" :loading="generating" @click="generateReport">Generate</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <AppModal v-model="reportDialog" :title="selectedReport?.title ?? 'Generate Report'" size="sm">
+        <div class="tw-space-y-4">
+          <p class="tw-text-sm tw-text-gray-600">{{ selectedReport?.description }}</p>
+          <v-text-field label="Start Date" type="date" variant="outlined" density="compact" v-model="reportForm.date_from" />
+          <v-text-field label="End Date" type="date" variant="outlined" density="compact" v-model="reportForm.date_to" />
+          <v-select
+            label="Format"
+            :items="selectedReport?.formats ?? []"
+            v-model="reportForm.format"
+            variant="outlined"
+            density="compact"
+          />
+        </div>
+        <template #actions>
+          <v-btn variant="outlined" @click="reportDialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" prepend-icon="mdi-download" :loading="generating" @click="generateReport">Generate</v-btn>
+        </template>
+      </AppModal>
 
     </div>
   </AdminLayout>
@@ -120,6 +112,7 @@ import AdminLayout from '../layout/AdminLayout.vue';
 import AppPageHeader from '../common/AppPageHeader.vue';
 import AppStatCard from '../common/AppStatCard.vue';
 import AppEmptyState from '../common/AppEmptyState.vue';
+import AppModal from '../common/AppModal.vue';
 import { dashboardAPI } from '../../utils/api';
 import { useToast } from '../../composables/useToast';
 

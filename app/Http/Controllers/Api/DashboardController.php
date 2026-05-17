@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Benefactor;
+use App\Models\Capitation;
 use App\Models\Enrollee;
 use App\Models\Facility;
 use App\Models\Invoice;
@@ -736,6 +737,109 @@ class DashboardController extends Controller
             'total_value' => (float) PremiumPin::sum('amount'),
             'used_value' => (float) PremiumPin::where('status', PremiumPin::STATUS_USED)->sum('amount'),
         ];
+    }
+
+    /**
+     * GET /api/dashboard/capitation-summary
+     */
+    public function capitationSummary(): JsonResponse
+    {
+        $now    = now();
+        $thisM  = $now->month;
+        $thisY  = $now->year;
+        $lastM  = $now->copy()->subMonth()->month;
+        $lastY  = $now->copy()->subMonth()->year;
+
+        // Total paid across all capitation payments (status = 1 means paid)
+        $totalPaid = (float) DB::table('capitation_payments')
+            ->where('status', 1)
+            ->sum('amount');
+
+        // Last month: sum of generated capitation detail amounts
+        $lastMonthGenerated = (float) DB::table('capitation_details')
+            ->join('capitations', 'capitation_details.capitation_id', '=', 'capitations.id')
+            ->where('capitations.capitation_month', $lastM)
+            ->where('capitations.year', $lastY)
+            ->whereNull('capitations.deleted_at')
+            ->sum('capitation_details.total_amount');
+
+        // Last month: sum of paid amounts
+        $lastMonthPaid = (float) DB::table('capitation_payments')
+            ->join('capitations', 'capitation_payments.capitation_id', '=', 'capitations.id')
+            ->where('capitations.capitation_month', $lastM)
+            ->where('capitations.year', $lastY)
+            ->where('capitation_payments.status', 1)
+            ->whereNull('capitations.deleted_at')
+            ->sum('capitation_payments.amount');
+
+        // This month: generated
+        $thisMonthGenerated = (float) DB::table('capitation_details')
+            ->join('capitations', 'capitation_details.capitation_id', '=', 'capitations.id')
+            ->where('capitations.capitation_month', $thisM)
+            ->where('capitations.year', $thisY)
+            ->whereNull('capitations.deleted_at')
+            ->sum('capitation_details.total_amount');
+
+        // Latest 5 capitation periods with financial aggregates
+        $latestPeriods = Capitation::query()
+            ->select([
+                'capitations.*',
+                DB::raw('(SELECT COUNT(DISTINCT facility_id) FROM capitation_details WHERE capitation_id = capitations.id) AS facilities_count'),
+                DB::raw('(SELECT COALESCE(SUM(total_amount), 0) FROM capitation_details WHERE capitation_id = capitations.id) AS amount_generated'),
+                DB::raw('(SELECT COALESCE(SUM(amount), 0) FROM capitation_payments WHERE capitation_id = capitations.id AND status = 1) AS amount_paid'),
+            ])
+            ->orderBy('id', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function (Capitation $p) {
+                $paid      = (float) $p->amount_paid;
+                $generated = (float) $p->amount_generated;
+
+                if ($p->status) {
+                    $status = 'finalised';
+                } elseif ($paid > 0) {
+                    $status = 'in_progress';
+                } elseif ($p->computed_at) {
+                    $status = 'generated';
+                } else {
+                    $status = 'draft';
+                }
+
+                return [
+                    'id'                => $p->id,
+                    'name'              => $p->name,
+                    'period_start'      => $p->period_start,
+                    'period_end'        => $p->period_end,
+                    'capitation_month'  => $p->capitation_month,
+                    'year'              => $p->year,
+                    'facilities_count'  => (int) $p->facilities_count,
+                    'amount_generated'  => $generated,
+                    'amount_paid'       => $paid,
+                    'status'            => $status,
+                    'computed_at'       => $p->computed_at,
+                    'finalised_at'      => $p->finalised_at,
+                ];
+            });
+
+        $lastMonthStatus = $lastMonthPaid > 0 ? 'paid' : ($lastMonthGenerated > 0 ? 'generated' : 'none');
+
+        return response()->json([
+            'success' => true,
+            'data'    => [
+                'total_paid'     => $totalPaid,
+                'last_month'     => [
+                    'label'             => $now->copy()->subMonth()->format('F Y'),
+                    'amount_generated'  => $lastMonthGenerated,
+                    'amount_paid'       => $lastMonthPaid,
+                    'status'            => $lastMonthStatus,
+                ],
+                'this_month'     => [
+                    'label'             => $now->format('F Y'),
+                    'amount_generated'  => $thisMonthGenerated,
+                ],
+                'latest_periods' => $latestPeriods,
+            ],
+        ]);
     }
 
     private function invoiceSummary(): array

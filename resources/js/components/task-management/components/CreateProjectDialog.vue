@@ -1,96 +1,84 @@
 <template>
-  <v-dialog v-model="dialog" max-width="800px" persistent>
-    <v-card>
-      <v-card-title class="d-flex align-center justify-space-between">
-        <span class="text-h5">Create New Project</span>
-        <v-btn icon="mdi-close" variant="text" @click="close" />
-      </v-card-title>
-      
-      <v-divider />
-      
-      <v-card-text class="pa-6">
-        <v-form ref="form" v-model="valid">
-          <v-row>
-            <v-col cols="12">
-              <v-text-field
-                v-model="project.name"
-                label="Project Name"
-                :rules="[rules.required]"
-                variant="outlined"
-                required
-              />
-            </v-col>
-            
-            <v-col cols="12">
-              <v-textarea
-                v-model="project.description"
-                label="Description"
-                variant="outlined"
-                rows="3"
-              />
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <v-select
-                v-model="project.priority"
-                label="Priority"
-                :items="priorityOptions"
-                variant="outlined"
-              />
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <v-text-field
-                v-model="project.budget"
-                label="Budget"
-                type="number"
-                variant="outlined"
-                prefix="₦"
-                min="0"
-              />
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <v-text-field
-                v-model="project.start_date"
-                label="Start Date"
-                type="date"
-                variant="outlined"
-              />
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <v-text-field
-                v-model="project.end_date"
-                label="End Date"
-                type="date"
-                variant="outlined"
-              />
-            </v-col>
-          </v-row>
-        </v-form>
-      </v-card-text>
-      
-      <v-divider />
-      
-      <v-card-actions class="pa-4">
-        <v-spacer />
-        <v-btn variant="text" @click="close">Cancel</v-btn>
-        <v-btn
-          color="primary"
-          :loading="loading"
-          :disabled="!valid"
-          @click="save"
-        >
-          Create Project
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+  <AppModal v-model="dialog" title="Create New Project" size="lg" :loading="loading" persistent>
+    <v-form ref="form" v-model="valid">
+      <v-row>
+        <v-col cols="12">
+          <v-text-field
+            v-model="project.name"
+            label="Project Name"
+            :rules="[rules.required]"
+            variant="outlined"
+            required
+          />
+        </v-col>
+
+        <v-col cols="12">
+          <v-textarea
+            v-model="project.description"
+            label="Description"
+            variant="outlined"
+            rows="3"
+          />
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-select
+            v-model="project.priority"
+            label="Priority"
+            :items="priorityOptions"
+            variant="outlined"
+          />
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-text-field
+            v-model="project.budget"
+            label="Budget"
+            type="number"
+            variant="outlined"
+            prefix="₦"
+            min="0"
+          />
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-text-field
+            v-model="project.start_date"
+            label="Start Date"
+            type="date"
+            variant="outlined"
+          />
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-text-field
+            v-model="project.end_date"
+            label="End Date"
+            type="date"
+            variant="outlined"
+          />
+        </v-col>
+      </v-row>
+    </v-form>
+
+    <template #actions>
+      <v-btn variant="outlined" :disabled="loading" @click="close">Cancel</v-btn>
+      <v-btn
+        color="primary"
+        variant="flat"
+        :loading="loading"
+        :disabled="!valid"
+        @click="save"
+      >
+        Create Project
+      </v-btn>
+    </template>
+  </AppModal>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
+import AppModal from '../../common/AppModal.vue'
 
 const props = defineProps({
   modelValue: {

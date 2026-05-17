@@ -1,96 +1,84 @@
 <template>
-  <v-dialog v-model="dialog" max-width="800px" persistent>
-    <v-card>
-      <v-card-title class="d-flex align-center justify-space-between">
-        <span class="text-h5">Create New Task</span>
-        <v-btn icon="mdi-close" variant="text" @click="close" />
-      </v-card-title>
-      
-      <v-divider />
-      
-      <v-card-text class="pa-6">
-        <v-form ref="form" v-model="valid">
-          <v-row>
-            <v-col cols="12">
-              <v-text-field
-                v-model="task.title"
-                label="Task Title"
-                :rules="[rules.required]"
-                variant="outlined"
-                required
-              />
-            </v-col>
-            
-            <v-col cols="12">
-              <v-textarea
-                v-model="task.description"
-                label="Description"
-                variant="outlined"
-                rows="3"
-              />
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <v-select
-                v-model="task.priority"
-                label="Priority"
-                :items="priorityOptions"
-                variant="outlined"
-              />
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <v-select
-                v-model="task.type"
-                label="Type"
-                :items="typeOptions"
-                variant="outlined"
-              />
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <v-text-field
-                v-model="task.due_date"
-                label="Due Date"
-                type="date"
-                variant="outlined"
-              />
-            </v-col>
-            
-            <v-col cols="12" md="6">
-              <v-text-field
-                v-model="task.story_points"
-                label="Story Points"
-                type="number"
-                variant="outlined"
-                min="1"
-                max="100"
-              />
-            </v-col>
-          </v-row>
-        </v-form>
-      </v-card-text>
-      
-      <v-divider />
-      
-      <v-card-actions class="pa-4">
-        <v-spacer />
-        <v-btn variant="text" @click="close">Cancel</v-btn>
-        <v-btn
-          color="primary"
-          :loading="loading"
-          :disabled="!valid"
-          @click="save"
-        >
-          Create Task
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+  <AppModal v-model="dialog" title="Create New Task" size="lg" :loading="loading" persistent>
+    <v-form ref="form" v-model="valid">
+      <v-row>
+        <v-col cols="12">
+          <v-text-field
+            v-model="task.title"
+            label="Task Title"
+            :rules="[rules.required]"
+            variant="outlined"
+            required
+          />
+        </v-col>
+
+        <v-col cols="12">
+          <v-textarea
+            v-model="task.description"
+            label="Description"
+            variant="outlined"
+            rows="3"
+          />
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-select
+            v-model="task.priority"
+            label="Priority"
+            :items="priorityOptions"
+            variant="outlined"
+          />
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-select
+            v-model="task.type"
+            label="Type"
+            :items="typeOptions"
+            variant="outlined"
+          />
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-text-field
+            v-model="task.due_date"
+            label="Due Date"
+            type="date"
+            variant="outlined"
+          />
+        </v-col>
+
+        <v-col cols="12" md="6">
+          <v-text-field
+            v-model="task.story_points"
+            label="Story Points"
+            type="number"
+            variant="outlined"
+            min="1"
+            max="100"
+          />
+        </v-col>
+      </v-row>
+    </v-form>
+
+    <template #actions>
+      <v-btn variant="outlined" :disabled="loading" @click="close">Cancel</v-btn>
+      <v-btn
+        color="primary"
+        variant="flat"
+        :loading="loading"
+        :disabled="!valid"
+        @click="save"
+      >
+        Create Task
+      </v-btn>
+    </template>
+  </AppModal>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
+import AppModal from '../../common/AppModal.vue'
 
 const props = defineProps({
   modelValue: {

@@ -11,6 +11,13 @@ class CapitationDetail extends Model
     protected $primaryKey = 'id';
    protected $guarded = ['id'];
 
+    protected $casts = [
+        'metadata' => 'array',
+        'reviewed_at' => 'date',
+        'approved_at' => 'date',
+        'paid_at' => 'date',
+    ];
+
     // capitation
     public function capitation(){
         return $this->belongsTo(Capitation::class, 'capitation_id', 'id');

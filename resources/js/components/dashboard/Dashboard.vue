@@ -512,68 +512,95 @@
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
               <div>
                 <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Capitation Overview</h2>
-                <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Period pipeline, payment status and provider amounts</p>
+                <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Financial summary and recent capitation periods</p>
               </div>
               <router-link to="/capitation/generate">
                 <v-chip size="x-small" color="cyan" variant="tonal" class="tw-cursor-pointer">View all</v-chip>
               </router-link>
             </div>
 
-            <!-- Summary stat chips -->
-            <div class="tw-grid tw-grid-cols-2 sm:tw-grid-cols-4 tw-gap-px tw-bg-gray-100 tw-border-b tw-border-gray-100">
+            <!-- Financial summary cards -->
+            <div class="tw-grid tw-grid-cols-1 sm:tw-grid-cols-3 tw-gap-px tw-bg-gray-100 tw-border-b tw-border-gray-100">
+              <!-- Total Paid -->
               <div class="tw-bg-white tw-px-5 tw-py-4">
-                <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">Total Periods</p>
-                <p class="tw-text-2xl tw-font-extrabold tw-text-gray-900 tw-mt-1">{{ capitationStats.total }}</p>
+                <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
+                  <div class="tw-h-7 tw-w-7 tw-rounded-lg tw-bg-green-50 tw-flex tw-items-center tw-justify-center tw-flex-shrink-0">
+                    <v-icon size="15" color="green-darken-1">mdi-cash-check</v-icon>
+                  </div>
+                  <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">Total Paid So Far</p>
+                </div>
+                <p v-if="capitationLoading" class="tw-text-xl tw-font-extrabold tw-text-gray-300 tw-animate-pulse">₦ —</p>
+                <p v-else class="tw-text-xl tw-font-extrabold tw-text-green-700">₦{{ fmtAmount(capitationSummary.total_paid) }}</p>
+                <p class="tw-text-[11px] tw-text-gray-400 tw-mt-0.5">All-time capitation disbursements</p>
               </div>
+
+              <!-- Last Month -->
               <div class="tw-bg-white tw-px-5 tw-py-4">
-                <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">Finalised</p>
-                <p class="tw-text-2xl tw-font-extrabold tw-text-green-600 tw-mt-1">{{ capitationStats.finalised }}</p>
+                <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
+                  <div class="tw-h-7 tw-w-7 tw-rounded-lg tw-bg-blue-50 tw-flex tw-items-center tw-justify-center tw-flex-shrink-0">
+                    <v-icon size="15" color="blue-darken-1">mdi-calendar-month-outline</v-icon>
+                  </div>
+                  <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">
+                    Last Month<span v-if="capitationSummary.last_month?.label" class="tw-normal-case tw-tracking-normal tw-font-normal"> ({{ capitationSummary.last_month.label }})</span>
+                  </p>
+                </div>
+                <p v-if="capitationLoading" class="tw-text-xl tw-font-extrabold tw-text-gray-300 tw-animate-pulse">₦ —</p>
+                <p v-else class="tw-text-xl tw-font-extrabold tw-text-blue-700">₦{{ fmtAmount(capitationSummary.last_month?.amount_paid) }}</p>
+                <p class="tw-text-[11px] tw-text-gray-400 tw-mt-0.5">
+                  <span v-if="!capitationLoading && capitationSummary.last_month?.amount_generated">Generated: ₦{{ fmtAmount(capitationSummary.last_month.amount_generated) }}</span>
+                  <span v-else>Amount paid last month</span>
+                </p>
               </div>
+
+              <!-- This Month -->
               <div class="tw-bg-white tw-px-5 tw-py-4">
-                <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">In Progress</p>
-                <p class="tw-text-2xl tw-font-extrabold tw-text-amber-600 tw-mt-1">{{ capitationStats.inProgress }}</p>
-              </div>
-              <div class="tw-bg-white tw-px-5 tw-py-4">
-                <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">Draft</p>
-                <p class="tw-text-2xl tw-font-extrabold tw-text-gray-400 tw-mt-1">{{ capitationStats.draft }}</p>
+                <div class="tw-flex tw-items-center tw-gap-2 tw-mb-2">
+                  <div class="tw-h-7 tw-w-7 tw-rounded-lg tw-bg-cyan-50 tw-flex tw-items-center tw-justify-center tw-flex-shrink-0">
+                    <v-icon size="15" color="cyan-darken-1">mdi-calendar-today-outline</v-icon>
+                  </div>
+                  <p class="tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-400">
+                    This Month<span v-if="capitationSummary.this_month?.label" class="tw-normal-case tw-tracking-normal tw-font-normal"> ({{ capitationSummary.this_month.label }})</span>
+                  </p>
+                </div>
+                <p v-if="capitationLoading" class="tw-text-xl tw-font-extrabold tw-text-gray-300 tw-animate-pulse">₦ —</p>
+                <p v-else class="tw-text-xl tw-font-extrabold tw-text-cyan-700">₦{{ fmtAmount(capitationSummary.this_month?.amount_generated) }}</p>
+                <p class="tw-text-[11px] tw-text-gray-400 tw-mt-0.5">Generated capitation this month</p>
               </div>
             </div>
 
-            <!-- Recent periods list -->
+            <!-- Latest periods list -->
             <div v-if="capitationLoading" class="tw-flex tw-items-center tw-justify-center tw-py-10">
               <v-progress-circular indeterminate color="cyan" size="28" />
             </div>
-            <div v-else-if="capitationPeriods.length" class="tw-divide-y tw-divide-gray-50">
+            <div v-else-if="capitationSummary.latest_periods?.length" class="tw-divide-y tw-divide-gray-50">
               <div
-                v-for="period in capitationPeriods.slice(0, 5)"
+                v-for="period in capitationSummary.latest_periods"
                 :key="period.id"
-                class="tw-flex tw-items-center tw-gap-4 tw-px-6 tw-py-3.5 hover:tw-bg-slate-50 tw-transition-colors"
+                class="tw-flex tw-items-start tw-gap-4 tw-px-6 tw-py-3.5 hover:tw-bg-slate-50 tw-transition-colors"
               >
                 <div
-                  class="tw-flex tw-h-9 tw-w-9 tw-flex-shrink-0 tw-items-center tw-justify-center tw-rounded-lg"
-                  :class="period.status ? 'tw-bg-green-100' : period.computed_at ? 'tw-bg-blue-100' : 'tw-bg-amber-100'"
+                  class="tw-flex tw-h-9 tw-w-9 tw-flex-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-mt-0.5"
+                  :class="capStatusClass(period.status_key).bg"
                 >
-                  <v-icon size="18" :color="period.status ? 'green' : period.computed_at ? 'blue' : 'amber-darken-2'">
-                    {{ period.status ? 'mdi-check-decagram' : period.computed_at ? 'mdi-progress-check' : 'mdi-clock-outline' }}
-                  </v-icon>
+                  <v-icon size="17" :color="capStatusClass(period.status_key).icon">{{ capStatusClass(period.status_key).mdi }}</v-icon>
                 </div>
                 <div class="tw-flex-1 tw-min-w-0">
                   <p class="tw-text-sm tw-font-semibold tw-text-gray-900 tw-truncate">{{ period.name }}</p>
                   <p class="tw-text-xs tw-text-gray-400 tw-mt-0.5">
-                    {{ formatCapDate(period.period_start) }} – {{ formatCapDate(period.period_end) }}
+                    Eligible: {{ formatCapDate(period.period_end) }}
                     <span class="tw-mx-1 tw-text-gray-300">·</span>
-                    {{ period.capitation_details_count || 0 }} facilities
+                    {{ period.facilities_count }} {{ period.facilities_count === 1 ? 'facility' : 'facilities' }}
+                  </p>
+                  <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5 tw-font-mono">
+                    ₦{{ fmtAmount(period.amount_paid) }} paid
+                    <span class="tw-text-gray-300 tw-mx-1">/</span>
+                    ₦{{ fmtAmount(period.amount_generated) }} generated
                   </p>
                 </div>
-                <div class="tw-text-right tw-shrink-0">
-                  <span
-                    class="tw-inline-block tw-rounded-full tw-px-2 tw-py-0.5 tw-text-xs tw-font-semibold"
-                    :class="period.status ? 'tw-bg-green-50 tw-text-green-700' : period.computed_at ? 'tw-bg-blue-50 tw-text-blue-700' : 'tw-bg-amber-50 tw-text-amber-700'"
-                  >{{ period.status ? 'Finalised' : period.computed_at ? 'Computed' : 'Draft' }}</span>
-                  <p v-if="period.capitation_rate" class="tw-text-xs tw-text-gray-400 tw-mt-1 tw-font-mono">
-                    ₦{{ Number(period.capitation_rate).toLocaleString() }}/head
-                  </p>
-                </div>
+                <span
+                  class="tw-inline-block tw-rounded-full tw-px-2.5 tw-py-0.5 tw-text-[11px] tw-font-semibold tw-flex-shrink-0 tw-mt-0.5"
+                  :class="capStatusClass(period.status_key).badge"
+                >{{ capStatusLabel(period.status_key) }}</span>
               </div>
             </div>
             <div v-else class="tw-py-10 tw-text-center tw-text-gray-400 tw-text-sm">
@@ -593,7 +620,7 @@ import AdminLayout from '../layout/AdminLayout.vue'
 import LineChart from '../charts/LineChart.vue'
 import BarChart from '../charts/BarChart.vue'
 import DoughnutChart from '../charts/DoughnutChart.vue'
-import { capitationAPI, dashboardAPI } from '../../utils/api'
+import { dashboardAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
 
 const { error, success } = useToast()
@@ -743,28 +770,28 @@ function backToYears() {
   trendMonthlyData.value  = []
 }
 
-// ── Capitation stats ─────────────────────────────────────────────────────────
-const capitationPeriods = ref([])
+// ── Capitation summary ────────────────────────────────────────────────────────
 const capitationLoading = ref(false)
+const capitationSummary = ref({ total_paid: 0, last_month: null, this_month: null, latest_periods: [] })
 
-const capitationStats = computed(() => {
-  const periods = capitationPeriods.value
-  return {
-    total:      periods.length,
-    finalised:  periods.filter(p => p.status).length,
-    inProgress: periods.filter(p => !p.status && p.computed_at).length,
-    draft:      periods.filter(p => !p.status && !p.computed_at).length,
-  }
-})
-
+const fmtAmount = (val) => val != null ? Number(val).toLocaleString('en-NG', { minimumFractionDigits: 0, maximumFractionDigits: 0 }) : '0'
 const formatCapDate = (value) => value ? new Date(value).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '—'
+
+const CAP_STATUS = {
+  finalised:   { bg: 'tw-bg-green-100', icon: 'green-darken-1',  mdi: 'mdi-check-decagram',  badge: 'tw-bg-green-50 tw-text-green-700' },
+  in_progress: { bg: 'tw-bg-amber-100', icon: 'amber-darken-2',  mdi: 'mdi-progress-clock',  badge: 'tw-bg-amber-50 tw-text-amber-700' },
+  generated:   { bg: 'tw-bg-blue-100',  icon: 'blue-darken-1',   mdi: 'mdi-progress-check',  badge: 'tw-bg-blue-50 tw-text-blue-700' },
+  draft:       { bg: 'tw-bg-gray-100',  icon: 'grey-darken-1',   mdi: 'mdi-clock-outline',   badge: 'tw-bg-gray-100 tw-text-gray-500' },
+}
+const STATUS_LABELS = { finalised: 'Finalised', in_progress: 'In Progress', generated: 'Generated', draft: 'Draft' }
+const capStatusClass = (key) => CAP_STATUS[key] || CAP_STATUS.draft
+const capStatusLabel = (key) => STATUS_LABELS[key] || 'Draft'
 
 async function loadCapitationStats() {
   capitationLoading.value = true
   try {
-    const response = await capitationAPI.periods({ per_page: 20, sort: 'desc' })
-    const payload = response.data?.data
-    capitationPeriods.value = (payload?.data || payload || []).sort((a, b) => b.id - a.id)
+    const response = await dashboardAPI.getCapitationSummary()
+    capitationSummary.value = response.data?.data || capitationSummary.value
   } catch (_) {
     // non-critical
   } finally {

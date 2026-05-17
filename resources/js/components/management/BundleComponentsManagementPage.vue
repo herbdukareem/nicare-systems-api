@@ -133,7 +133,7 @@
         <v-col cols="12">
           <v-card>
             <v-card-text>
-              <v-data-table
+              <AppDataTable
                 :headers="headers"
                 :items="components"
                 :loading="loading"
@@ -185,7 +185,7 @@
                     <v-icon>mdi-delete</v-icon>
                   </v-btn>
                 </template>
-              </v-data-table>
+              </AppDataTable>
             </v-card-text>
           </v-card>
         </v-col>
@@ -193,12 +193,7 @@
     </v-container>
 
     <!-- Create/Edit Dialog -->
-    <v-dialog v-model="showCreateDialog" max-width="600px" persistent>
-      <v-card>
-        <v-card-title class="bg-primary text-white">
-          <span>{{ editMode ? 'Edit Component' : 'Add Component to Bundle' }}</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="showCreateDialog" :title="editMode ? 'Edit Component' : 'Add Component to Bundle'" size="md" :loading="saving" persistent>
           <v-form ref="componentForm">
             <v-row>
 
@@ -281,24 +276,16 @@
               </v-col>
             </v-row>
           </v-form>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="closeDialog">Cancel</v-btn>
-          <v-btn color="primary" variant="elevated" @click="saveComponent" :loading="saving">
-            {{ editMode ? 'Update Component' : 'Add Component' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="saving" @click="closeDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" :loading="saving" @click="saveComponent">
+          {{ editMode ? 'Update Component' : 'Add Component' }}
+        </v-btn>
+      </template>
+    </AppModal>
 
     <!-- Bulk Add Dialog -->
-    <v-dialog v-model="showBulkAddDialog" max-width="900px" persistent>
-      <v-card>
-        <v-card-title class="bg-primary text-white">
-          <span>Bulk Add Components</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="showBulkAddDialog" title="Bulk Add Components" size="lg" :loading="saving" persistent>
           <v-form ref="bulkForm">
             <v-row>
               <v-col cols="12">
@@ -375,44 +362,24 @@
               </v-col>
             </v-row>
           </v-form>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="closeBulkDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="bulkAddComponents" :loading="saving">
-            Add All
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="saving" @click="closeBulkDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" :loading="saving" @click="bulkAddComponents">Add All</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="showDeleteDialog" max-width="400px">
-      <v-card>
-        <v-card-title class="bg-error text-white">
-          <span>Confirm Delete</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="showDeleteDialog" title="Confirm Delete" size="sm" color="error" :loading="deleting">
           <p>Are you sure you want to delete this component?</p>
           <p class="font-weight-bold">{{ componentToDelete?.case_record?.case_name }}</p>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="showDeleteDialog = false">Cancel</v-btn>
-          <v-btn color="error" @click="deleteComponent" :loading="deleting">
-            Delete
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="deleting" @click="showDeleteDialog = false">Cancel</v-btn>
+        <v-btn color="error" variant="flat" :loading="deleting" @click="deleteComponent">Delete</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Import Dialog -->
-    <v-dialog v-model="importDialog" max-width="600px" persistent>
-      <v-card>
-        <v-card-title class="bg-grey-lighten-4">
-          <span class="text-h6">Import Bundle Components</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="importDialog" title="Import Bundle Components" size="md" :loading="importing" persistent>
           <v-alert variant="outlined" type="info" class="mb-4">
             <div class="text-body-2">
               <strong>Import Instructions:</strong>
@@ -467,27 +434,19 @@
           <v-alert v-if="importSuccess" type="success" class="mt-4">
             {{ importSuccessMessage }}
           </v-alert>
-        </v-card-text>
-        <v-card-actions class="px-6 pb-4">
-          <v-spacer></v-spacer>
-          <v-btn text @click="closeImportDialog">Cancel</v-btn>
-          <v-btn
-            color="primary"
-            @click="importComponents"
-            :loading="importing"
-            :disabled="!importFile"
-          >
-            Import
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="importing" @click="closeImportDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" :loading="importing" :disabled="!importFile" @click="importComponents">Import</v-btn>
+      </template>
+    </AppModal>
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import { ref, computed, onMounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { useToast } from '../../composables/useToast';

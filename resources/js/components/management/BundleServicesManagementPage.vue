@@ -117,7 +117,7 @@
         <v-col cols="12">
           <v-card>
             <v-card-text>
-              <v-data-table
+              <AppDataTable
                 :headers="headers"
                 :items="bundles"
                 :loading="loading"
@@ -198,7 +198,7 @@
                     <v-icon>mdi-delete</v-icon>
                   </v-btn>
                 </template>
-              </v-data-table>
+              </AppDataTable>
             </v-card-text>
           </v-card>
         </v-col>
@@ -206,12 +206,7 @@
     </v-container>
 
     <!-- Create/Edit Dialog -->
-    <v-dialog v-model="showCreateDialog" max-width="700px" persistent>
-      <v-card>
-        <v-card-title class="bg-primary text-white">
-          <span>{{ editMode ? 'Edit Bundle' : 'Add New Bundle' }}</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="showCreateDialog" :title="editMode ? 'Edit Bundle' : 'Add New Bundle'" size="md" :loading="saving" persistent>
           <v-form ref="bundleForm">
             <v-row>
               <v-col cols="12">
@@ -290,31 +285,21 @@
               </v-col>
             </v-row>
           </v-form>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="closeDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="saveBundle" :loading="saving">
-            {{ editMode ? 'Update' : 'Create' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="saving" @click="closeDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" :loading="saving" @click="saveBundle">{{ editMode ? 'Update' : 'Create' }}</v-btn>
+      </template>
+    </AppModal>
 
     <!-- View Components Dialog -->
-    <v-dialog v-model="showComponentsDialog" max-width="900px">
-      <v-card>
-        <v-card-title class="bg-info text-white">
-          <span>Bundle Components - {{ selectedBundle?.name }}</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="showComponentsDialog" :title="`Bundle Components - ${selectedBundle?.name || ''}`" size="lg" color="info">
           <v-alert type="info" class="mb-4">
             <strong>Bundle Code:</strong> {{ selectedBundle?.code }} |
             <strong>Fixed Price:</strong> ₦{{ Number(selectedBundle?.fixed_price || 0).toLocaleString() }} |
             <strong>ICD-10:</strong> {{ selectedBundle?.diagnosis_icd10 }}
           </v-alert>
 
-          <v-data-table
+          <AppDataTable
             :headers="componentHeaders"
             :items="bundleComponents"
             :loading="loadingComponents"
@@ -342,25 +327,15 @@
                 {{ item.max_quantity }}
               </v-chip>
             </template>
-          </v-data-table>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="showComponentsDialog = false">Close</v-btn>
-          <v-btn color="primary" @click="navigateToComponents">
-            Manage Components
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+          </AppDataTable>
+      <template #actions>
+        <v-btn variant="outlined" @click="showComponentsDialog = false">Close</v-btn>
+        <v-btn color="primary" variant="flat" @click="navigateToComponents">Manage Components</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Import Dialog -->
-    <v-dialog v-model="showImportDialog" max-width="600px">
-      <v-card>
-        <v-card-title class="bg-primary text-white">
-          <span>Import Bundles from Excel</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="showImportDialog" title="Import Bundles from Excel" size="md" :loading="importing">
           <v-file-input
             v-model="importFile"
             label="Select Excel file"
@@ -383,45 +358,32 @@
             <v-icon left>mdi-download</v-icon>
             Download Template
           </v-btn>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="showImportDialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="importBundles" :loading="importing">
-            Import
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="importing" @click="showImportDialog = false">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" :loading="importing" @click="importBundles">Import</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="showDeleteDialog" max-width="400px">
-      <v-card>
-        <v-card-title class="bg-error text-white">
-          <span>Confirm Delete</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="showDeleteDialog" title="Confirm Delete" size="sm" color="error" :loading="deleting">
           <p>Are you sure you want to delete this bundle?</p>
           <p class="font-weight-bold">{{ bundleToDelete?.name }}</p>
           <v-alert type="warning" class="mt-2">
             This will also delete all associated components!
           </v-alert>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn @click="showDeleteDialog = false">Cancel</v-btn>
-          <v-btn color="error" @click="deleteBundle" :loading="deleting">
-            Delete
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="deleting" @click="showDeleteDialog = false">Cancel</v-btn>
+        <v-btn color="error" variant="flat" :loading="deleting" @click="deleteBundle">Delete</v-btn>
+      </template>
+    </AppModal>
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useToast } from '../../composables/useToast';

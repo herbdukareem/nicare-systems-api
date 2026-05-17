@@ -1,5 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useAuthStore } from '../stores/auth';
+import { useEnrolleeAuthStore } from '../stores/enrolleeAuth';
 import { useUiStore } from '../stores/ui';
 import { firstAccessiblePath } from '../navigation';
 
@@ -897,7 +898,14 @@ const routes = [
   },
 
   // ── Default ────────────────────────────────────────────────────────────────
-  { path: '/', redirect: '/dashboard' },
+  { path: '/', name: 'landing', component: () => import('../components/landing/LandingPage.vue'), meta: { requiresAuth: false } },
+
+  // ── Enrollee Portal ────────────────────────────────────────────────────────
+  { path: '/enroll/login', name: 'enroll-login', component: () => import('../components/enroll/EnrolleeLogin.vue'), meta: { requiresAuth: false, enrolleePublic: true } },
+  { path: '/enroll/dashboard', name: 'enroll-dashboard', component: () => import('../components/enroll/EnrolleeDashboard.vue'), meta: { requiresEnrolleeAuth: true, title: 'My Dashboard' } },
+  { path: '/enroll/plans', name: 'enroll-plans', component: () => import('../components/enroll/EnrolleePlansPage.vue'), meta: { requiresEnrolleeAuth: true, title: 'Premium Plans' } },
+  { path: '/enroll/profile', name: 'enroll-profile', component: () => import('../components/enroll/EnrolleeProfilePage.vue'), meta: { requiresEnrolleeAuth: true, title: 'My Profile' } },
+  { path: '/enroll/change-password', name: 'enroll-change-password', component: () => import('../components/enroll/EnrolleeChangePassword.vue'), meta: { requiresEnrolleeAuth: true, title: 'Change Password' } },
 ];
 
 const router = createRouter({
@@ -908,11 +916,37 @@ const router = createRouter({
 // ─── Navigation guard ──────────────────────────────────────────────────────────
 router.beforeEach(async (to, _from, next) => {
   const authStore = useAuthStore();
+  const enrolleeAuthStore = useEnrolleeAuthStore();
   const uiStore = useUiStore();
   uiStore.setRouteLoading(true);
 
   try {
-  // Public routes
+  // ── Enrollee portal routes ────────────────────────────────────────────────
+  if (to.meta.requiresEnrolleeAuth) {
+    if (!enrolleeAuthStore.isAuthenticated && !enrolleeAuthStore._initializing) {
+      await enrolleeAuthStore.initializeAuth();
+    }
+    if (!enrolleeAuthStore.isAuthenticated) {
+      next({ path: '/enroll/login', replace: true });
+      return;
+    }
+    next();
+    return;
+  }
+
+  if (to.meta.enrolleePublic) {
+    if (!enrolleeAuthStore.isAuthenticated && !enrolleeAuthStore._initializing) {
+      await enrolleeAuthStore.initializeAuth();
+    }
+    if (enrolleeAuthStore.isAuthenticated) {
+      next({ path: '/enroll/dashboard', replace: true });
+      return;
+    }
+    next();
+    return;
+  }
+
+  // ── System / admin routes ─────────────────────────────────────────────────
   if (!to.meta.requiresAuth) {
     if (to.name === 'login' && authStore.isAuthenticated) {
       next({ path: getDefaultDashboard(authStore), replace: true });

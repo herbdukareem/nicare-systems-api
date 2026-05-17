@@ -56,12 +56,11 @@
 
       <!-- Table -->
       <v-card class="tw-border tw-border-gray-100 tw-shadow-sm tw-rounded-xl" elevation="0">
-        <v-data-table
+        <AppDataTable
           :headers="headers"
           :items="logs"
           :loading="loading"
           :items-per-page="pagination.per_page"
-          hide-default-footer
           class="tw-rounded-xl"
         >
           <template #item.created_at="{ item }">
@@ -119,7 +118,7 @@
               <v-progress-circular indeterminate color="primary" />
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
 
         <!-- Pagination -->
         <div class="tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-border-t tw-border-gray-100">
@@ -137,52 +136,44 @@
       </v-card>
 
       <!-- Detail Dialog -->
-      <v-dialog v-model="detailDialog" max-width="640">
-        <v-card class="tw-rounded-xl" elevation="0">
-          <v-card-title class="tw-px-6 tw-pt-6 tw-pb-2 tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-lg tw-font-bold">Event Details</span>
-            <v-btn icon="mdi-close" variant="text" @click="detailDialog = false" />
-          </v-card-title>
-          <v-divider />
-          <v-card-text v-if="selectedLog" class="tw-px-6 tw-py-4 tw-space-y-4">
-            <div class="tw-grid tw-grid-cols-2 tw-gap-4">
-              <div>
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">Timestamp</p>
-                <p class="tw-text-sm tw-font-medium">{{ formatDate(selectedLog.created_at) }} {{ formatTime(selectedLog.created_at) }}</p>
-              </div>
-              <div>
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">User</p>
-                <p class="tw-text-sm tw-font-medium">{{ selectedLog.causer?.name || selectedLog.user?.name || 'System' }}</p>
-              </div>
-              <div>
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">Action</p>
-                <p class="tw-text-sm tw-font-medium tw-capitalize">{{ formatEvent(selectedLog.event || selectedLog.description) }}</p>
-              </div>
-              <div>
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">Model</p>
-                <p class="tw-text-sm tw-font-medium">{{ selectedLog.subject_type?.split('\\').pop() || '—' }}</p>
-              </div>
-              <div v-if="selectedLog.subject_id">
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">Record ID</p>
-                <p class="tw-text-sm tw-font-mono">{{ selectedLog.subject_id }}</p>
-              </div>
-              <div v-if="selectedLog.ip_address">
-                <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">IP Address</p>
-                <p class="tw-text-sm tw-font-mono">{{ selectedLog.ip_address }}</p>
-              </div>
+      <AppModal v-model="detailDialog" title="Event Details" size="md">
+        <div v-if="selectedLog" class="tw-space-y-4">
+          <div class="tw-grid tw-grid-cols-2 tw-gap-4">
+            <div>
+              <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">Timestamp</p>
+              <p class="tw-text-sm tw-font-medium">{{ formatDate(selectedLog.created_at) }} {{ formatTime(selectedLog.created_at) }}</p>
             </div>
+            <div>
+              <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">User</p>
+              <p class="tw-text-sm tw-font-medium">{{ selectedLog.causer?.name || selectedLog.user?.name || 'System' }}</p>
+            </div>
+            <div>
+              <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">Action</p>
+              <p class="tw-text-sm tw-font-medium tw-capitalize">{{ formatEvent(selectedLog.event || selectedLog.description) }}</p>
+            </div>
+            <div>
+              <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">Model</p>
+              <p class="tw-text-sm tw-font-medium">{{ selectedLog.subject_type?.split('\\').pop() || '—' }}</p>
+            </div>
+            <div v-if="selectedLog.subject_id">
+              <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">Record ID</p>
+              <p class="tw-text-sm tw-font-mono">{{ selectedLog.subject_id }}</p>
+            </div>
+            <div v-if="selectedLog.ip_address">
+              <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-1">IP Address</p>
+              <p class="tw-text-sm tw-font-mono">{{ selectedLog.ip_address }}</p>
+            </div>
+          </div>
 
-            <div v-if="selectedLog.properties && Object.keys(selectedLog.properties).length">
-              <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-2">Properties</p>
-              <pre class="tw-bg-gray-50 tw-rounded-lg tw-p-3 tw-text-xs tw-overflow-auto tw-max-h-64 tw-border tw-border-gray-200">{{ JSON.stringify(selectedLog.properties, null, 2) }}</pre>
-            </div>
-          </v-card-text>
-          <v-card-actions class="tw-px-6 tw-pb-4">
-            <v-spacer />
-            <v-btn color="primary" variant="flat" @click="detailDialog = false">Close</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+          <div v-if="selectedLog.properties && Object.keys(selectedLog.properties).length">
+            <p class="tw-text-xs tw-text-gray-400 tw-uppercase tw-tracking-wide tw-mb-2">Properties</p>
+            <pre class="tw-bg-gray-50 tw-rounded-lg tw-p-3 tw-text-xs tw-overflow-auto tw-max-h-64 tw-border tw-border-gray-200">{{ JSON.stringify(selectedLog.properties, null, 2) }}</pre>
+          </div>
+        </div>
+        <template #actions>
+          <v-btn color="primary" variant="flat" @click="detailDialog = false">Close</v-btn>
+        </template>
+      </AppModal>
 
     </div>
   </AdminLayout>
@@ -197,6 +188,8 @@ import AppStatCard from '../common/AppStatCard.vue';
 import AppStatusChip from '../common/AppStatusChip.vue';
 import AppFilterBar from '../common/AppFilterBar.vue';
 import AppEmptyState from '../common/AppEmptyState.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import { securityAPI } from '../../utils/api';
 import { useToast } from '../../composables/useToast';
 

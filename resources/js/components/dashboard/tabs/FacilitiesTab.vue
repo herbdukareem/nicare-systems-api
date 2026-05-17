@@ -167,7 +167,7 @@
         </div>
       </div>
 
-      <v-data-table
+      <AppDataTable
         :headers="topHeaders"
         :items="topFacilities"
         class="tw-elevation-0"
@@ -197,13 +197,14 @@
         <template #no-data>
           <EmptyState icon="mdi-database-off" text="No top facility records available" />
         </template>
-      </v-data-table>
+      </AppDataTable>
     </div>
   </div>
 </template>
 
 <script setup>
 import { computed, defineComponent } from 'vue'
+import AppDataTable from '../../common/AppDataTable.vue'
 
 const props = defineProps({
   stats: { type: Object, required: true },

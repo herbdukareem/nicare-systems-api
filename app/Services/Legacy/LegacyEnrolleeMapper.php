@@ -6,6 +6,7 @@ use App\Enums\RelationshipToPrincipal;
 use App\Models\Benefactor;
 use App\Models\BenefitPackage;
 use App\Models\EnrolleeCategory;
+use App\Models\EnrollmentPhase;
 use App\Models\Facility;
 use App\Models\FundingType;
 use App\Models\InsuranceProgramme;
@@ -17,10 +18,14 @@ use App\Models\Ward;
 use App\Support\LegacyReferenceData;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 
 class LegacyEnrolleeMapper
 {
+    /** @var array<int, int|null> */
+    private array $enrollmentPhaseIds = [];
+
     public function map(object $legacy, string $sourceTable): array
     {
         $classification = str_contains($sourceTable, 'formal')
@@ -33,6 +38,7 @@ class LegacyEnrolleeMapper
         $vulnerableGroup = $this->vulnerableGroup($legacy, $classification, $sourceTable);
         $benefitPackage = $this->benefitPackage($classification['benefit_package']);
         $benefactor = $this->benefactor($legacy, $classification);
+        $enrollmentPhase = $this->enrollmentPhase($legacy);
         $facility = $this->facility($legacy);
         $lga = $this->lga($legacy);
         $ward = $this->ward($legacy, $lga);
@@ -101,6 +107,7 @@ class LegacyEnrolleeMapper
                 'ward_id' => $ward->id,
                 'funding_type_id' => $fundingType->id,
                 'benefactor_id' => $benefactor?->id,
+                'enrollment_phase_id' => $enrollmentPhase?->id,
                 'capitation_start_date' => $this->date($legacy->cap_date_month ?? null)?->toDateString(),
                 'coverage_start_date' => $coverageStart->toDateString(),
                 'coverage_end_date' => $coverageEnd->toDateString(),
@@ -139,6 +146,8 @@ class LegacyEnrolleeMapper
                     'legacy_mode_of_enrolment' => $this->string($legacy->mode_of_enrolment ?? null),
                     'legacy_funding' => $this->string($legacy->funding ?? null),
                     'legacy_benefactor' => $this->string($legacy->benefactor ?? null),
+                    'legacy_enrollment_phase_id' => $this->string($legacy->tracking ?? null),
+                    'enrollment_phase_id' => $enrollmentPhase?->id,
                     'legacy_vulnerability_status' => $this->string($legacy->vulnerability_status ?? null),
                     'funding_source' => $fundingType->name,
                 ],
@@ -425,6 +434,30 @@ class LegacyEnrolleeMapper
         );
     }
 
+    private function enrollmentPhase(object $legacy): ?EnrollmentPhase
+    {
+        $tracking = $this->positiveInteger($legacy->tracking ?? null);
+        if (!$tracking) {
+            return null;
+        }
+
+        if (array_key_exists($tracking, $this->enrollmentPhaseIds)) {
+            $id = $this->enrollmentPhaseIds[$tracking];
+
+            return $id ? EnrollmentPhase::find($id) : null;
+        }
+
+        $phase = Schema::hasColumn('enrollment_phases', 'legacy_id')
+            ? EnrollmentPhase::where(function ($query) use ($tracking): void {
+                $query->where('legacy_id', $tracking)->orWhere('id', $tracking);
+            })->first()
+            : EnrollmentPhase::find($tracking);
+
+        $this->enrollmentPhaseIds[$tracking] = $phase?->id;
+
+        return $phase;
+    }
+
     private function facility(object $legacy): Facility
     {
         $providerId = $legacy->provider_id ?? $legacy->p_provider_id ?? null;
@@ -589,6 +622,18 @@ class LegacyEnrolleeMapper
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function positiveInteger(mixed $value): ?int
+    {
+        $value = $this->string($value);
+        if (!$value || !ctype_digit($value)) {
+            return null;
+        }
+
+        $id = (int) $value;
+
+        return $id > 0 ? $id : null;
     }
 
     private function string(mixed $value): ?string

@@ -105,7 +105,7 @@
       </v-alert>
 
       <div class="tw-bg-white tw-border tw-border-gray-100 tw-rounded-lg tw-shadow-sm">
-        <v-data-table v-model="selectedPins" :headers="headers" :items="rows" :loading="loading" density="comfortable" item-value="id" :show-select="['inventory','generate-pins'].includes(mode)">
+        <AppDataTable v-model="selectedPins" :headers="headers" :items="rows" :loading="loading" density="comfortable" item-value="id" :show-select="['inventory','generate-pins'].includes(mode)">
           <template #item.status="{ item }">
             <v-chip size="small" :color="statusColor(item.status || item.payment_status)" variant="flat">{{ item.status || item.payment_status }}</v-chip>
           </template>
@@ -118,60 +118,47 @@
               <v-btn v-if="mode === 'purchases' && item.payment_status !== 'confirmed'" icon="mdi-check" size="small" variant="text" @click="confirmPurchase(item)" />
             </div>
           </template>
-          <template #top>
+          <template #toolbar>
             <div v-if="['inventory','generate-pins'].includes(mode) && selectedPins.length" class="tw-p-3 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-gap-2">
               <span class="tw-text-sm tw-text-gray-600">{{ selectedPins.length }} PINs selected</span>
               <v-btn size="small" color="primary" prepend-icon="mdi-printer" @click="printSelectedPins">Print Selected</v-btn>
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </div>
 
-      <v-dialog v-model="pinDetailsDialog" max-width="640">
-        <v-card v-if="pinDetails">
-          <v-card-title class="tw-flex tw-items-center tw-justify-between">
-            <span>PIN Details</span>
-            <v-chip size="small" :color="statusColor(pinDetails.status)" variant="flat">{{ pinDetails.status }}</v-chip>
-          </v-card-title>
-          <v-card-text>
-            <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-3 tw-text-sm">
-              <div><strong>PIN:</strong> {{ pinDetails.pin }}</div>
-              <div><strong>Serial:</strong> {{ pinDetails.serial_number }}</div>
-              <div><strong>Batch:</strong> {{ pinDetails.batch_code }}</div>
-              <div><strong>Plan:</strong> {{ pinDetails.plan?.name }}</div>
-              <div><strong>Amount:</strong> {{ pinDetails.amount }}</div>
-              <div><strong>Expires:</strong> {{ pinDetails.expires_at || 'Calculated after usage' }}</div>
-              <div><strong>Used by:</strong> {{ pinDetails.used_by_enrollee?.full_name || pinDetails.used_by_enrollee?.enrollee_id || 'Not used' }}</div>
-              <div><strong>Payment:</strong> {{ pinDetails.purchase?.payment_reference || 'N/A' }}</div>
-            </div>
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
-            <v-btn variant="text" @click="pinDetailsDialog = false">Close</v-btn>
-            <v-btn color="primary" prepend-icon="mdi-printer" @click="printPins([pinDetails])">Print</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <AppModal v-model="pinDetailsDialog" title="PIN Details" size="md">
+        <div v-if="pinDetails" class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-3 tw-text-sm">
+          <div><strong>PIN:</strong> {{ pinDetails.pin }}</div>
+          <div><strong>Serial:</strong> {{ pinDetails.serial_number }}</div>
+          <div><strong>Batch:</strong> {{ pinDetails.batch_code }}</div>
+          <div><strong>Plan:</strong> {{ pinDetails.plan?.name }}</div>
+          <div><strong>Amount:</strong> {{ pinDetails.amount }}</div>
+          <div><strong>Expires:</strong> {{ pinDetails.expires_at || 'Calculated after usage' }}</div>
+          <div><strong>Used by:</strong> {{ pinDetails.used_by_enrollee?.full_name || pinDetails.used_by_enrollee?.enrollee_id || 'Not used' }}</div>
+          <div><strong>Payment:</strong> {{ pinDetails.purchase?.payment_reference || 'N/A' }}</div>
+        </div>
+        <template #actions>
+          <v-btn variant="outlined" @click="pinDetailsDialog = false">Close</v-btn>
+          <v-btn color="primary" variant="flat" prepend-icon="mdi-printer" @click="printPins([pinDetails])">Print</v-btn>
+        </template>
+      </AppModal>
 
-      <v-dialog v-model="paymentDialog" max-width="520">
-        <v-card>
-          <v-card-title>Complete Payment</v-card-title>
-          <v-card-text class="tw-space-y-3">
-            <div class="tw-rounded tw-border tw-border-gray-200 tw-p-3 tw-text-sm">
-              <div><strong>Gateway:</strong> {{ selectedPlanGateway }}</div>
-              <div><strong>Plan:</strong> {{ selectedPlan?.name }}</div>
-              <div><strong>Quantity:</strong> {{ pinForm.quantity }}</div>
-              <div><strong>Amount:</strong> NGN {{ paymentAmount }}</div>
-            </div>
-            <v-text-field v-model="paymentForm.reference" label="Payment reference" density="comfortable" variant="outlined" autofocus />
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
-            <v-btn variant="text" @click="paymentDialog = false">Cancel</v-btn>
-            <v-btn color="primary" :loading="saving" @click="confirmGatewayPayment">Confirm Payment & Generate</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <AppModal v-model="paymentDialog" title="Complete Payment" size="sm">
+        <div class="tw-space-y-3">
+          <div class="tw-rounded tw-border tw-border-gray-200 tw-p-3 tw-text-sm">
+            <div><strong>Gateway:</strong> {{ selectedPlanGateway }}</div>
+            <div><strong>Plan:</strong> {{ selectedPlan?.name }}</div>
+            <div><strong>Quantity:</strong> {{ pinForm.quantity }}</div>
+            <div><strong>Amount:</strong> NGN {{ paymentAmount }}</div>
+          </div>
+          <v-text-field v-model="paymentForm.reference" label="Payment reference" density="comfortable" variant="outlined" autofocus />
+        </div>
+        <template #actions>
+          <v-btn variant="outlined" @click="paymentDialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="saving" @click="confirmGatewayPayment">Confirm Payment & Generate</v-btn>
+        </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
@@ -181,6 +168,8 @@ import { computed, onMounted, ref, watch } from 'vue'
 import AdminLayout from '../layout/AdminLayout.vue'
 import { benefactorAPI, premiumAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
+import AppModal from '../common/AppModal.vue'
+import AppDataTable from '../common/AppDataTable.vue'
 
 const props = defineProps({ mode: { type: String, default: 'dashboard' } })
 const { success, error } = useToast()

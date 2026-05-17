@@ -400,7 +400,7 @@ class EnrolleeController extends BaseController
             'generatedAt' => now(),
         ])->setPaper('a4');
 
-        return $pdf->download('bulk_enrollment_slip_' . now()->format('Ymd_His') . '.pdf');
+        return $pdf->stream('bulk_enrollment_slip_' . now()->format('Ymd_His') . '.pdf');
     }
 
     /**

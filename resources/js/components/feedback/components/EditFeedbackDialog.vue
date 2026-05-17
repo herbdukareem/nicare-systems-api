@@ -1,13 +1,13 @@
 <template>
-  <v-dialog v-model="dialog" max-width="800px" persistent>
-    <v-card v-if="feedback">
-      <v-card-title class="tw-bg-blue-50 tw-text-blue-800">
-        <v-icon class="tw-mr-2">mdi-pencil</v-icon>
-        Edit Feedback - {{ feedback.feedback_code }}
-      </v-card-title>
-
-      <v-card-text class="tw-p-6">
-        <div class="tw-space-y-6">
+  <AppModal
+    v-model="dialog"
+    :title="feedback ? `Edit Feedback - ${feedback.feedback_code}` : 'Edit Feedback'"
+    icon="mdi-pencil"
+    size="lg"
+    :loading="submitting"
+    persistent
+  >
+    <div v-if="feedback" class="tw-space-y-6">
           <!-- Enrollee Info (Read-only) -->
           <v-card variant="outlined" class="tw-bg-gray-50">
             <v-card-title class="tw-text-lg">Enrollee Information</v-card-title>
@@ -113,34 +113,33 @@
             </v-card-text>
           </v-card>
         </div>
-      </v-card-text>
 
-      <v-card-actions class="tw-p-6 tw-bg-gray-50">
-        <v-spacer />
-        <v-btn
-          variant="outlined"
-          @click="closeDialog"
-          :disabled="submitting"
-        >
-          Cancel
-        </v-btn>
-        <v-btn
-          color="primary"
-          @click="updateFeedback"
-          :loading="submitting"
-          :disabled="!isFormValid"
-        >
-          Update Feedback
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+    <template #actions>
+      <v-btn
+        variant="outlined"
+        @click="closeDialog"
+        :disabled="submitting"
+      >
+        Cancel
+      </v-btn>
+      <v-btn
+        color="primary"
+        variant="flat"
+        @click="updateFeedback"
+        :loading="submitting"
+        :disabled="!isFormValid"
+      >
+        Update Feedback
+      </v-btn>
+    </template>
+  </AppModal>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { feedbackAPI } from '../../../utils/api.js';
 import { useToast } from '../../../composables/useToast';
+import AppModal from '../../common/AppModal.vue';
 
 const { success, error } = useToast();
 

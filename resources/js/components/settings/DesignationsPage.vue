@@ -35,12 +35,11 @@
 
       <!-- Table -->
       <v-card class="tw-border tw-border-gray-100 tw-shadow-sm tw-rounded-xl" elevation="0">
-        <v-data-table
+        <AppDataTable
           :headers="headers"
           :items="designations"
           :loading="loading"
           :items-per-page="25"
-          hide-default-footer
           class="tw-rounded-xl"
         >
           <template #item.department="{ item }">
@@ -77,7 +76,7 @@
               <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">Add Designation</v-btn>
             </AppEmptyState>
           </template>
-        </v-data-table>
+        </AppDataTable>
 
         <div class="tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3 tw-border-t tw-border-gray-100">
           <span class="tw-text-sm tw-text-gray-500">{{ pagination.total.toLocaleString() }} total records</span>
@@ -92,14 +91,7 @@
       </v-card>
 
       <!-- Create / Edit Dialog -->
-      <v-dialog v-model="formDialog" max-width="480" persistent>
-        <v-card class="tw-rounded-xl" elevation="0">
-          <v-card-title class="tw-px-6 tw-pt-6 tw-pb-2 tw-flex tw-items-center tw-justify-between">
-            <span class="tw-text-lg tw-font-bold">{{ isEditing ? 'Edit Designation' : 'Add Designation' }}</span>
-            <v-btn icon="mdi-close" variant="text" @click="closeForm" />
-          </v-card-title>
-          <v-divider />
-          <v-card-text class="tw-px-6 tw-py-4">
+      <AppModal v-model="formDialog" :title="isEditing ? 'Edit Designation' : 'Add Designation'" size="sm" :loading="saving" persistent>
             <v-form ref="formRef" @submit.prevent="submitForm">
               <div class="tw-space-y-4">
                 <v-text-field
@@ -145,31 +137,20 @@
                 />
               </div>
             </v-form>
-          </v-card-text>
-          <v-card-actions class="tw-px-6 tw-pb-4 tw-gap-2">
-            <v-spacer />
-            <v-btn variant="outlined" @click="closeForm">Cancel</v-btn>
-            <v-btn color="primary" variant="flat" :loading="saving" @click="submitForm">
-              {{ isEditing ? 'Save Changes' : 'Create' }}
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+        <template #actions>
+          <v-btn variant="outlined" :disabled="saving" @click="closeForm">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="saving" @click="submitForm">{{ isEditing ? 'Save Changes' : 'Create' }}</v-btn>
+        </template>
+      </AppModal>
 
       <!-- Delete Confirm -->
-      <v-dialog v-model="deleteDialog" max-width="400">
-        <v-card class="tw-rounded-xl" elevation="0">
-          <v-card-title class="tw-px-6 tw-pt-6 tw-pb-2">Delete Designation</v-card-title>
-          <v-card-text class="tw-px-6">
+      <AppModal v-model="deleteDialog" title="Delete Designation" size="sm" color="error" :loading="deleting">
             Are you sure you want to delete <strong>{{ selectedItem?.name }}</strong>?
-          </v-card-text>
-          <v-card-actions class="tw-px-6 tw-pb-4 tw-gap-2">
-            <v-spacer />
-            <v-btn variant="outlined" @click="deleteDialog = false">Cancel</v-btn>
-            <v-btn color="error" variant="flat" :loading="deleting" @click="deleteDesignation">Delete</v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+        <template #actions>
+          <v-btn variant="outlined" :disabled="deleting" @click="deleteDialog = false">Cancel</v-btn>
+          <v-btn color="error" variant="flat" :loading="deleting" @click="deleteDesignation">Delete</v-btn>
+        </template>
+      </AppModal>
 
     </div>
   </AdminLayout>

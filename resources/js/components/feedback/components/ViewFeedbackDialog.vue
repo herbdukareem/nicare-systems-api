@@ -1,20 +1,11 @@
 <template>
-  <v-dialog v-model="dialog" max-width="1200px" scrollable>
-    <v-card v-if="feedback">
-      <v-card-title class="tw-bg-blue-50 tw-text-blue-800">
-        <v-icon class="tw-mr-2">mdi-eye</v-icon>
-        Feedback Details - {{ feedback.feedback_code }}
-        <v-spacer />
-        <v-chip
-          :color="getStatusColor(feedback.status)"
-          size="small"
-          variant="flat"
-        >
-          {{ formatStatus(feedback.status) }}
-        </v-chip>
-      </v-card-title>
-
-      <v-card-text class="tw-p-0">
+  <AppModal
+    v-model="dialog"
+    :title="feedback ? `Feedback Details - ${feedback.feedback_code}` : 'Feedback Details'"
+    icon="mdi-eye"
+    size="2xl"
+  >
+    <div v-if="feedback">
         <v-tabs v-model="activeTab" class="tw-border-b">
           <v-tab value="overview">Overview</v-tab>
           <v-tab value="enrollee">Enrollee Details</v-tab>
@@ -335,22 +326,21 @@
             </div>
           </v-tabs-window-item>
         </v-tabs-window>
-      </v-card-text>
+    </div>
 
-      <v-card-actions class="tw-p-6 tw-bg-gray-50">
-        <v-spacer />
-        <v-btn variant="outlined" @click="dialog = false">
-          Close
-        </v-btn>
-      </v-card-actions>
-    </v-card>
-  </v-dialog>
+    <template #actions>
+      <v-btn variant="outlined" @click="dialog = false">
+        Close
+      </v-btn>
+    </template>
+  </AppModal>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue';
 import { feedbackAPI } from '../../../utils/api.js';
 import { useToast } from '../../../composables/useToast';
+import AppModal from '../../common/AppModal.vue';
 
 const { error } = useToast();
 

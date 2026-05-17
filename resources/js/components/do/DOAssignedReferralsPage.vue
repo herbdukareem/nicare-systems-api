@@ -121,7 +121,7 @@
                 Referrals ({{ filteredReferrals.length }})
               </v-card-title>
               <v-card-text>
-                <v-data-table
+                <AppDataTable
                   :headers="headers"
                   :items="filteredReferrals"
                   :loading="loading"
@@ -219,7 +219,7 @@
                       <p class="text-body-2 text-grey">Referrals for your assigned facilities will appear here</p>
                     </div>
                   </template>
-                </v-data-table>
+                </AppDataTable>
               </v-card-text>
             </v-card>
           </v-col>
@@ -246,6 +246,7 @@ import { useToast } from '../../composables/useToast';
 import { useAuthStore } from '../../stores/auth';
 import AdminLayout from '../layout/AdminLayout.vue';
 import ReferralDetailsModal from '../modals/ReferralDetailsModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 
 const { success: showSuccess, error: showError } = useToast();
 const authStore = useAuthStore();

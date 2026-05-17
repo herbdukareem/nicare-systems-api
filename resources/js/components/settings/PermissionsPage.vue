@@ -147,7 +147,7 @@
 
       <!-- Table View -->
       <div v-if="viewMode === 'table'" class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-border tw-border-gray-100">
-        <v-data-table
+        <AppDataTable
           v-model="selectedPermissions"
           v-model:items-per-page="itemsPerPage"
           v-model:page="currentPage"
@@ -221,7 +221,7 @@
                   </v-btn>
                 </template>
               </v-tooltip>
-              
+
               <v-tooltip text="Edit Permission">
                 <template v-slot:activator="{ props }">
                   <v-btn
@@ -235,7 +235,7 @@
                   </v-btn>
                 </template>
               </v-tooltip>
-              
+
               <v-tooltip text="Delete Permission">
                 <template v-slot:activator="{ props }">
                   <v-btn
@@ -252,7 +252,7 @@
               </v-tooltip>
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </div>
 
       <!-- Category View -->
@@ -312,209 +312,176 @@
     </div>
 
     <!-- Create/Edit Permission Dialog -->
-    <v-dialog v-model="showCreatePermissionDialog" max-width="600px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">
-            {{ editingPermission ? 'Edit Permission' : 'Create New Permission' }}
-          </span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
-              <v-text-field
-                v-model="permissionForm.name"
-                label="Permission Name"
-                variant="outlined"
-                required
-                hint="e.g., users.create"
-              />
-              <v-text-field
-                v-model="permissionForm.label"
-                label="Display Label"
-                variant="outlined"
-                required
-                hint="e.g., Create Users"
-              />
-            </div>
+    <AppModal v-model="showCreatePermissionDialog" :title="editingPermission ? 'Edit Permission' : 'Create New Permission'" size="md">
+      <div class="tw-space-y-4">
+        <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
+          <v-text-field
+            v-model="permissionForm.name"
+            label="Permission Name"
+            variant="outlined"
+            required
+            hint="e.g., users.create"
+          />
+          <v-text-field
+            v-model="permissionForm.label"
+            label="Display Label"
+            variant="outlined"
+            required
+            hint="e.g., Create Users"
+          />
+        </div>
 
-            <v-select
-              v-model="permissionForm.category"
-              :items="categoryOptions"
-              label="Category"
-              variant="outlined"
-              required
-            />
+        <v-select
+          v-model="permissionForm.category"
+          :items="categoryOptions"
+          label="Category"
+          variant="outlined"
+          required
+        />
 
-            <v-textarea
-              v-model="permissionForm.description"
-              label="Description"
-              variant="outlined"
-              rows="3"
-            />
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="closePermissionDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="savePermission">Save Permission</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        <v-textarea
+          v-model="permissionForm.description"
+          label="Description"
+          variant="outlined"
+          rows="3"
+        />
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="closePermissionDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="savePermission">Save Permission</v-btn>
+      </template>
+    </AppModal>
 
     <!-- View Permission Dialog -->
-    <v-dialog v-model="showViewPermissionDialog" max-width="600px">
-      <v-card v-if="viewingPermission">
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">Permission Details</span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <div>
-              <h4 class="tw-font-medium tw-text-gray-700">Basic Information</h4>
-              <div class="tw-mt-2 tw-space-y-2">
-                <div class="tw-flex tw-justify-between">
-                  <span class="tw-text-gray-600">Name:</span>
-                  <span class="tw-font-mono">{{ viewingPermission.name }}</span>
-                </div>
-                <div class="tw-flex tw-justify-between">
-                  <span class="tw-text-gray-600">Label:</span>
-                  <span>{{ viewingPermission.label }}</span>
-                </div>
-                <div class="tw-flex tw-justify-between">
-                  <span class="tw-text-gray-600">Category:</span>
-                  <v-chip size="small" color="primary" variant="outlined">
-                    {{ viewingPermission.category }}
-                  </v-chip>
-                </div>
-                <div class="tw-flex tw-justify-between">
-                  <span class="tw-text-gray-600">Description:</span>
-                  <span>{{ viewingPermission.description || 'No description' }}</span>
-                </div>
-              </div>
+    <AppModal v-model="showViewPermissionDialog" title="Permission Details" size="md" color="info">
+      <div v-if="viewingPermission" class="tw-space-y-4">
+        <div>
+          <h4 class="tw-font-medium tw-text-gray-700">Basic Information</h4>
+          <div class="tw-mt-2 tw-space-y-2">
+            <div class="tw-flex tw-justify-between">
+              <span class="tw-text-gray-600">Name:</span>
+              <span class="tw-font-mono">{{ viewingPermission.name }}</span>
             </div>
-
-            <div>
-              <h4 class="tw-font-medium tw-text-gray-700">Usage Statistics</h4>
-              <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw-mt-2">
-                <div class="tw-text-center tw-p-3 tw-bg-gray-50 tw-rounded-lg">
-                  <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ viewingPermission.roles_count || 0 }}</p>
-                  <p class="tw-text-sm tw-text-gray-600">Roles Assigned</p>
-                </div>
-                <div class="tw-text-center tw-p-3 tw-bg-gray-50 tw-rounded-lg">
-                  <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ formatDate(viewingPermission.created_at) }}</p>
-                  <p class="tw-text-sm tw-text-gray-600">Created</p>
-                </div>
-              </div>
+            <div class="tw-flex tw-justify-between">
+              <span class="tw-text-gray-600">Label:</span>
+              <span>{{ viewingPermission.label }}</span>
+            </div>
+            <div class="tw-flex tw-justify-between">
+              <span class="tw-text-gray-600">Category:</span>
+              <v-chip size="small" color="primary" variant="outlined">
+                {{ viewingPermission.category }}
+              </v-chip>
+            </div>
+            <div class="tw-flex tw-justify-between">
+              <span class="tw-text-gray-600">Description:</span>
+              <span>{{ viewingPermission.description || 'No description' }}</span>
             </div>
           </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showViewPermissionDialog = false">Close</v-btn>
-          <v-btn color="primary" @click="editPermission(viewingPermission)">Edit Permission</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        </div>
+
+        <div>
+          <h4 class="tw-font-medium tw-text-gray-700">Usage Statistics</h4>
+          <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw-mt-2">
+            <div class="tw-text-center tw-p-3 tw-bg-gray-50 tw-rounded-lg">
+              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ viewingPermission.roles_count || 0 }}</p>
+              <p class="tw-text-sm tw-text-gray-600">Roles Assigned</p>
+            </div>
+            <div class="tw-text-center tw-p-3 tw-bg-gray-50 tw-rounded-lg">
+              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ formatDate(viewingPermission.created_at) }}</p>
+              <p class="tw-text-sm tw-text-gray-600">Created</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showViewPermissionDialog = false">Close</v-btn>
+        <v-btn color="primary" variant="flat" @click="editPermission(viewingPermission)">Edit Permission</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Bulk Create Dialog -->
-    <v-dialog v-model="showBulkCreateDialog" max-width="800px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">Bulk Create Permissions</span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <v-select
-              v-model="bulkCreateForm.category"
-              :items="categoryOptions"
-              label="Category"
-              variant="outlined"
-              required
-            />
+    <AppModal v-model="showBulkCreateDialog" title="Bulk Create Permissions" size="lg">
+      <div class="tw-space-y-4">
+        <v-select
+          v-model="bulkCreateForm.category"
+          :items="categoryOptions"
+          label="Category"
+          variant="outlined"
+          required
+        />
 
-            <v-textarea
-              v-model="bulkCreateForm.permissions"
-              label="Permissions (one per line)"
-              variant="outlined"
-              rows="10"
-              hint="Format: permission_name|Display Label|Description"
-              placeholder="users.create|Create Users|Allow creating new users
+        <v-textarea
+          v-model="bulkCreateForm.permissions"
+          label="Permissions (one per line)"
+          variant="outlined"
+          rows="10"
+          hint="Format: permission_name|Display Label|Description"
+          placeholder="users.create|Create Users|Allow creating new users
 users.edit|Edit Users|Allow editing user information
 users.delete|Delete Users|Allow deleting users"
-            />
+        />
 
-            <div class="tw-p-4 tw-bg-blue-50 tw-rounded-lg">
-              <p class="tw-text-blue-800 tw-text-sm">
-                <v-icon color="blue" size="16" class="tw-mr-1">mdi-information</v-icon>
-                Use the format: <code>permission_name|Display Label|Description</code> (description is optional)
-              </p>
-            </div>
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showBulkCreateDialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="bulkCreatePermissions">Create Permissions</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        <div class="tw-p-4 tw-bg-blue-50 tw-rounded-lg">
+          <p class="tw-text-blue-800 tw-text-sm">
+            <v-icon color="blue" size="16" class="tw-mr-1">mdi-information</v-icon>
+            Use the format: <code>permission_name|Display Label|Description</code> (description is optional)
+          </p>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showBulkCreateDialog = false">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="bulkCreatePermissions">Create Permissions</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Bulk Actions Dialog -->
-    <v-dialog v-model="showBulkActionsDialog" max-width="500px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">
-            Bulk Actions ({{ selectedPermissions.length }} permissions)
-          </span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <v-select
-              v-model="bulkAction"
-              :items="bulkActionOptions"
-              label="Select Action"
-              variant="outlined"
-              required
-            />
+    <AppModal v-model="showBulkActionsDialog" :title="`Bulk Actions (${selectedPermissions.length} permissions)`" size="md">
+      <div class="tw-space-y-4">
+        <v-select
+          v-model="bulkAction"
+          :items="bulkActionOptions"
+          label="Select Action"
+          variant="outlined"
+          required
+        />
 
-            <div v-if="bulkAction === 'category'">
-              <v-select
-                v-model="bulkActionData.category"
-                :items="categoryOptions"
-                label="New Category"
-                variant="outlined"
-                required
-              />
-            </div>
+        <div v-if="bulkAction === 'category'">
+          <v-select
+            v-model="bulkActionData.category"
+            :items="categoryOptions"
+            label="New Category"
+            variant="outlined"
+            required
+          />
+        </div>
 
-            <div v-if="bulkAction === 'delete'" class="tw-p-4 tw-bg-red-50 tw-rounded-lg">
-              <p class="tw-text-red-800 tw-text-sm">
-                <v-icon color="red" size="16" class="tw-mr-1">mdi-alert</v-icon>
-                This action cannot be undone. {{ selectedPermissions.length }} permissions will be permanently deleted.
-              </p>
-            </div>
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showBulkActionsDialog = false">Cancel</v-btn>
-          <v-btn
-            :color="bulkAction === 'delete' ? 'error' : 'primary'"
-            @click="handleBulkAction"
-            :disabled="!bulkAction"
-          >
-            {{ bulkAction === 'delete' ? 'Delete Permissions' : 'Apply Action' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        <div v-if="bulkAction === 'delete'" class="tw-p-4 tw-bg-red-50 tw-rounded-lg">
+          <p class="tw-text-red-800 tw-text-sm">
+            <v-icon color="red" size="16" class="tw-mr-1">mdi-alert</v-icon>
+            This action cannot be undone. {{ selectedPermissions.length }} permissions will be permanently deleted.
+          </p>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showBulkActionsDialog = false">Cancel</v-btn>
+        <v-btn
+          :color="bulkAction === 'delete' ? 'error' : 'primary'"
+          variant="flat"
+          @click="handleBulkAction"
+          :disabled="!bulkAction"
+        >
+          {{ bulkAction === 'delete' ? 'Delete Permissions' : 'Apply Action' }}
+        </v-btn>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue';
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import { useToast } from '../../composables/useToast';
 import { permissionAPI } from '../../utils/api';
 

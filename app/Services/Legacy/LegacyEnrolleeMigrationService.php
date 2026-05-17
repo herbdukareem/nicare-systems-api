@@ -28,6 +28,9 @@ class LegacyEnrolleeMigrationService
             try {
                 $mapped = $this->mapper->map($legacy, $sourceTable);
                 $existing = $this->findExistingEnrollee($mapped);
+                if (!$existing) {
+                    $this->ensureUniqueEnrolleeId($mapped);
+                }
                 DB::rollBack();
 
                 return [
@@ -46,6 +49,10 @@ class LegacyEnrolleeMigrationService
             $mapped = $this->mapper->map($legacy, $sourceTable);
             $existing = $this->findExistingEnrollee($mapped);
             $systemUserId = $this->systemUserId();
+
+            if (!$existing) {
+                $this->ensureUniqueEnrolleeId($mapped);
+            }
 
             $enrolleeData = $mapped['enrollee'] + ['created_by' => $systemUserId];
             $enrolleeData['created_by'] = $existing?->created_by ?: $systemUserId;
@@ -174,7 +181,7 @@ class LegacyEnrolleeMigrationService
                 ->orWhere('legacy_enrollee_id', $mapped['dedupe']['shin'])
                 ->first();
             if ($match) {
-                return $match;
+                return $this->hasSameLegacyId($match, $mapped) ? $match : null;
             }
         }
 
@@ -194,6 +201,44 @@ class LegacyEnrolleeMigrationService
         }
 
         return null;
+    }
+
+    private function ensureUniqueEnrolleeId(array &$mapped): void
+    {
+        $enrolleeId = $mapped['enrollee']['enrollee_id'] ?? null;
+        if (!$enrolleeId) {
+            return;
+        }
+
+        $duplicate = Enrollee::where('enrollee_id', $enrolleeId)->first();
+        if (!$duplicate || $this->hasSameLegacyId($duplicate, $mapped)) {
+            return;
+        }
+
+        $mapped['enrollee']['enrollee_id'] = $this->generateUniqueEnrolleeId($mapped);
+    }
+
+    private function hasSameLegacyId(Enrollee $enrollee, array $mapped): bool
+    {
+        return $enrollee->legacy_id !== null
+            && (int) $enrollee->legacy_id === (int) $mapped['legacy_id'];
+    }
+
+    private function generateUniqueEnrolleeId(array $mapped): string
+    {
+        $source = str_contains($mapped['source_table'], 'formal') ? 'F' : 'I';
+        $legacyId = (int) $mapped['legacy_id'];
+
+        for ($attempt = 0; $attempt < 100; $attempt++) {
+            $suffix = $attempt === 0 ? '' : '-' . $attempt;
+            $candidate = substr("LEG-{$source}-{$legacyId}{$suffix}", 0, 20);
+
+            if (!Enrollee::where('enrollee_id', $candidate)->exists()) {
+                return $candidate;
+            }
+        }
+
+        throw new \RuntimeException("Unable to generate a unique enrollee ID for legacy row {$mapped['source_table']}:{$legacyId}.");
     }
 
     private function log(array $mapped, Enrollee $enrollee, string $status, string $message, object $legacy): void

@@ -118,7 +118,7 @@
 
       <!-- Benefactors Table -->
       <div class="tw-bg-white tw-rounded-lg tw-shadow-sm">
-        <v-data-table
+        <AppDataTable
           v-model:items-per-page="itemsPerPage"
           :headers="headers"
           :items="benefactors"
@@ -211,19 +211,12 @@
               </v-btn>
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </div>
     </div>
 
     <!-- Create/Edit Dialog -->
-    <v-dialog v-model="showCreateDialog" max-width="700px">
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">
-            {{ editingBenefactor ? 'Edit Benefactor' : 'Add New Benefactor' }}
-          </span>
-        </v-card-title>
-        <v-card-text>
+    <AppModal v-model="showCreateDialog" :title="editingBenefactor ? 'Edit Benefactor' : 'Add New Benefactor'" size="md">
           <div class="tw-space-y-4">
             <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
               <v-text-field
@@ -240,7 +233,7 @@
                 required
               />
             </div>
-            
+
             <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
               <v-text-field
                 v-model="benefactorForm.contact_person"
@@ -295,20 +288,19 @@
               rows="3"
             />
           </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="closeDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="saveBenefactor">Save</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" @click="closeDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="saveBenefactor">Save</v-btn>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 
 <script setup>
 import { ref, computed, onMounted } from 'vue';
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 import { useToast } from '../../composables/useToast';
 import { benefactorAPI } from '../../utils/api';
 

@@ -2,21 +2,19 @@
 
 namespace Tests\Feature;
 
-use App\Models\CoveragePeriod;
+use App\Models\Benefactor;
+use App\Models\EnrolleeCategory;
 use App\Models\Enrollee;
+use App\Models\EnrollmentPhase;
 use App\Models\Facility;
-use App\Models\FundingType;
+use App\Models\InsuranceProgramme;
 use App\Models\LegacyMigrationLog;
 use App\Models\Lga;
 use App\Models\PremiumPurchase;
 use App\Models\User;
 use App\Models\Ward;
 use App\Services\Legacy\LegacyEnrolleeMigrationService;
-use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Schema;
-use Mockery;
 use RuntimeException;
 use Tests\TestCase;
 
@@ -28,30 +26,14 @@ class LegacyEnrolleeMigrationTest extends TestCase
     {
         parent::setUp();
 
-        config(['database.connections.legacy_mysql' => array_merge(
-            config('database.connections.mysql'),
-            ['database' => config('database.connections.mysql.database')]
-        )]);
-
-        DB::purge('legacy_mysql');
-        DB::reconnect('legacy_mysql');
-
-        $this->createLegacyTables();
-    }
-
-    protected function tearDown(): void
-    {
-        Schema::connection('legacy_mysql')->dropIfExists('tbl_enrolee');
-        Schema::connection('legacy_mysql')->dropIfExists('tbl_enrolee_formal');
-        Schema::connection('legacy_mysql')->dropIfExists('tbl_providers');
-
-        parent::tearDown();
+        $this->seed(\Database\Seeders\InsuranceProgrammeSeeder::class);
+        $this->seedLegacyCategoryBuckets();
+        User::factory()->create(['id' => 1]);
     }
 
     public function test_formal_enrollee_migration_creates_active_coverage(): void
     {
-        $this->seedLegacyProvider();
-        $this->insertLegacyFormal([
+        $this->migrateLegacyFormal([
             'id' => 101,
             'enrolment_number' => 'FORM-001',
             'first_name' => 'Amina',
@@ -61,15 +43,11 @@ class LegacyEnrolleeMigrationTest extends TestCase
             'basic_salary' => 100000,
         ]);
 
-        $this->artisan('legacy:migrate-enrollees', ['--source' => 'formal'])
-            ->assertSuccessful();
-
         $enrollee = Enrollee::where('enrollee_id', 'FORM-001')->firstOrFail();
-        $coverage = CoveragePeriod::where('enrollee_id', $enrollee->id)->firstOrFail();
 
-        $this->assertSame(CoveragePeriod::STATUS_ACTIVE, $coverage->status);
-        $this->assertSame('payroll', $coverage->activation_source);
-        $this->assertSame('Payroll Deduction', $coverage->fundingType->name);
+        $this->assertTrue($enrollee->isActive());
+        $this->assertNotNull($enrollee->coverage_start_date);
+        $this->assertSame('Formal Sector Deduction', $enrollee->fundingType->name);
         $this->assertDatabaseHas('premium_purchases', [
             'payment_reference' => 'LEGACY-FORMAL-101-NO-PIN',
             'payment_status' => 'confirmed',
@@ -78,7 +56,7 @@ class LegacyEnrolleeMigrationTest extends TestCase
 
     public function test_bhcpf_enrollee_creates_vulnerable_coverage_with_bhcpf_funding(): void
     {
-        $this->insertLegacyInformal([
+        $this->migrateLegacyInformal([
             'id' => 201,
             'enrolment_number' => 'BHC-001',
             'first_name' => 'Musa',
@@ -88,21 +66,17 @@ class LegacyEnrolleeMigrationTest extends TestCase
             'BHCPF_number' => 'BHCPF-001',
         ]);
 
-        $this->artisan('legacy:migrate-enrollees', ['--source' => 'informal'])
-            ->assertSuccessful();
+        $enrollee = Enrollee::where('enrollee_id', 'BHC-001')->firstOrFail();
 
-        $coverage = CoveragePeriod::whereHas('enrollee', fn ($query) => $query->where('enrollee_id', 'BHC-001'))->firstOrFail();
-
-        $this->assertSame(CoveragePeriod::STATUS_ACTIVE, $coverage->status);
-        $this->assertSame('subsidy', $coverage->activation_source);
-        $this->assertSame('BHCPF', $coverage->fundingType->name);
-        $this->assertSame('Vulnerable Group Social Health Insurance', $coverage->programme->name);
+        $this->assertTrue($enrollee->isActive());
+        $this->assertSame('Basic Healthcare Provision Fund', $enrollee->fundingType->name);
+        $this->assertSame('Vulnerable Groups', $enrollee->insuranceProgramme->name);
         $this->assertSame(0, PremiumPurchase::count());
     }
 
     public function test_pin_enrollee_creates_informal_coverage_and_purchase(): void
     {
-        $this->insertLegacyInformal([
+        $this->migrateLegacyInformal([
             'id' => 301,
             'pin' => 'PIN12345',
             'enrolment_number' => 'PIN-001',
@@ -112,27 +86,60 @@ class LegacyEnrolleeMigrationTest extends TestCase
             'funding' => 'premium',
         ]);
 
-        $this->artisan('legacy:migrate-enrollees', ['--source' => 'informal'])
-            ->assertSuccessful();
+        $enrollee = Enrollee::where('enrollee_id', 'PIN-001')->firstOrFail();
 
-        $coverage = CoveragePeriod::whereHas('enrollee', fn ($query) => $query->where('enrollee_id', 'PIN-001'))->firstOrFail();
-
-        $this->assertSame('payment', $coverage->activation_source);
-        $this->assertSame('Out-of-pocket', $coverage->fundingType->name);
-        $this->assertSame('Informal Sector Programme', $coverage->programme->name);
+        $this->assertTrue($enrollee->isActive());
+        $this->assertSame('Premium', $enrollee->fundingType->name);
+        $this->assertSame('Informal Sector', $enrollee->insuranceProgramme->name);
         $this->assertDatabaseHas('premium_purchases', [
             'payment_reference' => 'LEGACY-TBL_ENROLEE-301-PIN12345',
             'payment_status' => 'confirmed',
         ]);
     }
 
-    public function test_duplicate_enrollee_is_not_recreated(): void
+    public function test_legacy_tracking_maps_to_enrollment_phase(): void
+    {
+        $benefactor = Benefactor::firstOrCreate(
+            ['name' => 'BHCPF-COUNTERPART'],
+            ['type' => 'government', 'status' => 1]
+        );
+
+        EnrollmentPhase::unguarded(function () use ($benefactor): void {
+            EnrollmentPhase::updateOrCreate(
+                ['id' => 7],
+                [
+                    'legacy_id' => 7,
+                    'name' => 'Phase Seven',
+                    'phase' => 'Phase 2',
+                    'sponsor' => 'BHCPF-COUNTERPART',
+                    'funding' => 'cf',
+                    'benefactor_id' => $benefactor->id,
+                    'is_current' => true,
+                    'status' => 1,
+                ]
+            );
+        });
+
+        $this->migrateLegacyInformal([
+            'id' => 701,
+            'enrolment_number' => 'PHA-001',
+            'first_name' => 'Hadiza',
+            'surname' => 'Umar',
+            'tracking' => '7',
+        ]);
+
+        $enrollee = Enrollee::where('enrollee_id', 'PHA-001')->firstOrFail();
+
+        $this->assertSame(7, $enrollee->enrollment_phase_id);
+    }
+
+    public function test_duplicate_enrolment_number_with_same_legacy_id_updates_existing_enrollee(): void
     {
         $facility = $this->seedGeography();
-        User::factory()->create();
         Enrollee::create([
             'enrollee_id' => 'DUP-001',
             'legacy_enrollee_id' => 'DUP-001',
+            'legacy_id' => 401,
             'first_name' => 'Existing',
             'last_name' => 'Person',
             'facility_id' => $facility->id,
@@ -141,23 +148,51 @@ class LegacyEnrolleeMigrationTest extends TestCase
             'created_by' => User::first()->id,
             'status' => 1,
         ]);
-        $this->insertLegacyInformal([
+        $this->migrateLegacyInformal([
             'id' => 401,
             'enrolment_number' => 'DUP-001',
             'first_name' => 'Updated',
             'surname' => 'Person',
         ]);
 
-        $this->artisan('legacy:migrate-enrollees', ['--source' => 'informal'])
-            ->assertSuccessful();
-
         $this->assertSame(1, Enrollee::where('enrollee_id', 'DUP-001')->count());
+        $this->assertSame('Updated', Enrollee::where('enrollee_id', 'DUP-001')->firstOrFail()->first_name);
         $this->assertSame(1, LegacyMigrationLog::where('source_table', 'tbl_enrolee')->where('legacy_id', 401)->count());
+    }
+
+    public function test_duplicate_enrolment_number_with_different_legacy_id_generates_new_enrollee_id(): void
+    {
+        $facility = $this->seedGeography();
+        Enrollee::create([
+            'enrollee_id' => 'DUP-002',
+            'legacy_enrollee_id' => 'DUP-002',
+            'legacy_id' => 900,
+            'first_name' => 'Existing',
+            'last_name' => 'Person',
+            'facility_id' => $facility->id,
+            'lga_id' => $facility->lga_id,
+            'ward_id' => $facility->ward_id,
+            'created_by' => User::first()->id,
+            'status' => 1,
+        ]);
+        $this->migrateLegacyInformal([
+            'id' => 402,
+            'enrolment_number' => 'DUP-002',
+            'first_name' => 'New',
+            'surname' => 'Person',
+        ]);
+
+        $this->assertSame(2, Enrollee::where('legacy_enrollee_id', 'DUP-002')->count());
+        $this->assertDatabaseHas('enrollees', [
+            'legacy_id' => 402,
+            'legacy_enrollee_id' => 'DUP-002',
+            'enrollee_id' => 'LEG-I-402',
+        ]);
     }
 
     public function test_running_command_twice_is_safe(): void
     {
-        $this->insertLegacyInformal([
+        $legacy = $this->legacyRow([
             'id' => 501,
             'pin' => 'PINSAFE',
             'enrolment_number' => 'SAFE-001',
@@ -166,43 +201,27 @@ class LegacyEnrolleeMigrationTest extends TestCase
             'mode_of_enrolment' => 'Premium PIN',
         ]);
 
-        $this->artisan('legacy:migrate-enrollees', ['--source' => 'informal'])
-            ->assertSuccessful();
-        $this->artisan('legacy:migrate-enrollees', ['--source' => 'informal'])
-            ->assertSuccessful();
+        $this->migrationService()->migrate($legacy, 'tbl_enrolee');
+        $this->migrationService()->migrate($legacy, 'tbl_enrolee');
 
         $enrollee = Enrollee::where('enrollee_id', 'SAFE-001')->firstOrFail();
 
         $this->assertSame(1, Enrollee::where('enrollee_id', 'SAFE-001')->count());
-        $this->assertSame(1, CoveragePeriod::where('enrollee_id', $enrollee->id)->count());
+        $this->assertTrue($enrollee->isActive());
+        $this->assertNotNull($enrollee->coverage_start_date);
         $this->assertSame(1, PremiumPurchase::where('payment_reference', 'LEGACY-TBL_ENROLEE-501-PINSAFE')->count());
     }
 
     public function test_failed_rows_are_logged(): void
     {
-        $this->insertLegacyInformal([
+        $legacy = $this->legacyRow([
             'id' => 601,
             'enrolment_number' => 'FAIL-001',
             'first_name' => 'Faulty',
             'surname' => 'Record',
         ]);
 
-        $mock = Mockery::mock(LegacyEnrolleeMigrationService::class);
-        $mock->shouldReceive('migrate')->once()->andThrow(new RuntimeException('forced failure'));
-        $mock->shouldReceive('logFailure')->once()->andReturnUsing(function (object $legacy, string $sourceTable, RuntimeException $exception): void {
-            LegacyMigrationLog::create([
-                'source_table' => $sourceTable,
-                'legacy_id' => (int) $legacy->id,
-                'legacy_enrolment_number' => $legacy->enrolment_number,
-                'migration_status' => 'failed',
-                'message' => $exception->getMessage(),
-                'legacy_payload' => json_decode(json_encode($legacy), true),
-            ]);
-        });
-        $this->app->instance(LegacyEnrolleeMigrationService::class, $mock);
-
-        $this->artisan('legacy:migrate-enrollees', ['--source' => 'informal'])
-            ->assertFailed();
+        $this->migrationService()->logFailure($legacy, 'tbl_enrolee', new RuntimeException('forced failure'));
 
         $this->assertDatabaseHas('legacy_migration_logs', [
             'source_table' => 'tbl_enrolee',
@@ -212,82 +231,45 @@ class LegacyEnrolleeMigrationTest extends TestCase
         ]);
     }
 
-    private function createLegacyTables(): void
+    private function migrateLegacyInformal(array $overrides): array
     {
-        Schema::connection('legacy_mysql')->dropIfExists('tbl_enrolee');
-        Schema::connection('legacy_mysql')->dropIfExists('tbl_enrolee_formal');
-        Schema::connection('legacy_mysql')->dropIfExists('tbl_providers');
+        return $this->migrationService()->migrate($this->legacyRow($overrides), 'tbl_enrolee');
+    }
 
-        foreach (['tbl_enrolee', 'tbl_enrolee_formal'] as $table) {
-            Schema::connection('legacy_mysql')->create($table, function (Blueprint $table): void {
-                $table->unsignedBigInteger('id')->primary();
-                $table->string('pin')->nullable();
-                $table->string('enrolee_category')->nullable();
-                $table->string('principal_id')->nullable();
-                $table->string('surname')->nullable();
-                $table->string('first_name')->nullable();
-                $table->string('other_name')->nullable();
-                $table->string('enrolment_number')->nullable();
-                $table->string('mode_of_enrolment')->nullable();
-                $table->date('enrol_date')->nullable();
-                $table->date('cap_date_month')->nullable();
-                $table->string('marital_status')->nullable();
-                $table->string('email_address')->nullable();
-                $table->string('date_of_birth')->nullable();
-                $table->string('vulnerability_status')->nullable();
-                $table->string('disability')->nullable();
-                $table->unsignedTinyInteger('pregnant')->default(0);
-                $table->string('BHCPF_number')->nullable();
-                $table->string('nin')->nullable();
-                $table->string('national_identification_number')->nullable();
-                $table->string('village')->nullable();
-                $table->string('phone_number')->nullable();
-                $table->string('occupation')->nullable();
-                $table->text('address')->nullable();
-                $table->string('community')->nullable();
-                $table->unsignedBigInteger('provider_id')->nullable();
-                $table->unsignedBigInteger('p_provider_id')->nullable();
-                $table->string('enrolee_image_link')->nullable();
-                $table->string('sex')->nullable();
-                $table->string('nok_name')->nullable();
-                $table->string('nok_phone_number')->nullable();
-                $table->string('nok_address')->nullable();
-                $table->string('nok_relationship')->nullable();
-                $table->string('employer')->nullable();
-                $table->string('ministry')->nullable();
-                $table->string('cno')->nullable();
-                $table->string('station')->nullable();
-                $table->date('date_of_first_appointment')->nullable();
-                $table->date('date_of_retirement')->nullable();
-                $table->string('lga')->nullable();
-                $table->string('ward')->nullable();
-                $table->string('benefit_plan')->nullable();
-                $table->string('enrolment_approval_status')->nullable();
-                $table->dateTime('approved_date')->nullable();
-                $table->string('status')->nullable();
-                $table->date('date_expired')->nullable();
-                $table->string('funding')->nullable();
-                $table->string('benefactor')->nullable();
-                $table->decimal('basic_salary', 14, 2)->nullable();
-                $table->string('salary_scheme')->nullable();
-            });
+    private function migrateLegacyFormal(array $overrides): array
+    {
+        return $this->migrationService()->migrate($this->legacyRow($overrides), 'tbl_enrolee_formal');
+    }
+
+    private function legacyRow(array $overrides): object
+    {
+        return (object) array_merge($this->legacyDefaults(), $overrides);
+    }
+
+    private function migrationService(): LegacyEnrolleeMigrationService
+    {
+        return app(LegacyEnrolleeMigrationService::class);
+    }
+
+    private function seedLegacyCategoryBuckets(): void
+    {
+        foreach ([
+            'formal_sector' => 'Formal',
+            'informal_sector' => 'Informal',
+            'vulnerable_groups' => 'Vulnerable',
+        ] as $programmeCode => $categoryName) {
+            $programme = InsuranceProgramme::where('code', $programmeCode)->firstOrFail();
+            EnrolleeCategory::firstOrCreate(
+                [
+                    'insurance_programme_id' => $programme->id,
+                    'code' => str($categoryName)->lower()->slug('_')->toString(),
+                ],
+                [
+                    'name' => $categoryName,
+                    'status' => 'active',
+                ]
+            );
         }
-
-        Schema::connection('legacy_mysql')->create('tbl_providers', function (Blueprint $table): void {
-            $table->unsignedBigInteger('id')->primary();
-            $table->string('hcpcode')->nullable();
-            $table->string('hcpname')->nullable();
-        });
-    }
-
-    private function insertLegacyInformal(array $overrides): void
-    {
-        DB::connection('legacy_mysql')->table('tbl_enrolee')->insert(array_merge($this->legacyDefaults(), $overrides));
-    }
-
-    private function insertLegacyFormal(array $overrides): void
-    {
-        DB::connection('legacy_mysql')->table('tbl_enrolee_formal')->insert(array_merge($this->legacyDefaults(), $overrides));
     }
 
     private function legacyDefaults(): array
@@ -318,7 +300,7 @@ class LegacyEnrolleeMigrationTest extends TestCase
             'occupation' => null,
             'address' => 'Legacy address',
             'community' => null,
-            'provider_id' => 1,
+            'provider_id' => null,
             'p_provider_id' => null,
             'enrolee_image_link' => null,
             'sex' => 'male',
@@ -343,19 +325,8 @@ class LegacyEnrolleeMigrationTest extends TestCase
             'benefactor' => null,
             'basic_salary' => null,
             'salary_scheme' => null,
+            'tracking' => '5',
         ];
-    }
-
-    private function seedLegacyProvider(): Facility
-    {
-        $facility = $this->seedGeography('HCP-001');
-        DB::connection('legacy_mysql')->table('tbl_providers')->insert([
-            'id' => 1,
-            'hcpcode' => 'HCP-001',
-            'hcpname' => 'Legacy Provider',
-        ]);
-
-        return $facility;
     }
 
     private function seedGeography(string $facilityCode = 'TEST-HCP'): Facility

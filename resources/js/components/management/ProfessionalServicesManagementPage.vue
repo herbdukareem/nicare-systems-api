@@ -148,7 +148,7 @@
           {{ totalItems }} Total
         </v-chip>
       </v-card-title>
-      <v-data-table
+      <AppDataTable
         :headers="headers"
         :items="services"
         :loading="loading"
@@ -229,16 +229,11 @@
             />
           </div>
         </template>
-      </v-data-table>
+      </AppDataTable>
     </v-card>
 
     <!-- Create/Edit Dialog -->
-    <v-dialog v-model="dialog" max-width="800px" persistent>
-      <v-card>
-        <v-card-title class="bg-primary text-white">
-          <span class="text-h5">{{ isEditing ? 'Edit' : 'Add' }} Professional Service</span>
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="dialog" :title="`${isEditing ? 'Edit' : 'Add'} Professional Service`" size="lg" :loading="saving" persistent>
           <v-form ref="form" v-model="formValid">
             <v-row>
               <v-col cols="12" md="6">
@@ -330,37 +325,14 @@
               </v-col>
             </v-row>
           </v-form>
-        </v-card-text>
-        <v-card-actions class="px-6 pb-4">
-          <v-spacer />
-          <v-btn
-            color="grey"
-            variant="outlined"
-            @click="closeDialog"
-          >
-            Cancel
-          </v-btn>
-          <v-btn
-            color="primary"
-            variant="flat"
-            @click="saveService"
-            :loading="saving"
-            :disabled="!formValid"
-          >
-            {{ isEditing ? 'Update' : 'Create' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="saving" @click="closeDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" :loading="saving" :disabled="!formValid" @click="saveService">{{ isEditing ? 'Update' : 'Create' }}</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Delete Confirmation Dialog -->
-    <v-dialog v-model="deleteDialog" max-width="500px">
-      <v-card>
-        <v-card-title class="bg-error text-white">
-          <v-icon start>mdi-alert</v-icon>
-          Confirm Delete
-        </v-card-title>
-        <v-card-text class="pt-4">
+    <AppModal v-model="deleteDialog" title="Confirm Delete" size="sm" color="error" :loading="deleting">
           <p class="text-body-1">
             Are you sure you want to delete this professional service?
           </p>
@@ -370,27 +342,11 @@
           <p class="text-caption text-grey mt-3">
             This action cannot be undone. The service will be soft-deleted and can be restored later.
           </p>
-        </v-card-text>
-        <v-card-actions class="px-6 pb-4">
-          <v-spacer />
-          <v-btn
-            color="grey"
-            variant="outlined"
-            @click="deleteDialog = false"
-          >
-            Cancel
-          </v-btn>
-          <v-btn
-            color="error"
-            variant="flat"
-            @click="deleteService"
-            :loading="deleting"
-          >
-            Delete
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="deleting" @click="deleteDialog = false">Cancel</v-btn>
+        <v-btn color="error" variant="flat" :loading="deleting" @click="deleteService">Delete</v-btn>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 
@@ -399,6 +355,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import AdminLayout from '@/js/components/layout/AdminLayout.vue'
 import Breadcrumb from '@/js/components/common/Breadcrumb.vue'
+import AppModal from '@/js/components/common/AppModal.vue'
+import AppDataTable from '@/js/components/common/AppDataTable.vue'
 import api from '@/js/utils/api'
 import { useToast } from '@/js/composables/useToast'
 

@@ -122,7 +122,7 @@
       <!-- Table -->
       <section class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100">
         
-        <v-data-table
+        <AppDataTable
           v-model="selectedUsers"
           v-model:items-per-page="itemsPerPage"
           v-model:page="currentPage"
@@ -306,409 +306,378 @@
               />
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </section>
     </div>
 
     <!-- Create/Edit User Dialog -->
-    <v-dialog v-model="showCreateUserDialog" max-width="640px" persistent>
-      <v-card>
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">
-            {{ editingUser ? 'Edit User' : 'Create New User' }}
-          </span>
-        </v-card-title>
-        <v-card-text>
-          <div class="tw-space-y-4">
-            <!-- User Type Selection (only for new users) -->
-            <div v-if="!editingUser" class="tw-grid tw-grid-cols-1 tw-gap-4">
-              <v-select
-                v-model="userForm.userable_type"
-                :items="userableTypeOptions"
-                label="User Type *"
-                variant="outlined"
-                required
-                :error-messages="validationErrors.userable_type"
-              />
-            </div>
+    <AppModal v-model="showCreateUserDialog" :title="editingUser ? 'Edit User' : 'Create New User'" size="md" persistent>
+      <div class="tw-space-y-4">
+        <!-- User Type Selection (only for new users) -->
+        <div v-if="!editingUser" class="tw-grid tw-grid-cols-1 tw-gap-4">
+          <v-select
+            v-model="userForm.userable_type"
+            :items="userableTypeOptions"
+            label="User Type *"
+            variant="outlined"
+            required
+            :error-messages="validationErrors.userable_type"
+          />
+        </div>
 
-            <!-- Basic User Information -->
-            <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-              <v-text-field
-                v-model="userForm.name"
-                label="Full Name"
-                variant="outlined"
-                required
-                :error-messages="validationErrors.name"
-              />
-              <v-text-field
-                v-model="userForm.email"
-                label="Email"
-                type="email"
-                variant="outlined"
-                required
-                :error-messages="validationErrors.email"
-              />
-            </div>
-            <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-              <v-text-field
-                v-model="userForm.phone"
-                label="Phone Number"
-                variant="outlined"
-                :error-messages="validationErrors.phone"
-              />
-              <v-text-field
-                v-model="userForm.username"
-                label="Username"
-                variant="outlined"
-                :error-messages="validationErrors.username"
-              />
-            </div>
+        <!-- Basic User Information -->
+        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+          <v-text-field
+            v-model="userForm.name"
+            label="Full Name"
+            variant="outlined"
+            required
+            :error-messages="validationErrors.name"
+          />
+          <v-text-field
+            v-model="userForm.email"
+            label="Email"
+            type="email"
+            variant="outlined"
+            required
+            :error-messages="validationErrors.email"
+          />
+        </div>
+        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+          <v-text-field
+            v-model="userForm.phone"
+            label="Phone Number"
+            variant="outlined"
+            :error-messages="validationErrors.phone"
+          />
+          <v-text-field
+            v-model="userForm.username"
+            label="Username"
+            variant="outlined"
+            :error-messages="validationErrors.username"
+          />
+        </div>
 
-            <!-- Profile Information (only for new users) -->
-            <div v-if="!editingUser" class="tw-space-y-4">
-              <v-divider />
-              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">Profile Information</h4>
+        <!-- Profile Information (only for new users) -->
+        <div v-if="!editingUser" class="tw-space-y-4">
+          <v-divider />
+          <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">Profile Information</h4>
 
-              <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-3 tw-gap-4">
-                <v-text-field
-                  v-model="userForm.first_name"
-                  label="First Name *"
-                  variant="outlined"
-                  required
-                  :error-messages="validationErrors.first_name"
-                />
-                <v-text-field
-                  v-model="userForm.last_name"
-                  label="Last Name *"
-                  variant="outlined"
-                  required
-                  :error-messages="validationErrors.last_name"
-                />
-                <v-text-field
-                  v-model="userForm.middle_name"
-                  label="Middle Name"
-                  variant="outlined"
-                  :error-messages="validationErrors.middle_name"
-                />
-              </div>
-
-              <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-                <v-text-field
-                  v-model="userForm.date_of_birth"
-                  label="Date of Birth"
-                  type="date"
-                  variant="outlined"
-                  :error-messages="validationErrors.date_of_birth"
-                />
-                <v-select
-                  v-model="userForm.gender"
-                  :items="genderOptions"
-                  label="Gender"
-                  variant="outlined"
-                  :error-messages="validationErrors.gender"
-                />
-              </div>
-
-              <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-                <v-select
-                  v-model="userForm.department_id"
-                  :items="departmentOptions"
-                  label="Department"
-                  variant="outlined"
-                  item-title="name"
-                  item-value="id"
-                  :error-messages="validationErrors.department_id"
-                />
-                <v-select
-                  v-model="userForm.designation_id"
-                  :items="designationOptions"
-                  label="Designation"
-                  variant="outlined"
-                  item-title="title"
-                  item-value="id"
-                  :error-messages="validationErrors.designation_id"
-                />
-              </div>
-
-              <v-textarea
-                v-model="userForm.address"
-                label="Address"
-                variant="outlined"
-                rows="2"
-                :error-messages="validationErrors.address"
-              />
-            </div>
-
-            <!-- System Settings -->
-            <div class="tw-space-y-4">
-              <v-divider />
-              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">System Settings</h4>
-
-              <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-                <v-select
-                  v-model="userForm.status"
-                  :items="statusOptions"
-                  label="Status"
-                  variant="outlined"
-                  required
-                  :error-messages="validationErrors.status"
-                />
-                <v-select
-                  v-model="userForm.roles"
-                  :items="roleOptions"
-                  label="Roles"
-                  variant="outlined"
-                  multiple
-                  chips
-                  :error-messages="validationErrors.roles"
-                />
-              </div>
-
-              <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4" v-if="!editingUser">
-                <v-text-field
-                  v-model="userForm.password"
-                  label="Password"
-                  type="password"
-                  variant="outlined"
-                  required
-                  :error-messages="validationErrors.password"
-                />
-                <v-text-field
-                  v-model="userForm.password_confirmation"
-                  label="Confirm Password"
-                  type="password"
-                  variant="outlined"
-                  required
-                  :error-messages="validationErrors.password_confirmation"
-                />
-              </div>
-            </div>
+          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-3 tw-gap-4">
+            <v-text-field
+              v-model="userForm.first_name"
+              label="First Name *"
+              variant="outlined"
+              required
+              :error-messages="validationErrors.first_name"
+            />
+            <v-text-field
+              v-model="userForm.last_name"
+              label="Last Name *"
+              variant="outlined"
+              required
+              :error-messages="validationErrors.last_name"
+            />
+            <v-text-field
+              v-model="userForm.middle_name"
+              label="Middle Name"
+              variant="outlined"
+              :error-messages="validationErrors.middle_name"
+            />
           </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="closeUserDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="saveUser">Save User</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+
+          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+            <v-text-field
+              v-model="userForm.date_of_birth"
+              label="Date of Birth"
+              type="date"
+              variant="outlined"
+              :error-messages="validationErrors.date_of_birth"
+            />
+            <v-select
+              v-model="userForm.gender"
+              :items="genderOptions"
+              label="Gender"
+              variant="outlined"
+              :error-messages="validationErrors.gender"
+            />
+          </div>
+
+          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+            <v-select
+              v-model="userForm.department_id"
+              :items="departmentOptions"
+              label="Department"
+              variant="outlined"
+              item-title="name"
+              item-value="id"
+              :error-messages="validationErrors.department_id"
+            />
+            <v-select
+              v-model="userForm.designation_id"
+              :items="designationOptions"
+              label="Designation"
+              variant="outlined"
+              item-title="title"
+              item-value="id"
+              :error-messages="validationErrors.designation_id"
+            />
+          </div>
+
+          <v-textarea
+            v-model="userForm.address"
+            label="Address"
+            variant="outlined"
+            rows="2"
+            :error-messages="validationErrors.address"
+          />
+        </div>
+
+        <!-- System Settings -->
+        <div class="tw-space-y-4">
+          <v-divider />
+          <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">System Settings</h4>
+
+          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
+            <v-select
+              v-model="userForm.status"
+              :items="statusOptions"
+              label="Status"
+              variant="outlined"
+              required
+              :error-messages="validationErrors.status"
+            />
+            <v-select
+              v-model="userForm.roles"
+              :items="roleOptions"
+              label="Roles"
+              variant="outlined"
+              multiple
+              chips
+              :error-messages="validationErrors.roles"
+            />
+          </div>
+
+          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4" v-if="!editingUser">
+            <v-text-field
+              v-model="userForm.password"
+              label="Password"
+              type="password"
+              variant="outlined"
+              required
+              :error-messages="validationErrors.password"
+            />
+            <v-text-field
+              v-model="userForm.password_confirmation"
+              label="Confirm Password"
+              type="password"
+              variant="outlined"
+              required
+              :error-messages="validationErrors.password_confirmation"
+            />
+          </div>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="closeUserDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="saveUser">Save User</v-btn>
+      </template>
+    </AppModal>
 
     <!-- Manage Roles -->
-    <v-dialog v-model="showRolesDialog" max-width="800px" persistent>
-      <v-card v-if="managingUser">
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">Manage Roles — {{ managingUser.name }}</span>
-        </v-card-title>
-        <v-card-text class="tw-space-y-4">
-          <v-select v-model="selectedRoles" :items="roleOptions" label="Select Roles" variant="outlined" multiple chips />
+    <AppModal v-model="showRolesDialog" :title="managingUser ? `Manage Roles — ${managingUser.name}` : 'Manage Roles'" size="lg" persistent>
+      <div v-if="managingUser" class="tw-space-y-4">
+        <v-select v-model="selectedRoles" :items="roleOptions" label="Select Roles" variant="outlined" multiple chips />
 
-          <!-- Show permissions from selected roles -->
-          <div v-if="selectedRolesPermissions.length > 0" class="tw-mt-4">
+        <!-- Show permissions from selected roles -->
+        <div v-if="selectedRolesPermissions.length > 0" class="tw-mt-4">
+          <h4 class="tw-font-semibold tw-text-gray-700 tw-mb-2">
+            <v-icon size="small" class="tw-mr-1">mdi-shield-account</v-icon>
+            Permissions from Selected Roles ({{ selectedRolesPermissions.length }})
+          </h4>
+          <v-chip-group column>
+            <v-chip
+              v-for="perm in selectedRolesPermissions"
+              :key="perm.id || perm.name"
+              size="small"
+              variant="tonal"
+              color="blue-grey"
+            >
+              {{ perm.label || perm.name }}
+            </v-chip>
+          </v-chip-group>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showRolesDialog = false; selectedRoles = []">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="updateUserRoles">Update Roles</v-btn>
+      </template>
+    </AppModal>
+
+    <!-- Manage Permissions -->
+    <AppModal v-model="showPermissionsDialog" :title="managingUser ? `Manage Direct Permissions — ${managingUser.name}` : 'Manage Permissions'" size="lg" persistent :loading="savingPermissions">
+      <div v-if="managingUser" class="tw-space-y-4">
+        <v-alert type="info" density="compact" variant="tonal" class="tw-mb-2">
+          <strong>How it works:</strong> Permissions from roles are auto-selected and disabled (cannot be removed here).
+          You can add additional direct permissions that will be assigned specifically to this user.
+        </v-alert>
+
+        <v-divider />
+
+        <!-- Loading State -->
+        <div v-if="loadingPermissions" class="tw-text-center tw-py-8">
+          <v-progress-circular indeterminate color="primary" />
+          <p class="tw-mt-2 tw-text-gray-600">Loading permissions...</p>
+        </div>
+
+        <!-- Permissions List -->
+        <div v-else>
+          <!-- Role Permissions (Read-only) -->
+          <div v-if="Array.isArray(rolePermissionsList) && rolePermissionsList.length > 0" class="tw-mb-6">
             <h4 class="tw-font-semibold tw-text-gray-700 tw-mb-2">
               <v-icon size="small" class="tw-mr-1">mdi-shield-account</v-icon>
-              Permissions from Selected Roles ({{ selectedRolesPermissions.length }})
+              Permissions from Roles ({{ Array.isArray(rolePermissionsList) ? rolePermissionsList.length : 0 }})
             </h4>
             <v-chip-group column>
               <v-chip
-                v-for="perm in selectedRolesPermissions"
-                :key="perm.id || perm.name"
+                v-for="perm in (Array.isArray(rolePermissionsList) ? rolePermissionsList : [])"
+                :key="'role-' + perm.id"
                 size="small"
                 variant="tonal"
                 color="blue-grey"
+                disabled
               >
                 {{ perm.label || perm.name }}
               </v-chip>
             </v-chip-group>
           </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showRolesDialog = false; selectedRoles = []">Cancel</v-btn>
-          <v-btn color="primary" @click="updateUserRoles">Update Roles</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
 
-    <!-- Manage Permissions -->
-    <v-dialog v-model="showPermissionsDialog" max-width="800px" persistent scrollable>
-      <v-card v-if="managingUser">
-        <v-card-title>
-          <span class="tw-text-xl tw-font-semibold">Manage Direct Permissions — {{ managingUser.name }}</span>
-        </v-card-title>
-        <v-card-subtitle class="tw-pt-2">
-          <v-alert type="info" density="compact" variant="tonal" class="tw-mb-2">
-            <strong>How it works:</strong> Permissions from roles are auto-selected and disabled (cannot be removed here).
-            You can add additional direct permissions that will be assigned specifically to this user.
-          </v-alert>
-        </v-card-subtitle>
-        <v-divider />
-        <v-card-text style="max-height: 500px;">
-          <div class="tw-space-y-4">
-            <!-- Loading State -->
-            <div v-if="loadingPermissions" class="tw-text-center tw-py-8">
-              <v-progress-circular indeterminate color="primary" />
-              <p class="tw-mt-2 tw-text-gray-600">Loading permissions...</p>
-            </div>
+          <!-- Direct Permissions (Editable) -->
+          <div>
+            <h4 class="tw-font-semibold tw-text-gray-700 tw-mb-2">
+              <v-icon size="small" class="tw-mr-1">mdi-shield-plus</v-icon>
+              All Permissions
+              <span class="tw-text-sm tw-font-normal tw-text-gray-600">
+                ({{ selectedPermissions.length }} total: {{ rolePermissionsList.length }} from roles + {{ directPermissionsCount }} direct)
+              </span>
+            </h4>
+            <p class="tw-text-sm tw-text-gray-600 tw-mb-3">
+              ✓ Checked & Disabled = From roles (cannot be removed here)<br>
+              ✓ Checked & Enabled = Direct permissions (can be removed)<br>
+              ☐ Unchecked = Available to add
+            </p>
 
-            <!-- Permissions List -->
-            <div v-else>
-              <!-- Role Permissions (Read-only) -->
-              <div v-if="Array.isArray(rolePermissionsList) && rolePermissionsList.length > 0" class="tw-mb-6">
-                <h4 class="tw-font-semibold tw-text-gray-700 tw-mb-2">
-                  <v-icon size="small" class="tw-mr-1">mdi-shield-account</v-icon>
-                  Permissions from Roles ({{ Array.isArray(rolePermissionsList) ? rolePermissionsList.length : 0 }})
-                </h4>
-                <v-chip-group column>
+            <!-- Search/Filter -->
+            <v-text-field
+              v-model="permissionSearch"
+              label="Search permissions"
+              prepend-inner-icon="mdi-magnify"
+              variant="outlined"
+              density="compact"
+              clearable
+              class="tw-mb-3"
+            />
+
+            <!-- Permission Categories -->
+            <div v-for="category in filteredPermissionCategories" :key="category.name" class="tw-mb-4">
+              <h5 class="tw-font-medium tw-text-sm tw-text-gray-600 tw-mb-2">{{ category.name }}</h5>
+              <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-2">
+                <div v-for="perm in category.permissions" :key="perm.id" class="tw-flex tw-items-center tw-gap-1">
+                  <v-checkbox
+                    v-model="selectedPermissions"
+                    :value="perm.id"
+                    :label="perm.label || perm.name"
+                    :hint="perm.description"
+                    density="compact"
+                    hide-details
+                    :disabled="isPermissionFromRole(perm.id)"
+                    class="tw-flex-1"
+                  />
                   <v-chip
-                    v-for="perm in (Array.isArray(rolePermissionsList) ? rolePermissionsList : [])"
-                    :key="'role-' + perm.id"
-                    size="small"
-                    variant="tonal"
+                    v-if="isPermissionFromRole(perm.id)"
+                    size="x-small"
                     color="blue-grey"
-                    disabled
+                    variant="tonal"
+                    class="tw-ml-1"
                   >
-                    {{ perm.label || perm.name }}
+                    Role
                   </v-chip>
-                </v-chip-group>
-              </div>
-
-              <!-- Direct Permissions (Editable) -->
-              <div>
-                <h4 class="tw-font-semibold tw-text-gray-700 tw-mb-2">
-                  <v-icon size="small" class="tw-mr-1">mdi-shield-plus</v-icon>
-                  All Permissions
-                  <span class="tw-text-sm tw-font-normal tw-text-gray-600">
-                    ({{ selectedPermissions.length }} total: {{ rolePermissionsList.length }} from roles + {{ directPermissionsCount }} direct)
-                  </span>
-                </h4>
-                <p class="tw-text-sm tw-text-gray-600 tw-mb-3">
-                  ✓ Checked & Disabled = From roles (cannot be removed here)<br>
-                  ✓ Checked & Enabled = Direct permissions (can be removed)<br>
-                  ☐ Unchecked = Available to add
-                </p>
-
-                <!-- Search/Filter -->
-                <v-text-field
-                  v-model="permissionSearch"
-                  label="Search permissions"
-                  prepend-inner-icon="mdi-magnify"
-                  variant="outlined"
-                  density="compact"
-                  clearable
-                  class="tw-mb-3"
-                />
-
-                <!-- Permission Categories -->
-                <div v-for="category in filteredPermissionCategories" :key="category.name" class="tw-mb-4">
-                  <h5 class="tw-font-medium tw-text-sm tw-text-gray-600 tw-mb-2">{{ category.name }}</h5>
-                  <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-2">
-                    <div v-for="perm in category.permissions" :key="perm.id" class="tw-flex tw-items-center tw-gap-1">
-                      <v-checkbox
-                        v-model="selectedPermissions"
-                        :value="perm.id"
-                        :label="perm.label || perm.name"
-                        :hint="perm.description"
-                        density="compact"
-                        hide-details
-                        :disabled="isPermissionFromRole(perm.id)"
-                        class="tw-flex-1"
-                      />
-                      <v-chip
-                        v-if="isPermissionFromRole(perm.id)"
-                        size="x-small"
-                        color="blue-grey"
-                        variant="tonal"
-                        class="tw-ml-1"
-                      >
-                        Role
-                      </v-chip>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
           </div>
-        </v-card-text>
-        <v-divider />
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="closePermissionsDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="updateUserPermissions" :loading="savingPermissions">
-            Update Permissions
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="closePermissionsDialog">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="updateUserPermissions" :loading="savingPermissions">
+          Update Permissions
+        </v-btn>
+      </template>
+    </AppModal>
 
     <!-- Bulk Actions -->
-    <v-dialog v-model="showBulkActionsDialog" max-width="520px" persistent>
-      <v-card>
-        <v-card-title><span class="tw-text-xl tw-font-semibold">Bulk Actions ({{ selectedUsers.length }} users)</span></v-card-title>
-        <v-card-text class="tw-space-y-4">
-          <v-select v-model="bulkAction" :items="bulkActionOptions" label="Select Action" variant="outlined" required />
-          <div v-if="bulkAction === 'status'">
-            <v-select v-model="bulkActionData.status" :items="statusOptions" label="New Status" variant="outlined" required />
-          </div>
-          <div v-if="bulkAction === 'delete'" class="tw-p-4 tw-bg-red-50 tw-rounded-lg">
-            <p class="tw-text-red-800 tw-text-sm">
-              <v-icon color="red" size="16" class="tw-mr-1">mdi-alert</v-icon>
-              This action cannot be undone. {{ selectedUsers.length }} users will be permanently deleted.
-            </p>
-          </div>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showBulkActionsDialog = false">Cancel</v-btn>
-          <v-btn :color="bulkAction === 'delete' ? 'error' : 'primary'" @click="handleBulkAction" :disabled="!bulkAction">
-            {{ bulkAction === 'delete' ? 'Delete Users' : 'Apply Action' }}
-          </v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppModal v-model="showBulkActionsDialog" :title="`Bulk Actions (${selectedUsers.length} users)`" size="md" persistent>
+      <div class="tw-space-y-4">
+        <v-select v-model="bulkAction" :items="bulkActionOptions" label="Select Action" variant="outlined" required />
+        <div v-if="bulkAction === 'status'">
+          <v-select v-model="bulkActionData.status" :items="statusOptions" label="New Status" variant="outlined" required />
+        </div>
+        <div v-if="bulkAction === 'delete'" class="tw-p-4 tw-bg-red-50 tw-rounded-lg">
+          <p class="tw-text-red-800 tw-text-sm">
+            <v-icon color="red" size="16" class="tw-mr-1">mdi-alert</v-icon>
+            This action cannot be undone. {{ selectedUsers.length }} users will be permanently deleted.
+          </p>
+        </div>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showBulkActionsDialog = false">Cancel</v-btn>
+        <v-btn :color="bulkAction === 'delete' ? 'error' : 'primary'" variant="flat" @click="handleBulkAction" :disabled="!bulkAction">
+          {{ bulkAction === 'delete' ? 'Delete Users' : 'Apply Action' }}
+        </v-btn>
+      </template>
+    </AppModal>
 
     <!-- Import -->
-    <v-dialog v-model="showImportDialog" max-width="640px" persistent>
-      <v-card>
-        <v-card-title><span class="tw-text-xl tw-font-semibold">Import Users</span></v-card-title>
-        <v-card-text class="tw-space-y-4">
-          <v-file-input
-            v-model="importFile"
-            label="Select CSV File"
-            accept=".csv,.txt"
-            variant="outlined"
-            prepend-icon="mdi-file-upload"
-            show-size
-          />
-          <div class="tw-p-4 tw-bg-blue-50 tw-rounded-lg">
-            <h4 class="tw-font-medium tw-text-blue-900 tw-mb-2">CSV Format Requirements:</h4>
-            <ul class="tw-text-blue-800 tw-text-sm tw-list-disc tw-list-inside tw-space-y-1">
-              <li><strong>name</strong> (required)</li>
-              <li><strong>email</strong> (required)</li>
-              <li><strong>username</strong> (optional)</li>
-              <li><strong>phone</strong> (optional)</li>
-              <li><strong>password</strong> (optional; default: password123)</li>
-              <li><strong>status</strong> (Active / Pending / Suspended)</li>
-              <li><strong>roles</strong> (comma-separated role names)</li>
-            </ul>
-          </div>
-          <v-btn color="primary" variant="outlined" prepend-icon="mdi-download" @click="downloadTemplate" block>
-            Download CSV Template
-          </v-btn>
-        </v-card-text>
-        <v-card-actions>
-          <v-spacer />
-          <v-btn variant="text" @click="showImportDialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="importUsers" :disabled="!importFile" :loading="importing">Import Users</v-btn>
-        </v-card-actions>
-      </v-card>
-    </v-dialog>
+    <AppModal v-model="showImportDialog" title="Import Users" size="md" persistent>
+      <div class="tw-space-y-4">
+        <v-file-input
+          v-model="importFile"
+          label="Select CSV File"
+          accept=".csv,.txt"
+          variant="outlined"
+          prepend-icon="mdi-file-upload"
+          show-size
+        />
+        <div class="tw-p-4 tw-bg-blue-50 tw-rounded-lg">
+          <h4 class="tw-font-medium tw-text-blue-900 tw-mb-2">CSV Format Requirements:</h4>
+          <ul class="tw-text-blue-800 tw-text-sm tw-list-disc tw-list-inside tw-space-y-1">
+            <li><strong>name</strong> (required)</li>
+            <li><strong>email</strong> (required)</li>
+            <li><strong>username</strong> (optional)</li>
+            <li><strong>phone</strong> (optional)</li>
+            <li><strong>password</strong> (optional; default: password123)</li>
+            <li><strong>status</strong> (Active / Pending / Suspended)</li>
+            <li><strong>roles</strong> (comma-separated role names)</li>
+          </ul>
+        </div>
+        <v-btn color="primary" variant="outlined" prepend-icon="mdi-download" @click="downloadTemplate" block>
+          Download CSV Template
+        </v-btn>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" @click="showImportDialog = false">Cancel</v-btn>
+        <v-btn color="primary" variant="flat" @click="importUsers" :disabled="!importFile" :loading="importing">Import Users</v-btn>
+      </template>
+    </AppModal>
   </AdminLayout>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, watch, onBeforeUnmount } from 'vue'
 import AdminLayout from '../layout/AdminLayout.vue'
+import AppModal from '../common/AppModal.vue'
+import AppDataTable from '../common/AppDataTable.vue'
 import { useToast } from '../../composables/useToast'
 import { userAPI, roleAPI, departmentAPI, designationAPI, permissionAPI } from '../../utils/api'
 

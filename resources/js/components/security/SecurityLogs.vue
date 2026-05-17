@@ -90,13 +90,13 @@
 
       <!-- Security Logs Table -->
       <v-card class="tw-border tw-border-gray-200">
-        <v-data-table
+        <AppDataTable
           v-model="selectedLogs"
           :headers="headers"
           :items="logs"
           :loading="loading"
           :items-per-page="itemsPerPage"
-          :server-items-length="totalLogs"
+          :items-length="totalLogs"
           show-select
           item-value="id"
           @update:options="handleTableUpdate"
@@ -184,112 +184,89 @@
               </v-tooltip>
             </div>
           </template>
-        </v-data-table>
+        </AppDataTable>
       </v-card>
 
       <!-- Log Details Dialog -->
-      <v-dialog v-model="showDetailsDialog" max-width="800px">
-        <v-card v-if="selectedLog">
-          <v-card-title>
-            <span class="tw-text-xl tw-font-semibold">Security Log Details</span>
-          </v-card-title>
-          <v-card-text>
-            <div class="tw-space-y-4">
-              <div class="tw-grid tw-grid-cols-2 tw-gap-4">
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">Event Type</label>
-                  <p class="tw-text-gray-900">{{ selectedLog.type_label }}</p>
-                </div>
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">Severity</label>
-                  <v-chip :color="selectedLog.severity_color" size="small" variant="flat">
-                    {{ selectedLog.severity_label }}
-                  </v-chip>
-                </div>
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">IP Address</label>
-                  <p class="tw-font-mono tw-text-gray-900">{{ selectedLog.ip_address }}</p>
-                </div>
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">User</label>
-                  <p class="tw-text-gray-900">{{ selectedLog.user?.name || 'N/A' }}</p>
-                </div>
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">Date/Time</label>
-                  <p class="tw-text-gray-900">{{ formatDate(selectedLog.created_at) }}</p>
-                </div>
-                <div>
-                  <label class="tw-text-sm tw-font-medium tw-text-gray-600">Status</label>
-                  <v-chip 
-                    :color="selectedLog.resolved_at ? 'success' : 'warning'" 
-                    size="small" 
-                    variant="flat"
-                  >
-                    {{ selectedLog.resolved_at ? 'Resolved' : 'Open' }}
-                  </v-chip>
-                </div>
-              </div>
-              
-              <div>
-                <label class="tw-text-sm tw-font-medium tw-text-gray-600">URL</label>
-                <p class="tw-text-gray-900 tw-break-all">{{ selectedLog.url }}</p>
-              </div>
-              
-              <div>
-                <label class="tw-text-sm tw-font-medium tw-text-gray-600">User Agent</label>
-                <p class="tw-text-gray-900 tw-break-all">{{ selectedLog.user_agent || 'N/A' }}</p>
-              </div>
-              
-              <div v-if="selectedLog.details">
-                <label class="tw-text-sm tw-font-medium tw-text-gray-600">Additional Details</label>
-                <pre class="tw-bg-gray-100 tw-p-3 tw-rounded tw-text-sm tw-overflow-auto">{{ JSON.stringify(selectedLog.details, null, 2) }}</pre>
-              </div>
+      <AppModal v-model="showDetailsDialog" title="Security Log Details" size="lg">
+        <div v-if="selectedLog" class="tw-space-y-4">
+          <div class="tw-grid tw-grid-cols-2 tw-gap-4">
+            <div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">Event Type</label>
+              <p class="tw-text-gray-900">{{ selectedLog.type_label }}</p>
             </div>
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
-            <v-btn variant="text" @click="showDetailsDialog = false">Close</v-btn>
-            <v-btn 
-              v-if="!selectedLog.resolved_at"
-              color="success" 
-              @click="resolveLog(selectedLog)"
-            >
-              Resolve
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+            <div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">Severity</label>
+              <v-chip :color="selectedLog.severity_color" size="small" variant="flat">
+                {{ selectedLog.severity_label }}
+              </v-chip>
+            </div>
+            <div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">IP Address</label>
+              <p class="tw-font-mono tw-text-gray-900">{{ selectedLog.ip_address }}</p>
+            </div>
+            <div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">User</label>
+              <p class="tw-text-gray-900">{{ selectedLog.user?.name || 'N/A' }}</p>
+            </div>
+            <div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">Date/Time</label>
+              <p class="tw-text-gray-900">{{ formatDate(selectedLog.created_at) }}</p>
+            </div>
+            <div>
+              <label class="tw-text-sm tw-font-medium tw-text-gray-600">Status</label>
+              <v-chip
+                :color="selectedLog.resolved_at ? 'success' : 'warning'"
+                size="small"
+                variant="flat"
+              >
+                {{ selectedLog.resolved_at ? 'Resolved' : 'Open' }}
+              </v-chip>
+            </div>
+          </div>
+
+          <div>
+            <label class="tw-text-sm tw-font-medium tw-text-gray-600">URL</label>
+            <p class="tw-text-gray-900 tw-break-all">{{ selectedLog.url }}</p>
+          </div>
+
+          <div>
+            <label class="tw-text-sm tw-font-medium tw-text-gray-600">User Agent</label>
+            <p class="tw-text-gray-900 tw-break-all">{{ selectedLog.user_agent || 'N/A' }}</p>
+          </div>
+
+          <div v-if="selectedLog.details">
+            <label class="tw-text-sm tw-font-medium tw-text-gray-600">Additional Details</label>
+            <pre class="tw-bg-gray-100 tw-p-3 tw-rounded tw-text-sm tw-overflow-auto">{{ JSON.stringify(selectedLog.details, null, 2) }}</pre>
+          </div>
+        </div>
+        <template #actions>
+          <v-btn variant="outlined" @click="showDetailsDialog = false">Close</v-btn>
+          <v-btn
+            v-if="selectedLog && !selectedLog.resolved_at"
+            color="success"
+            variant="flat"
+            @click="resolveLog(selectedLog)"
+          >
+            Resolve
+          </v-btn>
+        </template>
+      </AppModal>
 
       <!-- Bulk Resolve Dialog -->
-      <v-dialog v-model="showBulkResolveDialog" max-width="500px">
-        <v-card>
-          <v-card-title>
-            <span class="tw-text-xl tw-font-semibold">
-              Bulk Resolve ({{ selectedLogs.length }} logs)
-            </span>
-          </v-card-title>
-          <v-card-text>
-            <v-textarea
-              v-model="bulkResolutionNotes"
-              label="Resolution Notes (Optional)"
-              variant="outlined"
-              rows="3"
-              placeholder="Add notes about how these issues were resolved..."
-            />
-          </v-card-text>
-          <v-card-actions>
-            <v-spacer />
-            <v-btn variant="text" @click="showBulkResolveDialog = false">Cancel</v-btn>
-            <v-btn 
-              color="success" 
-              @click="bulkResolve"
-              :loading="resolving"
-            >
-              Resolve All
-            </v-btn>
-          </v-card-actions>
-        </v-card>
-      </v-dialog>
+      <AppModal v-model="showBulkResolveDialog" :title="`Bulk Resolve (${selectedLogs.length} logs)`" size="sm" color="success">
+        <v-textarea
+          v-model="bulkResolutionNotes"
+          label="Resolution Notes (Optional)"
+          variant="outlined"
+          rows="3"
+          placeholder="Add notes about how these issues were resolved..."
+        />
+        <template #actions>
+          <v-btn variant="outlined" @click="showBulkResolveDialog = false">Cancel</v-btn>
+          <v-btn color="success" variant="flat" @click="bulkResolve" :loading="resolving">Resolve All</v-btn>
+        </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
@@ -299,6 +276,8 @@ import { ref, computed, onMounted, watch } from 'vue';
 import AdminLayout from '../layout/AdminLayout.vue';
 import { useToast } from '../../composables/useToast';
 import { securityAPI } from '../../utils/api';
+import AppModal from '../common/AppModal.vue';
+import AppDataTable from '../common/AppDataTable.vue';
 
 const { success, error } = useToast();
 
