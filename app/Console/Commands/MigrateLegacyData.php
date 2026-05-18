@@ -100,10 +100,6 @@ class MigrateLegacyData extends Command
             $dryRun ? $this->previewLegacyPins() : $this->migrateLegacyPins();
         }
 
-        if ($runCapitations) {
-            $dryRun ? $this->previewLegacyCapitations() : $this->migrateLegacyCapitations();
-        }
-
         $enrolleeStats = ['failed' => 0];
         if ($runEnrollees) {
             $enrolleeStats = $this->migrateEnrollees(
@@ -114,6 +110,10 @@ class MigrateLegacyData extends Command
                 $this->option('limit') !== null ? (int) $this->option('limit') : null,
                 $dryRun
             );
+        }
+
+        if ($runCapitations) {
+            $dryRun ? $this->previewLegacyCapitations() : $this->migrateLegacyCapitations();
         }
 
         $this->info('Legacy migration completed.');
@@ -526,7 +526,10 @@ class MigrateLegacyData extends Command
         $userId = $this->systemUserId();
         $keyColumn = $this->legacyKeyColumn('tbl_request', ['id', 'sn', 'request_id', 'invoice_id']);
         $paymentReferenceCounts = $this->legacyPaymentReferenceCounts('tbl_request');
+        $total = DB::connection(self::LEGACY_CONNECTION)->table('tbl_request')->count();
         $count = 0;
+
+        $this->info("Migrating legacy invoices from tbl_request: {$total} row(s) found.");
 
         DB::connection(self::LEGACY_CONNECTION)
             ->table('tbl_request')
@@ -578,6 +581,8 @@ class MigrateLegacyData extends Command
 
                     $count++;
                 }
+
+                $this->line("Legacy invoices progress: {$count} migrated.");
             });
 
         $this->info("Legacy invoices migrated from tbl_request: {$count}");
@@ -610,8 +615,11 @@ class MigrateLegacyData extends Command
 
         $count = 0;
         $skipped = 0;
+        $total = DB::connection(self::LEGACY_CONNECTION)->table('tbl_pin_inven')->count();
 
         $requestLookup = $this->legacyRequestsByPaymentId();
+
+        $this->info("Migrating legacy premium pins from tbl_pin_inven: {$total} row(s) found.");
 
         DB::connection(self::LEGACY_CONNECTION)
             ->table('tbl_pin_inven')
@@ -680,6 +688,8 @@ class MigrateLegacyData extends Command
 
                     $count++;
                 }
+
+                $this->line("Legacy premium pins progress: {$count} migrated, {$skipped} skipped.");
             });
 
         $this->info("Legacy premium pins migrated from tbl_pin_inven: {$count}");
@@ -742,6 +752,10 @@ class MigrateLegacyData extends Command
             ->all();
         $groupLookup = [];
         $groupsMigrated = 0;
+        $groupsTotal = DB::connection(self::LEGACY_CONNECTION)->table('capitation_grouping')->count();
+        $detailsTotal = DB::connection(self::LEGACY_CONNECTION)->table('capitations')->count();
+
+        $this->info("Migrating legacy capitation groups from capitation_grouping: {$groupsTotal} row(s) found.");
 
         DB::connection(self::LEGACY_CONNECTION)
             ->table('capitation_grouping')
@@ -812,10 +826,14 @@ class MigrateLegacyData extends Command
                     $groupLookup[$legacyId] = $capitation->id;
                     $groupsMigrated++;
                 }
+
+                $this->line("Legacy capitation groups progress: {$groupsMigrated} migrated.");
             });
 
         $detailsMigrated = 0;
         $detailsSkipped = 0;
+
+        $this->info("Migrating legacy capitation details from capitations: {$detailsTotal} row(s) found.");
 
         DB::connection(self::LEGACY_CONNECTION)
             ->table('capitations')
@@ -910,6 +928,8 @@ class MigrateLegacyData extends Command
 
                     $detailsMigrated++;
                 }
+
+                $this->line("Legacy capitation details progress: {$detailsMigrated} migrated, {$detailsSkipped} skipped.");
             });
 
         $this->info("Legacy capitation groups migrated from capitation_grouping: {$groupsMigrated}");
@@ -1066,8 +1086,15 @@ class MigrateLegacyData extends Command
         $this->info(($dryRun ? 'Dry-running' : 'Migrating') . ' legacy enrollees from: ' . implode(', ', $tables));
 
         foreach ($tables as $table) {
+            $available = DB::connection(self::LEGACY_CONNECTION)
+                ->table($table)
+                ->when($fromId !== null, fn ($query) => $query->where('id', '>=', $fromId))
+                ->count();
+            $target = $limit === null ? $available : min($available, $limit);
             $remaining = $limit;
             $lastId = $fromId ? $fromId - 1 : 0;
+
+            $this->info("Migrating legacy enrollees from {$table}: {$target} row(s) targeted.");
 
             while ($remaining === null || $remaining > 0) {
                 $take = $remaining === null ? $chunk : min($chunk, $remaining);
@@ -1118,6 +1145,8 @@ class MigrateLegacyData extends Command
                 if ($remaining !== null) {
                     $remaining -= $rows->count();
                 }
+
+                $this->line("Legacy enrollees progress for {$table}: last id {$lastId}; {$stats['processed']} total processed.");
             }
         }
 
