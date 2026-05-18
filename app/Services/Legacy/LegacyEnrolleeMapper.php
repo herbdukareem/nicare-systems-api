@@ -33,7 +33,7 @@ class LegacyEnrolleeMapper
             : $this->classifyInformal($legacy);
 
         $programme = $this->programme($classification['programme_code'], $classification['programme_name']);
-        $category = $this->category($programme, $classification['category_name']);
+        $category = $this->category($programme, $this->categoryName($legacy, $classification, $sourceTable));
         $fundingType = $this->fundingType($classification['funding_type']);
         $vulnerableGroup = $this->vulnerableGroup($legacy, $classification, $sourceTable);
         $benefitPackage = $this->benefitPackage($classification['benefit_package']);
@@ -299,6 +299,38 @@ class LegacyEnrolleeMapper
         return $category;
     }
 
+    private function categoryName(object $legacy, array $classification, string $sourceTable): string
+    {
+        if ($classification['programme_code'] === 'vulnerable_groups') {
+            return $this->allowedVulnerableGroupName($this->string($legacy->vulnerability_status ?? null)) ?? 'Others';
+        }
+
+        if ($classification['programme_code'] === 'formal_sector') {
+            return $this->formalCategory($legacy);
+        }
+
+        if ($classification['programme_code'] === 'informal_sector') {
+            $legacyCategory = Str::lower((string) ($this->legacyCategoryValue($legacy) ?? ''));
+            $mode = Str::lower((string) ($legacy->mode_of_enrolment ?? ''));
+
+            if (Str::contains($legacyCategory . ' ' . $mode, ['family', 'household'])) {
+                return 'Family Plan';
+            }
+
+            if (Str::contains($legacyCategory . ' ' . $mode, ['community', 'cbhi'])) {
+                return 'Community-Based Health Insurance (CBHI)';
+            }
+
+            if (Str::contains($legacyCategory . ' ' . $mode, ['cooperative', 'association', 'organized', 'organised', 'group'])) {
+                return 'Trade Associations / Cooperatives';
+            }
+
+            return 'Individual / Voluntary Contributors';
+        }
+
+        return $classification['category_name'];
+    }
+
     private function fundingType(string $name): FundingType
     {
         $fundingType = LegacyReferenceData::fundingTypeByLegacyValue($name);
@@ -541,16 +573,24 @@ class LegacyEnrolleeMapper
         ])));
 
         if (Str::contains($text, ['retire', 'pension'])) {
-            return 'Retirees / Pensioners';
+            return 'Federal/State Civil Servants';
         }
         if (Str::contains($text, ['local government', 'lga'])) {
-            return 'Local Government Employees';
+            return 'Federal/State Civil Servants';
         }
         if (Str::contains($text, ['company', 'private', 'ngo', 'sme'])) {
-            return 'Registered Company Employees';
+            return 'Private Sector Employees';
         }
 
-        return 'State Civil Servants';
+        if (Str::contains($text, ['military', 'paramilitary', 'army', 'police', 'civil defence', 'customs', 'immigration'])) {
+            return 'Military and Paramilitary';
+        }
+
+        if (Str::contains($text, ['student', 'tiship', 'tertiary'])) {
+            return 'Tertiary Institution Students (TISHIP)';
+        }
+
+        return 'Federal/State Civil Servants';
     }
 
     private function coverageStatus(object $legacy, int $waitingDays, Carbon $coverageEnd): string
