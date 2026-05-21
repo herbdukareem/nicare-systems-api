@@ -69,7 +69,7 @@
   .page-break { page-break-after: always; }
 
   /* ── SLIP ── */
-  .slip { border: 1pt solid #0d3b6e; margin-bottom: 6mm; page-break-inside: avoid; }
+  .slip { border: 1pt solid #0d3b6e; margin-bottom: 4mm; page-break-inside: avoid; }
 
   .slip-hdr { background: #0d3b6e; color: white; padding: 2.5mm 3mm; }
   .slip-hdr-tbl { width: 100%; border-collapse: collapse; }
@@ -272,17 +272,8 @@
 
   {{-- Slip header --}}
   <div class="slip-hdr">
-    <table class="slip-hdr-tbl">
-      <tr>
-        <td>
-          <div class="slip-hdr-title">Niger State Contributory Health Agency (NGSCHA)</div>
-          <div class="slip-hdr-sub">Health Insurance Enrollment Confirmation Slip</div>
-        </td>
-        <td style="text-align:right; vertical-align:middle">
-          <span class="slip-serial">No. {{ str_pad($loop->iteration, 4, '0', STR_PAD_LEFT) }}</span>
-        </td>
-      </tr>
-    </table>
+    <div class="slip-hdr-title">Niger State Contributory Health Agency (NGSCHA)</div>
+    <div class="slip-hdr-sub">Health Insurance Enrollment Confirmation Slip</div>
   </div>
 
   {{-- Slip body --}}
@@ -366,27 +357,11 @@
     </tr>
   </table>
 
-  {{-- Certification & Signatures --}}
+  {{-- Certification --}}
   <div class="slip-cert">
     This is to certify that the above-named individual has been duly enrolled under the Niger State
     Contributory Health Agency (NGSCHA) Health Insurance Scheme. This slip serves as official proof of
     enrollment and should be retained by the enrollee for future reference.
-    <table class="cert-sig-tbl">
-      <tr>
-        <td style="width:38%; padding:0 2mm 0 0;">
-          <div class="cert-sig-line"></div>
-          <div class="cert-sig-lbl">Enrollee Signature / Thumbprint</div>
-        </td>
-        <td style="width:4%;"></td>
-        <td style="width:38%; padding:0 2mm;">
-          <div class="cert-sig-line"></div>
-          <div class="cert-sig-lbl">Authorised Officer &amp; Stamp</div>
-        </td>
-        <td style="width:20%; vertical-align:bottom; padding:0 0 0 2mm;">
-          <div style="font-size:6.5pt; color:#555;">Date: _______________</div>
-        </td>
-      </tr>
-    </table>
   </div>
 
   {{-- Slip footer --}}
@@ -400,6 +375,9 @@
   </div>
 
 </div>
+@if($loop->iteration % 2 === 0 && !$loop->last)
+<div class="page-break"></div>
+@endif
 @endforeach
 
 </body>

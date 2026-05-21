@@ -52,10 +52,7 @@ class LegacyEnrolleeMapper
             ?? $this->date($legacy->approved_date ?? null)
             ?? $this->date($legacy->enrol_date ?? null)
             ?? now();
-        $coverageEnd = $this->date($legacy->date_expired ?? null) ?? $coverageStart->copy()->addYear()->subDay();
-        if ($coverageEnd->lt($coverageStart)) {
-            $coverageEnd = $coverageStart->copy()->addYear()->subDay();
-        }
+        $coverageEnd = $this->date($legacy->date_expired ?? null);
 
         $coverageStatus = $this->coverageStatus($legacy, $classification['waiting_period_days'], $coverageEnd);
         $enrolleeStatus = match ($coverageStatus) {
@@ -110,7 +107,7 @@ class LegacyEnrolleeMapper
                 'enrollment_phase_id' => $enrollmentPhase?->id,
                 'capitation_start_date' => $this->date($legacy->cap_date_month ?? null)?->toDateString(),
                 'coverage_start_date' => $coverageStart->toDateString(),
-                'coverage_end_date' => $coverageEnd->toDateString(),
+                'coverage_end_date' => $coverageEnd?->toDateString(),
                 'approval_date' => $this->date($legacy->approved_date ?? null)?->toDateTimeString(),
                 'enrollment_date' => $this->date($legacy->enrol_date ?? null)?->toDateTimeString(),
                 'nok_name' => $this->string($legacy->nok_name ?? null),
@@ -136,7 +133,7 @@ class LegacyEnrolleeMapper
                 'benefactor_id' => $benefactor?->id,
                 'funding_type_id' => $fundingType->id,
                 'coverage_start_date' => $coverageStart->toDateString(),
-                'coverage_end_date' => $coverageEnd->toDateString(),
+                'coverage_end_date' => $coverageEnd?->toDateString(),
                 'activation_source' => $classification['activation_source'],
                 'status' => $coverageStatus,
                 'metadata' => [
@@ -593,7 +590,7 @@ class LegacyEnrolleeMapper
         return 'Federal/State Civil Servants';
     }
 
-    private function coverageStatus(object $legacy, int $waitingDays, Carbon $coverageEnd): string
+    private function coverageStatus(object $legacy, int $waitingDays, ?Carbon $coverageEnd): string
     {
         $status = Str::lower((string) ($legacy->status ?? ''));
         $approval = (string) ($legacy->enrolment_approval_status ?? '');
@@ -601,7 +598,7 @@ class LegacyEnrolleeMapper
         if (Str::contains($status, ['0', 'suspend', 'deceased', 'dead', 'inactive', 'deleted']) || $approval === '0') {
             return 'suspended';
         }
-        if ($coverageEnd->isPast()) {
+        if ($coverageEnd !== null && $coverageEnd->isPast()) {
             return 'expired';
         }
         if ($waitingDays > 0) {

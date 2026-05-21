@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Jobs\ProcessLegacyEnrolleesJob;
 use App\Models\AccountDetail;
 use App\Models\Bank;
 use App\Models\Benefactor;
@@ -21,8 +22,10 @@ use App\Models\User;
 use App\Models\Ward;
 use App\Services\Legacy\LegacyEnrolleeMigrationService;
 use App\Support\LegacyReferenceData;
+use Illuminate\Bus\Batch;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Schema;
@@ -38,7 +41,9 @@ class MigrateLegacyData extends Command
         {--chunk=500 : Number of legacy enrollee rows per chunk}
         {--from-id= : Start enrollee migration from a legacy id}
         {--limit= : Maximum enrollee rows to process per source table}
-        {--skip-users : Do not migrate legacy admin users}';
+        {--skip-users : Do not migrate legacy admin users}
+        {--dispatch : Dispatch enrollees as queued jobs instead of processing inline}
+        {--workers=4 : Number of parallel job chunks when using --dispatch}';
 
     protected $description = 'Migrate legacy reference data and enrollees into the current coverage structure';
 
@@ -102,14 +107,22 @@ class MigrateLegacyData extends Command
 
         $enrolleeStats = ['failed' => 0];
         if ($runEnrollees) {
-            $enrolleeStats = $this->migrateEnrollees(
-                $enrolleeService,
-                $enrolleeTables,
-                max((int) $this->option('chunk'), 1),
-                $this->option('from-id') !== null ? (int) $this->option('from-id') : null,
-                $this->option('limit') !== null ? (int) $this->option('limit') : null,
-                $dryRun
-            );
+            $chunk   = max((int) $this->option('chunk'), 1);
+            $fromId  = $this->option('from-id') !== null ? (int) $this->option('from-id') : null;
+            $limit   = $this->option('limit') !== null ? (int) $this->option('limit') : null;
+
+            if ((bool) $this->option('dispatch')) {
+                $this->dispatchEnrollees($enrolleeTables, $chunk, $fromId, $limit, $dryRun);
+            } else {
+                $enrolleeStats = $this->migrateEnrollees(
+                    $enrolleeService,
+                    $enrolleeTables,
+                    $chunk,
+                    $fromId,
+                    $limit,
+                    $dryRun
+                );
+            }
         }
 
         if ($runCapitations) {
@@ -1058,6 +1071,55 @@ class MigrateLegacyData extends Command
         }
 
         return (string) ($row->status ?? '1') === '1' ? 1 : 0;
+    }
+
+    /**
+     * @param array<int, string> $tables
+     */
+    private function dispatchEnrollees(
+        array $tables,
+        int $chunk,
+        ?int $fromId,
+        ?int $limit,
+        bool $dryRun
+    ): void {
+        $jobs = [];
+
+        foreach ($tables as $table) {
+            $query = DB::connection(self::LEGACY_CONNECTION)
+                ->table($table)
+                ->orderBy('id')
+                ->when($fromId !== null, fn ($q) => $q->where('id', '>=', $fromId));
+
+            $total   = $query->count();
+            $target  = $limit === null ? $total : min($total, $limit);
+            $fetched = 0;
+
+            $this->info("Queuing jobs for {$table}: {$target} row(s) across " . (int) ceil($target / $chunk) . ' chunk(s).');
+
+            $query->select('id')->limit($target)->chunk($chunk, function ($rows) use ($table, $dryRun, &$jobs, &$fetched): void {
+                $ids = $rows->pluck('id')->map(fn ($id) => (int) $id)->all();
+                $jobs[] = new ProcessLegacyEnrolleesJob($table, $ids, $dryRun);
+                $fetched += count($ids);
+            });
+        }
+
+        if (empty($jobs)) {
+            $this->warn('No enrollee jobs to dispatch.');
+            return;
+        }
+
+        $batch = Bus::batch($jobs)
+            ->name('legacy-enrollee-migration')
+            ->allowFailures()
+            ->onQueue('legacy')
+            ->then(fn (Batch $b) => \Log::info("Legacy enrollee migration batch {$b->id} completed."))
+            ->catch(fn (Batch $b, \Throwable $e) => \Log::error("Legacy enrollee migration batch {$b->id} failed: {$e->getMessage()}"))
+            ->dispatch();
+
+        $this->info("Dispatched {$batch->totalJobs} job(s) as batch ID: {$batch->id}");
+        $this->line('Monitor progress: php artisan queue:work --queue=legacy');
+        $this->line("Or check: DB::table('job_batches')->find('{$batch->id}')");
     }
 
     /**
