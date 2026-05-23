@@ -57,17 +57,20 @@ class LegacyEnrolleeMigrationService
 
             $enrolleeData = $mapped['enrollee'] + ['created_by' => $systemUserId];
             $enrolleeData['created_by'] = $existing?->created_by ?: $systemUserId;
+            $enrolleeData['status'] = 1;
+            $enrolleeData['approval_date'] = $enrolleeData['approval_date'] ?? $existing?->approval_date ?? now();
+            $enrolleeData['approved_by'] = $existing?->approved_by ?: $systemUserId;
 
             if ($existing) {
                 $existing->fill($enrolleeData);
                 $existing->save();
-                $enrollee = $existing->fresh();
+                $enrollee = $existing;
             } else {
                 $enrollee = Enrollee::create($enrolleeData);
             }
 
             $purchase = $this->createOrUpdatePurchase($mapped);
-            $enrollee = $this->applyCoverageToEnrollee($enrollee, $mapped);
+            $this->markPremiumPinUsed($enrollee, $mapped);
             $this->linkBenefactor($enrollee, $mapped, $purchase);
             $this->log($mapped, $enrollee, 'migrated', $existing ? 'Matched existing enrollee and updated coverage.' : 'Created enrollee and coverage.', $legacy);
 
@@ -116,25 +119,9 @@ class LegacyEnrolleeMigrationService
         return $this->coverageService->createPurchase($mapped['purchase']);
     }
 
-    private function applyCoverageToEnrollee(Enrollee $enrollee, array $mapped): Enrollee
+    private function markPremiumPinUsed(Enrollee $enrollee, array $mapped): void
     {
         $coverageData = $mapped['coverage'];
-
-        $enrollee->update([
-            'insurance_programme_id' => $coverageData['insurance_programme_id'] ?? $enrollee->insurance_programme_id,
-            'enrollee_category_id' => $coverageData['enrollee_category_id'] ?? $enrollee->enrollee_category_id,
-            'premium_plan_id' => $coverageData['premium_plan_id'] ?? $enrollee->premium_plan_id,
-            'premium_pin_id' => $coverageData['premium_pin_id'] ?? $enrollee->premium_pin_id,
-            'benefit_package_id' => $coverageData['benefit_package_id'] ?? $enrollee->benefit_package_id,
-            'facility_id' => $coverageData['facility_id'] ?? $enrollee->facility_id,
-            'benefactor_id' => $coverageData['benefactor_id'] ?? $enrollee->benefactor_id,
-            'funding_type_id' => $coverageData['funding_type_id'] ?? $enrollee->funding_type_id,
-            'coverage_start_date' => $coverageData['coverage_start_date'],
-            'coverage_end_date' => $coverageData['coverage_end_date'],
-            'status' => 1,
-            'approval_date' => $enrollee->approval_date ?? now(),
-            'approved_by' => $enrollee->approved_by ?? $this->systemUserId(),
-        ]);
 
         if (!empty($coverageData['premium_pin_id'])) {
             PremiumPin::whereKey($coverageData['premium_pin_id'])->update([
@@ -143,8 +130,6 @@ class LegacyEnrolleeMigrationService
                 'used_by_enrollee_id' => $enrollee->id,
             ]);
         }
-
-        return $enrollee->fresh();
     }
 
     private function linkBenefactor(Enrollee $enrollee, array $mapped, ?PremiumPurchase $purchase): void

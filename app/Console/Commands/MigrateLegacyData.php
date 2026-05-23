@@ -1233,7 +1233,9 @@ class MigrateLegacyData extends Command
                             $stats['missing_funding_type']++;
                         }
 
-                        $this->line(sprintf('[%s:%s] %s', $table, $row->id, $result['message']));
+                        if ($this->output->isVerbose()) {
+                            $this->line(sprintf('[%s:%s] %s', $table, $row->id, $result['message']));
+                        }
                     } catch (\Throwable $e) {
                         $stats['failed']++;
                         if (!$dryRun) {
