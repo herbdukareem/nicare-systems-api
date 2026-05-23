@@ -34,6 +34,33 @@ class MigrateLegacyData extends Command
 {
     private const LEGACY_CONNECTION = 'legacy_mysql';
 
+    private const BENEFACTOR_ID_MAP = [
+        1 => 1,
+        2 => 2,
+        3 => 3,
+        4 => 4,
+        5 => 5,
+        6 => 6,
+        7 => 7,
+        8 => 8,
+        9 => 9,
+        10 => 10,
+        11 => 11,
+        12 => 12,
+        13 => 13,
+        14 => 14,
+        100 => 15,
+    ];
+
+    private const FUNDING_TYPE_ID_MAP = [
+        'bhcpf' => 1,
+        'cf' => 2,
+        'premium' => 3,
+        'gac' => 4,
+        'unicef' => 5,
+        'formal' => 6,
+    ];
+
     protected $signature = 'legacy:migrate
         {--only=all : all, reference, phases, pins, invoices, enrollees, or capitations}
         {--source=all : all, informal, or formal}
@@ -69,8 +96,8 @@ class MigrateLegacyData extends Command
 
         $runReference = in_array($only, ['all', 'reference'], true);
         $runPhases = $only === 'phases';
-        $runPins = in_array($only, ['all', 'pins', 'enrollees'], true);
-        $runInvoices = in_array($only, ['all', 'invoices', 'pins', 'enrollees'], true);
+        $runPins = in_array($only, ['all', 'pins'], true);
+        $runInvoices = in_array($only, ['all', 'invoices', 'pins'], true);
         $runEnrollees = in_array($only, ['all', 'enrollees'], true);
         $runCapitations = in_array($only, ['all', 'capitations'], true);
         $enrolleeTables = $runEnrollees ? $this->selectedEnrolleeTables($source) : [];
@@ -214,9 +241,11 @@ class MigrateLegacyData extends Command
     {
         $count = 0;
         foreach (LegacyReferenceData::fundingTypes() as $fundingType) {
+            $newId = self::FUNDING_TYPE_ID_MAP[$fundingType['code2']] ?? (int) $fundingType['legacy_id'];
             FundingType::updateOrCreate(
-                ['name' => $fundingType['name']],
+                ['id' => $newId],
                 [
+                    'name' => $fundingType['name'],
                     'description' => sprintf(
                         'Legacy funding code: %s; legacy short code: %s; legacy id: %s',
                         $fundingType['code'],
@@ -239,6 +268,7 @@ class MigrateLegacyData extends Command
 
         foreach (LegacyReferenceData::benefactors() as $benefactor) {
             $data = [
+                'name' => $benefactor['name'],
                 'status' => $benefactor['status'],
             ];
 
@@ -246,7 +276,10 @@ class MigrateLegacyData extends Command
                 $data['type'] = $benefactor['type'];
             }
 
-            Benefactor::updateOrCreate(['name' => $benefactor['name']], $data);
+            Benefactor::updateOrCreate(
+                ['id' => self::BENEFACTOR_ID_MAP[$benefactor['legacy_id']] ?? (int) $benefactor['legacy_id']],
+                $data
+            );
             $count++;
         }
 
@@ -352,6 +385,7 @@ class MigrateLegacyData extends Command
                 }
 
                 $data = [
+                    'hcp_code' => $hcpCode,
                     'name' => $this->string($provider->hcpname ?? null) ?? 'Legacy Facility ' . $legacyId,
                     'ownership' => $this->facilityOwnership($provider->hcpcategory ?? null),
                     'type' => $this->facilityType($provider->hcptype ?? null),
@@ -368,7 +402,10 @@ class MigrateLegacyData extends Command
                     $data['accreditation_status'] = 'active';
                 }
 
-                $facility = Facility::updateOrCreate(['hcp_code' => $hcpCode], $data);
+                $facility = Facility::whereKey($legacyId)->first()
+                    ?: Facility::where('hcp_code', $hcpCode)->first()
+                    ?: new Facility(['id' => $legacyId]);
+                $facility->forceFill($data)->save();
                 $this->syncFacilityAccount($facility, $provider);
                 $count++;
             });
@@ -660,44 +697,46 @@ class MigrateLegacyData extends Command
                     $legacyLgaId = $this->legacyIntegerId($this->value($row, 'lga', 'lga_id'));
                     $legacyWardId = $this->legacyIntegerId($this->value($row, 'ward', 'ward_id'));
 
-                    PremiumPin::updateOrCreate(
-                        ['pin' => $rawPin],
-                        [
+                    $pin = PremiumPin::where('pin', $rawPin)->first()
+                        ?: PremiumPin::whereKey($legacyId)->first()
+                        ?: new PremiumPin(['id' => $legacyId]);
+
+                    $pin->forceFill([
+                        'legacy_id' => $legacyId,
+                        'legacy_request_id' => $legacyRequestId ? (int) $legacyRequestId : null,
+                        'premium_plan_id' => $plan->id,
+                        'insurance_programme_id' => $plan->insurance_programme_id,
+                        'benefit_package_id' => $standardPackage->id,
+                        'lga_id' => $legacyLgaId && Lga::whereKey($legacyLgaId)->exists() ? $legacyLgaId : null,
+                        'ward_id' => $legacyWardId && Ward::whereKey($legacyWardId)->exists() ? $legacyWardId : null,
+                        'premium_purchase_id' => null,
+                        'batch_code' => $this->string($this->value($row, 'batch_code', 'batch', 'request_no'))
+                            ?? 'LEGACY-PIN-' . ($legacyPaymentId ?: $legacyRequestId ?: $legacyId),
+                        'pin' => $rawPin,
+                        'serial_number' => $serialNumber,
+                        'amount' => $this->numeric($this->value($row, 'nicare_premium', 'amount', 'price', 'pin_amount'))
+                            ?? $this->requestUnitAmount($legacyRequest)
+                            ?? (float) $plan->amount,
+                        'status' => $status,
+                        'legacy_status' => $this->string($this->value($row, 'status')),
+                        'metadata' => [
+                            'source_table' => 'tbl_pin_inven',
                             'legacy_id' => $legacyId,
-                            'legacy_request_id' => $legacyRequestId ? (int) $legacyRequestId : null,
-                            'premium_plan_id' => $plan->id,
-                            'insurance_programme_id' => $plan->insurance_programme_id,
-                            'benefit_package_id' => $standardPackage->id,
-                            'lga_id' => $legacyLgaId && Lga::whereKey($legacyLgaId)->exists() ? $legacyLgaId : null,
-                            'ward_id' => $legacyWardId && Ward::whereKey($legacyWardId)->exists() ? $legacyWardId : null,
-                            'premium_purchase_id' => null,
-                            'batch_code' => $this->string($this->value($row, 'batch_code', 'batch', 'request_no'))
-                                ?? 'LEGACY-PIN-' . ($legacyPaymentId ?: $legacyRequestId ?: $legacyId),
-                            'serial_number' => $serialNumber,
-                            'amount' => $this->numeric($this->value($row, 'nicare_premium', 'amount', 'price', 'pin_amount'))
-                                ?? $this->requestUnitAmount($legacyRequest)
-                                ?? (float) $plan->amount,
-                            'status' => $status,
-                            'legacy_status' => $this->string($this->value($row, 'status')),
-                            'metadata' => [
-                                'source_table' => 'tbl_pin_inven',
-                                'legacy_id' => $legacyId,
-                                'payment_reference' => $legacyPaymentId,
-                                'invoice_number' => $legacyPaymentId,
-                                'legacy_payment_id' => $legacyPaymentId,
-                                'legacy_request_sn' => $legacyRequestId,
-                                'legacy_lga_id' => $legacyLgaId,
-                                'legacy_ward_id' => $legacyWardId,
-                                'legacy_pin_type' => $this->string($row->pin_type ?? null),
-                                'legacy_category' => $this->string($row->category ?? null),
-                                'legacy_benefit_type' => $this->string($row->benefit_type ?? null),
-                                'legacy_payload' => json_decode(json_encode($row), true),
-                            ],
-                            'expires_at' => $this->legacyDateTime($row->date_expired ?? null),
-                            'sold_at' => in_array($status, [PremiumPin::STATUS_SOLD, PremiumPin::STATUS_USED], true) ? $soldAt : null,
-                            'used_at' => $usedAt,
-                        ]
-                    );
+                            'payment_reference' => $legacyPaymentId,
+                            'invoice_number' => $legacyPaymentId,
+                            'legacy_payment_id' => $legacyPaymentId,
+                            'legacy_request_sn' => $legacyRequestId,
+                            'legacy_lga_id' => $legacyLgaId,
+                            'legacy_ward_id' => $legacyWardId,
+                            'legacy_pin_type' => $this->string($row->pin_type ?? null),
+                            'legacy_category' => $this->string($row->category ?? null),
+                            'legacy_benefit_type' => $this->string($row->benefit_type ?? null),
+                            'legacy_payload' => json_decode(json_encode($row), true),
+                        ],
+                        'expires_at' => $this->legacyDateTime($row->date_expired ?? null),
+                        'sold_at' => in_array($status, [PremiumPin::STATUS_SOLD, PremiumPin::STATUS_USED], true) ? $soldAt : null,
+                        'used_at' => $usedAt,
+                    ])->save();
 
                     $count++;
                 }
@@ -1370,7 +1409,7 @@ class MigrateLegacyData extends Command
      */
     private function selectedEnrolleeTables(string $source): array
     {
-        $formalTable = $this->firstExistingLegacyTable(['tbl_enrolee_formal2', 'tbl_enrolee_formal']) ?? 'tbl_enrolee_formal';
+        $formalTable = 'tbl_enrolee_formal';
 
         return match ($source) {
             'informal' => ['tbl_enrolee'],

@@ -2,7 +2,6 @@
 
 namespace App\Services\Legacy;
 
-use App\Models\Benefactor;
 use App\Models\Enrollee;
 use App\Models\LegacyMigrationLog;
 use App\Models\PremiumPin;
@@ -15,6 +14,8 @@ use Throwable;
 
 class LegacyEnrolleeMigrationService
 {
+    private ?int $systemUserId = null;
+
     public function __construct(
         private LegacyEnrolleeMapper $mapper,
         private PremiumCoverageService $coverageService
@@ -152,18 +153,19 @@ class LegacyEnrolleeMigrationService
             return;
         }
 
-        $benefactor = Benefactor::find($mapped['coverage']['benefactor_id']);
-        if (!$benefactor) {
-            return;
-        }
-
-        $benefactor->fundedEnrollees()->syncWithoutDetaching([
-            $enrollee->id => [
+        DB::table('benefactor_enrollees')->updateOrInsert(
+            [
+                'benefactor_id' => $mapped['coverage']['benefactor_id'],
+                'enrollee_id' => $enrollee->id,
+            ],
+            [
                 'premium_purchase_id' => $purchase?->id,
                 'relationship' => 'legacy_funding',
                 'status' => 'active',
-            ],
-        ]);
+                'updated_at' => now(),
+                'created_at' => now(),
+            ]
+        );
     }
 
     private function findExistingEnrollee(array $mapped): ?Enrollee
@@ -257,12 +259,16 @@ class LegacyEnrolleeMigrationService
 
     private function systemUserId(): int
     {
-        $user = User::query()->first();
-        if ($user) {
-            return $user->id;
+        if ($this->systemUserId !== null) {
+            return $this->systemUserId;
         }
 
-        return User::create([
+        $user = User::query()->first();
+        if ($user) {
+            return $this->systemUserId = $user->id;
+        }
+
+        return $this->systemUserId = User::create([
             'name' => 'Legacy Migration',
             'username' => 'legacy-migration',
             'email' => 'legacy-migration@nicare.local',
