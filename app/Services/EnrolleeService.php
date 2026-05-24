@@ -4,7 +4,10 @@ namespace App\Services;
 
 use App\Filters\EnrolleeFilter;
 use App\Models\Enrollee;
+use App\Models\Facility;
+use App\Models\Lga;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Class EnrolleeService
@@ -24,16 +27,71 @@ class EnrolleeService
      */
     public function paginate(array $filters = [], int $perPage = 15, string $sortBy = 'created_at', string $sortDirection = 'desc'): LengthAwarePaginator
     {
-        $query = Enrollee::query();
-        $query = EnrolleeFilter::apply($query, $filters);
-        return $query->with([
+        $query = $this->query($filters);
+
+        $perPage = max(1, min($perPage, 250));
+
+        return $this->applySorting($query, $sortBy, $sortDirection)
+            ->with([
                 'enrolleeType', 'insuranceProgramme', 'enrolleeCategory', 'premiumPlan',
                 'benefitPackage', 'facility', 'lga', 'ward', 'benefactor', 'fundingType',
                 'enrollmentPhase',
             ])
             ->withCount('dependants')
-            ->orderBy($sortBy, $sortDirection)
             ->paginate($perPage);
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     */
+    public function query(array $filters = []): Builder
+    {
+        return EnrolleeFilter::apply(Enrollee::query(), $filters);
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, int>
+     */
+    public function summary(array $filters = []): array
+    {
+        $base = $this->query($filters);
+        $today = now()->toDateString();
+
+        return [
+            'total' => (clone $base)->count(),
+            'approved' => (clone $base)->where('status', Enrollee::STATUS_ACTIVE)->count(),
+            'pending' => (clone $base)->where('status', Enrollee::STATUS_PENDING)->count(),
+            'active_coverage' => (clone $base)
+                ->where('status', Enrollee::STATUS_ACTIVE)
+                ->whereNotNull('coverage_start_date')
+                ->whereDate('coverage_start_date', '<=', $today)
+                ->where(function (Builder $query) use ($today): void {
+                    $query->whereNull('coverage_end_date')
+                        ->orWhereDate('coverage_end_date', '>=', $today);
+                })
+                ->count(),
+        ];
+    }
+
+    private function applySorting(Builder $query, string $sortBy, string $sortDirection): Builder
+    {
+        $direction = strtolower($sortDirection) === 'asc' ? 'asc' : 'desc';
+
+        return match ($sortBy) {
+            'name', 'full_name' => $query->orderBy('last_name', $direction)->orderBy('first_name', $direction),
+            'enrollee_id' => $query->orderBy('enrollee_id', $direction),
+            'lga', 'lga_name' => $query->orderBy(
+                Lga::select('name')->whereColumn('lgas.id', 'enrollees.lga_id'),
+                $direction
+            ),
+            'facility', 'facility_name' => $query->orderBy(
+                Facility::select('name')->whereColumn('facilities.id', 'enrollees.facility_id'),
+                $direction
+            ),
+            'created_at', 'created_date' => $query->orderBy('created_at', $direction),
+            default => $query->orderBy('created_at', 'desc'),
+        };
     }
 
     /**

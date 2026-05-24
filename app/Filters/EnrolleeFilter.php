@@ -31,6 +31,8 @@ class EnrolleeFilter
                           ->orWhere('last_name', 'like', "%{$value}%")
                           ->orWhere('middle_name', 'like', "%{$value}%")
                           ->orWhere('enrollee_id', 'like', "%{$value}%")
+                          ->orWhere('legacy_id', 'like', "%{$value}%")
+                          ->orWhere('legacy_enrollee_id', 'like', "%{$value}%")
                           ->orWhere('nin', 'like', "%{$value}%")
                           ->orWhere('phone', 'like', "%{$value}%")
                           ->orWhere('email', 'like', "%{$value}%");
@@ -96,6 +98,9 @@ class EnrolleeFilter
                 case 'enrollee_id':
                     $query->where('enrollee_id', $value);
                     break;
+                case 'legacy_id':
+                    $query->where('legacy_id', $value);
+                    break;
                 case 'date_of_birth_from':
                     $query->whereDate('date_of_birth', '>=', $value);
                     break;
@@ -110,10 +115,10 @@ class EnrolleeFilter
                     }
                     break;
                 case 'date_from':
-                    $query->whereDate('created_at', '>=', $value);
+                    $query->whereDate(self::dateField($filters), '>=', $value);
                     break;
                 case 'date_to':
-                    $query->whereDate('created_at', '<=', $value);
+                    $query->whereDate(self::dateField($filters), '<=', $value);
                     break;
                 case 'approval_date_from':
                     $query->whereDate('approval_date', '>=', $value);
@@ -149,5 +154,15 @@ class EnrolleeFilter
             }
         }
         return $query;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     */
+    private static function dateField(array $filters): string
+    {
+        return in_array($filters['date_field'] ?? null, ['created_at', 'enrollment_date'], true)
+            ? $filters['date_field']
+            : 'created_at';
     }
 }

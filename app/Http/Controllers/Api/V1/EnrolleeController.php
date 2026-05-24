@@ -18,7 +18,6 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use App\Enums\Status;
 
 /**
  * Class EnrolleeController
@@ -57,7 +56,7 @@ class EnrolleeController extends BaseController
             'date_to', 'approval_date_from', 'approval_date_to', 'age_from', 'age_to'
             , 'insurance_programme_id', 'enrollee_category_id', 'premium_plan_id',
             'funding_type_id', 'benefactor_id', 'enrollment_phase_id',
-            'coverage_status'
+            'coverage_status', 'legacy_id', 'date_field'
         ]);
 
         // Handle array parameters
@@ -73,20 +72,26 @@ class EnrolleeController extends BaseController
         $sortDirection = $request->get('sort_direction', 'desc');
 
         $enrollees = $this->enrolleeService->paginate($filters, $perPage, $sortBy, $sortDirection);
+        $rows = $enrollees->getCollection()
+            ->map(fn (Enrollee $enrollee): array => (new EnrolleeResource($enrollee))->resolve($request))
+            ->values();
 
-        $response = EnrolleeResource::collection($enrollees);
-        $response->additional([
-            'meta' => [
-                'total' => $enrollees->total(),
-                'per_page' => $enrollees->perPage(),
-                'current_page' => $enrollees->currentPage(),
-                'last_page' => $enrollees->lastPage(),
-                'from' => $enrollees->firstItem(),
-                'to' => $enrollees->lastItem(),
+        return response()->json([
+            'success' => true,
+            'message' => 'Enrollees retrieved successfully',
+            'data' => [
+                'data' => $rows,
+                'meta' => [
+                    'total' => $enrollees->total(),
+                    'per_page' => $enrollees->perPage(),
+                    'current_page' => $enrollees->currentPage(),
+                    'last_page' => $enrollees->lastPage(),
+                    'from' => $enrollees->firstItem(),
+                    'to' => $enrollees->lastItem(),
+                ],
+                'summary' => $this->enrolleeService->summary($filters),
             ],
         ]);
-
-        return $this->sendResponse($response, 'Enrollees retrieved successfully');
     }
 
     /**
@@ -467,7 +472,7 @@ class EnrolleeController extends BaseController
     public function updateStatus(Request $request, Enrollee $enrollee)
     {
         $validator = Validator::make($request->all(), [
-            'status' => 'required|integer|in:' . implode(',', Status::toValues()),
+            'status' => 'required|integer|in:0,1,2,3,4',
             'comment' => 'nullable|string|max:500',
         ]);
 
@@ -477,23 +482,21 @@ class EnrolleeController extends BaseController
 
         try {
             $oldStatus = $enrollee->status;
-            $newStatus = Status::coerce($request->status);
+            $newStatus = (int) $request->status;
 
-            // Update enrollee status
             $enrollee->update([
-                'status' => $newStatus->value,
+                'status' => $newStatus,
                 'updated_at' => now(),
             ]);
 
-            // Create audit trail for status change
             \App\Models\AuditTrail::create([
                 'enrollee_id' => $enrollee->id,
                 'action' => 'status_changed',
-                'description' => "Status changed from {$oldStatus->label} to {$newStatus->label}",
+                'description' => 'Status changed from ' . $this->statusLabel((int) $oldStatus) . ' to ' . $this->statusLabel($newStatus),
                 'user_id' => auth()->id(),
-                'old_values' => json_encode(['status' => $oldStatus->value]),
+                'old_values' => json_encode(['status' => $oldStatus]),
                 'new_values' => json_encode([
-                    'status' => $newStatus->value,
+                    'status' => $newStatus,
                     'comment' => $request->comment
                 ]),
             ]);
@@ -732,5 +735,17 @@ class EnrolleeController extends BaseController
         return PremiumPin::where('used_by_enrollee_id', $enrollee->id)
             ->where('status', PremiumPin::STATUS_USED)
             ->exists();
+    }
+
+    private function statusLabel(int $status): string
+    {
+        return match ($status) {
+            Enrollee::STATUS_PENDING => 'Pending Approval',
+            Enrollee::STATUS_ACTIVE => 'Approved',
+            Enrollee::STATUS_REJECTED => 'Rejected',
+            Enrollee::STATUS_SUSPENDED => 'Suspended',
+            Enrollee::STATUS_EXPIRED => 'Inactive',
+            default => 'Unknown',
+        };
     }
 }

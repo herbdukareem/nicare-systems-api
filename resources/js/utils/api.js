@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useUiStore } from '../stores/ui';
 
 // Determine API base URL based on environment
 const getApiBaseUrl = () => {
@@ -22,6 +23,51 @@ const api = axios.create({
   },
 });
 
+const globalLoaderOptions = (config = {}) => {
+  const method = (config.method || 'get').toUpperCase();
+  const isDownload = config.responseType === 'blob';
+
+  if (config.loaderTitle || config.loaderSubtitle) {
+    return {
+      title: config.loaderTitle,
+      subtitle: config.loaderSubtitle,
+    };
+  }
+
+  if (isDownload) {
+    return {
+      title: 'Preparing download',
+      subtitle: 'Generating your file from the server',
+    };
+  }
+
+  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
+    return {
+      title: 'Processing request',
+      subtitle: 'Saving your changes securely',
+    };
+  }
+
+  return {
+    title: 'Loading data',
+    subtitle: 'Fetching the latest records from the server',
+  };
+};
+
+const startGlobalLoader = (config) => {
+  if (config.showGlobalLoader === false) return config;
+
+  config.__globalLoader = true;
+  useUiStore().startRequestLoading(globalLoaderOptions(config));
+  return config;
+};
+
+const finishGlobalLoader = (config) => {
+  if (config?.__globalLoader) {
+    useUiStore().finishRequestLoading();
+  }
+};
+
 // Request interceptor
 api.interceptors.request.use(
   (config) => {
@@ -29,15 +75,20 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
-    return config;
+    return startGlobalLoader(config);
   },
   (error) => Promise.reject(error)
 );
 
 
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    finishGlobalLoader(response.config);
+    return response;
+  },
   (error) => {
+    finishGlobalLoader(error.config);
+
     const status = error?.response?.status;
     const requestUrl = error?.config?.url || '';
     const authEndpoint = ['/login', '/logout', '/user'].some((endpoint) => requestUrl.endsWith(endpoint));
@@ -70,6 +121,7 @@ export const enrolleeAPI = {
   approve: (id, data = {}) => api.post(`/enrollees/${id}/approve`, data),
   pendingApproval: (params) => api.get('/enrollees/pending-approval', { params }),
   update: (id, data) => api.put(`/enrollees/${id}`, data),
+  updateStatus: (id, data) => api.put(`/enrollees/${id}/status`, data),
   delete: (id) => api.delete(`/enrollees/${id}`),
   idCard: (id) => api.get(`/enrollees/${id}/id-card`, { responseType: 'blob' }),
   bulkEnrollmentSlip: (params) => api.get('/enrollees/bulk-enrollment-slip', { params, responseType: 'blob' }),

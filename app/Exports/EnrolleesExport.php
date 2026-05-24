@@ -2,6 +2,7 @@
 
 namespace App\Exports;
 
+use App\Filters\EnrolleeFilter;
 use App\Models\Enrollee;
 use Maatwebsite\Excel\Concerns\FromCollection;
 use Maatwebsite\Excel\Concerns\WithHeadings;
@@ -23,9 +24,11 @@ class EnrolleesExport implements FromCollection, WithHeadings, WithMapping, Shou
      */
     public function collection()
     {
-        $query = Enrollee::with(['enrolleeType', 'facility', 'lga', 'ward', 'village']);
+        $query = Enrollee::with([
+            'facility', 'lga', 'ward', 'fundingType', 'benefactor',
+            'enrollmentPhase',
+        ]);
 
-        // Apply the same filters as in the index method
         $this->applyFilters($query);
 
         return $query->get();
@@ -38,30 +41,23 @@ class EnrolleesExport implements FromCollection, WithHeadings, WithMapping, Shou
     {
         return [
             'Enrollee ID',
-            'First Name',
-            'Middle Name',
-            'Last Name',
+            'Legacy ID',
+            'Full Name',
+            'NIN',
             'Phone',
             'Email',
-            'NIN',
-            'Date of Birth',
-            'Age',
             'Gender',
-            'Marital Status',
-            'Address',
-            'Enrollee Type',
-            'Facility',
+            'Date of Birth',
             'LGA',
             'Ward',
-            'Village',
-            'Premium ID',
-            'Employment Detail ID',
+            'Facility',
             'Funding Type',
             'Benefactor',
-            'Capitation Start Date',
-            'Approval Date',
+            'Enrollment Phase',
             'Status',
+            'Coverage Status',
             'Created At',
+            'Updated At',
         ];
     }
 
@@ -73,30 +69,23 @@ class EnrolleesExport implements FromCollection, WithHeadings, WithMapping, Shou
     {
         return [
             $enrollee->enrollee_id,
-            $enrollee->first_name,
-            $enrollee->middle_name,
-            $enrollee->last_name,
+            $enrollee->legacy_id,
+            $enrollee->full_name,
+            $enrollee->nin,
             $enrollee->phone,
             $enrollee->email,
-            $enrollee->nin,
+            $enrollee->sex == 1 ? 'Male' : ($enrollee->sex == 2 ? 'Female' : 'Other'),
             $enrollee->date_of_birth ? $enrollee->date_of_birth->format('Y-m-d') : '',
-            $enrollee->date_of_birth ? $enrollee->date_of_birth->age : '',
-            $enrollee->gender,
-            $enrollee->marital_status,
-            $enrollee->address,
-            $enrollee->enrolleeType ? $enrollee->enrolleeType->name : '',
-            $enrollee->facility ? $enrollee->facility->name : '',
             $enrollee->lga ? $enrollee->lga->name : '',
             $enrollee->ward ? $enrollee->ward->name : '',
-            $enrollee->village,
-            $enrollee->premium_plan_id,
-            $enrollee->employment_detail_id,
+            $enrollee->facility ? $enrollee->facility->name : '',
             $enrollee->fundingType ? $enrollee->fundingType->name : '',
             $enrollee->benefactor ? $enrollee->benefactor->name : '',
-            $enrollee->capitation_start_date ? $enrollee->capitation_start_date->format('Y-m-d') : '',
-            $enrollee->approval_date ? $enrollee->approval_date->format('Y-m-d H:i:s') : '',
-            $enrollee->status ? $enrollee->status->value : '',
+            $enrollee->enrollmentPhase ? $enrollee->enrollmentPhase->name : '',
+            $this->statusLabel((int) $enrollee->status),
+            $this->coverageStatus($enrollee),
             $enrollee->created_at ? $enrollee->created_at->format('Y-m-d H:i:s') : '',
+            $enrollee->updated_at ? $enrollee->updated_at->format('Y-m-d H:i:s') : '',
         ];
     }
 
@@ -105,111 +94,36 @@ class EnrolleesExport implements FromCollection, WithHeadings, WithMapping, Shou
      */
     private function applyFilters($query)
     {
-        $request = $this->filters;
+        EnrolleeFilter::apply($query, $this->filters->all());
+        $query->orderBy('created_at', 'desc');
+    }
 
-        // Apply filters with array support
-        if ($request->has('status')) {
-            $status = $request->status;
-            if (is_array($status)) {
-                $query->whereIn('status', $status);
-            } else {
-                $query->where('status', $status);
-            }
+    private function statusLabel(int $status): string
+    {
+        return match ($status) {
+            Enrollee::STATUS_PENDING => 'Pending Approval',
+            Enrollee::STATUS_ACTIVE => 'Approved',
+            Enrollee::STATUS_REJECTED => 'Rejected',
+            Enrollee::STATUS_SUSPENDED => 'Suspended',
+            Enrollee::STATUS_EXPIRED => 'Inactive',
+            default => 'Unknown',
+        };
+    }
+
+    private function coverageStatus(Enrollee $enrollee): string
+    {
+        if (!$enrollee->coverage_start_date) {
+            return 'Pending';
         }
 
-        if ($request->has('lga_id')) {
-            $lgaIds = $request->lga_id;
-            if (is_array($lgaIds)) {
-                $query->whereIn('lga_id', $lgaIds);
-            } else {
-                $query->where('lga_id', $lgaIds);
-            }
+        if ($enrollee->hasValidCoverage()) {
+            return 'Active';
         }
 
-        if ($request->has('ward_id')) {
-            $wardIds = $request->ward_id;
-            if (is_array($wardIds)) {
-                $query->whereIn('ward_id', $wardIds);
-            } else {
-                $query->where('ward_id', $wardIds);
-            }
+        if ($enrollee->coverage_start_date->isFuture()) {
+            return 'Future';
         }
 
-        if ($request->has('facility_id')) {
-            $facilityIds = $request->facility_id;
-            if (is_array($facilityIds)) {
-                $query->whereIn('facility_id', $facilityIds);
-            } else {
-                $query->where('facility_id', $facilityIds);
-            }
-        }
-
-        if ($request->has('enrollee_type_id')) {
-            $enrolleeTypeIds = $request->enrollee_type_id;
-            if (is_array($enrolleeTypeIds)) {
-                $query->whereIn('enrollee_type_id', $enrolleeTypeIds);
-            } else {
-                $query->where('enrollee_type_id', $enrolleeTypeIds);
-            }
-        }
-
-        if ($request->has('gender')) {
-            $genders = $request->gender;
-            if (is_array($genders)) {
-                $query->whereIn('gender', $genders);
-            } else {
-                $query->where('gender', $genders);
-            }
-        }
-
-        // Date range filters
-        if ($request->has('date_from')) {
-            $query->whereDate('created_at', '>=', $request->date_from);
-        }
-
-        if ($request->has('date_to')) {
-            $query->whereDate('created_at', '<=', $request->date_to);
-        }
-
-        if ($request->has('approval_date_from')) {
-            $query->whereDate('approval_date', '>=', $request->approval_date_from);
-        }
-
-        if ($request->has('approval_date_to')) {
-            $query->whereDate('approval_date', '<=', $request->approval_date_to);
-        }
-
-        // Age range filter
-        if ($request->has('age_from') || $request->has('age_to')) {
-            $query->where(function($q) use ($request) {
-                if ($request->has('age_from')) {
-                    $dateFrom = now()->subYears($request->age_from)->format('Y-m-d');
-                    $q->where('date_of_birth', '<=', $dateFrom);
-                }
-                if ($request->has('age_to')) {
-                    $dateTo = now()->subYears($request->age_to)->format('Y-m-d');
-                    $q->where('date_of_birth', '>=', $dateTo);
-                }
-            });
-        }
-
-        // Search functionality
-        if ($request->has('search')) {
-            $search = $request->search;
-            $query->where(function($q) use ($search) {
-                $q->where('first_name', 'like', "%{$search}%")
-                  ->orWhere('last_name', 'like', "%{$search}%")
-                  ->orWhere('middle_name', 'like', "%{$search}%")
-                  ->orWhere('enrollee_id', 'like', "%{$search}%")
-                  ->orWhere('nin', 'like', "%{$search}%")
-                  ->orWhere('phone', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
-            });
-        }
-
-        // Sorting
-        $sortBy = $request->get('sort_by', 'created_at');
-        $sortDirection = $request->get('sort_direction', 'desc');
-        $query->orderBy($sortBy, $sortDirection);
+        return 'Expired';
     }
 }

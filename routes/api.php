@@ -154,7 +154,26 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('enrollees/{enrollee}/statistics', [EnrolleeController::class, 'getStatistics']);
     });
     Route::middleware('permission:enrollees.export')->get('enrollees-export', function (Request $request) {
-        $filename = 'enrollees_' . now()->format('Y-m-d_H-i-s') . '.xlsx';
+        $parts = ['enrollees'];
+        $nameFor = function (string $model, string $id): string {
+            $name = $model::whereKey($id)->value('name') ?: $id;
+            return trim(strtolower(preg_replace('/[^A-Za-z0-9]+/', '-', (string) $name)), '-');
+        };
+        $models = [
+            'lga_id' => ['lga', \App\Models\Lga::class],
+            'facility_id' => ['facility', \App\Models\Facility::class],
+            'funding_type_id' => ['funding', \App\Models\FundingType::class],
+            'benefactor_id' => ['benefactor', \App\Models\Benefactor::class],
+            'enrollment_phase_id' => ['phase', \App\Models\EnrollmentPhase::class],
+        ];
+        foreach ($models as $key => [$label, $model]) {
+            if ($request->filled($key)) {
+                $value = $nameFor($model, (string) $request->get($key));
+                $parts[] = "{$label}-{$value}";
+            }
+        }
+        $parts[] = now()->format('Y-m-d');
+        $filename = implode('_', $parts) . '.xlsx';
         return Excel::download(new EnrolleesExport($request), $filename);
     });
     Route::get('enrollees/{enrollee}/export-pdf', function (Enrollee $enrollee) {

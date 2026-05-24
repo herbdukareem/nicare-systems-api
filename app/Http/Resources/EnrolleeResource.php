@@ -16,6 +16,8 @@ class EnrolleeResource extends JsonResource
         return [
             'id' => $this->id,
             'enrollee_id' => $this->enrollee_id,
+            'legacy_id' => $this->legacy_id,
+            'legacy_enrollee_id' => $this->legacy_enrollee_id,
             'nin' => $this->nin,
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
@@ -26,6 +28,7 @@ class EnrolleeResource extends JsonResource
             'phone' => $this->phone,
             'date_of_birth' => $this->date_of_birth,
             'age' => $this->date_of_birth ? now()->diffInYears($this->date_of_birth) : null,
+            'sex' => $this->sex,
             'gender' => $this->sex == 1 ? 'Male' : ($this->sex == 2 ? 'Female' : 'Other'),
             'marital_status' => $this->marital_status,
             'address' => $this->address,
@@ -58,6 +61,9 @@ class EnrolleeResource extends JsonResource
                 return $this->lga->name ?? null;
             }),
             'ward' => new WardResource($this->whenLoaded('ward')),
+            'ward_name' => $this->whenLoaded('ward', function() {
+                return $this->ward->name ?? null;
+            }),
             'employment_detail' => new EmploymentDetailResource($this->whenLoaded('employmentDetail')),
             'funding_type' => new FundingTypeResource($this->whenLoaded('fundingType')),
             'benefactor' => new BenefactorResource($this->whenLoaded('benefactor')),
@@ -65,6 +71,7 @@ class EnrolleeResource extends JsonResource
             'coverage_start_date' => $this->coverage_start_date,
             'coverage_end_date' => $this->coverage_end_date,
             'coverage_label' => $this->coverage_label,
+            'coverage_status' => $this->coverageStatus(),
             'is_no_expiry' => $this->hasNoExpiryCoverage(),
             'has_valid_coverage' => $this->hasValidCoverage(),
             'approval_date' => $this->approval_date,
@@ -105,5 +112,22 @@ class EnrolleeResource extends JsonResource
             default:
                 return 'Pending';
         }
+    }
+
+    private function coverageStatus(): string
+    {
+        if (!$this->coverage_start_date) {
+            return 'pending';
+        }
+
+        if ($this->hasValidCoverage()) {
+            return 'active';
+        }
+
+        if ($this->coverage_start_date->isFuture()) {
+            return 'future';
+        }
+
+        return 'expired';
     }
 }

@@ -13,8 +13,8 @@
     <transition name="fade">
       <AppLoadingScreen
         v-if="showGlobalLoader"
-        :title="authStore._initializing ? 'Checking access' : 'Loading page'"
-        :subtitle="authStore._initializing ? 'Restoring your secure session' : 'Preparing your workspace'"
+        :title="loaderTitle"
+        :subtitle="loaderSubtitle"
       />
     </transition>
 
@@ -32,7 +32,17 @@ import ToastContainer from './components/layout/ToastContainer.vue';
 const authStore = useAuthStore();
 const uiStore = useUiStore();
 
-const showGlobalLoader = computed(() => authStore._initializing || uiStore.routeLoading);
+const showGlobalLoader = computed(() => authStore._initializing || uiStore.routeLoading || uiStore.requestLoading);
+const loaderTitle = computed(() => {
+  if (authStore._initializing) return 'Checking access';
+  if (uiStore.routeLoading) return 'Loading page';
+  return uiStore.requestTitle;
+});
+const loaderSubtitle = computed(() => {
+  if (authStore._initializing) return 'Restoring your secure session';
+  if (uiStore.routeLoading) return 'Preparing your workspace';
+  return uiStore.requestSubtitle;
+});
 </script>
 
 <style>

@@ -27,15 +27,19 @@ class PremiumMetadataController extends Controller
         $lgaId = $request->integer('lga_id') ?: null;
         $wardId = $request->integer('ward_id') ?: null;
         $benefactorId = $request->integer('benefactor_id') ?: null;
+        $programmes = InsuranceProgramme::orderBy('name')->get();
+        $categories = EnrolleeCategory::query()
+            ->when($programmeId, fn ($query) => $query->where('insurance_programme_id', $programmeId))
+            ->orderBy('name')
+            ->get();
 
         return response()->json([
             'success' => true,
             'data' => [
-                'programmes' => InsuranceProgramme::orderBy('name')->get(),
-                'categories' => EnrolleeCategory::query()
-                    ->when($programmeId, fn ($query) => $query->where('insurance_programme_id', $programmeId))
-                    ->orderBy('name')
-                    ->get(),
+                'programmes' => $programmes,
+                'insurance_programmes' => $programmes,
+                'categories' => $categories,
+                'enrollee_categories' => $categories,
                 'benefit_packages' => BenefitPackage::orderBy('name')->get(),
                 'premium_plans' => PremiumPlan::with(['programme', 'benefitPackage'])
                     ->when($programmeId, fn ($query) => $query->where('insurance_programme_id', $programmeId))
