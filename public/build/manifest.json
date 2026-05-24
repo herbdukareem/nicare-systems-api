@@ -1,0 +1,1485 @@
+{
+  "_AdminLayout-DHUn_W7K.js": {
+    "file": "assets/AdminLayout-DHUn_W7K.js",
+    "name": "AdminLayout",
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/AdminLayout-DYiHSMAL.css"
+    ]
+  },
+  "_AdminLayout-DYiHSMAL.css": {
+    "file": "assets/AdminLayout-DYiHSMAL.css",
+    "src": "_AdminLayout-DYiHSMAL.css"
+  },
+  "_AppDataTable-CBy7W2jp.js": {
+    "file": "assets/AppDataTable-CBy7W2jp.js",
+    "name": "AppDataTable",
+    "imports": [
+      "_vue-R40XmSTA.js"
+    ]
+  },
+  "_AppEmptyState-D8lWXsAJ.js": {
+    "file": "assets/AppEmptyState-D8lWXsAJ.js",
+    "name": "AppEmptyState",
+    "imports": [
+      "_vue-R40XmSTA.js"
+    ]
+  },
+  "_AppModal-C4LVPnW2.js": {
+    "file": "assets/AppModal-C4LVPnW2.js",
+    "name": "AppModal",
+    "imports": [
+      "_vue-R40XmSTA.js"
+    ]
+  },
+  "_AppStatCard-C754Wjnn.js": {
+    "file": "assets/AppStatCard-C754Wjnn.js",
+    "name": "AppStatCard",
+    "imports": [
+      "_vue-R40XmSTA.js"
+    ]
+  },
+  "_AppStatusChip-ieExT2O1.js": {
+    "file": "assets/AppStatusChip-ieExT2O1.js",
+    "name": "AppStatusChip",
+    "imports": [
+      "_vue-R40XmSTA.js"
+    ]
+  },
+  "_BarChart--36pMGEF.css": {
+    "file": "assets/BarChart--36pMGEF.css",
+    "src": "_BarChart--36pMGEF.css"
+  },
+  "_BarChart-DRs2D1fB.js": {
+    "file": "assets/BarChart-DRs2D1fB.js",
+    "name": "BarChart",
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_charts-BzTzB7UU.js",
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/BarChart--36pMGEF.css"
+    ]
+  },
+  "_ClaimDetailsModal-B9bvJbLS.css": {
+    "file": "assets/ClaimDetailsModal-B9bvJbLS.css",
+    "src": "_ClaimDetailsModal-B9bvJbLS.css"
+  },
+  "_ClaimDetailsModal-DFjmHebv.js": {
+    "file": "assets/ClaimDetailsModal-DFjmHebv.js",
+    "name": "ClaimDetailsModal",
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/ClaimDetailsModal-B9bvJbLS.css"
+    ]
+  },
+  "_DoughnutChart-9hqvc3Jo.js": {
+    "file": "assets/DoughnutChart-9hqvc3Jo.js",
+    "name": "DoughnutChart",
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_charts-BzTzB7UU.js",
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/DoughnutChart-C96V6_D6.css"
+    ]
+  },
+  "_DoughnutChart-C96V6_D6.css": {
+    "file": "assets/DoughnutChart-C96V6_D6.css",
+    "src": "_DoughnutChart-C96V6_D6.css"
+  },
+  "_EnrolleeLayout-CrtgwRQ2.js": {
+    "file": "assets/EnrolleeLayout-CrtgwRQ2.js",
+    "name": "EnrolleeLayout",
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/EnrolleeLayout-tqBNlr2I.css"
+    ]
+  },
+  "_EnrolleeLayout-tqBNlr2I.css": {
+    "file": "assets/EnrolleeLayout-tqBNlr2I.css",
+    "src": "_EnrolleeLayout-tqBNlr2I.css"
+  },
+  "_FUPACodeDetailsModal-DBKoVN2Y.css": {
+    "file": "assets/FUPACodeDetailsModal-DBKoVN2Y.css",
+    "src": "_FUPACodeDetailsModal-DBKoVN2Y.css"
+  },
+  "_FUPACodeDetailsModal-DZnCn16P.js": {
+    "file": "assets/FUPACodeDetailsModal-DZnCn16P.js",
+    "name": "FUPACodeDetailsModal",
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AppModal-C4LVPnW2.js",
+      "resources/js/app.js"
+    ],
+    "css": [
+      "assets/FUPACodeDetailsModal-DBKoVN2Y.css"
+    ]
+  },
+  "_ReferralDetailsModal-C95kFl4W.css": {
+    "file": "assets/ReferralDetailsModal-C95kFl4W.css",
+    "src": "_ReferralDetailsModal-C95kFl4W.css"
+  },
+  "_ReferralDetailsModal-baiT_f9t.js": {
+    "file": "assets/ReferralDetailsModal-baiT_f9t.js",
+    "name": "ReferralDetailsModal",
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AppModal-C4LVPnW2.js"
+    ],
+    "css": [
+      "assets/ReferralDetailsModal-C95kFl4W.css"
+    ]
+  },
+  "_charts-BzTzB7UU.js": {
+    "file": "assets/charts-BzTzB7UU.js",
+    "name": "charts",
+    "imports": [
+      "_vue-R40XmSTA.js"
+    ]
+  },
+  "_lodash-5c63_K0k.js": {
+    "file": "assets/lodash-5c63_K0k.js",
+    "name": "lodash",
+    "imports": [
+      "_lodash-b1k5V174.js"
+    ]
+  },
+  "_lodash-b1k5V174.js": {
+    "file": "assets/lodash-b1k5V174.js",
+    "name": "lodash"
+  },
+  "_primevue-8U-7ZSfw.js": {
+    "file": "assets/primevue-8U-7ZSfw.js",
+    "name": "primevue",
+    "imports": [
+      "_vue-R40XmSTA.js"
+    ]
+  },
+  "_useClaimsAPI-Idr7NnCs.js": {
+    "file": "assets/useClaimsAPI-Idr7NnCs.js",
+    "name": "useClaimsAPI",
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js"
+    ]
+  },
+  "_vue-R40XmSTA.js": {
+    "file": "assets/vue-R40XmSTA.js",
+    "name": "vue"
+  },
+  "_vuetify-BTAzqw1N.js": {
+    "file": "assets/vuetify-BTAzqw1N.js",
+    "name": "vuetify",
+    "imports": [
+      "_vue-R40XmSTA.js"
+    ]
+  },
+  "node_modules/@mdi/font/fonts/materialdesignicons-webfont.eot": {
+    "file": "assets/materialdesignicons-webfont-CSr8KVlo.eot",
+    "src": "node_modules/@mdi/font/fonts/materialdesignicons-webfont.eot"
+  },
+  "node_modules/@mdi/font/fonts/materialdesignicons-webfont.ttf": {
+    "file": "assets/materialdesignicons-webfont-B7mPwVP_.ttf",
+    "src": "node_modules/@mdi/font/fonts/materialdesignicons-webfont.ttf"
+  },
+  "node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff": {
+    "file": "assets/materialdesignicons-webfont-PXm3-2wK.woff",
+    "src": "node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff"
+  },
+  "node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff2": {
+    "file": "assets/materialdesignicons-webfont-Dp5v-WZN.woff2",
+    "src": "node_modules/@mdi/font/fonts/materialdesignicons-webfont.woff2"
+  },
+  "resources/assets/ngscha-ceremony.png": {
+    "file": "assets/ngscha-ceremony-DjNELJdL.png",
+    "src": "resources/assets/ngscha-ceremony.png"
+  },
+  "resources/css/app.css": {
+    "file": "assets/app-ChGgfQRD.css",
+    "src": "resources/css/app.css",
+    "isEntry": true,
+    "name": "app",
+    "names": [
+      "app.css"
+    ]
+  },
+  "resources/images/logo.png": {
+    "file": "assets/logo-BlbyDYW2.png",
+    "src": "resources/images/logo.png"
+  },
+  "resources/js/app.js": {
+    "file": "assets/app-DXJcx4bq.js",
+    "name": "app",
+    "src": "resources/js/app.js",
+    "isEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "dynamicImports": [
+      "resources/js/components/auth/LoginPage.vue",
+      "resources/js/components/dashboard/Dashboard.vue",
+      "resources/js/components/enrollees/EnrolleesPage.vue",
+      "resources/js/components/enrollees/EnrolleeProfilePage.vue",
+      "resources/js/components/facilities/FacilitiesPage.vue",
+      "resources/js/components/settings/UsersPage.vue",
+      "resources/js/components/settings/BenefactorsPage.vue",
+      "resources/js/components/settings/RolesPermissionsPage.vue",
+      "resources/js/components/enrollees/PendingEnrolleesPage.vue",
+      "resources/js/components/enrollees/EnrollmentApprovalPage.vue",
+      "resources/js/components/enrollees/BulkEnrollmentSlipPage.vue",
+      "resources/js/components/setup/SetupWorkspace.vue",
+      "resources/js/components/do/DODashboard.vue",
+      "resources/js/components/dashboard/FacilityDashboard.vue",
+      "resources/js/components/enrollees/BulkIdCardPage.vue",
+      "resources/js/components/enrollees/DemoEnrollmentPage.vue",
+      "resources/js/components/common/ComingSoonPage.vue",
+      "resources/js/components/common/ComingSoonPage.vue",
+      "resources/js/components/common/ComingSoonPage.vue",
+      "resources/js/components/pas/DOFacilityAssignmentPage.vue",
+      "resources/js/components/do/DOAssignedReferralsPage.vue",
+      "resources/js/components/pas/PASDashboard.vue",
+      "resources/js/components/pas/UTNValidationPage.vue",
+      "resources/js/components/claims/ReferralSubmissionPage.vue",
+      "resources/js/components/pas/ReferralManagementPage.vue",
+      "resources/js/components/facility/FacilityAdmissionManagementPage.vue",
+      "resources/js/components/pas/FacilityPACodeManagementPage.vue",
+      "resources/js/components/pas/FUPACodeRequestPage.vue",
+      "resources/js/components/pas/FUPACodeApprovalPage.vue",
+      "resources/js/components/pas/DocumentRequirementsPage.vue",
+      "resources/js/components/claims/ClaimsDashboard.vue",
+      "resources/js/components/facility/FacilityClaimSubmissionPage.vue",
+      "resources/js/components/claims/ClaimsReviewPage.vue",
+      "resources/js/components/claims/ClaimsApprovalPage.vue",
+      "resources/js/components/claims/PaymentBatchManagementPage.vue",
+      "resources/js/components/claims/ClaimsHistoryPage.vue",
+      "resources/js/components/claims/automation/AdmissionManagementPage.vue",
+      "resources/js/components/claims/automation/AdmissionDetailPage.vue",
+      "resources/js/components/claims/automation/ClaimsProcessingPage.vue",
+      "resources/js/components/claims/automation/ClaimsProcessingPage.vue",
+      "resources/js/components/claims/automation/BundleManagementPage.vue",
+      "resources/js/components/premium/PremiumWorkspace.vue",
+      "resources/js/components/premium/PremiumWorkspace.vue",
+      "resources/js/components/premium/PremiumWorkspace.vue",
+      "resources/js/components/premium/PremiumWorkspace.vue",
+      "resources/js/components/premium/PremiumWorkspace.vue",
+      "resources/js/components/premium/PremiumWorkspace.vue",
+      "resources/js/components/premium/PremiumWorkspace.vue",
+      "resources/js/components/premium/PremiumWorkspace.vue",
+      "resources/js/components/premium/PremiumWorkspace.vue",
+      "resources/js/components/premium/PremiumWorkspace.vue",
+      "resources/js/components/capitation/CapitationWorkspace.vue",
+      "resources/js/components/capitation/CapitationWorkspace.vue",
+      "resources/js/components/capitation/CapitationWorkspace.vue",
+      "resources/js/components/capitation/CapitationWorkspace.vue",
+      "resources/js/components/payments/PaymentsPage.vue",
+      "resources/js/components/management/ManagementDashboard.vue",
+      "resources/js/components/management/CaseManagementPage.vue",
+      "resources/js/components/management/BundleServicesManagementPage.vue",
+      "resources/js/components/management/BundleComponentsManagementPage.vue",
+      "resources/js/components/management/DrugsManagementPage.vue",
+      "resources/js/components/management/LaboratoriesManagementPage.vue",
+      "resources/js/components/management/ProfessionalServicesManagementPage.vue",
+      "resources/js/components/reports/ReportsPage.vue",
+      "resources/js/components/reports/FinancialReportsPage.vue",
+      "resources/js/components/reports/AnalyticsPage.vue",
+      "resources/js/components/security/AuditLogsPage.vue",
+      "resources/js/components/feedback/FeedbackManagementPage.vue",
+      "resources/js/components/feedback/FeedbackCreationPage.vue",
+      "resources/js/components/task-management/TaskManagementPage.vue",
+      "resources/js/components/settings/DepartmentsPage.vue",
+      "resources/js/components/settings/DesignationsPage.vue",
+      "resources/js/components/common/ComingSoonPage.vue",
+      "resources/js/components/common/ComingSoonPage.vue",
+      "resources/js/components/landing/LandingPage.vue",
+      "resources/js/components/enroll/EnrolleeLogin.vue",
+      "resources/js/components/enroll/EnrolleeDashboard.vue",
+      "resources/js/components/enroll/EnrolleePlansPage.vue",
+      "resources/js/components/enroll/EnrolleeProfilePage.vue",
+      "resources/js/components/enroll/EnrolleeChangePassword.vue"
+    ],
+    "css": [
+      "assets/app-B0SQrxBa.css",
+      "assets/app-ChGgfQRD.css"
+    ],
+    "assets": [
+      "assets/logo-BlbyDYW2.png",
+      "assets/materialdesignicons-webfont-CSr8KVlo.eot",
+      "assets/materialdesignicons-webfont-Dp5v-WZN.woff2",
+      "assets/materialdesignicons-webfont-PXm3-2wK.woff",
+      "assets/materialdesignicons-webfont-B7mPwVP_.ttf"
+    ]
+  },
+  "resources/js/components/auth/LoginPage.vue": {
+    "file": "assets/LoginPage-CctqVIMf.js",
+    "name": "LoginPage",
+    "src": "resources/js/components/auth/LoginPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AppModal-C4LVPnW2.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/LoginPage-Du3DcTZf.css",
+      "assets/app-ChGgfQRD.css"
+    ],
+    "assets": [
+      "assets/ngscha-ceremony-DjNELJdL.png"
+    ]
+  },
+  "resources/js/components/capitation/CapitationWorkspace.vue": {
+    "file": "assets/CapitationWorkspace-Dz6m4sWh.js",
+    "name": "CapitationWorkspace",
+    "src": "resources/js/components/capitation/CapitationWorkspace.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/claims/ClaimsApprovalPage.vue": {
+    "file": "assets/ClaimsApprovalPage-Y-duBuKB.js",
+    "name": "ClaimsApprovalPage",
+    "src": "resources/js/components/claims/ClaimsApprovalPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_ClaimDetailsModal-DFjmHebv.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/claims/ClaimsDashboard.vue": {
+    "file": "assets/ClaimsDashboard-DktpRKhH.js",
+    "name": "ClaimsDashboard",
+    "src": "resources/js/components/claims/ClaimsDashboard.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/ClaimsDashboard-CBaHXP7V.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/claims/ClaimsHistoryPage.vue": {
+    "file": "assets/ClaimsHistoryPage-uS0WtxSk.js",
+    "name": "ClaimsHistoryPage",
+    "src": "resources/js/components/claims/ClaimsHistoryPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_lodash-5c63_K0k.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppEmptyState-D8lWXsAJ.js",
+      "_AppStatCard-C754Wjnn.js",
+      "_AppStatusChip-ieExT2O1.js",
+      "resources/js/app.js",
+      "_lodash-b1k5V174.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/claims/ClaimsReviewPage.vue": {
+    "file": "assets/ClaimsReviewPage-TkCWhvUk.js",
+    "name": "ClaimsReviewPage",
+    "src": "resources/js/components/claims/ClaimsReviewPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_ClaimDetailsModal-DFjmHebv.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/claims/PaymentBatchManagementPage.vue": {
+    "file": "assets/PaymentBatchManagementPage-eZdhL2B7.js",
+    "name": "PaymentBatchManagementPage",
+    "src": "resources/js/components/claims/PaymentBatchManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/claims/ReferralSubmissionPage.vue": {
+    "file": "assets/ReferralSubmissionPage-DbXjZce7.js",
+    "name": "ReferralSubmissionPage",
+    "src": "resources/js/components/claims/ReferralSubmissionPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/ReferralSubmissionPage-QBoM-ILa.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/claims/automation/AdmissionDetailPage.vue": {
+    "file": "assets/AdmissionDetailPage-B-_qkp99.js",
+    "name": "AdmissionDetailPage",
+    "src": "resources/js/components/claims/automation/AdmissionDetailPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_useClaimsAPI-Idr7NnCs.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/AdmissionDetailPage-BA1dS3-Y.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/claims/automation/AdmissionManagementPage.vue": {
+    "file": "assets/AdmissionManagementPage-BFuQGOYi.js",
+    "name": "AdmissionManagementPage",
+    "src": "resources/js/components/claims/automation/AdmissionManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_useClaimsAPI-Idr7NnCs.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/AdmissionManagementPage-BQERajNh.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/claims/automation/BundleManagementPage.vue": {
+    "file": "assets/BundleManagementPage-BzTsfA25.js",
+    "name": "BundleManagementPage",
+    "src": "resources/js/components/claims/automation/BundleManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/BundleManagementPage-CpJ3IcYY.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/claims/automation/ClaimsProcessingPage.vue": {
+    "file": "assets/ClaimsProcessingPage-BF0kJGKa.js",
+    "name": "ClaimsProcessingPage",
+    "src": "resources/js/components/claims/automation/ClaimsProcessingPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_useClaimsAPI-Idr7NnCs.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/ClaimsProcessingPage-DiCBc8fq.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/common/ComingSoonPage.vue": {
+    "file": "assets/ComingSoonPage-CHyDD57A.js",
+    "name": "ComingSoonPage",
+    "src": "resources/js/components/common/ComingSoonPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/ComingSoonPage-CrnFOPi4.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/dashboard/Dashboard.vue": {
+    "file": "assets/Dashboard-DGLOCa09.js",
+    "name": "Dashboard",
+    "src": "resources/js/components/dashboard/Dashboard.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_DoughnutChart-9hqvc3Jo.js",
+      "_BarChart-DRs2D1fB.js",
+      "resources/js/app.js",
+      "_charts-BzTzB7UU.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/dashboard/FacilityDashboard.vue": {
+    "file": "assets/FacilityDashboard-DrwPWA8R.js",
+    "name": "FacilityDashboard",
+    "src": "resources/js/components/dashboard/FacilityDashboard.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/do/DOAssignedReferralsPage.vue": {
+    "file": "assets/DOAssignedReferralsPage-CEd7d1OO.js",
+    "name": "DOAssignedReferralsPage",
+    "src": "resources/js/components/do/DOAssignedReferralsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_ReferralDetailsModal-baiT_f9t.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js",
+      "_AppModal-C4LVPnW2.js"
+    ],
+    "css": [
+      "assets/DOAssignedReferralsPage-DKhnq5oP.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/do/DODashboard.vue": {
+    "file": "assets/DODashboard-DwWHFvbI.js",
+    "name": "DODashboard",
+    "src": "resources/js/components/do/DODashboard.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/DODashboard-2UMe5Nad.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enroll/EnrolleeChangePassword.vue": {
+    "file": "assets/EnrolleeChangePassword-D-7IpCiW.js",
+    "name": "EnrolleeChangePassword",
+    "src": "resources/js/components/enroll/EnrolleeChangePassword.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_EnrolleeLayout-CrtgwRQ2.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/EnrolleeChangePassword-T8PqdGbM.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enroll/EnrolleeDashboard.vue": {
+    "file": "assets/EnrolleeDashboard-DqZp2V-0.js",
+    "name": "EnrolleeDashboard",
+    "src": "resources/js/components/enroll/EnrolleeDashboard.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_EnrolleeLayout-CrtgwRQ2.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/EnrolleeDashboard-_67z_CfX.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enroll/EnrolleeLogin.vue": {
+    "file": "assets/EnrolleeLogin-D1lP-qMr.js",
+    "name": "EnrolleeLogin",
+    "src": "resources/js/components/enroll/EnrolleeLogin.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/EnrolleeLogin-BbiIzm2m.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enroll/EnrolleePlansPage.vue": {
+    "file": "assets/EnrolleePlansPage-fHuTOjjX.js",
+    "name": "EnrolleePlansPage",
+    "src": "resources/js/components/enroll/EnrolleePlansPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_EnrolleeLayout-CrtgwRQ2.js",
+      "_AppModal-C4LVPnW2.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/EnrolleePlansPage-g_QzgmeV.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enroll/EnrolleeProfilePage.vue": {
+    "file": "assets/EnrolleeProfilePage-BMFEvJNb.js",
+    "name": "EnrolleeProfilePage",
+    "src": "resources/js/components/enroll/EnrolleeProfilePage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_EnrolleeLayout-CrtgwRQ2.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/EnrolleeProfilePage-D_kfOuyr.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enrollees/BulkEnrollmentSlipPage.vue": {
+    "file": "assets/BulkEnrollmentSlipPage-CKeA5iPM.js",
+    "name": "BulkEnrollmentSlipPage",
+    "src": "resources/js/components/enrollees/BulkEnrollmentSlipPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enrollees/BulkIdCardPage.vue": {
+    "file": "assets/BulkIdCardPage-B9yVbLOJ.js",
+    "name": "BulkIdCardPage",
+    "src": "resources/js/components/enrollees/BulkIdCardPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enrollees/DemoEnrollmentPage.vue": {
+    "file": "assets/DemoEnrollmentPage-lGcQ2-Cb.js",
+    "name": "DemoEnrollmentPage",
+    "src": "resources/js/components/enrollees/DemoEnrollmentPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enrollees/EnrolleeProfilePage.vue": {
+    "file": "assets/EnrolleeProfilePage-rheKHG2k.js",
+    "name": "EnrolleeProfilePage",
+    "src": "resources/js/components/enrollees/EnrolleeProfilePage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enrollees/EnrolleesPage.vue": {
+    "file": "assets/EnrolleesPage-DlZJYEgN.js",
+    "name": "EnrolleesPage",
+    "src": "resources/js/components/enrollees/EnrolleesPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/EnrolleesPage-Q3wfWjNU.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enrollees/EnrollmentApprovalPage.vue": {
+    "file": "assets/EnrollmentApprovalPage-BCe3HgIU.js",
+    "name": "EnrollmentApprovalPage",
+    "src": "resources/js/components/enrollees/EnrollmentApprovalPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/enrollees/PendingEnrolleesPage.vue": {
+    "file": "assets/PendingEnrolleesPage-Bpnz5-9S.js",
+    "name": "PendingEnrolleesPage",
+    "src": "resources/js/components/enrollees/PendingEnrolleesPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/facilities/FacilitiesPage.vue": {
+    "file": "assets/FacilitiesPage-DRf-DBV2.js",
+    "name": "FacilitiesPage",
+    "src": "resources/js/components/facilities/FacilitiesPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppStatCard-C754Wjnn.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/FacilitiesPage-ItGVByCM.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/facility/FacilityAdmissionManagementPage.vue": {
+    "file": "assets/FacilityAdmissionManagementPage-rWGwiX7r.js",
+    "name": "FacilityAdmissionManagementPage",
+    "src": "resources/js/components/facility/FacilityAdmissionManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/FacilityAdmissionManagementPage-DWKmDHB9.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/facility/FacilityClaimSubmissionPage.vue": {
+    "file": "assets/FacilityClaimSubmissionPage-Dwn15X-n.js",
+    "name": "FacilityClaimSubmissionPage",
+    "src": "resources/js/components/facility/FacilityClaimSubmissionPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/FacilityClaimSubmissionPage-4VfwMb9L.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/feedback/FeedbackCreationPage.vue": {
+    "file": "assets/FeedbackCreationPage-Dqb77QJ_.js",
+    "name": "FeedbackCreationPage",
+    "src": "resources/js/components/feedback/FeedbackCreationPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/feedback/FeedbackManagementPage.vue": {
+    "file": "assets/FeedbackManagementPage-BFKjwjoS.js",
+    "name": "FeedbackManagementPage",
+    "src": "resources/js/components/feedback/FeedbackManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_AppModal-C4LVPnW2.js",
+      "_lodash-b1k5V174.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/landing/LandingPage.vue": {
+    "file": "assets/LandingPage-w73LxlCJ.js",
+    "name": "LandingPage",
+    "src": "resources/js/components/landing/LandingPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/LandingPage-Df4Vrr37.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/management/BundleComponentsManagementPage.vue": {
+    "file": "assets/BundleComponentsManagementPage-BN3NBfxo.js",
+    "name": "BundleComponentsManagementPage",
+    "src": "resources/js/components/management/BundleComponentsManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_lodash-5c63_K0k.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js",
+      "_lodash-b1k5V174.js"
+    ],
+    "css": [
+      "assets/BundleComponentsManagementPage-SMIgFLVm.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/management/BundleServicesManagementPage.vue": {
+    "file": "assets/BundleServicesManagementPage-DDWMukVU.js",
+    "name": "BundleServicesManagementPage",
+    "src": "resources/js/components/management/BundleServicesManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_lodash-5c63_K0k.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js",
+      "_lodash-b1k5V174.js"
+    ],
+    "css": [
+      "assets/BundleServicesManagementPage-BhlhcvnJ.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/management/CaseManagementPage.vue": {
+    "file": "assets/CaseManagementPage-B-g8PW3Q.js",
+    "name": "CaseManagementPage",
+    "src": "resources/js/components/management/CaseManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/CaseManagementPage-BQFYy9rz.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/management/DrugsManagementPage.vue": {
+    "file": "assets/DrugsManagementPage--vvcAYxp.js",
+    "name": "DrugsManagementPage",
+    "src": "resources/js/components/management/DrugsManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_lodash-5c63_K0k.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_lodash-b1k5V174.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/DrugsManagementPage-Bk20lXZn.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/management/LaboratoriesManagementPage.vue": {
+    "file": "assets/LaboratoriesManagementPage-B4L7xmgD.js",
+    "name": "LaboratoriesManagementPage",
+    "src": "resources/js/components/management/LaboratoriesManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_lodash-5c63_K0k.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js",
+      "_lodash-b1k5V174.js"
+    ],
+    "css": [
+      "assets/LaboratoriesManagementPage-Csh7ZqHE.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/management/ManagementDashboard.vue": {
+    "file": "assets/ManagementDashboard-CrbgA8q4.js",
+    "name": "ManagementDashboard",
+    "src": "resources/js/components/management/ManagementDashboard.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/ManagementDashboard-Ak70P1rB.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/management/ProfessionalServicesManagementPage.vue": {
+    "file": "assets/ProfessionalServicesManagementPage-D0hYhSOa.js",
+    "name": "ProfessionalServicesManagementPage",
+    "src": "resources/js/components/management/ProfessionalServicesManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/ProfessionalServicesManagementPage-gAdtpdNO.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/pas/DOFacilityAssignmentPage.vue": {
+    "file": "assets/DOFacilityAssignmentPage-CRWbzo9G.js",
+    "name": "DOFacilityAssignmentPage",
+    "src": "resources/js/components/pas/DOFacilityAssignmentPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/DOFacilityAssignmentPage-D0Xxn_WY.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/pas/DocumentRequirementsPage.vue": {
+    "file": "assets/DocumentRequirementsPage-BIba5hwo.js",
+    "name": "DocumentRequirementsPage",
+    "src": "resources/js/components/pas/DocumentRequirementsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_lodash-5c63_K0k.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js",
+      "_lodash-b1k5V174.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/pas/FUPACodeApprovalPage.vue": {
+    "file": "assets/FUPACodeApprovalPage-CIYJMzlm.js",
+    "name": "FUPACodeApprovalPage",
+    "src": "resources/js/components/pas/FUPACodeApprovalPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_FUPACodeDetailsModal-DZnCn16P.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/FUPACodeApprovalPage-knc8HQYY.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/pas/FUPACodeRequestPage.vue": {
+    "file": "assets/FUPACodeRequestPage-CNC7oIV3.js",
+    "name": "FUPACodeRequestPage",
+    "src": "resources/js/components/pas/FUPACodeRequestPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/FUPACodeRequestPage-CYaP8EWk.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/pas/FacilityPACodeManagementPage.vue": {
+    "file": "assets/FacilityPACodeManagementPage-Dq4xJaLG.js",
+    "name": "FacilityPACodeManagementPage",
+    "src": "resources/js/components/pas/FacilityPACodeManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_FUPACodeDetailsModal-DZnCn16P.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/FacilityPACodeManagementPage-CjHIIo88.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/pas/PASDashboard.vue": {
+    "file": "assets/PASDashboard-BS8bkw6G.js",
+    "name": "PASDashboard",
+    "src": "resources/js/components/pas/PASDashboard.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/PASDashboard-BqqGxMIM.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/pas/ReferralManagementPage.vue": {
+    "file": "assets/ReferralManagementPage-9PImGOOb.js",
+    "name": "ReferralManagementPage",
+    "src": "resources/js/components/pas/ReferralManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_ReferralDetailsModal-baiT_f9t.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/ReferralManagementPage-DL0tpy84.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/pas/UTNValidationPage.vue": {
+    "file": "assets/UTNValidationPage-DwnnwKSn.js",
+    "name": "UTNValidationPage",
+    "src": "resources/js/components/pas/UTNValidationPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/UTNValidationPage-CqvvWATo.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/payments/PaymentsPage.vue": {
+    "file": "assets/PaymentsPage-DXsUIAJe.js",
+    "name": "PaymentsPage",
+    "src": "resources/js/components/payments/PaymentsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_lodash-5c63_K0k.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppEmptyState-D8lWXsAJ.js",
+      "_AppStatCard-C754Wjnn.js",
+      "_AppStatusChip-ieExT2O1.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_lodash-b1k5V174.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/premium/PremiumWorkspace.vue": {
+    "file": "assets/PremiumWorkspace-B6ZANOP9.js",
+    "name": "PremiumWorkspace",
+    "src": "resources/js/components/premium/PremiumWorkspace.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "resources/js/app.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/reports/AnalyticsPage.vue": {
+    "file": "assets/AnalyticsPage-9zl6BOlU.js",
+    "name": "AnalyticsPage",
+    "src": "resources/js/components/reports/AnalyticsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppEmptyState-D8lWXsAJ.js",
+      "_AppStatCard-C754Wjnn.js",
+      "_DoughnutChart-9hqvc3Jo.js",
+      "_BarChart-DRs2D1fB.js",
+      "resources/js/app.js",
+      "_charts-BzTzB7UU.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/reports/FinancialReportsPage.vue": {
+    "file": "assets/FinancialReportsPage-BCtgvSdt.js",
+    "name": "FinancialReportsPage",
+    "src": "resources/js/components/reports/FinancialReportsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppEmptyState-D8lWXsAJ.js",
+      "_AppStatCard-C754Wjnn.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_BarChart-DRs2D1fB.js",
+      "resources/js/app.js",
+      "_charts-BzTzB7UU.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/reports/ReportsPage.vue": {
+    "file": "assets/ReportsPage-B80Xu9f4.js",
+    "name": "ReportsPage",
+    "src": "resources/js/components/reports/ReportsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppEmptyState-D8lWXsAJ.js",
+      "_AppStatCard-C754Wjnn.js",
+      "_AppModal-C4LVPnW2.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/security/AuditLogsPage.vue": {
+    "file": "assets/AuditLogsPage-CfW8ni_h.js",
+    "name": "AuditLogsPage",
+    "src": "resources/js/components/security/AuditLogsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_lodash-5c63_K0k.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppEmptyState-D8lWXsAJ.js",
+      "_AppStatCard-C754Wjnn.js",
+      "_AppStatusChip-ieExT2O1.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_lodash-b1k5V174.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/settings/BenefactorsPage.vue": {
+    "file": "assets/BenefactorsPage-COf2aFdv.js",
+    "name": "BenefactorsPage",
+    "src": "resources/js/components/settings/BenefactorsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/BenefactorsPage-DLOy62gg.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/settings/DepartmentsPage.vue": {
+    "file": "assets/DepartmentsPage-C3RvyD8s.js",
+    "name": "DepartmentsPage",
+    "src": "resources/js/components/settings/DepartmentsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_lodash-5c63_K0k.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_AppEmptyState-D8lWXsAJ.js",
+      "_AppStatusChip-ieExT2O1.js",
+      "resources/js/app.js",
+      "_lodash-b1k5V174.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/settings/DesignationsPage.vue": {
+    "file": "assets/DesignationsPage-D7iKAdU-.js",
+    "name": "DesignationsPage",
+    "src": "resources/js/components/settings/DesignationsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_lodash-5c63_K0k.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppEmptyState-D8lWXsAJ.js",
+      "_AppStatusChip-ieExT2O1.js",
+      "resources/js/app.js",
+      "_lodash-b1k5V174.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/settings/RolesPermissionsPage.vue": {
+    "file": "assets/RolesPermissionsPage-zM66Bb-V.js",
+    "name": "RolesPermissionsPage",
+    "src": "resources/js/components/settings/RolesPermissionsPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/RolesPermissionsPage-B6jpdBSw.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/settings/UsersPage.vue": {
+    "file": "assets/UsersPage-4IDJWgVN.js",
+    "name": "UsersPage",
+    "src": "resources/js/components/settings/UsersPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/UsersPage-Apj5u22A.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/setup/SetupWorkspace.vue": {
+    "file": "assets/SetupWorkspace-DaPPXAMl.js",
+    "name": "SetupWorkspace",
+    "src": "resources/js/components/setup/SetupWorkspace.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "_AdminLayout-DHUn_W7K.js",
+      "_AppModal-C4LVPnW2.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "resources/js/app.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/app-ChGgfQRD.css"
+    ]
+  },
+  "resources/js/components/task-management/TaskManagementPage.vue": {
+    "file": "assets/TaskManagementPage-DSyvW3uO.js",
+    "name": "TaskManagementPage",
+    "src": "resources/js/components/task-management/TaskManagementPage.vue",
+    "isDynamicEntry": true,
+    "imports": [
+      "_vue-R40XmSTA.js",
+      "resources/js/app.js",
+      "_AppDataTable-CBy7W2jp.js",
+      "_AppModal-C4LVPnW2.js",
+      "_vuetify-BTAzqw1N.js",
+      "_primevue-8U-7ZSfw.js"
+    ],
+    "css": [
+      "assets/TaskManagementPage-BpC0Fi_Z.css",
+      "assets/app-ChGgfQRD.css"
+    ]
+  }
+}
