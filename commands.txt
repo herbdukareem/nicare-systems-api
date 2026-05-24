@@ -1,0 +1,7 @@
+/opt/cpanel/ea-php82/root/usr/bin/php artisan legacy:migrate --only=enrollees --chunk=500 --dispatch
+
+
+nohup /opt/cpanel/ea-php82/root/usr/bin/php artisan queue:work --queue=legacy --timeout=3600 --tries=3 > storage/logs/legacy-worker-1.log 2>&1 &
+nohup /opt/cpanel/ea-php82/root/usr/bin/php artisan queue:work --queue=legacy --timeout=3600 --tries=3 > storage/logs/legacy-worker-2.log 2>&1 &
+nohup /opt/cpanel/ea-php82/root/usr/bin/php artisan queue:work --queue=legacy --timeout=3600 --tries=3 > storage/logs/legacy-worker-3.log 2>&1 &
+nohup /opt/cpanel/ea-php82/root/usr/bin/php artisan queue:work --queue=legacy --timeout=3600 --tries=3 > storage/logs/legacy-worker-4.log 2>&1 &

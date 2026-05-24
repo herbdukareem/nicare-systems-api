@@ -73,6 +73,9 @@ class LegacyEnrolleeMapper
     /** @var array<string, int> */
     private array $fallbackIds = [];
 
+    /** @var array<int, int|null> */
+    private array $facilityIds = [];
+
     /** @var array<int, bool> */
     private array $ensuredFundingTypeIds = [];
 
@@ -573,7 +576,7 @@ class LegacyEnrolleeMapper
     private function facilityId(object $legacy, int $lgaId, int $wardId): int
     {
         $providerId = $this->directLegacyId($legacy, 'provider_id', 'p_provider_id', 'facility_id');
-        if ($providerId) {
+        if ($providerId && $this->facilityExists($providerId)) {
             return $providerId;
         }
 
@@ -581,6 +584,17 @@ class LegacyEnrolleeMapper
             ['hcp_code' => 'LEGACY-UNKNOWN'],
             ['name' => 'Unknown Legacy Facility', 'ownership' => 'Public', 'type' => 'Primary', 'lga_id' => $lgaId, 'ward_id' => $wardId, 'status' => 1]
         )->id;
+    }
+
+    private function facilityExists(int $providerId): bool
+    {
+        if (array_key_exists($providerId, $this->facilityIds)) {
+            return $this->facilityIds[$providerId] !== null;
+        }
+
+        $this->facilityIds[$providerId] = Facility::whereKey($providerId)->value('id');
+
+        return $this->facilityIds[$providerId] !== null;
     }
 
     private function lgaId(object $legacy): int
