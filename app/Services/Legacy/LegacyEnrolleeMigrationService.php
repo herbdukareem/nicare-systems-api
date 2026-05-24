@@ -86,20 +86,22 @@ class LegacyEnrolleeMigrationService
                 'mapped' => $mapped,
                 'duplicate_matched' => (bool) $existing,
             ];
-        });
+        }, 5);
     }
 
     public function logFailure(object $legacy, string $sourceTable, Throwable $exception): void
     {
-        LegacyMigrationLog::updateOrCreate(
-            ['source_table' => $sourceTable, 'legacy_id' => (int) ($legacy->id ?? 0)],
-            [
-                'legacy_enrolment_number' => $legacy->enrolment_number ?? null,
-                'migration_status' => 'failed',
-                'message' => $exception->getMessage(),
-                'legacy_payload' => json_decode(json_encode($legacy), true),
-            ]
-        );
+        DB::transaction(function () use ($legacy, $sourceTable, $exception): void {
+            LegacyMigrationLog::updateOrCreate(
+                ['source_table' => $sourceTable, 'legacy_id' => (int) ($legacy->id ?? 0)],
+                [
+                    'legacy_enrolment_number' => $legacy->enrolment_number ?? null,
+                    'migration_status' => 'failed',
+                    'message' => $exception->getMessage(),
+                    'legacy_payload' => json_decode(json_encode($legacy), true),
+                ]
+            );
+        }, 5);
     }
 
     private function createOrUpdatePurchase(array $mapped): ?PremiumPurchase
@@ -159,35 +161,8 @@ class LegacyEnrolleeMigrationService
             ->where('legacy_id', $mapped['legacy_id'])
             ->whereNotNull('new_enrollee_id')
             ->first();
-        if ($log?->enrollee) {
-            return $log->enrollee;
-        }
 
-        if ($mapped['dedupe']['shin']) {
-            $match = Enrollee::where('enrollee_id', $mapped['dedupe']['shin'])
-                ->orWhere('legacy_enrollee_id', $mapped['dedupe']['shin'])
-                ->first();
-            if ($match) {
-                return $this->hasSameLegacyId($match, $mapped) ? $match : null;
-            }
-        }
-
-        if ($mapped['dedupe']['nin']) {
-            $match = Enrollee::where('nin', $mapped['dedupe']['nin'])->first();
-            if ($match) {
-                return $match;
-            }
-        }
-
-        if ($mapped['dedupe']['phone'] && $mapped['dedupe']['first_name'] && $mapped['dedupe']['last_name'] && $mapped['dedupe']['date_of_birth']) {
-            return Enrollee::where('phone', $mapped['dedupe']['phone'])
-                ->where('first_name', $mapped['dedupe']['first_name'])
-                ->where('last_name', $mapped['dedupe']['last_name'])
-                ->whereDate('date_of_birth', $mapped['dedupe']['date_of_birth'])
-                ->first();
-        }
-
-        return null;
+        return $log?->enrollee;
     }
 
     private function ensureUniqueEnrolleeId(array &$mapped): void
@@ -198,17 +173,11 @@ class LegacyEnrolleeMigrationService
         }
 
         $duplicate = Enrollee::where('enrollee_id', $enrolleeId)->first();
-        if (!$duplicate || $this->hasSameLegacyId($duplicate, $mapped)) {
+        if (!$duplicate) {
             return;
         }
 
         $mapped['enrollee']['enrollee_id'] = $this->generateUniqueEnrolleeId($mapped);
-    }
-
-    private function hasSameLegacyId(Enrollee $enrollee, array $mapped): bool
-    {
-        return $enrollee->legacy_id !== null
-            && (int) $enrollee->legacy_id === (int) $mapped['legacy_id'];
     }
 
     private function generateUniqueEnrolleeId(array $mapped): string
