@@ -6,7 +6,6 @@ use App\Models\Enrollee;
 use App\Models\Facility;
 use App\Models\PremiumPlan;
 use App\Models\PremiumPurchase;
-use App\Models\User;
 use App\Services\Billing\BillingCheckoutService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -19,7 +18,8 @@ class PublicEnrollmentService
 {
     public function __construct(
         private PremiumCoverageService $premiumCoverageService,
-        private BillingCheckoutService $billingCheckoutService
+        private BillingCheckoutService $billingCheckoutService,
+        private SystemAuditUserResolver $systemAuditUserResolver
     ) {
     }
 
@@ -187,16 +187,6 @@ class PublicEnrollmentService
             return (int) auth()->id();
         }
 
-        $systemUser = User::where('username', 'system.audit')->first();
-
-        if (!$systemUser) {
-            $systemUser = User::factory()->create([
-                'name' => 'System Audit',
-                'username' => 'system.audit',
-                'email' => 'system.audit@local.test',
-            ]);
-        }
-
-        return (int) $systemUser->id;
+        return $this->systemAuditUserResolver->resolveId();
     }
 }

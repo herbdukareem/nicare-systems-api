@@ -3,12 +3,16 @@
 namespace App\Services;
 
 use App\Models\AuditTrail;
-use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Request;
 
 class PremiumAuditService
 {
+    public function __construct(
+        private SystemAuditUserResolver $systemAuditUserResolver
+    ) {
+    }
+
     public function record(Model $model, string $action, string $description, array $old = [], array $new = []): void
     {
         AuditTrail::create([
@@ -29,16 +33,6 @@ class PremiumAuditService
             return (int) auth()->id();
         }
 
-        $systemUser = User::where('username', 'system.audit')->first();
-
-        if (!$systemUser) {
-            $systemUser = User::factory()->create([
-                'name' => 'System Audit',
-                'username' => 'system.audit',
-                'email' => 'system.audit@local.test',
-            ]);
-        }
-
-        return (int) $systemUser->id;
+        return $this->systemAuditUserResolver->resolveId();
     }
 }
