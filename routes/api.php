@@ -66,7 +66,9 @@ use App\Http\Controllers\Api\CapitationController;
 use App\Http\Controllers\Api\MobileSyncController;
 use App\Http\Controllers\Api\NinProviderConfigurationController;
 use App\Http\Controllers\Api\OrganizationSettingsController;
+use App\Http\Controllers\Api\PaymentGatewayConfigurationController;
 use App\Http\Controllers\Api\PublicEnrollmentController;
+use App\Http\Controllers\Api\PublicEnrollmentPaymentController;
 use App\Http\Controllers\Api\EnrolleeImportController;
 use App\Http\Controllers\Api\EnrolleeController as EnrolleeApiController;
 use App\Http\Controllers\Api\ExtendedReportingController;
@@ -102,6 +104,7 @@ Route::get('enroll/plans', [EnrolleeAuthController::class, 'plans']);
 Route::prefix('public/enrollment')->middleware(['security'])->group(function () {
     Route::get('metadata', [PublicEnrollmentController::class, 'metadata'])->middleware('throttle:30,1');
     Route::post('applications', [PublicEnrollmentController::class, 'store'])->middleware('throttle:10,1');
+    Route::get('payments/{reference}/verify', [PublicEnrollmentPaymentController::class, 'verify'])->middleware('throttle:20,1');
 });
 
 Route::middleware(['auth:sanctum', 'enrollee'])->prefix('enroll')->group(function () {
@@ -281,6 +284,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::apiResource('purchases', PremiumPurchaseController::class)->only(['index', 'store', 'show'])->parameters(['purchases' => 'premiumPurchase']);
         Route::post('purchases/{premiumPurchase}/confirm', [PremiumPurchaseController::class, 'confirm']);
         Route::post('purchases/{premiumPurchase}/cancel', [PremiumPurchaseController::class, 'cancel']);
+        Route::post('purchases/{premiumPurchase}/checkout', [PremiumPurchaseController::class, 'initializeCheckout']);
+        Route::post('purchases/{premiumPurchase}/verify', [PremiumPurchaseController::class, 'verify']);
 
         Route::apiResource('payroll-batches', PayrollBatchController::class)->only(['index', 'store'])->parameters(['payroll-batches' => 'payrollBatch']);
         Route::post('payroll-batches/{payrollBatch}/approve', [PayrollBatchController::class, 'approve']);
@@ -303,6 +308,10 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,settings.organization.manage,settings.edit');
     Route::delete('settings/organization/logo', [OrganizationSettingsController::class, 'removeLogo'])
         ->middleware('permission:any,settings.organization.manage,settings.edit');
+    Route::get('settings/payment-gateways', [PaymentGatewayConfigurationController::class, 'show'])
+        ->middleware('permission:any,settings.payment-gateway.manage,settings.edit');
+    Route::put('settings/payment-gateways', [PaymentGatewayConfigurationController::class, 'update'])
+        ->middleware('permission:any,settings.payment-gateway.manage,settings.edit');
     Route::apiResource('lgas', LgaController::class);
     Route::get('lgas/{lga}/wards', [LgaController::class, 'wards']);
     Route::apiResource('wards', WardController::class);

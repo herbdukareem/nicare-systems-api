@@ -26,6 +26,7 @@ class StorePremiumPurchaseRequest extends FormRequest
             'payment_method' => ['required', 'in:cash,bank_transfer,pos,online_payment,payroll_deduction,government_subsidy,donor_sponsorship'],
             'payment_status' => ['nullable', 'in:pending,paid,confirmed,cancelled'],
             'payment_reference' => ['nullable', 'string', 'max:255'],
+            'initialize_checkout' => ['nullable', 'boolean'],
             'quantity' => ['nullable', 'integer', 'min:1'],
             'amount' => ['nullable', 'numeric', 'min:0'],
             'paid_at' => ['nullable', 'date'],

@@ -85,5 +85,8 @@ export const enrolleePortalAPI = {
 
 export const publicEnrollmentAPI = {
   metadata: (params = {}) => enrolleeHttp.get('/public/enrollment/metadata', { params }),
-  createApplication: (data) => enrolleeHttp.post('/public/enrollment/applications', data),
+  createApplication: (data) => enrolleeHttp.post('/public/enrollment/applications', data, {
+    headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
+  }),
+  verifyPayment: (reference) => enrolleeHttp.get(`/public/enrollment/payments/${encodeURIComponent(reference)}/verify`),
 };

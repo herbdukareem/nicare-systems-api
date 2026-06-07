@@ -243,6 +243,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'settings.view',
                 'settings.edit',
                 'settings.nin.manage',
+                'settings.payment-gateway.manage',
                 'impersonate_users',
             ],
             'Feedback & Tasks' => [
@@ -292,7 +293,7 @@ class RolesAndPermissionsSeeder extends Seeder
                     'group-enrollment.', 'payroll-upload.', 'subsidy-batch.', 'eligibility.', 'referrals.',
                     'pa_codes.', 'admissions.', 'utn.', 'claims.', 'payment_batches.', 'capitation.', 'payments.',
                     'reports.', 'analytics.', 'feedback.', 'users.view', 'roles.view', 'permissions.view',
-                ]), ['settings.nin.manage'])),
+                ]), ['settings.nin.manage', 'settings.payment-gateway.manage'])),
             ],
             'enrollment-officer' => [
                 'label' => 'Enrollment Officer',

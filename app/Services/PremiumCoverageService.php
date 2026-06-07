@@ -54,6 +54,11 @@ class PremiumCoverageService
             'quantity' => $quantity,
             'amount' => $data['amount'] ?? ($plan->amount * $quantity),
             'payment_status' => $data['payment_status'] ?? 'pending',
+            'gateway_code' => $data['gateway_code'] ?? $plan->payment_gateway,
+            'gateway_status' => $data['gateway_status'] ?? null,
+            'authorization_url' => $data['authorization_url'] ?? null,
+            'gateway_access_code' => $data['gateway_access_code'] ?? null,
+            'gateway_response' => $data['gateway_response'] ?? null,
             'sold_by' => $data['sold_by'] ?? auth()->id(),
         ]));
 
@@ -162,6 +167,33 @@ class PremiumCoverageService
         ]);
 
         $this->audit->record($purchase, 'premium_purchase_confirmed', "Premium purchase {$purchase->id} confirmed.", $old, $purchase->fresh()->toArray());
+
+        return $purchase->fresh();
+    }
+
+    public function markPurchasePaidFromGateway(PremiumPurchase $purchase, array $verification): PremiumPurchase
+    {
+        if ($purchase->payment_status === 'confirmed') {
+            return $purchase->fresh();
+        }
+
+        $old = $purchase->toArray();
+        $purchase->update([
+            'payment_status' => 'confirmed',
+            'gateway_status' => $verification['status'] ?? 'success',
+            'gateway_response' => $verification['raw_response'] ?? null,
+            'paid_at' => $purchase->paid_at ?? now(),
+            'confirmed_at' => $purchase->confirmed_at ?? now(),
+            'verified_at' => now(),
+        ]);
+
+        $this->audit->record(
+            $purchase,
+            'premium_purchase_gateway_confirmed',
+            "Premium purchase {$purchase->id} confirmed by online gateway verification.",
+            $old,
+            $purchase->fresh()->toArray()
+        );
 
         return $purchase->fresh();
     }

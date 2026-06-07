@@ -296,10 +296,22 @@
 
       <v-navigation-drawer v-model="detailDrawer" location="right" temporary width="560">
         <div v-if="selected" class="tw-space-y-4 tw-p-5">
-          <div class="tw-flex tw-items-start tw-justify-between">
-            <div>
-              <h2 class="tw-text-xl tw-font-bold tw-text-slate-950">{{ selected.full_name || selected.name }}</h2>
-              <p class="tw-text-sm tw-text-slate-500">{{ selected.enrollee_id }}</p>
+          <div class="tw-flex tw-items-start tw-justify-between tw-gap-4">
+            <div class="tw-flex tw-items-start tw-gap-4">
+              <div class="tw-flex tw-h-24 tw-w-24 tw-items-center tw-justify-center tw-overflow-hidden tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-slate-100">
+                <img
+                  v-if="selected.image_url"
+                  :src="selected.image_url"
+                  :alt="selected.full_name || selected.name || 'Enrollee photo'"
+                  class="tw-h-full tw-w-full tw-object-cover"
+                />
+                <v-icon v-else size="34" color="grey">mdi-account-box-outline</v-icon>
+              </div>
+
+              <div>
+                <h2 class="tw-text-xl tw-font-bold tw-text-slate-950">{{ selected.full_name || selected.name }}</h2>
+                <p class="tw-text-sm tw-text-slate-500">{{ selected.enrollee_id }}</p>
+              </div>
             </div>
             <v-btn icon variant="text" @click="detailDrawer = false">
               <v-icon>mdi-close</v-icon>

@@ -6,15 +6,21 @@ use App\Models\Enrollee;
 use App\Models\Facility;
 use App\Models\PremiumPlan;
 use App\Models\PremiumPurchase;
+use App\Models\User;
+use App\Services\Billing\BillingCheckoutService;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use RuntimeException;
 
 class PublicEnrollmentService
 {
-    public function __construct(private PremiumCoverageService $premiumCoverageService)
-    {
+    public function __construct(
+        private PremiumCoverageService $premiumCoverageService,
+        private BillingCheckoutService $billingCheckoutService
+    ) {
     }
 
     public function submitApplication(array $data): array
@@ -35,7 +41,34 @@ class PublicEnrollmentService
             throw new RuntimeException('The selected facility does not belong to the selected ward.');
         }
 
-        return DB::transaction(function () use ($data, $plan) {
+        if ($plan->requiresPayment() && blank($data['email'] ?? null)) {
+            throw new RuntimeException('Email address is required for plans that use secure online payment.');
+        }
+
+        $paymentReference = $plan->requiresPayment()
+            ? (($data['payment_reference'] ?? null) ?: $this->generatedPaymentReference())
+            : null;
+        $passportPath = $this->storePassport($data['passport'] ?? null);
+
+        $paymentCheckout = null;
+
+        if ($plan->requiresPayment()) {
+            $paymentCheckout = $this->billingCheckoutService->initializePremiumEnrollmentPlanCheckout(
+                $plan,
+                [
+                    'email' => $data['email'],
+                    'metadata' => [
+                        'channel' => 'self_service_enrollment',
+                        'lga_id' => $data['lga_id'],
+                        'ward_id' => $data['ward_id'],
+                        'facility_id' => $data['facility_id'],
+                    ],
+                ],
+                $paymentReference
+            );
+        }
+
+        $result = DB::transaction(function () use ($data, $plan, $paymentReference, $paymentCheckout, $passportPath) {
             $purchase = null;
 
             if ($plan->requiresPayment()) {
@@ -53,7 +86,12 @@ class PublicEnrollmentService
                     ],
                     'payment_method' => 'online_payment',
                     'payment_status' => 'pending',
-                    'payment_reference' => $data['payment_reference'] ?: $this->generatedPaymentReference(),
+                    'payment_reference' => $paymentReference,
+                    'gateway_code' => $paymentCheckout['provider'] ?? $plan->payment_gateway,
+                    'gateway_status' => $paymentCheckout['status'] ?? 'initialized',
+                    'authorization_url' => $paymentCheckout['authorization_url'] ?? null,
+                    'gateway_access_code' => $paymentCheckout['access_code'] ?? null,
+                    'gateway_response' => $paymentCheckout['raw_response'] ?? null,
                     'quantity' => 1,
                     'amount' => $plan->amount,
                     'sold_by' => null,
@@ -72,6 +110,7 @@ class PublicEnrollmentService
                 'sex' => (int) $data['sex'],
                 'marital_status' => $data['marital_status'] ?? null,
                 'address' => $data['address'] ?? null,
+                'image_url' => $passportPath,
                 'facility_id' => $data['facility_id'],
                 'lga_id' => $data['lga_id'],
                 'ward_id' => $data['ward_id'],
@@ -81,6 +120,7 @@ class PublicEnrollmentService
                 'benefit_package_id' => $plan->benefit_package_id,
                 'status' => Enrollee::STATUS_PENDING,
                 'relationship_to_principal' => 1,
+                'created_by' => $this->systemActorId(),
                 'password' => Hash::make($data['password']),
                 'enrollment_date' => now(),
                 'enrollment_source' => 'self_service',
@@ -93,9 +133,10 @@ class PublicEnrollmentService
                 'enrollee' => $enrollee->load(['premiumPlan', 'premiumPurchase', 'benefitPackage', 'facility', 'lga', 'ward', 'insuranceProgramme']),
                 'purchase' => $purchase?->load(['plan']),
                 'requires_payment' => $plan->requiresPayment(),
+                'payment_checkout' => $paymentCheckout,
                 'next_steps' => $plan->requiresPayment()
                     ? [
-                        'Complete payment using the generated payment reference or your preferred configured payment channel.',
+                        'Complete the secure online payment using the launched checkout page.',
                         'Your application will remain pending until payment is confirmed and an approval officer verifies your NIN.',
                         'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
                     ]
@@ -106,12 +147,26 @@ class PublicEnrollmentService
                     ],
             ];
         });
+
+        return $result;
+    }
+
+    private function storePassport(mixed $passport): ?string
+    {
+        if (!$passport instanceof UploadedFile) {
+            return null;
+        }
+
+        $disk = (string) config('filesystems.enrollee_passport_disk', 'public');
+        $path = Storage::disk($disk)->putFile('enrollees/passports', $passport, 'public');
+
+        return Storage::disk($disk)->url($path);
     }
 
     private function generatedEnrolleeId(): string
     {
         do {
-            $value = 'NGSCHA' . now()->format('ymdHis') . random_int(100, 999);
+            $value = 'NG' . now()->format('ymdHis') . str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
         } while (Enrollee::where('enrollee_id', $value)->exists());
 
         return $value;
@@ -124,5 +179,24 @@ class PublicEnrollmentService
         } while (PremiumPurchase::where('payment_reference', $reference)->exists());
 
         return $reference;
+    }
+
+    private function systemActorId(): int
+    {
+        if (auth()->id()) {
+            return (int) auth()->id();
+        }
+
+        $systemUser = User::where('username', 'system.audit')->first();
+
+        if (!$systemUser) {
+            $systemUser = User::factory()->create([
+                'name' => 'System Audit',
+                'username' => 'system.audit',
+                'email' => 'system.audit@local.test',
+            ]);
+        }
+
+        return (int) $systemUser->id;
     }
 }

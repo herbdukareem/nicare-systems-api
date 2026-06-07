@@ -892,6 +892,17 @@ const routes = [
     },
   },
   {
+    path: '/settings/payment-gateways',
+    name: 'settings-payment-gateways',
+    component: () => import('../components/settings/PaymentGatewaySettingsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['settings.payment-gateway.manage', 'settings.edit'],
+      title: 'Payment Gateway Configuration',
+      breadcrumb: 'Payment Gateway Configuration',
+    },
+  },
+  {
     path: '/settings/organization',
     name: 'settings-organization',
     component: () => import('../components/settings/OrganizationSettingsPage.vue'),

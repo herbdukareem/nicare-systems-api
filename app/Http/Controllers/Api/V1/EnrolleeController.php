@@ -370,7 +370,7 @@ class EnrolleeController extends BaseController
         $w = round(85.6 * 72 / 25.4, 2); // 242.39
         $h = round(54.0 * 72 / 25.4, 2); // 152.91
 
-        $pdf = Pdf::loadView('pdf.enrollee-id-card', [
+        $pdf = Pdf::setOptions(['isRemoteEnabled' => true])->loadView('pdf.enrollee-id-card', [
             'enrollee'    => $enrollee,
             'qrBase64'    => $qrBase64,
             'generatedAt' => now(),
@@ -444,7 +444,7 @@ class EnrolleeController extends BaseController
             ->limit(500)
             ->get();
 
-        $pdf = Pdf::loadView('pdf.bulk-enrollment-slip', [
+        $pdf = Pdf::setOptions(['isRemoteEnabled' => true])->loadView('pdf.bulk-enrollment-slip', [
             'enrollees' => $enrollees,
             'filters' => $data,
             'generatedBy' => auth()->user(),

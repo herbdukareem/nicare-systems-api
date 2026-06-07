@@ -265,7 +265,12 @@
   $coverageEnd   = $enrollee->coverage_end_date
     ? optional($enrollee->coverage_end_date)->format('d M Y')
     : 'No Expiry';
-  $photoPath = $enrollee->image_url ? public_path(ltrim($enrollee->image_url, '/')) : null;
+  $photoSrc = null;
+  if ($enrollee->image_url) {
+    $photoSrc = preg_match('#^(https?://|data:)#i', $enrollee->image_url)
+      ? $enrollee->image_url
+      : url($enrollee->image_url);
+  }
 @endphp
 
 <div class="slip">
@@ -341,8 +346,8 @@
       </td>
 
       <td class="slip-photo-td">
-        @if($photoPath && file_exists($photoPath))
-          <img src="file://{{ $photoPath }}" alt="Photo"
+        @if($photoSrc)
+          <img src="{{ $photoSrc }}" alt="Photo"
                style="width:24mm; height:30mm; object-fit:cover; border:1pt solid #b0bcc8;">
         @else
           <div class="photo-box"></div>

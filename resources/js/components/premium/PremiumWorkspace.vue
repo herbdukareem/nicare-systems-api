@@ -73,13 +73,20 @@
           </div>
 
           <v-text-field v-if="mode === 'sell-pin'" v-model="saleForm.pin" label="PIN" density="comfortable" variant="outlined" />
-          <v-select v-if="mode === 'sell-pin'" v-model="purchaseForm.premium_plan_id" :items="plans" item-title="name" item-value="id" label="Premium plan" density="comfortable" variant="outlined" />
+          <v-select v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.premium_plan_id" :items="plans" item-title="name" item-value="id" label="Premium plan" density="comfortable" variant="outlined" />
           <v-select v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.payer_type" :items="payerTypes" label="Payer type" density="comfortable" variant="outlined" />
           <v-select v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding type" density="comfortable" variant="outlined" clearable />
           <v-select v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.benefactor_id" :items="benefactors" item-title="name" item-value="id" label="Benefactor / sponsor" density="comfortable" variant="outlined" clearable />
           <v-text-field v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.payer_name" label="Payer name" density="comfortable" variant="outlined" />
+          <v-text-field v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.payer_email" label="Payer email" density="comfortable" variant="outlined" />
           <v-select v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.payment_method" :items="paymentMethods" label="Payment method" density="comfortable" variant="outlined" />
           <v-text-field v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.payment_reference" label="Payment reference" density="comfortable" variant="outlined" />
+          <v-alert v-if="mode === 'sell-pin' && purchaseForm.payment_method === 'online_payment'" type="warning" variant="tonal" density="compact" class="lg:tw-col-span-2">
+            Secure hosted checkout is available from the Purchases screen. Sell PIN is kept for cash, transfer, POS, and already-confirmed purchase flows.
+          </v-alert>
+          <v-alert v-if="mode === 'purchases' && purchaseForm.payment_method === 'online_payment'" type="info" variant="tonal" density="compact" class="lg:tw-col-span-2">
+            Creating this purchase will open the configured hosted checkout page instead of collecting a manual payment reference.
+          </v-alert>
 
           <v-text-field v-if="mode === 'eligibility'" v-model="eligibilityForm.enrollee_number" label="SHIN / enrollee number" density="comfortable" variant="outlined" />
           <v-text-field v-if="mode === 'eligibility'" v-model="eligibilityForm.date" label="Care date" type="date" density="comfortable" variant="outlined" />
@@ -166,6 +173,7 @@
 
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
 import { benefactorAPI, premiumAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
@@ -174,6 +182,7 @@ import AppDataTable from '../common/AppDataTable.vue'
 
 const props = defineProps({ mode: { type: String, default: 'dashboard' } })
 const { success, error } = useToast()
+const route = useRoute()
 const loading = ref(false)
 const saving = ref(false)
 const dashboard = ref({})
@@ -216,7 +225,7 @@ const blankPlanForm = () => ({
 const planForm = ref(blankPlanForm())
 const pinForm = ref({ premium_plan_id: null, quantity: 100, payment_reference: '' })
 const saleForm = ref({ pin: '' })
-const purchaseForm = ref({ premium_plan_id: null, payer_type: 'individual', payer_name: '', payment_method: 'cash', payment_reference: '', quantity: 1 })
+const purchaseForm = ref({ premium_plan_id: null, payer_type: 'individual', payer_name: '', payer_email: '', payment_method: 'cash', payment_reference: '', quantity: 1 })
 const coverageForm = ref({ enrollee_id: null, premium_plan_id: null, activation_source: 'admin' })
 const eligibilityForm = ref({ enrollee_number: '', date: '' })
 const benefactorForm = ref({ name: '', type: 'individual', registration_number: '', contact_person: '', phone: '', email: '', status: 1 })
@@ -372,10 +381,24 @@ const primaryAction = async () => {
       return
     }
     else if (props.mode === 'sell-pin') {
+      if (purchaseForm.value.payment_method === 'online_payment') {
+        throw new Error('Use Premium Purchases to launch secure online payment before selling a PIN.')
+      }
       const purchase = (await premiumAPI.createPurchase(purchaseForm.value)).data.data
       const pin = (await premiumAPI.validatePin({ pin: saleForm.value.pin })).data.data
       await premiumAPI.sellPin(pin.id, { premium_purchase_id: purchase.id })
-    } else if (props.mode === 'purchases') await premiumAPI.createPurchase(purchaseForm.value)
+    } else if (props.mode === 'purchases') {
+      const response = await premiumAPI.createPurchase({
+        ...purchaseForm.value,
+        initialize_checkout: purchaseForm.value.payment_method === 'online_payment',
+      })
+      const checkout = response.data?.checkout
+
+      if (checkout?.authorization_url) {
+        openCheckoutWindow(checkout.authorization_url)
+        success('Purchase created. Continuing to secure payment checkout.')
+      }
+    }
     else if (props.mode === 'eligibility') eligibilityResult.value = (await premiumAPI.eligibility(eligibilityForm.value)).data
     else if (props.mode === 'benefactors') await benefactorAPI.create(benefactorForm.value)
     else if (props.mode === 'payroll') await premiumAPI.createPayrollBatch(batchPayload('payroll'))
@@ -385,6 +408,15 @@ const primaryAction = async () => {
     error(err?.response?.data?.message || 'Action failed')
   } finally {
     saving.value = false
+  }
+}
+
+const openCheckoutWindow = (authorizationUrl) => {
+  if (!authorizationUrl) return
+
+  const popup = window.open(authorizationUrl, 'premium-purchase-checkout', 'width=520,height=760,noopener,noreferrer')
+  if (!popup) {
+    window.location.href = authorizationUrl
   }
 }
 
@@ -577,4 +609,18 @@ watch(() => planForm.value.payment_required, (value) => {
 watch(() => planForm.value.merchant_id, () => {
   planForm.value.merchant_service_type_id = null
 })
+watch(() => route.query.purchase_id, async (purchaseId) => {
+  if (props.mode !== 'purchases' || !purchaseId) return
+
+  try {
+    const response = await premiumAPI.verifyPurchase(purchaseId)
+    const verification = response.data?.data?.verification
+    if (verification?.paid) {
+      success('Purchase payment verified successfully')
+      await loadAll()
+    }
+  } catch (err) {
+    error(err?.response?.data?.message || 'Unable to verify returned purchase payment.')
+  }
+}, { immediate: true })
 </script>

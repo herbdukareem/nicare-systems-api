@@ -14,6 +14,7 @@ use App\Models\Lga;
 use App\Models\PremiumPlan;
 use App\Models\VulnerableGroup;
 use App\Models\Ward;
+use App\Services\Billing\PaymentGatewayConfigurationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -21,6 +22,10 @@ use Illuminate\Support\Facades\Schema;
 
 class PremiumMetadataController extends Controller
 {
+    public function __construct(private PaymentGatewayConfigurationService $paymentGatewayConfigurationService)
+    {
+    }
+
     public function index(Request $request): JsonResponse
     {
         $programmeId = $request->integer('insurance_programme_id') ?: null;
@@ -63,15 +68,8 @@ class PremiumMetadataController extends Controller
                     ->when($wardId, fn ($query) => $query->where('ward_id', $wardId))
                     ->orderBy('name')
                     ->get(),
-                'payment_gateways' => [
-                    ['name' => 'Remita', 'code' => 'remita'],
-                    ['name' => 'Paystack', 'code' => 'paystack'],
-                    ['name' => 'Flutterwave', 'code' => 'flutterwave'],
-                    ['name' => 'XpressPay', 'code' => 'xpresspay'],
-                    ['name' => 'Bank Transfer', 'code' => 'bank_transfer'],
-                    ['name' => 'POS', 'code' => 'pos'],
-                    ['name' => 'Cash Office', 'code' => 'cash'],
-                ],
+                'payment_gateways' => $this->paymentGatewayConfigurationService->availableGatewayOptions(),
+                'active_payment_gateway' => $this->paymentGatewayConfigurationService->getActiveGatewayCode(),
                 'merchants' => Schema::hasTable('merchants') ? DB::table('merchants')->orderBy('name')->get() : [],
                 'merchant_service_types' => Schema::hasTable('merchant_service_types')
                     ? DB::table('merchant_service_types')->orderBy('type_name')->get()

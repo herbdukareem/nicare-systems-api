@@ -125,7 +125,11 @@ export const enrolleeAPI = {
   updateStatus: (id, data) => api.put(`/enrollees/${id}/status`, data),
   delete: (id) => api.delete(`/enrollees/${id}`),
   idCard: (id) => api.get(`/enrollees/${id}/id-card`, { responseType: 'blob' }),
-  bulkEnrollmentSlip: (params) => api.get('/enrollees/bulk-enrollment-slip', { params, responseType: 'blob' }),
+  bulkEnrollmentSlip: (params) => api.get('/enrollees/bulk-enrollment-slip', {
+    params,
+    responseType: 'blob',
+    timeout: 120000,
+  }),
   bulkIdCard: (params) => api.get('/enrollees/bulk-id-card', { params, responseType: 'blob', timeout: 120000 }),
   getStatsByFacility: (facilityId) => api.get(`/enrollees/stats/facility/${facilityId}`),
   getActivity: (id) => api.get(`/enrollees/${id}/activity`),
@@ -273,6 +277,8 @@ export const premiumAPI = {
   createPurchase: (data) => api.post('/premium/purchases', data),
   confirmPurchase: (id) => api.post(`/premium/purchases/${id}/confirm`),
   cancelPurchase: (id) => api.post(`/premium/purchases/${id}/cancel`),
+  checkoutPurchase: (id) => api.post(`/premium/purchases/${id}/checkout`),
+  verifyPurchase: (id) => api.post(`/premium/purchases/${id}/verify`),
   payrollBatches: (params) => api.get('/premium/payroll-batches', { params }),
   createPayrollBatch: (data) => api.post('/premium/payroll-batches', data),
   approvePayrollBatch: (id) => api.post(`/premium/payroll-batches/${id}/approve`),
@@ -305,6 +311,11 @@ export const permissionAPI = {
 export const ninProviderAPI = {
   getConfig: () => api.get('/settings/nin-provider'),
   updateConfig: (data) => api.put('/settings/nin-provider', data),
+};
+
+export const paymentGatewaySettingsAPI = {
+  getConfig: () => api.get('/settings/payment-gateways'),
+  updateConfig: (data) => api.put('/settings/payment-gateways', data),
 };
 
 export const organizationSettingsAPI = {

@@ -41,6 +41,13 @@
         :message="successSummary"
       />
 
+      <AppAlert
+        v-if="paymentSummary"
+        :tone="verifyingPayment ? 'info' : 'success'"
+        title="Payment status"
+        :message="paymentSummary"
+      />
+
       <div class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-[1.2fr_0.8fr] tw-gap-4">
         <div class="tw-space-y-4">
           <!-- PLAN SELECTION -->
@@ -114,6 +121,44 @@
                 <v-select v-model="form.facility_id" label="Preferred facility" variant="outlined" density="compact" :items="metadata.facilities" item-title="name" item-value="id" :error-messages="errors.facility_id" />
               </div>
 
+              <div class="tw-mt-4 tw-grid tw-gap-3 lg:tw-grid-cols-[minmax(0,1fr)_220px]">
+                <div class="tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
+                  <div class="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3">
+                    <div>
+                      <h3 class="tw-text-sm tw-font-semibold tw-text-slate-900">Passport photo</h3>
+                      <p class="tw-mt-1 tw-text-xs tw-leading-5 tw-text-slate-500">
+                        Upload a clear face photo so the approval officer can compare it with your verified NIN photo.
+                      </p>
+                    </div>
+                    <v-btn variant="outlined" color="primary" prepend-icon="mdi-camera-plus-outline" @click="passportInput?.click()">
+                      {{ passportPreview ? 'Change photo' : 'Upload photo' }}
+                    </v-btn>
+                  </div>
+
+                  <input
+                    ref="passportInput"
+                    type="file"
+                    accept="image/jpeg,image/png,image/jpg,image/gif"
+                    class="tw-hidden"
+                    @change="handlePassportSelected"
+                  />
+
+                  <p v-if="errors.passport?.length" class="tw-mt-3 tw-text-xs tw-font-medium tw-text-rose-700">
+                    {{ errors.passport[0] }}
+                  </p>
+                </div>
+
+                <div class="tw-flex tw-justify-center">
+                  <div class="tw-flex tw-h-[220px] tw-w-[220px] tw-items-center tw-justify-center tw-overflow-hidden tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-slate-100">
+                    <img v-if="passportPreview" :src="passportPreview" alt="Passport preview" class="tw-h-full tw-w-full tw-object-cover" />
+                    <div v-else class="tw-flex tw-flex-col tw-items-center tw-gap-2 tw-text-slate-400">
+                      <v-icon size="40">mdi-account-box-outline</v-icon>
+                      <span class="tw-text-xs tw-font-medium">No photo uploaded</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <v-textarea
                 v-model="form.address"
                 label="Residential address"
@@ -144,14 +189,12 @@
                 />
               </div>
 
-              <v-text-field
+              <AppAlert
                 v-if="selectedPlan?.payment_required"
-                v-model="form.payment_reference"
-                label="Payment reference (if already paid)"
-                variant="outlined"
-                density="compact"
                 class="tw-mt-3"
-                :error-messages="errors.payment_reference"
+                tone="info"
+                title="Secure online payment"
+                :message="paymentInstruction"
               />
 
               <div class="tw-mt-4 tw-flex tw-flex-wrap tw-gap-2">
@@ -185,7 +228,7 @@
               <div><dt>Coverage</dt><dd>{{ selectedPlan.has_no_expiry ? 'No expiry' : `${selectedPlan.duration_days || 0} days` }}</dd></div>
               <div><dt>Waiting period</dt><dd>{{ selectedPlan.waiting_period_days || 0 }} days</dd></div>
               <div><dt>Enrollment type</dt><dd>{{ selectedPlan.is_family_plan ? 'Family plan' : 'Principal only' }}</dd></div>
-              <div><dt>Payment</dt><dd>{{ selectedPlan.payment_required ? 'Required before approval' : 'Not required' }}</dd></div>
+              <div><dt>Payment</dt><dd>{{ selectedPlan.payment_required ? selectedPlan.payment_gateway || activePaymentGatewayLabel : 'Not required' }}</dd></div>
             </dl>
           </section>
 
@@ -217,7 +260,7 @@
             </header>
             <ol class="enroll__steps">
               <li><span>1</span>Your application and documents are received and queued for review.</li>
-              <li><span>2</span>If your plan requires payment, the linked purchase is tracked by reference.</li>
+              <li><span>2</span>If your plan requires payment, a secure hosted payment page opens using the configured gateway.</li>
               <li><span>3</span>An enrollment officer verifies your NIN and reviews your details.</li>
               <li><span>4</span>Once approved, sign in to the enrollee portal with your chosen password.</li>
             </ol>
@@ -230,6 +273,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useToast } from '../../composables/useToast'
 import { publicEnrollmentAPI } from '../../utils/enrolleeApi'
 import AppAlert from '../common/AppAlert.vue'
@@ -241,19 +285,27 @@ import { useOrganizationSettings } from '../../composables/useOrganizationSettin
 
 const { error } = useToast()
 const { settings: org, fetchSettings } = useOrganizationSettings()
+const route = useRoute()
 
 const logoErr = ref(false)
 const loading = ref(false)
 const submitting = ref(false)
+const verifyingPayment = ref(false)
+const passportInput = ref(null)
+const passportFile = ref(null)
+const passportPreview = ref('')
 const metadata = ref({
   insurance_programmes: [],
   premium_plans: [],
+  payment_gateways: [],
+  active_payment_gateway: null,
   lgas: [],
   wards: [],
   facilities: [],
 })
 const errors = reactive({})
 const successSummary = ref('')
+const paymentSummary = ref('')
 
 const form = reactive({
   premium_plan_id: null,
@@ -292,6 +344,19 @@ const selectedPlan = computed(() => plans.value.find((plan) => plan.id === form.
 const selectedFacility = computed(() => (metadata.value.facilities || []).find((facility) => facility.id === form.facility_id) || null)
 const selectedLgaName = computed(() => (metadata.value.lgas || []).find((item) => item.id === form.lga_id)?.name || 'Not selected')
 const selectedWardName = computed(() => (metadata.value.wards || []).find((item) => item.id === form.ward_id)?.name || 'Not selected')
+const activePaymentGatewayLabel = computed(() => {
+  const code = selectedPlan.value?.payment_gateway || metadata.value.active_payment_gateway
+  return (metadata.value.payment_gateways || []).find((gateway) => gateway.code === code)?.name || code || 'configured online gateway'
+})
+const paymentInstruction = computed(() => `After you submit this form, we will open ${activePaymentGatewayLabel.value} so you can pay securely online.`)
+
+const setPassportPreview = (value) => {
+  if (passportPreview.value && passportPreview.value.startsWith('blob:')) {
+    URL.revokeObjectURL(passportPreview.value)
+  }
+
+  passportPreview.value = value || ''
+}
 
 const clearErrors = () => {
   Object.keys(errors).forEach((key) => {
@@ -325,6 +390,9 @@ const selectPlan = (plan) => {
 const resetForm = () => {
   clearErrors()
   successSummary.value = ''
+  paymentSummary.value = ''
+  passportFile.value = null
+  setPassportPreview('')
   Object.assign(form, {
     premium_plan_id: null,
     nin: '',
@@ -344,28 +412,93 @@ const resetForm = () => {
     password_confirmation: '',
     payment_reference: '',
   })
+
+  if (passportInput.value) {
+    passportInput.value.value = ''
+  }
+}
+
+const openCheckoutWindow = (authorizationUrl) => {
+  if (!authorizationUrl) return
+
+  const popup = window.open(authorizationUrl, 'premium-checkout', 'width=520,height=760,noopener,noreferrer')
+
+  if (!popup) {
+    window.location.href = authorizationUrl
+  }
+}
+
+const verifyReturnedPayment = async (reference) => {
+  if (!reference) return
+
+  verifyingPayment.value = true
+  paymentSummary.value = ''
+
+  try {
+    const response = await publicEnrollmentAPI.verifyPayment(reference)
+    const payload = response.data?.data || {}
+    const purchase = payload.purchase
+    const verification = payload.verification || {}
+
+    if (verification.paid) {
+      paymentSummary.value = `Payment ${purchase?.payment_reference || reference} was verified successfully through ${verification.provider || activePaymentGatewayLabel.value}. Your enrollment application remains pending approval and NIN verification.`
+    } else {
+      paymentSummary.value = `Payment ${purchase?.payment_reference || reference} is still ${verification.status || 'pending'}. Complete the checkout and return to this page if you have not finished payment.`
+    }
+  } catch (err) {
+    error(err?.response?.data?.message || 'Unable to verify your payment status right now.')
+  } finally {
+    verifyingPayment.value = false
+  }
 }
 
 const submitApplication = async () => {
   clearErrors()
   successSummary.value = ''
+  paymentSummary.value = ''
   submitting.value = true
 
   try {
-    const response = await publicEnrollmentAPI.createApplication(form)
-    const payload = response.data.data
-    const enrolleeId = payload?.enrollee?.enrollee_id
-    const paymentRef = payload?.purchase?.payment_reference
+    const requestData = new FormData()
 
-    successSummary.value = payload?.requires_payment
-      ? `Application ${enrolleeId} submitted. Payment reference ${paymentRef} is linked to your pending purchase. Approval continues after payment confirmation and NIN verification.`
+    Object.entries(form).forEach(([key, value]) => {
+      if (value === null || value === '') {
+        return
+      }
+
+      requestData.append(key, value)
+    })
+
+    if (passportFile.value) {
+      requestData.append('passport', passportFile.value)
+    }
+
+    const response = await publicEnrollmentAPI.createApplication(requestData)
+    const responseData = response.data.data
+    const enrolleeId = responseData?.enrollee?.enrollee_id
+    const paymentRef = responseData?.purchase?.payment_reference
+    const checkout = responseData?.payment_checkout
+
+    successSummary.value = responseData?.requires_payment
+      ? `Application ${enrolleeId} submitted. We are opening ${activePaymentGatewayLabel.value} for payment reference ${paymentRef}. Approval continues after payment confirmation and NIN verification.`
       : `Application ${enrolleeId} submitted and is awaiting approval and NIN verification.`
 
     Object.assign(form, {
-      payment_reference: payload?.purchase?.payment_reference || '',
+      payment_reference: responseData?.purchase?.payment_reference || '',
       password: '',
       password_confirmation: '',
     })
+
+    passportFile.value = null
+    setPassportPreview(responseData?.enrollee?.image_url || '')
+
+    if (passportInput.value) {
+      passportInput.value.value = ''
+    }
+
+    if (responseData?.requires_payment && checkout?.authorization_url) {
+      openCheckoutWindow(checkout.authorization_url)
+    }
   } catch (err) {
     if (err.response?.status === 422) {
       const serverErrors = err.response?.data?.errors || {}
@@ -378,6 +511,34 @@ const submitApplication = async () => {
   } finally {
     submitting.value = false
   }
+}
+
+const handlePassportSelected = (event) => {
+  const file = event.target.files?.[0]
+  clearErrors()
+
+  if (!file) {
+    passportFile.value = null
+    setPassportPreview('')
+    return
+  }
+
+  if (!file.type.startsWith('image/')) {
+    errors.passport = ['Please select a valid image file.']
+    passportFile.value = null
+    setPassportPreview('')
+    return
+  }
+
+  if (file.size > 2 * 1024 * 1024) {
+    errors.passport = ['Passport photo must be 2MB or smaller.']
+    passportFile.value = null
+    setPassportPreview('')
+    return
+  }
+
+  passportFile.value = file
+  setPassportPreview(URL.createObjectURL(file))
 }
 
 watch(() => form.lga_id, async () => {
@@ -394,6 +555,11 @@ watch(() => form.ward_id, async () => {
 onMounted(() => {
   fetchSettings()
   fetchMetadata()
+
+  const returnedReference = route.query.payment_reference || route.query.reference || route.query.trxref
+  if (returnedReference) {
+    verifyReturnedPayment(String(returnedReference))
+  }
 })
 </script>
 

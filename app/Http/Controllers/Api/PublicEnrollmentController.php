@@ -10,6 +10,7 @@ use App\Models\InsuranceProgramme;
 use App\Models\Lga;
 use App\Models\PremiumPlan;
 use App\Models\Ward;
+use App\Services\Billing\PaymentGatewayConfigurationService;
 use App\Services\PublicEnrollmentService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;
@@ -18,6 +19,10 @@ use RuntimeException;
 
 class PublicEnrollmentController extends BaseController
 {
+    public function __construct(private PaymentGatewayConfigurationService $paymentGatewayConfigurationService)
+    {
+    }
+
     public function metadata(Request $request)
     {
         $programmeId = $request->integer('insurance_programme_id') ?: null;
@@ -45,6 +50,8 @@ class PublicEnrollmentController extends BaseController
         return $this->sendResponse([
             'insurance_programmes' => InsuranceProgramme::whereIn('id', $programmeIds)->orderBy('name')->get(),
             'premium_plans' => PremiumPlanResource::collection($plans),
+            'payment_gateways' => $this->paymentGatewayConfigurationService->availableGatewayOptions(),
+            'active_payment_gateway' => $this->paymentGatewayConfigurationService->getActiveGatewayCode(),
             'lgas' => Lga::orderBy('name')->get(),
             'wards' => Ward::query()
                 ->when($lgaId, fn ($query) => $query->where('lga_id', $lgaId))
@@ -78,6 +85,7 @@ class PublicEnrollmentController extends BaseController
             'ward_id' => ['required', 'exists:wards,id'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'payment_reference' => ['nullable', 'string', 'max:255'],
+            'passport' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
         ]);
 
         try {
@@ -90,6 +98,7 @@ class PublicEnrollmentController extends BaseController
             'enrollee' => new EnrolleeResource($result['enrollee']),
             'purchase' => $result['purchase'],
             'requires_payment' => $result['requires_payment'],
+            'payment_checkout' => $result['payment_checkout'] ?? null,
             'next_steps' => $result['next_steps'],
         ], 'Self-enrollment application submitted successfully.', 201);
     }

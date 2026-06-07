@@ -6,6 +6,7 @@ use App\Models\AuditTrail;
 use App\Models\Enrollee;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use RuntimeException;
 use Throwable;
@@ -75,19 +76,41 @@ class NinVerificationService
         }
 
         $body = $response->json() ?? [];
+        $this->logProviderResponse($enrollee, $config, $payload, $response->status(), $body);
+
         $success = (bool) data_get($body, (string) $config['success_path'], false);
-        $providerData = data_get($body, (string) $config['data_path'], []);
+        $providerData = $this->extractProviderData($body, $config);
 
         if (!$response->successful() || !$success || !is_array($providerData)) {
             $this->markFailed($enrollee, $verifiedBy, $config, [
                 'message' => data_get($body, 'message', 'The NIN provider did not return a successful verification response.'),
                 'http_status' => $response->status(),
+                'provider_response_excerpt' => $this->excerptProviderResponse($body),
             ]);
 
             throw new RuntimeException((string) data_get($body, 'message', 'Unable to verify NIN with the configured provider.'));
         }
 
         $normalized = $this->normalizeProviderData($providerData, (array) $config['field_map']);
+
+        if ($normalized === []) {
+            $normalized = $this->normalizeProviderData($providerData, $this->configService->defaultFieldMap());
+        }
+
+        if ($normalized === [] && $this->looksLikeProviderPayload($body)) {
+            $normalized = $this->normalizeProviderData($body, $this->configService->defaultFieldMap());
+        }
+
+        if ($normalized === []) {
+            $this->markFailed($enrollee, $verifiedBy, $config, [
+                'message' => 'The NIN provider returned a successful response, but no usable enrollee fields were found.',
+                'http_status' => $response->status(),
+                'provider_response_excerpt' => $this->excerptProviderResponse($body),
+            ]);
+
+            throw new RuntimeException('The NIN provider response did not contain the expected enrollee fields. Review the provider configuration and logs.');
+        }
+
         $comparison = $this->buildComparison($enrollee, $normalized);
 
         $enrollee->forceFill([
@@ -104,6 +127,7 @@ class NinVerificationService
                 'provider_name' => $config['provider_name'],
                 'verified_at' => now()->toIso8601String(),
                 'http_status' => $response->status(),
+                'provider_response_excerpt' => $this->excerptProviderResponse($body),
             ],
         ])->save();
 
@@ -211,7 +235,15 @@ class NinVerificationService
         $normalized = [];
 
         foreach ($fieldMap as $internalField => $providerPath) {
+            if (blank($providerPath)) {
+                continue;
+            }
+
             $value = data_get($providerData, (string) $providerPath);
+            if ($value === null) {
+                $value = $this->resolveAliasValue($providerData, $internalField);
+            }
+
             if ($value === null) {
                 continue;
             }
@@ -222,6 +254,133 @@ class NinVerificationService
         }
 
         return $normalized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @param  array<string, mixed>  $config
+     * @return array<string, mixed>|mixed
+     */
+    private function extractProviderData(array $body, array $config): mixed
+    {
+        $dataPath = trim((string) ($config['data_path'] ?? ''));
+        $fallbackCandidate = null;
+
+        if ($dataPath !== '') {
+            $configured = data_get($body, $dataPath);
+            if (is_array($configured)) {
+                if ($this->looksLikeProviderPayload($configured)) {
+                    return $configured;
+                }
+
+                $fallbackCandidate = $configured;
+            }
+        }
+
+        $commonFallbacks = [
+            'data._raw.data',
+            'data.data',
+            '_raw.data',
+            'response.data',
+            'result.data',
+            'result',
+            'payload',
+            'data',
+        ];
+
+        foreach ($commonFallbacks as $path) {
+            $candidate = data_get($body, $path);
+            if (is_array($candidate) && $candidate !== []) {
+                if ($this->looksLikeProviderPayload($candidate)) {
+                    return $candidate;
+                }
+
+                $fallbackCandidate ??= $candidate;
+            }
+        }
+
+        if (is_array($fallbackCandidate) && $fallbackCandidate !== []) {
+            return $fallbackCandidate;
+        }
+
+        return $this->looksLikeProviderPayload($body) ? $body : [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     */
+    private function looksLikeProviderPayload(array $body): bool
+    {
+        return isset($body['nin'])
+            || isset($body['first_name'])
+            || isset($body['last_name'])
+            || isset($body['idNumber'])
+            || isset($body['firstName'])
+            || isset($body['lastName']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $config
+     * @param  array<string, mixed>  $payload
+     * @param  array<string, mixed>  $body
+     */
+    private function logProviderResponse(Enrollee $enrollee, array $config, array $payload, int $status, array $body): void
+    {
+        Log::info('nin_provider_response', [
+            'enrollee_id' => $enrollee->id,
+            'enrollee_code' => $enrollee->enrollee_id,
+            'provider_name' => $config['provider_name'] ?? null,
+            'base_url' => $config['base_url'] ?? null,
+            'verify_endpoint' => $config['verify_endpoint'] ?? null,
+            'success_path' => $config['success_path'] ?? null,
+            'data_path' => $config['data_path'] ?? null,
+            'field_map' => $config['field_map'] ?? [],
+            'request_payload' => $payload,
+            'http_status' => $status,
+            'response_body' => $body,
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private function excerptProviderResponse(array $body): array
+    {
+        return [
+            'success' => data_get($body, 'success'),
+            'message' => data_get($body, 'message'),
+            'data_keys' => is_array(data_get($body, 'data')) ? array_keys((array) data_get($body, 'data')) : [],
+        ];
+    }
+
+    private function resolveAliasValue(array $providerData, string $internalField): mixed
+    {
+        foreach ($this->fieldAliases($internalField) as $path) {
+            $value = data_get($providerData, $path);
+            if ($value !== null) {
+                return $value;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function fieldAliases(string $internalField): array
+    {
+        return match ($internalField) {
+            'nin' => ['idNumber'],
+            'first_name' => ['firstName'],
+            'middle_name' => ['middleName'],
+            'last_name' => ['lastName'],
+            'date_of_birth' => ['dateOfBirth'],
+            'phone' => ['mobile'],
+            'photo' => ['image'],
+            default => [],
+        };
     }
 
     /**

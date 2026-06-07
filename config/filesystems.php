@@ -17,6 +17,22 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Enrollee Passport Disk
+    |--------------------------------------------------------------------------
+    |
+    | Self-service enrollee passport photos can be stored separately from the
+    | default local public disk. When AWS credentials are configured, this
+    | defaults to S3 unless overridden explicitly.
+    |
+    */
+
+    'enrollee_passport_disk' => env(
+        'ENROLLEE_PASSPORT_DISK',
+        env('AWS_BUCKET') ? 's3' : 'public'
+    ),
+
+    /*
+    |--------------------------------------------------------------------------
     | Filesystem Disks
     |--------------------------------------------------------------------------
     |

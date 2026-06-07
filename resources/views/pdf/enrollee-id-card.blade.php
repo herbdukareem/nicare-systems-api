@@ -149,9 +149,16 @@
           </table>
         </td>
         <td class="photo-td">
-          @php $photoPath = $enrollee->image_url ? public_path(ltrim($enrollee->image_url, '/')) : null; @endphp
-          @if($photoPath && file_exists($photoPath))
-            <img class="passport" src="file://{{ $photoPath }}" alt="Photo">
+          @php
+            $photoSrc = null;
+            if ($enrollee->image_url) {
+              $photoSrc = preg_match('#^(https?://|data:)#i', $enrollee->image_url)
+                ? $enrollee->image_url
+                : url($enrollee->image_url);
+            }
+          @endphp
+          @if($photoSrc)
+            <img class="passport" src="{{ $photoSrc }}" alt="Photo">
           @else
             <div class="passport-ph"></div>
           @endif
