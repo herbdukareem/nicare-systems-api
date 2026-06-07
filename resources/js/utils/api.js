@@ -118,6 +118,7 @@ export const enrolleeAPI = {
   getAll: (params) => api.get('/enrollees', { params }),
   getById: (id) => api.get(`/enrollees/${id}`),
   create: (data) => api.post('/enrollees', data),
+  verifyNin: (id, data = {}) => api.post(`/enrollees/${id}/verify-nin`, data),
   approve: (id, data = {}) => api.post(`/enrollees/${id}/approve`, data),
   pendingApproval: (params) => api.get('/enrollees/pending-approval', { params }),
   update: (id, data) => api.put(`/enrollees/${id}`, data),
@@ -136,6 +137,7 @@ export const enrolleeAPI = {
   exportPdf: (id) => api.get(`/enrollees/${id}/export-pdf`, {
     responseType: 'blob'
   }),
+  getStatistics: (id) => api.get(`/enrollees/${id}/statistics`),
 };
 
 export const dashboardAPI = {
@@ -221,13 +223,7 @@ export const userAPI = {
   // Advanced features
   impersonate: (id) => api.post(`/users/${id}/impersonate`),
   stopImpersonation: () => api.post('/users/stop-impersonation'),
-  // export: (params) => api.get('/users/export', { params }),
-    async export (params = {}) {
-    return api.get('/cases/export', {
-      params,
-      responseType: 'blob'
-    })
-  },
+  export: (params) => api.get('/users/export', { params, responseType: 'blob' }),
   import: (formData) => api.post('/users/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
     maxBodyLength: Infinity
@@ -306,49 +302,43 @@ export const permissionAPI = {
   bulkDelete: (data) => api.delete('/permissions/bulk-delete', { data }),
 };
 
+export const ninProviderAPI = {
+  getConfig: () => api.get('/settings/nin-provider'),
+  updateConfig: (data) => api.put('/settings/nin-provider', data),
+};
+
 export const securityAPI = {
-  getDashboard: () => api.get('/security/dashboard'),
-  getLogs: (params) => api.get('/security/logs', { params }),
-  resolve: (id, data) => api.post(`/security/logs/${id}/resolve`, data),
-  bulkResolve: (data) => api.post('/security/logs/bulk-resolve', data),
-  getAuditTrail: (params) => api.get('/security/audit-trail', { params }),
-  getSessions: () => api.get('/security/sessions'),
-  revokeSessions: (data) => api.post('/security/sessions/revoke', data),
+  getDashboard: () => api.get('/pas/security/dashboard'),
+  getLogs: (params) => api.get('/pas/security/logs', { params }),
+  resolve: (id, data) => api.post(`/pas/security/logs/${id}/resolve`, data),
+  bulkResolve: (data) => api.post('/pas/security/logs/bulk-resolve', data),
+  getAuditTrail: (params) => api.get('/pas/security/audit-trail', { params }),
+  getSessions: () => api.get('/pas/security/sessions'),
+  revokeSessions: (data) => api.post('/pas/security/sessions/revoke', data),
 };
 
 // PAS (Pre-Authorization System) API
 export const pasAPI = {
   // Referral APIs
-  getReferrals: (params) => api.get('/pas/referrals', { params }),
-  createReferral: (data) => api.post('/pas/workflow/referral', data, {
+  getReferrals: (params) => api.get('/referrals', { params }),
+  createReferral: (data) => api.post('/referrals', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  getReferral: (id) => api.get(`/pas/referrals/${id}`),
-  getReferralByCode: (code) => api.get(`/pas/referrals`, { params: { search: code } }),
-  approveReferral: (id, data) => api.post(`/pas/referrals/${id}/approve`, data),
-  denyReferral: (id, data) => api.post(`/pas/referrals/${id}/deny`, data),
-  generatePACodeFromReferral: (referralId, data) => api.post(`/pas/referrals/${referralId}/generate-pa-code`, data),
-  getReferralStatistics: () => api.get('/pas/referrals-statistics'),
-  getPendingReferralsByFacility: (facilityId) => api.get(`/pas/referrals/pending/${facilityId}`),
-  modifyReferral: (referralId, data) => api.put(`/pas/referrals/${referralId}/modify`, data),
+  getReferral: (id) => api.get(`/referrals/${id}`),
+  getReferralByCode: (code) => api.get('/referrals', { params: { search: code } }),
+  approveReferral: (id, data) => api.post(`/referrals/${id}/approve`, data),
+  denyReferral: (id, data) => api.post(`/referrals/${id}/reject`, data),
 
   // PA Code APIs
   getPACodes: (params) => api.get('/pas/pa-codes', { params }),
-  generatePACode: (data) => api.post('/pas/workflow/pa-code', data, {
+  generatePACode: (data) => api.post('/pas/pa-codes', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   getPACode: (id) => api.get(`/pas/pa-codes/${id}`),
   getPACodeById: (id) => api.get(`/pas/pa-codes/${id}`), // Alias for consistency
-  generatePACodeFromReferral: (referralId, data) => api.post(`/pas/referrals/${referralId}/generate-pa-code`, data),
-  markPACodeUsed: (id, data) => api.post(`/pas/pa-codes/${id}/mark-used`, data),
-  markPACodeAsUsed: (id) => api.post(`/pas/pa-codes/${id}/mark-used`), // Alias without data
-  cancelPACode: (id) => api.post(`/pas/pa-codes/${id}/cancel`),
-  generateUTN: (id) => api.post(`/pas/pa-codes/${id}/generate-utn`),
-  verifyPACode: (data) => api.post('/pas/pa-codes/verify', data),
-  getPACodeStatistics: () => api.get('/pas/pa-codes-statistics'),
 
   // UTN Validation APIs
-  validateUTN: (referralId, data) => api.post(`/pas/referrals/${referralId}/validate-utn`, data),
+  validateUTN: (data) => api.post('/do-dashboard/validate-utn', data),
 };
 
 // Drug Management API
@@ -523,20 +513,15 @@ export const designationAPI = {
 // Claims Management API (core claim submission & lifecycle)
 export const claimsAPI = {
   getAll: (params) => api.get('/pas/claims', { params }),
-  getById: (id) => api.get(`/pas/claims/${id}`),
-  create: (data) => api.post('/pas/claims', data),
-  update: (id, data) => api.put(`/pas/claims/${id}`, data),
-  submit: (id) => api.post(`/pas/claims/${id}/submit`),
-  getServicesForReferralOrPACode: (params) =>
-    api.get('/pas/claims/services/for-referral-or-pacode', { params }),
+  getFullDetails: (id) => api.get(`/pas/claims/${id}/full-details`),
+  create: (data) => api.post('/claims-automation/claims', data),
+  submit: (id) => api.post(`/claims-automation/claims/${id}/submit`),
   getClaims: (params) => api.get('/pas/claims', { params }),
-  approveClaim: (id, data) => api.post(`/pas/claims/${id}/approve`, data),
-  rejectClaim: (id, data) => api.post(`/pas/claims/${id}/reject`, data),
   // Review and batch operations
-  reviewClaim: (id, data) => api.post(`/claims-automation/claims/${id}/review`, data),
-  batchApprove: (data) => api.post('/claims-automation/claims/batch-approve', data),
-  batchReject: (data) => api.post('/claims-automation/claims/batch-reject', data),
-  downloadSlip: (id) => api.get(`/claims-automation/claims/${id}/slip`, { responseType: 'blob' }),
+  reviewClaim: (id, data) => api.post(`/pas/claims/${id}/review`, data),
+  batchApprove: (data) => api.post('/pas/claims/batch-approve', data),
+  batchReject: (data) => api.post('/pas/claims/batch-reject', data),
+  downloadSlip: (id) => api.get(`/pas/claims/${id}/slip`, { responseType: 'blob' }),
 };
 
 // Payment Batch API
@@ -550,33 +535,13 @@ export const paymentBatchAPI = {
   downloadReceipt: (id) => api.get(`/claims-automation/payment-batches/${id}/receipt`, { responseType: 'blob' }),
 };
 
-// Claims Automation API - Hybrid Bundle/FFS Payment Model
+// Claims Automation API - aligned to existing backend endpoints
 export const claimsAutomationAPI = {
-  // Admission Management
-  createAdmission: (data) => api.post('/pas/claims/automation/admissions', data),
-  dischargePatient: (admissionId, data) => api.post(`/pas/claims/automation/admissions/${admissionId}/discharge`, data),
-  getAdmissionHistory: (params) => api.get('/pas/claims/automation/admissions/history', { params }),
-
-  // Claim Processing
-  processClaim: (claimId) => api.post(`/pas/claims/automation/${claimId}/process`),
-  getClaimPreview: (claimId) => api.get(`/pas/claims/automation/${claimId}/preview`),
-  validateClaim: (claimId) => api.post(`/pas/claims/automation/${claimId}/validate`),
-  classifyTreatments: (claimId) => api.post(`/pas/claims/automation/${claimId}/classify`),
-  buildSections: (claimId) => api.post(`/pas/claims/automation/${claimId}/build-sections`),
-
-  // Diagnosis Management
-  addDiagnosis: (claimId, data) => api.post(`/pas/claims/automation/${claimId}/diagnoses`, data),
-
-  // PA Code Management
-  detectMissingPAs: (claimId) => api.get(`/pas/claims/automation/${claimId}/missing-pas`),
-
-  // Treatment Management
-  convertToFFS: (treatmentId, data) => api.post(`/pas/claims/automation/treatments/${treatmentId}/convert-to-ffs`, data),
-
-  // Compliance Alerts
-  getComplianceAlerts: (claimId) => api.get(`/pas/claims/automation/${claimId}/alerts`),
-  resolveAlert: (alertId, data) => api.post(`/pas/claims/automation/alerts/${alertId}/resolve`, data),
-  overrideAlert: (alertId, data) => api.post(`/pas/claims/automation/alerts/${alertId}/override`, data),
+  createAdmission: (data) => api.post('/claims-automation/admissions', data),
+  dischargePatient: (admissionId, data) => api.post(`/claims-automation/admissions/${admissionId}/discharge`, data),
+  getAdmissionByEnrollee: (enrolleeId) => api.get(`/claims-automation/admissions/enrollee/${enrolleeId}`),
+  checkAdmissionEligibility: (referralId) => api.get(`/claims-automation/admissions/check/${referralId}`),
+  validateClaim: (claimId) => api.post(`/claims-automation/claims/${claimId}/validate`),
 };
 
 // Bundle Management API

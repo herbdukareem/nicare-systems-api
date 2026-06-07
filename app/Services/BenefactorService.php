@@ -13,7 +13,9 @@ class BenefactorService
 {
     public function all(): Collection
     {
-        return Benefactor::all();
+        return Benefactor::query()
+            ->withCount(['enrollees', 'enrollmentPhases'])
+            ->get();
     }
 
     /**
@@ -21,7 +23,7 @@ class BenefactorService
      */
     public function paginate(array $filters = [], int $perPage = 15, string $sortBy = 'created_at', string $sortDirection = 'desc'): LengthAwarePaginator
     {
-        $query = Benefactor::with('enrollees');
+        $query = Benefactor::query()->withCount(['enrollees', 'enrollmentPhases']);
 
         // Apply filters
         if (!empty($filters['search'])) {

@@ -106,7 +106,7 @@ class Facility extends Model
      */
     public function scopeByLevelOfCare($query, $level)
     {
-        return $query->where('level_of_care', $level);
+        return $query->where('type', $level);
     }
 
     /**
@@ -134,7 +134,7 @@ class Facility extends Model
         // Secondary facilities can provide Primary and Secondary services
         // Tertiary facilities can provide all levels
 
-        $facilityLevel = $this->level_of_care;
+        $facilityLevel = $this->type;
 
         if ($facilityLevel === 'Primary') {
             return $serviceLevel === 'Primary';
@@ -145,6 +145,16 @@ class Facility extends Model
         }
 
         return false;
+    }
+
+    public function getLevelOfCareAttribute()
+    {
+        return $this->attributes['type'] ?? null;
+    }
+
+    public function setLevelOfCareAttribute($value): void
+    {
+        $this->attributes['type'] = $value;
     }
 
     /**

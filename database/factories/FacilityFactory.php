@@ -35,7 +35,7 @@ class FacilityFactory extends Factory
             'hcp_code' => 'HCP' . fake()->unique()->numerify('####'),
             'name' => fake()->company() . ' Hospital',
             'ownership' => fake()->randomElement(['Public', 'Private']),
-            'level_of_care' => fake()->randomElement(['Primary', 'Secondary', 'Tertiary']),
+            'type' => fake()->randomElement(['Primary', 'Secondary', 'Tertiary']),
             'address' => fake()->address(),
             'phone' => fake()->phoneNumber(),
             'email' => fake()->companyEmail(),
@@ -63,22 +63,21 @@ class FacilityFactory extends Factory
     public function primary(): static
     {
         return $this->state(fn (array $attributes) => [
-            'level_of_care' => 'Primary',
+            'type' => 'Primary',
         ]);
     }
 
     public function secondary(): static
     {
         return $this->state(fn (array $attributes) => [
-            'level_of_care' => 'Secondary',
+            'type' => 'Secondary',
         ]);
     }
 
     public function tertiary(): static
     {
         return $this->state(fn (array $attributes) => [
-            'level_of_care' => 'Tertiary',
+            'type' => 'Tertiary',
         ]);
     }
 }
-

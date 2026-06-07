@@ -32,27 +32,27 @@ return new class extends Migration
             $table->unsignedTinyInteger('pregnant')->nullable()->default(0);
             
         
-            $table->foreignId('sector_id')->nullable();
-            $table->foreignId('benefit_package_id')->nullable()->default(null);
-             $table->foreignId('vulnerable_group_id')->nullable()->default(null); 
+            $table->foreignId('sector_id')->nullable()->constrained('sectors')->nullOnDelete();
+            $table->foreignId('benefit_package_id')->nullable()->default(null)->constrained('benefit_packages')->nullOnDelete();
+             $table->foreignId('vulnerable_group_id')->nullable()->default(null)->constrained('vulnerable_groups')->nullOnDelete(); 
              $table->unsignedTinyInteger('relationship_to_principal')->default(1)
              ->comment('1=princiapl,2=spouse,3=child,4=other');
-            $table->foreignId('facility_id')->constrained();
-            $table->foreignId('lga_id')->constrained();
-            $table->foreignId('ward_id')->constrained();
+            $table->foreignId('facility_id')->constrained('facilities')->restrictOnDelete();
+            $table->foreignId('lga_id')->constrained('lgas')->restrictOnDelete();
+            $table->foreignId('ward_id')->constrained('wards')->restrictOnDelete();
 
-            $table->foreignId('enrollment_phase_id')->nullable()->constrained();
+            $table->foreignId('enrollment_phase_id')->nullable()->constrained('enrollment_phases')->nullOnDelete();
            
             
-            $table->foreignId('premium_id')->nullable()->constrained('premiums');
-            $table->foreignId('funding_type_id')->nullable()->constrained();
-            $table->foreignId('benefactor_id')->nullable()->constrained();
+            $table->foreignId('premium_id')->nullable()->constrained('premiums')->nullOnDelete();
+            $table->foreignId('funding_type_id')->nullable()->constrained('funding_types')->nullOnDelete();
+            $table->foreignId('benefactor_id')->nullable()->constrained('benefactors')->nullOnDelete();
             $table->date('capitation_start_date')->nullable();
             $table->dateTime('approval_date')->nullable();
              $table->dateTime('enrollment_date')->nullable();
             
-            $table->foreignId('created_by')->constrained('users');
-            $table->foreignId('approved_by')->nullable()->constrained('users');
+            $table->foreignId('created_by')->constrained('users')->restrictOnDelete();
+            $table->foreignId('approved_by')->nullable()->constrained('users')->nullOnDelete();
 
             // nok
             $table->string('nok_name')->nullable();
@@ -68,7 +68,7 @@ return new class extends Migration
             $table->decimal('basic_salary', 10, 2)->nullable();
             $table->string('station')->nullable();
             $table->string('salary_scheme')->nullable();
-            $table->foreignId('mda_id')->nullable()->constrained();
+            $table->foreignId('mda_id')->nullable()->constrained('mdas')->nullOnDelete();
 
             $table->unsignedTinyInteger('status')->default(0);
 

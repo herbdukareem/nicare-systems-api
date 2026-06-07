@@ -5,10 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Gate;
-use Spatie\Permission\Traits\HasRoles;
-
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -18,7 +15,7 @@ use Laravel\Sanctum\HasApiTokens;
  */
 class User extends Authenticatable
 {
-       use HasApiTokens, HasFactory, Notifiable, HasRoles;
+       use HasApiTokens, HasFactory, Notifiable;
 
     protected $table = 'users';
 
@@ -68,8 +65,12 @@ class User extends Authenticatable
      * @param  string  $roleName
      * @return bool
      */
-    public function hasRole(string $roleName): bool
+    public function hasRole($roleName): bool
     {
+        if (is_array($roleName)) {
+            return $this->hasAnyRole($roleName);
+        }
+
         return $this->roles()->where('name', $roleName)->exists();
     }
 

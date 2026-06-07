@@ -25,6 +25,7 @@ class StorePremiumPlanRequest extends FormRequest
             'amount' => ['required', 'numeric', 'min:0'],
             'consultant_fee' => ['required', 'numeric', 'min:0'],
             'payment_required' => ['nullable', 'boolean'],
+            'self_enrollment_enabled' => ['nullable', 'boolean'],
             'payment_gateway' => ['nullable', 'string', 'max:80', Rule::in($this->supportedPaymentGateways())],
             'duration_days' => ['nullable', 'integer', 'min:1'],
             'has_no_expiry' => ['nullable', 'boolean'],
@@ -77,6 +78,7 @@ class StorePremiumPlanRequest extends FormRequest
         $data['is_family_plan'] = (bool) ($data['is_family_plan'] ?? false);
         $data['has_no_expiry'] = (bool) ($data['has_no_expiry'] ?? false);
         $data['payment_required'] = (bool) ($data['payment_required'] ?? false);
+        $data['self_enrollment_enabled'] = (bool) ($data['self_enrollment_enabled'] ?? false);
         $data['waiting_period_days'] = (int) ($data['waiting_period_days'] ?? 0);
         $data['consultant_fee'] = $data['consultant_fee'] ?? 0;
         $data['status'] = $data['status'] ?? 'active';

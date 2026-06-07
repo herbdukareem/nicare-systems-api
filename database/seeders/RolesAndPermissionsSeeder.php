@@ -5,11 +5,14 @@ namespace Database\Seeders;
 use App\Models\Permission;
 use App\Models\Role;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\Schema;
 
 class RolesAndPermissionsSeeder extends Seeder
 {
     public function run(): void
     {
+        $hasCategoryColumn = Schema::hasColumn('permissions', 'category');
+
         $permissionsByCategory = [
             'Dashboard' => [
                 'dashboard.view',
@@ -26,6 +29,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'enrollee.update',
                 'enrollee.delete',
                 'enrollee.approve',
+                'enrollee.nin.verify',
                 'enrollee.print-id-card',
                 'enrollee.print-bulk-slip',
                 'enrollees.view',
@@ -238,6 +242,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'designations.manage',
                 'settings.view',
                 'settings.edit',
+                'settings.nin.manage',
                 'impersonate_users',
             ],
             'Feedback & Tasks' => [
@@ -257,11 +262,11 @@ class RolesAndPermissionsSeeder extends Seeder
             foreach ($permissions as $name) {
                 Permission::updateOrCreate(
                     ['name' => $name],
-                    [
+                    array_filter([
                         'label' => $this->label($name),
                         'description' => 'Allows ' . strtolower(str_replace(['.', '_', '-'], ' ', $name)) . '.',
-                        'category' => $category,
-                    ]
+                        'category' => $hasCategoryColumn ? $category : null,
+                    ], static fn ($value) => $value !== null)
                 );
             }
         }
@@ -282,19 +287,19 @@ class RolesAndPermissionsSeeder extends Seeder
             'scheme-admin' => [
                 'label' => 'Scheme Admin',
                 'description' => 'Manages scheme operations, users, enrolment, coverage, claims, and reporting.',
-                'permissions' => $this->pick($all, [
+                'permissions' => array_values(array_unique(array_merge($this->pick($all, [
                     'dashboard.', 'enrollee.', 'enrollees.', 'setup.', 'facilities.', 'premium.', 'coverage.', 'benefactor.', 'benefactors.',
                     'group-enrollment.', 'payroll-upload.', 'subsidy-batch.', 'eligibility.', 'referrals.',
                     'pa_codes.', 'admissions.', 'utn.', 'claims.', 'payment_batches.', 'capitation.', 'payments.',
                     'reports.', 'analytics.', 'feedback.', 'users.view', 'roles.view', 'permissions.view',
-                ]),
+                ]), ['settings.nin.manage'])),
             ],
             'enrollment-officer' => [
                 'label' => 'Enrollment Officer',
                 'description' => 'Registers and maintains enrollees.',
                 'permissions' => [
                     'dashboard.view', 'enrollees.view', 'enrollees.create', 'enrollees.update',
-                    'enrollee.view', 'enrollee.create', 'enrollee.update', 'enrollee.print-id-card', 'enrollee.print-bulk-slip',
+                    'enrollee.view', 'enrollee.create', 'enrollee.update', 'enrollee.nin.verify', 'enrollee.print-id-card', 'enrollee.print-bulk-slip',
                     'enrollees.import', 'enrollees.export', 'facilities.view', 'coverage.view',
                     'eligibility.lookup', 'reports.view',
                 ],

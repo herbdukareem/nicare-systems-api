@@ -95,6 +95,16 @@ class UpdateEnrolleeRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
+            if ($this->filled('lga_id') && $this->filled('ward_id')) {
+                $wardBelongsToLga = \App\Models\Ward::whereKey($this->input('ward_id'))
+                    ->where('lga_id', $this->input('lga_id'))
+                    ->exists();
+
+                if (!$wardBelongsToLga) {
+                    $validator->errors()->add('ward_id', 'The selected ward does not belong to the selected LGA.');
+                }
+            }
+
             $relationship = (int) $this->input('relationship_to_principal', 1);
             if ($relationship === 1 || !$this->filled('premium_plan_id')) {
                 return;

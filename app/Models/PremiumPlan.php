@@ -18,6 +18,7 @@ class PremiumPlan extends Model
         'amount',
         'consultant_fee',
         'payment_required',
+        'self_enrollment_enabled',
         'payment_gateway',
         'merchant_id',
         'merchant_service_type_id',
@@ -35,6 +36,7 @@ class PremiumPlan extends Model
         'amount' => 'decimal:2',
         'consultant_fee' => 'decimal:2',
         'payment_required' => 'boolean',
+        'self_enrollment_enabled' => 'boolean',
         'has_no_expiry' => 'boolean',
         'duration_days' => 'integer',
         'waiting_period_days' => 'integer',
@@ -75,6 +77,11 @@ class PremiumPlan extends Model
     public function requiresPayment(): bool
     {
         return (bool) $this->payment_required;
+    }
+
+    public function isSelfEnrollmentEnabled(): bool
+    {
+        return (bool) $this->self_enrollment_enabled && $this->status === 'active';
     }
 
     public function isFamilyPlan(): bool

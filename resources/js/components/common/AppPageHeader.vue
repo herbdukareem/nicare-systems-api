@@ -1,23 +1,35 @@
 <template>
-  <header class="tw-flex tw-items-start md:tw-items-center tw-justify-between tw-gap-4 tw-flex-wrap">
-    <div>
-      <div class="tw-flex tw-items-center tw-gap-2">
-        <v-icon v-if="icon" :color="iconColor" size="28">{{ icon }}</v-icon>
-        <h1 class="tw-text-2xl md:tw-text-3xl tw-font-bold tw-text-gray-900">{{ title }}</h1>
+  <div class="qds-page-header">
+    <div class="tw-flex tw-items-start tw-gap-4">
+      <div v-if="icon" class="qds-icon-shell" :class="toneClass">
+        <v-icon :icon="icon" size="22" />
       </div>
-      <p v-if="subtitle" class="tw-text-gray-500 tw-mt-1 tw-text-sm">{{ subtitle }}</p>
+      <div class="tw-min-w-0">
+        <p v-if="kicker" class="qds-page-kicker">{{ kicker }}</p>
+        <h1 class="qds-page-title">{{ title }}</h1>
+        <p v-if="subtitle" class="qds-page-subtitle">{{ subtitle }}</p>
+        <div v-if="$slots.meta" class="tw-mt-3 tw-flex tw-flex-wrap tw-items-center tw-gap-2">
+          <slot name="meta" />
+        </div>
+      </div>
     </div>
     <div v-if="$slots.default" class="tw-flex tw-flex-wrap tw-items-center tw-gap-2">
       <slot />
     </div>
-  </header>
+  </div>
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+import { toneClasses } from '../../design-system/tokens'
+
+const props = defineProps({
   title: { type: String, required: true },
   subtitle: { type: String, default: '' },
+  kicker: { type: String, default: '' },
   icon: { type: String, default: '' },
   iconColor: { type: String, default: 'primary' },
-});
+})
+
+const toneClass = computed(() => toneClasses[props.iconColor] || toneClasses.primary)
 </script>

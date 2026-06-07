@@ -23,6 +23,11 @@ class Enrollee extends Authenticatable
     public const STATUS_SUSPENDED = 3;
     public const STATUS_EXPIRED = 4;
 
+    public const NIN_VERIFICATION_NOT_STARTED = 'not_started';
+    public const NIN_VERIFICATION_NOT_PROVIDED = 'not_provided';
+    public const NIN_VERIFICATION_VERIFIED = 'verified';
+    public const NIN_VERIFICATION_FAILED = 'failed';
+
     /**
      * The table associated with the model.
      *
@@ -49,6 +54,9 @@ protected $guarded = ['id'];
         'coverage_end_date' => 'date',
         'approval_date' => 'datetime',
         'enrollment_date' => 'datetime',
+        'nin_verified_at' => 'datetime',
+        'nin_verification_data' => 'array',
+        'nin_verification_meta' => 'array',
         'duplicate_reviewed' => 'boolean',
         'duplicate_reviewed_at' => 'datetime',
         'status' => 'integer',
@@ -122,6 +130,11 @@ protected $guarded = ['id'];
         return $this->belongsTo(PremiumPin::class, 'premium_pin_id');
     }
 
+    public function premiumPurchase()
+    {
+        return $this->belongsTo(PremiumPurchase::class, 'premium_purchase_id');
+    }
+
     public function benefitPackage()
     {
         return $this->belongsTo(BenefitPackage::class, 'benefit_package_id');
@@ -159,6 +172,11 @@ protected $guarded = ['id'];
     public function approvedBy()
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function ninVerifiedBy()
+    {
+        return $this->belongsTo(User::class, 'nin_verified_by');
     }
 
     public function duplicateReviewedBy()

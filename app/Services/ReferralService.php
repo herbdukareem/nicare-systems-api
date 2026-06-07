@@ -38,7 +38,7 @@ class ReferralService
             'service_selection_type' => $data['service_selection_type'] ?? null,
             'service_bundle_id' => $data['service_bundle_id'] ?? null,
             'case_record_ids' => $data['case_record_ids'] ?? [],
-            'status' => $data['status'] ?? 'PENDING',
+            'status' => $data['status'] ?? Referral::STATUS_PENDING,
             'utn' => $data['utn'] ?? $this->generateUTN(),
             'referral_code' => $data['referral_code'] ?? $this->generateReferralCode(),
             'valid_until' => now()->addMonths(3),

@@ -36,7 +36,7 @@ class ClaimController extends Controller
     public function index(Request $request): JsonResponse
     {
         try {
-            $query = Claim::with(['referral', 'admission', 'coveragePeriod', 'enrollee', 'facility', 'lineItems']);
+            $query = Claim::with(['referral', 'admission', 'enrollee', 'facility', 'lineItems']);
 
             // Filter by referral_id (direct relationship)
             if ($request->filled('referral_id')) {
@@ -247,15 +247,11 @@ public function showFullDetails($claimId): JsonResponse
                 }
             }
 
-            // 6. Calculate FFS total
             $ffsAmount = array_reduce($lineItems, function ($sum, $item) {
                 return $sum + (float) ($item['line_total'] ?? 0);
             }, 0);
 
             $totalAmount = $bundleAmount + $ffsAmount;
-             
-
-            // 7. Validate at least one amount is present
             if ($totalAmount <= 0) {
                 return response()->json([
                     'success' => false,
@@ -263,80 +259,13 @@ public function showFullDetails($claimId): JsonResponse
                 ], 400);
             }
 
-            // 8. Create claim in transaction
-            DB::beginTransaction();
-            try {
-                $claim = Claim::create([
-                    'referral_id' => $validated['referral_id'],
-                    'admission_id' => $validated['admission_id'] ?? null,
-                    'enrollee_id' => $referral->enrollee_id,
-                    'facility_id' => $referral->receiving_facility_id,
-                    'claim_number' => Claim::generateClaimNumber(),
-                    'utn' => $referral->utn,
-                    'bundle_amount' => $bundleAmount,
-                    'ffs_amount' => $ffsAmount,
-                    'total_amount' => $totalAmount,
-                    'total_amount_claimed' => $totalAmount,
-                    'status' => 'SUBMITTED',
-                    'claim_date' => $validated['claim_date'] ?? now(),
-                    'service_date' => $serviceDate,
-                    'submitted_at' => now(),
-                    'submitted_by' => auth()->id() ?? null,
-                ]);
+            $claim = $this->claimProcessingService->createDraftClaimFromReferral($referral, $validated, $admission);
 
-                // 9. Create claim line items for selected bundle components (for tracking)
-                // foreach ($bundleComponents as $component) {
-                //     $unitPrice = (float) ($component['unit_price'] ?? 0);
-                //     $quantity = (int) ($component['quantity'] ?? 1);
-
-                //     \App\Models\ClaimLine::create([
-                //         'claim_id' => $claim->id,
-                //         'bundle_component_id' => $component['bundle_component_id'],
-                //         'case_record_id' => $component['case_record_id'] ?? null,
-                //         'service_description' => 'Bundle Component',
-                //         'quantity' => $quantity,
-                //         'unit_price' => $unitPrice,
-                //         'line_total' => $unitPrice * $quantity, // Component cost for tracking
-                //         'tariff_type' => 'BUNDLE',
-                //         'service_type' => 'bundle_component',
-                //         'reporting_type' => 'IN_BUNDLE',
-                //     ]);
-                // }
-
-                // 10. Create claim line items for FFS
-                foreach ($lineItems as $lineItem) {
-                    \App\Models\ClaimLine::create([
-                        'claim_id' => $claim->id,
-                        'pa_code_id' => $lineItem['pa_code_id'],
-                        'case_record_id' => $lineItem['case_record_id'] ?? null,
-                        'service_description' => $lineItem['service_description'],
-                        'quantity' => $lineItem['quantity'],
-                        'unit_price' => $lineItem['unit_price'],
-                        'line_total' => $lineItem['line_total'],
-                        'tariff_type' => $lineItem['tariff_type'],
-                        'service_type' => 'service',
-                        'reporting_type' => $lineItem['tariff_type'] === 'BUNDLE' ? 'IN_BUNDLE' : 'FFS_TOP_UP',
-                    ]);
-                }
-
-                // 11. Mark referral as claim submitted
-                $referral->markClaimSubmitted();
-
-                // 12. Create automatic feedback for claim submission
-                $this->feedbackService->createClaimSubmittedFeedback($claim);
-
-                DB::commit();
-
-                return response()->json([
-                    'success' => true,
-                    'message' => 'Claim submitted successfully',
-                    'data' => $claim->load(['referral', 'admission', 'enrollee', 'facility', 'lineItems.paCode']),
-                ], 201);
-
-            } catch (\Exception $e) {
-                DB::rollBack();
-                throw $e;
-            }
+            return response()->json([
+                'success' => true,
+                'message' => 'Claim draft created successfully',
+                'data' => $claim,
+            ], 201);
 
         } catch (\Illuminate\Validation\ValidationException $e) {
             return response()->json([
@@ -360,7 +289,7 @@ public function showFullDetails($claimId): JsonResponse
     {
         return response()->json([
             'success' => true,
-            'data' => $claim->load(['admission', 'coveragePeriod', 'enrollee', 'facility', 'lineItems', 'alerts']),
+            'data' => $claim->load(['admission', 'referral', 'enrollee', 'facility', 'lineItems', 'alerts']),
         ]);
     }
 
@@ -372,6 +301,7 @@ public function showFullDetails($claimId): JsonResponse
     {
         try {
             $claim = $this->claimProcessingService->submitClaim($claim);
+            $this->feedbackService->createClaimSubmittedFeedback($claim);
 
             return response()->json([
                 'success' => true,
@@ -398,7 +328,7 @@ public function showFullDetails($claimId): JsonResponse
             return response()->json([
                 'success' => true,
                 'alerts' => $alerts,
-                'has_critical_alerts' => collect($alerts)->where('severity', 'CRITICAL')->count() > 0,
+                'has_critical_alerts' => collect($alerts)->where('type', 'CRITICAL')->count() > 0,
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -526,7 +456,7 @@ public function showFullDetails($claimId): JsonResponse
     {
         try {
             $validated = $request->validate([
-                'status' => 'required|in:APPROVED,REJECTED,REVIEWING',
+                'status' => 'required|in:DRAFT,SUBMITTED,REVIEWING,APPROVED,REJECTED',
                 'approved_amount' => 'nullable|numeric|min:0',
                 'comments' => 'nullable|string',
                 'line_item_adjustments' => 'nullable|array',
@@ -534,68 +464,12 @@ public function showFullDetails($claimId): JsonResponse
                 'line_item_adjustments.*.included' => 'required|boolean',
                 'line_item_adjustments.*.approved_quantity' => 'required|integer|min:0',
             ]);
-
-            if (!in_array($claim->status, ['SUBMITTED', 'REVIEWING'])) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Only submitted or reviewing claims can be processed',
-                ], 400);
-            }
-
-            DB::beginTransaction();
-
-            // Process line item adjustments if provided
-            $adjustedFfsAmount = 0;
-            if (!empty($validated['line_item_adjustments'])) {
-                foreach ($validated['line_item_adjustments'] as $adjustment) {
-                    $lineItem = $claim->lineItems()->find($adjustment['id']);
-                    if ($lineItem) {
-                        // Update line item with approved quantity
-                        $approvedQty = $adjustment['included'] ? $adjustment['approved_quantity'] : 0;
-                        $lineItem->update([
-                            'approved_quantity' => $approvedQty,
-                            'approved_amount' => $approvedQty * $lineItem->unit_price,
-                            'is_approved' => $adjustment['included'],
-                        ]);
-
-                        if ($adjustment['included']) {
-                            $adjustedFfsAmount += $approvedQty * $lineItem->unit_price;
-                        }
-                    }
-                }
-            }
-
-            // Calculate final approved amount
-            $bundleAmount = $claim->bundle_amount ?? 0;
-            $finalApprovedAmount = $validated['approved_amount'] ?? ($bundleAmount + $adjustedFfsAmount);
-
-            // Prepare update data based on decision
-            $updateData = [
-                'status' => $validated['status'],
-                'approval_comments' => $validated['comments'] ?? null,
-            ];
-
-            if ($validated['status'] === 'APPROVED') {
-                $updateData['approved_amount'] = $finalApprovedAmount;
-                $updateData['approved_by'] = auth()->id();
-                $updateData['approved_at'] = now();
-            } elseif ($validated['status'] === 'REJECTED') {
-                $updateData['rejection_reason'] = $validated['comments'] ?? null;
-                $updateData['rejected_by'] = auth()->id();
-                $updateData['rejected_at'] = now();
-            } elseif ($validated['status'] === 'REVIEWING') {
-                $updateData['reviewed_by'] = auth()->id();
-                $updateData['reviewed_at'] = now();
-            }
-
-            $claim->update($updateData);
+            $claim = $this->claimProcessingService->reviewClaim($claim, $validated);
 
             // Create feedback record for the decision
             if (in_array($validated['status'], ['APPROVED', 'REJECTED'])) {
                 $this->createClaimReviewFeedback($claim, $validated['status'], $validated['comments'] ?? null);
             }
-
-            DB::commit();
 
             $statusMessages = [
                 'APPROVED' => 'Claim approved successfully',
@@ -606,10 +480,9 @@ public function showFullDetails($claimId): JsonResponse
             return response()->json([
                 'success' => true,
                 'message' => $statusMessages[$validated['status']] ?? 'Claim updated',
-                'data' => $claim->fresh(['referral', 'enrollee', 'facility', 'lineItems']),
+                'data' => $claim,
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to review claim: ' . $e->getMessage(),
@@ -665,34 +538,10 @@ public function showFullDetails($claimId): JsonResponse
                 'generate_payment_receipts' => 'nullable|boolean',
             ]);
 
-            DB::beginTransaction();
-
-            $approvedCount = 0;
-            $errors = [];
-            $approvedClaims = [];
-
-            foreach ($validated['claim_ids'] as $claimId) {
-                $claim = Claim::find($claimId);
-
-                if (!in_array($claim->status, ['SUBMITTED', 'REVIEWING'])) {
-                    $errors[] = "Claim {$claim->claim_number} is not in a reviewable state";
-                    continue;
-                }
-
-                $claim->update([
-                    'status' => 'APPROVED',
-                    'approved_amount' => $claim->approved_amount ?? $claim->total_amount_claimed,
-                    'approval_comments' => $validated['approval_comments'] ?? null,
-                    'payment_code' => $validated['payment_code'],
-                    'approved_by' => auth()->id(),
-                    'approved_at' => now(),
-                ]);
-
-                $approvedClaims[] = $claim;
-                $approvedCount++;
-            }
-
-            DB::commit();
+            $result = $this->claimProcessingService->batchReviewClaims($validated['claim_ids'], Claim::STATUS_APPROVED, [
+                'approval_comments' => $validated['approval_comments'] ?? null,
+                'payment_code' => $validated['payment_code'],
+            ]);
 
             // Generate approval letter if requested
             if ($validated['generate_approval_letter'] ?? false) {
@@ -708,13 +557,12 @@ public function showFullDetails($claimId): JsonResponse
 
             return response()->json([
                 'success' => true,
-                'message' => "{$approvedCount} claims approved successfully",
-                'approved_count' => $approvedCount,
-                'errors' => $errors,
+                'message' => "{$result['processed_count']} claims approved successfully",
+                'approved_count' => $result['processed_count'],
+                'errors' => $result['errors'],
                 'payment_code' => $validated['payment_code'],
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to batch approve claims: ' . $e->getMessage(),
@@ -735,36 +583,17 @@ public function showFullDetails($claimId): JsonResponse
                 'rejection_reason' => 'required|string',
             ]);
 
-            DB::beginTransaction();
-
-            $rejectedCount = 0;
-
-            foreach ($validated['claim_ids'] as $claimId) {
-                $claim = Claim::find($claimId);
-
-                if (!in_array($claim->status, ['SUBMITTED', 'REVIEWING'])) {
-                    continue;
-                }
-
-                $claim->update([
-                    'status' => 'REJECTED',
-                    'rejection_reason' => $validated['rejection_reason'],
-                    'rejected_by' => auth()->id(),
-                    'rejected_at' => now(),
-                ]);
-
-                $rejectedCount++;
-            }
-
-            DB::commit();
+            $result = $this->claimProcessingService->batchReviewClaims($validated['claim_ids'], Claim::STATUS_REJECTED, [
+                'rejection_reason' => $validated['rejection_reason'],
+            ]);
 
             return response()->json([
                 'success' => true,
-                'message' => "{$rejectedCount} claims rejected",
-                'rejected_count' => $rejectedCount,
+                'message' => "{$result['processed_count']} claims rejected",
+                'rejected_count' => $result['processed_count'],
+                'errors' => $result['errors'],
             ]);
         } catch (\Exception $e) {
-            DB::rollBack();
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to batch reject claims: ' . $e->getMessage(),

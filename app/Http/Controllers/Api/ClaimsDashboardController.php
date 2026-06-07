@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\Claim;
+use App\Models\Referral;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
 
@@ -60,6 +61,9 @@ class ClaimsDashboardController extends Controller
                 ->whereColumn('submitted_at', '>', 'created_at')
                 ->count();
 
+            $totalClaims = Claim::count();
+            $totalReferrals = Referral::count();
+
             $totalAdjudicated = $approvedMonth + $rejectedMonth;
             $approvalRate     = $totalAdjudicated > 0
                 ? round(($approvedMonth / $totalAdjudicated) * 100, 1)
@@ -111,6 +115,12 @@ class ClaimsDashboardController extends Controller
             return response()->json([
                 'success' => true,
                 'data'    => [
+                    'overview' => [
+                        'total_claims' => $totalClaims,
+                        'awaiting_review' => $awaitingReview,
+                        'approved_month' => $approvedMonth,
+                        'total_referrals' => $totalReferrals,
+                    ],
                     'queue' => [
                         'awaiting_review'    => $awaitingReview,
                         'currently_reviewing'=> $currentlyReviewing,

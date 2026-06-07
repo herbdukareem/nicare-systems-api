@@ -1,18 +1,22 @@
 <template>
-  <div class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-py-16 tw-text-center">
-    <v-icon :size="iconSize" :color="iconColor" class="tw-mb-4 tw-opacity-40">{{ icon }}</v-icon>
-    <h3 class="tw-text-lg tw-font-semibold tw-text-gray-700 tw-mb-1">{{ title }}</h3>
-    <p class="tw-text-sm tw-text-gray-400 tw-max-w-sm tw-mb-6">{{ description }}</p>
-    <slot />
+  <div class="tw-flex tw-flex-col tw-items-center tw-justify-center tw-px-4 tw-py-14 tw-text-center">
+    <div class="qds-icon-shell qds-tone-neutral tw-h-14 tw-w-14">
+      <v-icon :size="iconSize" :color="iconColor">{{ icon }}</v-icon>
+    </div>
+    <h3 class="tw-mt-4 tw-text-lg tw-font-semibold tw-text-slate-900">{{ title }}</h3>
+    <p class="tw-mt-2 tw-max-w-md tw-text-sm tw-leading-6 tw-text-slate-500">{{ description }}</p>
+    <div v-if="$slots.default" class="tw-mt-6">
+      <slot />
+    </div>
   </div>
 </template>
 
 <script setup>
 defineProps({
-  icon:        { type: String, default: 'mdi-inbox-outline' },
-  iconColor:   { type: String, default: 'grey' },
-  iconSize:    { type: Number, default: 64 },
-  title:       { type: String, default: 'No data found' },
+  icon: { type: String, default: 'mdi-inbox-outline' },
+  iconColor: { type: String, default: 'grey' },
+  iconSize: { type: Number, default: 22 },
+  title: { type: String, default: 'No data found' },
   description: { type: String, default: 'There are no records matching your criteria.' },
-});
+})
 </script>

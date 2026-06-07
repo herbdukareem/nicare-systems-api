@@ -1,29 +1,24 @@
 <template>
   <AdminLayout>
-    <div class="tw-space-y-5">
-      <div class="tw-flex tw-flex-col tw-gap-3 lg:tw-flex-row lg:tw-items-center lg:tw-justify-between">
-        <div>
-          <h1 class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ title }}</h1>
-          <p class="tw-text-sm tw-text-gray-600">Generate, review, approve, export, and track capitation periods.</p>
-        </div>
-        <div class="tw-flex tw-gap-2">
-          <v-btn
-            v-for="action in visibleWorkflowActions"
-            :key="action.path"
-            variant="tonal"
-            :prepend-icon="action.icon"
-            @click="$router.push(action.path)"
-          >
-            {{ action.name }}
-          </v-btn>
-        </div>
-      </div>
+    <div class="tw-space-y-4">
+      <AppPageHeader :title="title" icon="mdi-cash-sync">
+        <v-btn
+          v-for="action in visibleWorkflowActions"
+          :key="action.path"
+          size="small"
+          variant="outlined"
+          :prepend-icon="action.icon"
+          @click="$router.push(action.path)"
+        >
+          {{ action.name }}
+        </v-btn>
+      </AppPageHeader>
 
       <!-- Generate: create period -->
-      <div v-if="mode === 'generate'" class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-white tw-p-4 tw-shadow-sm tw-space-y-4">
+      <div v-if="mode === 'generate'" class="qds-card qds-card-padding tw-space-y-4">
         <div>
-          <h2 class="tw-text-lg tw-font-semibold tw-text-gray-900">Capitation Period</h2>
-          <p class="tw-text-sm tw-text-gray-600">Create the monthly capitation period first. Facility generation is done separately by period and funding type.</p>
+          <h2 class="tw-text-sm tw-font-semibold tw-text-gray-900">Capitation Period</h2>
+          <p class="tw-text-xs tw-text-gray-500">Create the monthly capitation period first. Facility generation is done separately by period and funding type.</p>
         </div>
         <div class="tw-grid tw-grid-cols-1 tw-gap-4 md:tw-grid-cols-4">
           <v-text-field v-model="form.name" label="Period name" density="comfortable" variant="outlined" />
@@ -38,10 +33,10 @@
       </div>
 
       <!-- Generate: facility capitation -->
-      <div v-if="mode === 'generate'" class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-white tw-p-4 tw-shadow-sm tw-space-y-4">
+      <div v-if="mode === 'generate'" class="qds-card qds-card-padding tw-space-y-4">
         <div>
-          <h2 class="tw-text-lg tw-font-semibold tw-text-gray-900">Generate Facility Capitation</h2>
-          <p class="tw-text-sm tw-text-gray-600">Select the period and funding type, load facilities, review enrollee counts and totals, then generate only the selected facilities.</p>
+          <h2 class="tw-text-sm tw-font-semibold tw-text-gray-900">Generate Facility Capitation</h2>
+          <p class="tw-text-xs tw-text-gray-500">Select the period and funding type, load facilities, review enrollee counts and totals, then generate only the selected facilities.</p>
         </div>
         <div class="tw-grid tw-grid-cols-1 tw-gap-4 md:tw-grid-cols-2">
           <v-select v-model="generationForm.period_id" :items="periodOptions" item-title="label" item-value="id" label="Capitation period" density="comfortable" variant="outlined" :disabled="facilitiesLoaded" />
@@ -52,7 +47,7 @@
           <v-btn variant="tonal" prepend-icon="mdi-refresh" @click="resetGenerationFlow">Reset</v-btn>
         </div>
 
-        <div v-if="facilitiesLoaded" class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-gray-50 tw-p-4 tw-space-y-4">
+        <div v-if="facilitiesLoaded" class="tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-3 tw-space-y-3">
           <div class="tw-flex tw-flex-col tw-gap-3 lg:tw-flex-row lg:tw-items-center lg:tw-justify-between">
             <div>
               <p class="tw-text-sm tw-text-gray-500">Loaded facilities for</p>
@@ -69,23 +64,23 @@
           </div>
 
           <div class="tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-5">
-            <div class="tw-rounded tw-border tw-border-gray-100 tw-bg-white tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Funding Type</p>
               <p class="tw-font-bold">{{ selectedGenerationFundingType?.name || 'N/A' }}</p>
             </div>
-            <div class="tw-rounded tw-border tw-border-gray-100 tw-bg-white tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Facilities Loaded</p>
               <p class="tw-font-bold">{{ eligibleProviders.length }}</p>
             </div>
-            <div class="tw-rounded tw-border tw-border-gray-100 tw-bg-white tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Eligible Enrollees</p>
               <p class="tw-font-bold">{{ eligibleProviderTotals.enrollees.toLocaleString() }}</p>
             </div>
-            <div class="tw-rounded tw-border tw-border-gray-100 tw-bg-white tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Rate</p>
               <p class="tw-font-bold">NGN {{ Number(selectedGenerationFundingType?.capitation_rate || 0).toLocaleString() }}</p>
             </div>
-            <div class="tw-rounded tw-border tw-border-gray-100 tw-bg-white tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Selected Amount</p>
               <p class="tw-font-bold">NGN {{ selectedProviderTotal.amount.toLocaleString() }}</p>
             </div>
@@ -114,10 +109,10 @@
       </div>
 
       <!-- Workflow panel (review / approval / payments) -->
-      <div v-if="workflowMode" class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-white tw-p-4 tw-shadow-sm tw-space-y-4">
+      <div v-if="workflowMode" class="qds-card qds-card-padding tw-space-y-4">
         <div>
-          <h2 class="tw-text-lg tw-font-semibold tw-text-gray-900">{{ workflowTitle }}</h2>
-          <p class="tw-text-sm tw-text-gray-600">{{ workflowDescription }}</p>
+          <h2 class="tw-text-sm tw-font-semibold tw-text-gray-900">{{ workflowTitle }}</h2>
+          <p class="tw-text-xs tw-text-gray-500">{{ workflowDescription }}</p>
         </div>
         <div class="tw-grid tw-grid-cols-1 tw-gap-4 md:tw-grid-cols-3">
           <v-select v-model="workflowForm.period_id" :items="periodOptions" item-title="label" item-value="id" label="Capitation period" density="comfortable" variant="outlined" />
@@ -127,21 +122,21 @@
           </div>
         </div>
 
-        <div v-if="workflowDetailsLoaded" class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-gray-50 tw-p-4 tw-space-y-4">
+        <div v-if="workflowDetailsLoaded" class="tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-3 tw-space-y-3">
           <div class="tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-4">
-            <div class="tw-rounded tw-border tw-border-gray-100 tw-bg-white tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Facilities</p>
               <p class="tw-font-bold">{{ workflowDetails.length }}</p>
             </div>
-            <div class="tw-rounded tw-border tw-border-gray-100 tw-bg-white tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Enrollees</p>
               <p class="tw-font-bold">{{ workflowTotals.enrollees.toLocaleString() }}</p>
             </div>
-            <div class="tw-rounded tw-border tw-border-gray-100 tw-bg-white tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Amount</p>
               <p class="tw-font-bold">NGN {{ workflowTotals.amount.toLocaleString() }}</p>
             </div>
-            <div class="tw-rounded tw-border tw-border-gray-100 tw-bg-white tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Selected</p>
               <p class="tw-font-bold">{{ selectedDetailIds.length }}</p>
             </div>
@@ -242,21 +237,21 @@
           </div>
 
           <div class="tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-3">
-            <div class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Facilities</p>
               <p class="tw-text-xl tw-font-bold">{{ filteredBreakdown.length }}</p>
             </div>
-            <div class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Total Enrollees</p>
               <p class="tw-text-xl tw-font-bold">{{ breakdownTotals.enrollees }}</p>
             </div>
-            <div class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Total Amount</p>
               <p class="tw-text-xl tw-font-bold">NGN {{ breakdownTotals.amount.toLocaleString() }}</p>
             </div>
           </div>
 
-          <div class="tw-overflow-x-auto tw-rounded-lg tw-border tw-border-gray-100">
+          <div class="tw-overflow-x-auto tw-border tw-border-gray-100">
             <table class="tw-min-w-full tw-text-sm">
               <thead class="tw-bg-slate-100 tw-text-left tw-text-xs tw-font-semibold tw-text-slate-600 tw-uppercase tw-tracking-wide">
                 <tr>
@@ -312,19 +307,19 @@
 
         <div class="tw-space-y-4">
           <div class="tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-4">
-            <div class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Funding Type</p>
               <p class="tw-font-bold">{{ selectedPeriod?.funding_type?.name || selectedPeriod?.funding_type?.label || 'N/A' }}</p>
             </div>
-            <div class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Capitation Rate</p>
               <p class="tw-font-bold">NGN {{ Number(selectedPeriod?.capitation_rate || 0).toLocaleString() }}</p>
             </div>
-            <div class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Eligible Providers</p>
               <p class="tw-font-bold">{{ eligibleProviders.length }}</p>
             </div>
-            <div class="tw-rounded-lg tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
+            <div class="tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Selected Amount</p>
               <p class="tw-font-bold tw-text-cyan-700">NGN {{ selectedProviderTotal.amount.toLocaleString() }}</p>
             </div>
@@ -375,7 +370,7 @@
         </template>
 
         <div class="tw-space-y-4">
-          <div class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4 tw-text-sm tw-space-y-1">
+          <div class="tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-3 tw-text-sm tw-space-y-1">
             <div class="tw-flex tw-gap-2">
               <span class="tw-text-slate-500 tw-w-28 tw-flex-shrink-0">Period:</span>
               <span class="tw-font-semibold tw-text-slate-800">{{ selectedPeriod?.name }}</span>
@@ -398,6 +393,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import AdminLayout from '../layout/AdminLayout.vue'
 import AppModal from '../common/AppModal.vue'
+import AppPageHeader from '../common/AppPageHeader.vue'
 import AppDataTable from '../common/AppDataTable.vue'
 import { capitationAPI, fundingTypeAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'

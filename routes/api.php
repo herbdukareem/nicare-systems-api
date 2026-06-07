@@ -64,6 +64,8 @@ use App\Http\Controllers\Api\FacilityDashboardController;
 use App\Http\Controllers\Api\ClaimsDashboardController;
 use App\Http\Controllers\Api\CapitationController;
 use App\Http\Controllers\Api\MobileSyncController;
+use App\Http\Controllers\Api\NinProviderConfigurationController;
+use App\Http\Controllers\Api\PublicEnrollmentController;
 use App\Http\Controllers\Api\EnrolleeImportController;
 use App\Http\Controllers\Api\EnrolleeController as EnrolleeApiController;
 use App\Http\Controllers\Api\ExtendedReportingController;
@@ -92,8 +94,12 @@ Route::get('test', function () {
 // ── Enrollee portal auth routes ────────────────────────────────────────────────
 use App\Http\Controllers\Api\EnrolleeAuthController;
 
-Route::post('enroll/login', [EnrolleeAuthController::class, 'login']);
+Route::post('enroll/login', [EnrolleeAuthController::class, 'login'])->middleware('security');
 Route::get('enroll/plans', [EnrolleeAuthController::class, 'plans']);
+Route::prefix('public/enrollment')->middleware(['security'])->group(function () {
+    Route::get('metadata', [PublicEnrollmentController::class, 'metadata'])->middleware('throttle:30,1');
+    Route::post('applications', [PublicEnrollmentController::class, 'store'])->middleware('throttle:10,1');
+});
 
 Route::middleware(['auth:sanctum', 'enrollee'])->prefix('enroll')->group(function () {
     Route::post('logout',           [EnrolleeAuthController::class, 'logout']);
@@ -102,7 +108,7 @@ Route::middleware(['auth:sanctum', 'enrollee'])->prefix('enroll')->group(functio
 });
 
 // Auth routes (without middleware to avoid CSRF issues)
-Route::post('login', [AuthController::class, 'login'])->withoutMiddleware(['web']);
+Route::post('login', [AuthController::class, 'login'])->withoutMiddleware(['web'])->middleware('security');
 Route::post('register', [AuthController::class, 'register']);
 Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanctum');
 Route::post('forget-password', [AuthController::class, 'forgetPassword']);
@@ -142,17 +148,34 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Enrollee routes
-    Route::middleware('permission:enrollees.view,enrollees.create,enrollees.update')->group(function () {
-        Route::get('enrollees/pending-approval', [EnrolleeController::class, 'pendingApproval']);
-        Route::get('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip']);
-        Route::get('enrollees/bulk-id-card', [EnrolleeController::class, 'bulkIdCard']);
-        Route::post('enrollees/{enrollee}/approve', [EnrolleeController::class, 'approve']);
-        Route::get('enrollees/{enrollee}/id-card', [EnrolleeController::class, 'idCard']);
-        Route::apiResource('enrollees', EnrolleeController::class);
-        Route::post('enrollees/{enrollee}/upload-passport', [EnrolleeController::class, 'uploadPassport']);
-        Route::put('enrollees/{enrollee}/status', [EnrolleeController::class, 'updateStatus']);
-        Route::get('enrollees/{enrollee}/statistics', [EnrolleeController::class, 'getStatistics']);
-    });
+    Route::get('enrollees/pending-approval', [EnrolleeController::class, 'pendingApproval'])
+        ->middleware('permission:any,enrollees.view,enrollee.approve,enrollee.nin.verify');
+    Route::get('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip'])
+        ->middleware('permission:any,enrollees.view,enrollee.print-bulk-slip');
+    Route::get('enrollees/bulk-id-card', [EnrolleeController::class, 'bulkIdCard'])
+        ->middleware('permission:any,enrollees.view,enrollee.print-id-card');
+    Route::post('enrollees/{enrollee}/verify-nin', [EnrolleeController::class, 'verifyNin'])
+        ->middleware('permission:any,enrollee.nin.verify,enrollee.approve');
+    Route::post('enrollees/{enrollee}/approve', [EnrolleeController::class, 'approve'])
+        ->middleware('permission:enrollee.approve');
+    Route::get('enrollees/{enrollee}/id-card', [EnrolleeController::class, 'idCard'])
+        ->middleware('permission:any,enrollees.view,enrollee.print-id-card');
+    Route::get('enrollees', [EnrolleeController::class, 'index'])
+        ->middleware('permission:enrollees.view');
+    Route::post('enrollees', [EnrolleeController::class, 'store'])
+        ->middleware('permission:enrollees.create');
+    Route::get('enrollees/{enrollee}', [EnrolleeController::class, 'show'])
+        ->middleware('permission:enrollees.view');
+    Route::match(['put', 'patch'], 'enrollees/{enrollee}', [EnrolleeController::class, 'update'])
+        ->middleware('permission:any,enrollees.update,enrollees.edit');
+    Route::delete('enrollees/{enrollee}', [EnrolleeController::class, 'destroy'])
+        ->middleware('permission:any,enrollees.delete,enrollee.delete');
+    Route::post('enrollees/{enrollee}/upload-passport', [EnrolleeController::class, 'uploadPassport'])
+        ->middleware('permission:any,enrollees.update,enrollees.edit');
+    Route::put('enrollees/{enrollee}/status', [EnrolleeController::class, 'updateStatus'])
+        ->middleware('permission:any,enrollees.update,enrollees.edit');
+    Route::get('enrollees/{enrollee}/statistics', [EnrolleeController::class, 'getStatistics'])
+        ->middleware('permission:enrollees.view');
     Route::middleware('permission:enrollees.export')->get('enrollees-export', function (Request $request) {
         $parts = ['enrollees'];
         $nameFor = function (string $model, string $id): string {
@@ -234,9 +257,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('banks', BankController::class);
     Route::get('facilities/{facility}/enrollees', [FacilityController::class, 'enrollees']);
     Route::apiResource('facilities', FacilityController::class);
-    Route::apiResource('referrals', ReferralController::class)->only(['index', 'store', 'show']);
-    Route::post('referrals/{referral}/approve', [ReferralController::class, 'approve']);
-    Route::post('referrals/{referral}/reject', [ReferralController::class, 'reject']);
+    Route::get('referrals', [ReferralController::class, 'index'])->middleware('permission:any,referrals.view,referrals.manage,referrals.approve,referrals.reject');
+    Route::post('referrals', [ReferralController::class, 'store'])->middleware('permission:any,referrals.create,referrals.submit,referrals.manage');
+    Route::get('referrals/{referral}', [ReferralController::class, 'show'])->middleware('permission:any,referrals.view,referrals.manage,referrals.approve,referrals.reject');
+    Route::post('referrals/{referral}/approve', [ReferralController::class, 'approve'])->middleware('permission:any,referrals.approve,referrals.manage');
+    Route::post('referrals/{referral}/reject', [ReferralController::class, 'reject'])->middleware('permission:any,referrals.reject,referrals.deny,referrals.manage');
     Route::prefix('premium')->group(function () {
         Route::get('dashboard', [PremiumDashboardController::class, 'index']);
         Route::get('metadata', [PremiumMetadataController::class, 'index']);
@@ -263,6 +288,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('funding-types', FundingTypeController::class);
     Route::apiResource('benefactors', BenefactorController::class);
     Route::apiResource('benefit-packages', BenefitPackageController::class)->parameters(['benefit-packages' => 'benefitPackage']);
+    Route::get('settings/nin-provider', [NinProviderConfigurationController::class, 'show'])
+        ->middleware('permission:any,settings.nin.manage,settings.edit');
+    Route::put('settings/nin-provider', [NinProviderConfigurationController::class, 'update'])
+        ->middleware('permission:any,settings.nin.manage,settings.edit');
     Route::apiResource('lgas', LgaController::class);
     Route::get('lgas/{lga}/wards', [LgaController::class, 'wards']);
     Route::apiResource('wards', WardController::class);
@@ -341,67 +370,67 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::prefix('claims-automation')->group(function () {
         // Admission Management
         Route::prefix('admissions')->group(function () {
-            Route::get('/', [AdmissionController::class, 'index']);
-            Route::post('/', [AdmissionController::class, 'store']);
-            Route::get('/check/{referralId}', [AdmissionController::class, 'checkAdmissionEligibility']);
-            Route::get('/enrollee/{enrolleeId}', [AdmissionController::class, 'getActiveAdmission']);
-            Route::get('/{admission}', [AdmissionController::class, 'show']);
-            Route::post('/{admission}/discharge', [AdmissionController::class, 'discharge']);
+            Route::get('/', [AdmissionController::class, 'index'])->middleware('permission:any,admissions.view,admissions.manage');
+            Route::post('/', [AdmissionController::class, 'store'])->middleware('permission:any,admissions.create,admissions.manage');
+            Route::get('/check/{referralId}', [AdmissionController::class, 'checkAdmissionEligibility'])->middleware('permission:any,admissions.view,admissions.create,admissions.manage');
+            Route::get('/enrollee/{enrolleeId}', [AdmissionController::class, 'getActiveAdmission'])->middleware('permission:any,admissions.view,admissions.manage');
+            Route::get('/{admission}', [AdmissionController::class, 'show'])->middleware('permission:any,admissions.view,admissions.manage');
+            Route::post('/{admission}/discharge', [AdmissionController::class, 'discharge'])->middleware('permission:any,admissions.discharge,admissions.manage');
         });
 
         // Claim Management
         Route::prefix('claims')->group(function () {
-            Route::get('/', [ClaimController::class, 'index']);
-            Route::post('/', [ClaimController::class, 'store']);
-            Route::get('/{claim}', [ClaimController::class, 'show']);
-            Route::get('/{claim}/full-details', [ClaimController::class, 'showFullDetails']);
-            Route::get('/{claim}/slip', [ClaimController::class, 'downloadSlip']);
-            Route::post('/{claim}/submit', [ClaimController::class, 'submit']);
-            Route::post('/{claim}/validate', [ClaimController::class, 'validateClaim']);
-            Route::post('/{claim}/approve', [ClaimController::class, 'approve']);
-            Route::post('/{claim}/reject', [ClaimController::class, 'reject']);
-            Route::get('/{claim}/summary', [ClaimController::class, 'summary']);
+            Route::get('/', [ClaimController::class, 'index'])->middleware('permission:any,claims.view,claims.review,claims.approve,claims.reject');
+            Route::post('/', [ClaimController::class, 'store'])->middleware('permission:any,claims.create,claims.process,claims.automate');
+            Route::get('/{claim}', [ClaimController::class, 'show'])->middleware('permission:any,claims.view,claims.review,claims.approve,claims.reject');
+            Route::get('/{claim}/full-details', [ClaimController::class, 'showFullDetails'])->middleware('permission:any,claims.view,claims.review,claims.approve,claims.reject');
+            Route::get('/{claim}/slip', [ClaimController::class, 'downloadSlip'])->middleware('permission:any,claims.view,claims.review,claims.approve,claims.reject');
+            Route::post('/{claim}/submit', [ClaimController::class, 'submit'])->middleware('permission:any,claims.submit,claims.process,claims.automate');
+            Route::post('/{claim}/validate', [ClaimController::class, 'validateClaim'])->middleware('permission:any,claims.review,claims.process,claims.automate');
+            Route::post('/{claim}/approve', [ClaimController::class, 'approve'])->middleware('permission:any,claims.approve,claims.reviewer.approve,claims.approver.approve');
+            Route::post('/{claim}/reject', [ClaimController::class, 'reject'])->middleware('permission:any,claims.reject,claims.reviewer.reject,claims.approver.reject');
+            Route::get('/{claim}/summary', [ClaimController::class, 'summary'])->middleware('permission:any,claims.view,claims.review,claims.approve');
             // Review and batch operations
-            Route::post('/{claim}/review', [ClaimController::class, 'review']);
-            Route::post('/batch-approve', [ClaimController::class, 'batchApprove']);
-            Route::post('/batch-reject', [ClaimController::class, 'batchReject']);
+            Route::post('/{claim}/review', [ClaimController::class, 'review'])->middleware('permission:any,claims.review,claims.reviewer.review,claims.approver.review');
+            Route::post('/batch-approve', [ClaimController::class, 'batchApprove'])->middleware('permission:any,claims.approve,claims.reviewer.approve,claims.approver.approve');
+            Route::post('/batch-reject', [ClaimController::class, 'batchReject'])->middleware('permission:any,claims.reject,claims.reviewer.reject,claims.approver.reject');
 
             // Claim Lines
-            Route::post('/{claim}/lines/bundle', [ClaimLineController::class, 'addBundleTreatment']);
-            Route::post('/{claim}/lines/ffs', [ClaimLineController::class, 'addFFSTreatment']);
-            Route::get('/{claim}/classification', [ClaimLineController::class, 'getClassification']);
+            Route::post('/{claim}/lines/bundle', [ClaimLineController::class, 'addBundleTreatment'])->middleware('permission:any,claims.create,claims.process,claims.automate');
+            Route::post('/{claim}/lines/ffs', [ClaimLineController::class, 'addFFSTreatment'])->middleware('permission:any,claims.create,claims.process,claims.automate');
+            Route::get('/{claim}/classification', [ClaimLineController::class, 'getClassification'])->middleware('permission:any,claims.view,claims.review,claims.process');
         });
 
         // Claim Line Management
         Route::prefix('claim-lines')->group(function () {
-            Route::get('/{claimLine}', [ClaimLineController::class, 'show']);
-            Route::delete('/{claimLine}', [ClaimLineController::class, 'destroy']);
+            Route::get('/{claimLine}', [ClaimLineController::class, 'show'])->middleware('permission:any,claims.view,claims.review,claims.approve');
+            Route::delete('/{claimLine}', [ClaimLineController::class, 'destroy'])->middleware('permission:any,claims.create,claims.process,claims.automate');
         });
 
         // Payment Batch Management
         Route::prefix('payment-batches')->group(function () {
-            Route::get('/', [PaymentBatchController::class, 'index']);
-            Route::post('/', [PaymentBatchController::class, 'store']);
-            Route::get('/approved-claims', [PaymentBatchController::class, 'getApprovedClaims']);
-            Route::get('/{batch}', [PaymentBatchController::class, 'show']);
-            Route::post('/{batch}/process', [PaymentBatchController::class, 'process']);
-            Route::post('/{batch}/mark-paid', [PaymentBatchController::class, 'markPaid']);
-            Route::get('/{batch}/receipt', [PaymentBatchController::class, 'downloadReceipt']);
+            Route::get('/', [PaymentBatchController::class, 'index'])->middleware('permission:any,payment_batches.view,payment_batches.manage');
+            Route::post('/', [PaymentBatchController::class, 'store'])->middleware('permission:any,payment_batches.create,payment_batches.manage');
+            Route::get('/approved-claims', [PaymentBatchController::class, 'getApprovedClaims'])->middleware('permission:any,payment_batches.view,payment_batches.manage');
+            Route::get('/{batch}', [PaymentBatchController::class, 'show'])->middleware('permission:any,payment_batches.view,payment_batches.manage');
+            Route::post('/{batch}/process', [PaymentBatchController::class, 'process'])->middleware('permission:any,payment_batches.approve,payment_batches.manage,payments.process');
+            Route::post('/{batch}/mark-paid', [PaymentBatchController::class, 'markPaid'])->middleware('permission:any,payment_batches.approve,payment_batches.manage,payments.process');
+            Route::get('/{batch}/receipt', [PaymentBatchController::class, 'downloadReceipt'])->middleware('permission:any,payment_batches.view,payment_batches.manage,payments.view');
         });
 
         // Payment Management
         Route::prefix('payments')->group(function () {
-            Route::get('/calculate/{claim}', [PaymentController::class, 'calculate']);
-            Route::post('/process', [PaymentController::class, 'process']);
-            Route::get('/track/{claim}', [PaymentController::class, 'track']);
-            Route::get('/facility/{facilityId}/summary', [PaymentController::class, 'facilityPaymentSummary']);
+            Route::get('/calculate/{claim}', [PaymentController::class, 'calculate'])->middleware('permission:any,payments.view,payments.process');
+            Route::post('/process', [PaymentController::class, 'process'])->middleware('permission:any,payments.process,payments.finalise');
+            Route::get('/track/{claim}', [PaymentController::class, 'track'])->middleware('permission:any,payments.view,payments.process');
+            Route::get('/facility/{facilityId}/summary', [PaymentController::class, 'facilityPaymentSummary'])->middleware('permission:any,payments.view,payments.process');
         });
 
         // Reporting
         Route::prefix('reports')->group(function () {
-            Route::get('/claims', [ReportingController::class, 'claimsReport']);
-            Route::get('/payments', [ReportingController::class, 'paymentReport']);
-            Route::get('/compliance', [ReportingController::class, 'complianceReport']);
+            Route::get('/claims', [ReportingController::class, 'claimsReport'])->middleware('permission:any,reports.view,reports.export');
+            Route::get('/payments', [ReportingController::class, 'paymentReport'])->middleware('permission:any,reports.view,reports.export');
+            Route::get('/compliance', [ReportingController::class, 'complianceReport'])->middleware('permission:any,reports.view,reports.export');
         });
     });
 
@@ -492,32 +521,34 @@ Route::middleware('auth:sanctum')->group(function () {
 });
 
 // PAS (Pre-Authorization System) routes
-Route::middleware(['auth:sanctum', 'permission:referrals.view,pa_codes.view,admissions.view,utn.validate'])->prefix('pas')->group(function () {
+Route::middleware(['auth:sanctum'])->prefix('pas')->group(function () {
 
     // PA Code Management
-    Route::apiResource('pa-codes', PACodeController::class)->only(['index', 'store', 'show']);
-    Route::post('pa-codes/{paCode}/approve', [PACodeController::class, 'approve']);
-    Route::post('pa-codes/{paCode}/reject', [PACodeController::class, 'reject']);
+    Route::get('pa-codes', [PACodeController::class, 'index'])->middleware('permission:any,pa_codes.view,pa_codes.manage');
+    Route::post('pa-codes', [PACodeController::class, 'store'])->middleware('permission:any,pa_codes.request,pa_codes.create,pa_codes.manage');
+    Route::get('pa-codes/{paCode}', [PACodeController::class, 'show'])->middleware('permission:any,pa_codes.view,pa_codes.manage');
+    Route::post('pa-codes/{paCode}/approve', [PACodeController::class, 'approve'])->middleware('permission:any,pa_codes.approve,pa_codes.manage');
+    Route::post('pa-codes/{paCode}/reject', [PACodeController::class, 'reject'])->middleware('permission:any,pa_codes.reject,pa_codes.manage');
 
     // Claims Management (for review/approval)
     Route::prefix('claims')->group(function () {
-        Route::get('/', [ClaimController::class, 'index']);
-        Route::get('/{claim}', [ClaimController::class, 'show']);
-        Route::get('/{claim}/full-details', [ClaimController::class, 'showFullDetails']);
-        Route::get('/{claim}/slip', [ClaimController::class, 'downloadSlip']);
-        Route::post('/{claim}/review', [ClaimController::class, 'review']);
-        Route::post('/batch-approve', [ClaimController::class, 'batchApprove']);
-        Route::post('/batch-reject', [ClaimController::class, 'batchReject']);
+        Route::get('/', [ClaimController::class, 'index'])->middleware('permission:any,claims.view,claims.review,claims.approve,claims.reject');
+        Route::get('/{claim}', [ClaimController::class, 'show'])->middleware('permission:any,claims.view,claims.review,claims.approve,claims.reject');
+        Route::get('/{claim}/full-details', [ClaimController::class, 'showFullDetails'])->middleware('permission:any,claims.view,claims.review,claims.approve,claims.reject');
+        Route::get('/{claim}/slip', [ClaimController::class, 'downloadSlip'])->middleware('permission:any,claims.view,claims.review,claims.approve,claims.reject');
+        Route::post('/{claim}/review', [ClaimController::class, 'review'])->middleware('permission:any,claims.review,claims.reviewer.review,claims.approver.review');
+        Route::post('/batch-approve', [ClaimController::class, 'batchApprove'])->middleware('permission:any,claims.approve,claims.reviewer.approve,claims.approver.approve');
+        Route::post('/batch-reject', [ClaimController::class, 'batchReject'])->middleware('permission:any,claims.reject,claims.reviewer.reject,claims.approver.reject');
     });
 
     // Security routes
     Route::prefix('security')->group(function () {
-        Route::get('dashboard', [SecurityController::class, 'dashboard']);
-        Route::get('logs', [SecurityController::class, 'logs']);
-        Route::post('logs/{securityLog}/resolve', [SecurityController::class, 'resolve']);
-        Route::post('logs/bulk-resolve', [SecurityController::class, 'bulkResolve']);
-        Route::get('audit-trail', [SecurityController::class, 'auditTrail']);
-        Route::get('sessions', [SecurityController::class, 'sessions']);
-        Route::post('sessions/revoke', [SecurityController::class, 'revokeSessions']);
+        Route::get('dashboard', [SecurityController::class, 'dashboard'])->middleware('permission:audit.view');
+        Route::get('logs', [SecurityController::class, 'logs'])->middleware('permission:audit.view');
+        Route::post('logs/{securityLog}/resolve', [SecurityController::class, 'resolve'])->middleware('permission:audit.view');
+        Route::post('logs/bulk-resolve', [SecurityController::class, 'bulkResolve'])->middleware('permission:audit.view');
+        Route::get('audit-trail', [SecurityController::class, 'auditTrail'])->middleware('permission:audit.view');
+        Route::get('sessions', [SecurityController::class, 'sessions'])->middleware('permission:audit.view');
+        Route::post('sessions/revoke', [SecurityController::class, 'revokeSessions'])->middleware('permission:audit.view');
     });
 });

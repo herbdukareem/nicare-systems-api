@@ -50,6 +50,7 @@ const breadcrumbMappings = {
   '/settings/benefactors': [{ name: 'Settings' }, { name: 'Manage Benefactors' }],
   '/settings/departments': [{ name: 'Settings' }, { name: 'Manage Department' }],
   '/settings/designations': [{ name: 'Settings' }, { name: 'Manage Designation' }],
+  '/settings/nin-provider': [{ name: 'Settings' }, { name: 'NIN Provider Configuration' }],
   '/devices/manage': [{ name: 'Device Management' }, { name: 'Manage Device' }],
   '/devices/config': [{ name: 'Device Management' }, { name: 'Enrollment Configuration' }],
   '/capitation/generate': [{ name: 'Capitation Module' }, { name: 'Generate Capitation' }],

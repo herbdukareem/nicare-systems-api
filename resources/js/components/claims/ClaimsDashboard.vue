@@ -1,250 +1,154 @@
 <template>
   <AdminLayout>
-    <div class="claims-dashboard">
-      <v-container fluid>
-      <!-- Header -->
-      <v-row>
-        <v-col cols="12">
-          <div class="mb-6">
-            <h1 class="text-h4 font-weight-bold">Claims Module</h1>
-            <p class="text-subtitle-1 text-grey">Manage referrals, claims submission, and review</p>
+    <div class="qds-page-shell">
+      <AppPageHeader title="Claims Dashboard" icon="mdi-file-document-multiple-outline" icon-color="secondary">
+        <v-btn size="small" variant="outlined" prepend-icon="mdi-refresh" :loading="loading" @click="loadStatistics">Refresh</v-btn>
+      </AppPageHeader>
+
+      <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-4 xl:tw-grid-cols-7">
+        <AppStatCard compact label="Total Claims" :value="overview.total_claims || 0" icon="mdi-file-document-multiple" color="secondary" :loading="loading" />
+        <AppStatCard compact label="Awaiting Review" :value="queue.awaiting_review || 0" icon="mdi-clock-outline" color="warning" :loading="loading" />
+        <AppStatCard compact label="Approved This Month" :value="month.approved || 0" icon="mdi-check-decagram" color="success" :loading="loading" />
+        <AppStatCard compact label="Total Referrals" :value="overview.total_referrals || 0" icon="mdi-hospital-box-outline" color="info" :loading="loading" />
+        <AppStatCard compact label="My Queue" :value="queue.my_queue || 0" icon="mdi-account-switch-outline" color="primary" :loading="loading" />
+        <AppStatCard compact label="Approval Rate" :value="`${month.approval_rate_percent || 0}%`" icon="mdi-chart-arc" color="success" :loading="loading" />
+        <AppStatCard compact label="Avg Review Time" :value="`${today.avg_review_time_minutes || 0} min`" icon="mdi-timer-outline" color="info" :loading="loading" />
+      </div>
+
+      <div v-if="loadError">
+        <AppErrorState title="Claims dashboard unavailable" :message="loadError">
+          <v-btn color="primary" variant="flat" prepend-icon="mdi-refresh" @click="loadStatistics">Retry</v-btn>
+        </AppErrorState>
+      </div>
+
+      <div class="tw-grid tw-grid-cols-1 tw-gap-4 xl:tw-grid-cols-2">
+        <AppCard title="Claims Queue" icon="mdi-format-list-checks" tone="secondary">
+          <div class="tw-grid tw-grid-cols-1 tw-gap-3 sm:tw-grid-cols-2">
+            <div class="tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-3">
+              <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Currently Reviewing</p>
+              <p class="tw-mt-1.5 tw-text-xl tw-font-semibold tw-text-slate-950">{{ queue.currently_reviewing || 0 }}</p>
+            </div>
+            <div class="tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-3">
+              <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Claims Over 7 Days</p>
+              <p class="tw-mt-1.5 tw-text-xl tw-font-semibold tw-text-slate-950">{{ turnaround.claims_over_7_days || 0 }}</p>
+            </div>
           </div>
-        </v-col>
-      </v-row>
+          <div class="tw-mt-4 tw-flex tw-flex-wrap tw-gap-2">
+            <v-btn color="primary" variant="flat" prepend-icon="mdi-file-search-outline" to="/claims/review">Open Review Queue</v-btn>
+            <v-btn color="primary" variant="outlined" prepend-icon="mdi-cash-multiple" to="/claims/payment-batches">Payment Batches</v-btn>
+          </div>
+        </AppCard>
 
-      <!-- Statistics Cards -->
-      <v-row>
-        <v-col cols="12" md="3">
-          <v-card class="stat-card">
-            <v-card-text>
-              <div class="d-flex justify-space-between align-center">
-                <div>
-                  <p class="text-caption text-grey mb-1">Total Claims</p>
-                  <h3 class="text-h5">{{ statistics.total_claims || 0 }}</h3>
-                </div>
-                <v-icon size="40" color="primary">mdi-file-document-multiple</v-icon>
+        <AppCard title="Recent Adjudications" icon="mdi-history" tone="info">
+          <div v-if="recentAdjudications.length" class="tw-space-y-2">
+            <div
+              v-for="item in recentAdjudications.slice(0, 6)"
+              :key="item.id"
+              class="tw-flex tw-items-start tw-justify-between tw-gap-3 tw-border tw-border-slate-200 tw-bg-slate-50 tw-px-3 tw-py-2"
+            >
+              <div class="tw-min-w-0">
+                <p class="tw-font-medium tw-text-slate-900">Claim #{{ item.claim_number || item.id }}</p>
+                <p class="tw-text-xs tw-text-slate-500">{{ item.facility?.name || 'Facility unavailable' }}</p>
+                <p class="tw-text-xs tw-text-slate-500">{{ item.enrollee?.first_name }} {{ item.enrollee?.last_name }}</p>
               </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" md="3">
-          <v-card class="stat-card">
-            <v-card-text>
-              <div class="d-flex justify-space-between align-center">
-                <div>
-                  <p class="text-caption text-grey mb-1">Pending Review</p>
-                  <h3 class="text-h5">{{ statistics.pending_claims || 0 }}</h3>
-                </div>
-                <v-icon size="40" color="warning">mdi-clock-outline</v-icon>
+              <div class="tw-flex tw-flex-col tw-items-end tw-gap-2">
+                <ClaimStatusBadge :status="item.status" size="sm" />
+                <DateDisplay :value="item.updated_at" format="short" />
               </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" md="3">
-          <v-card class="stat-card">
-            <v-card-text>
-              <div class="d-flex justify-space-between align-center">
-                <div>
-                  <p class="text-caption text-grey mb-1">Approved Claims</p>
-                  <h3 class="text-h5">{{ statistics.approved_claims || 0 }}</h3>
-                </div>
-                <v-icon size="40" color="success">mdi-check-circle</v-icon>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" md="3">
-          <v-card class="stat-card">
-            <v-card-text>
-              <div class="d-flex justify-space-between align-center">
-                <div>
-                  <p class="text-caption text-grey mb-1">Total Referrals</p>
-                  <h3 class="text-h5">{{ statistics.total_referrals || 0 }}</h3>
-                </div>
-                <v-icon size="40" color="info">mdi-hospital-box</v-icon>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
+            </div>
+          </div>
+          <AppEmptyState
+            v-else
+            icon="mdi-history"
+            title="No adjudications yet"
+            description="As claims are approved or rejected, they will appear here for quick operational review."
+          />
+        </AppCard>
+      </div>
 
-      <!-- Navigation Cards -->
-      <v-row class="mt-4">
-        <v-col cols="12">
-          <h2 class="text-h6 mb-4">Quick Actions</h2>
-        </v-col>
-
-        <v-col cols="12" md="6" lg="4" v-for="card in filteredNavigationCards" :key="card.route">
-          <v-card
-            class="navigation-card"
-            hover
-            @click="navigateTo(card.route)"
-            :disabled="card.disabled"
-          >
-            <v-card-text class="pa-6">
-              <div class="d-flex align-start">
-                <v-avatar :color="card.color" size="56" class="mr-4">
-                  <v-icon size="32" color="white">{{ card.icon }}</v-icon>
-                </v-avatar>
-                <div class="flex-grow-1">
-                  <h3 class="text-h6 mb-2">{{ card.title }}</h3>
-                  <p class="text-body-2 text-grey">{{ card.description }}</p>
-                  <v-chip
-                    v-if="card.badge"
-                    :color="card.badgeColor"
-                    size="small"
-                    class="mt-2"
-                  >
-                    {{ card.badge }}
-                  </v-chip>
-                </div>
-                <v-icon color="grey-lighten-1">mdi-chevron-right</v-icon>
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-      </v-container>
+      <AppCard title="Facility Workload" icon="mdi-hospital-building" tone="warning">
+        <div v-if="byFacility.length" class="tw-overflow-x-auto">
+          <table class="tw-min-w-full tw-text-sm">
+            <thead class="tw-bg-slate-50">
+              <tr class="tw-text-left tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">
+                <th class="tw-px-4 tw-py-3">Facility</th>
+                <th class="tw-px-4 tw-py-3">Total</th>
+                <th class="tw-px-4 tw-py-3">Submitted</th>
+                <th class="tw-px-4 tw-py-3">Approved</th>
+                <th class="tw-px-4 tw-py-3">Rejected</th>
+                <th class="tw-px-4 tw-py-3">Pending</th>
+              </tr>
+            </thead>
+            <tbody class="tw-divide-y tw-divide-slate-200">
+              <tr v-for="facility in byFacility" :key="facility.facility_name">
+                <td class="tw-px-4 tw-py-3 tw-font-medium tw-text-slate-900">{{ facility.facility_name }}</td>
+                <td class="tw-px-4 tw-py-3">{{ facility.total }}</td>
+                <td class="tw-px-4 tw-py-3">{{ facility.submitted }}</td>
+                <td class="tw-px-4 tw-py-3">{{ facility.approved }}</td>
+                <td class="tw-px-4 tw-py-3">{{ facility.rejected }}</td>
+                <td class="tw-px-4 tw-py-3">{{ facility.pending }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <AppEmptyState
+          v-else
+          icon="mdi-file-chart-outline"
+          title="No facility workload data"
+          description="Facility-level claim summaries will appear here once submissions start flowing."
+        />
+      </AppCard>
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue';
-import { useRouter } from 'vue-router';
-import { useToast } from '@/js/composables/useToast';
-import { useAuthStore } from '@/js/stores/auth';
-import api from '@/js/utils/api';
-import AdminLayout from '../layout/AdminLayout.vue';
+import { ref } from 'vue'
+import AdminLayout from '../layout/AdminLayout.vue'
+import AppCard from '../common/AppCard.vue'
+import AppEmptyState from '../common/AppEmptyState.vue'
+import AppErrorState from '../common/AppErrorState.vue'
+import AppPageHeader from '../common/AppPageHeader.vue'
+import AppStatCard from '../common/AppStatCard.vue'
+import ClaimStatusBadge from '../common/ClaimStatusBadge.vue'
+import DateDisplay from '../common/DateDisplay.vue'
+import api from '../../utils/api'
+import { useToast } from '../../composables/useToast'
 
-const router = useRouter();
-const authStore = useAuthStore();
-const { error: showError } = useToast();
+const { error } = useToast()
 
-const statistics = ref({
-  total_claims: 0,
-  pending_claims: 0,
-  approved_claims: 0,
-  total_referrals: 0,
-});
-
-const navigationCards = ref([
-
-  {
-    title: 'Review Claims',
-    description: 'Review  submitted claims',
-    icon: 'mdi-file-check',
-    color: 'warning',
-    route: '/claims/review',
-    permissions: ['claims.review', 'claims.confirm', 'claims.approve'],
-    roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'], // Fallback
-  },
-   {
-    title: 'Claims Approval',
-    description: 'Approve submitted claims',
-    icon: 'mdi-file-check',
-    color: 'warning',
-    route: '/claims/approval',
-    permissions: ['claims.approve', 'claims.approver.approve'],
-    roles: ['admin', 'Super Admin', 'claim_reviewer', 'claim_confirmer', 'claim_approver'], // Fallback
-  },
-  {
-    title: 'Payment Batches',
-    description: 'Authorize and process payment batches',
-    icon: 'mdi-cash-multiple',
-    color: 'success',
-    route: '/claims/payment-batches',
-    permissions: ['payment_batches.view', 'payment_batches.manage'],
-    roles: ['admin', 'Super Admin', 'claims_officer', 'claim_approver'], // Fallback
-  },
-  {
-    title: 'Claims History',
-    description: 'View claims history and reports',
-    icon: 'mdi-history',
-    color: 'purple',
-    route: '/claims/history',
-    permissions: ['claims.view'],
-  },
-  {
-    title: 'Admission Management',
-    description: 'Manage patient admissions for episode-of-care tracking',
-    icon: 'mdi-bed-empty',
-    color: 'teal',
-    route: '/claims/automation/admissions',
-    permissions: ['admissions.view', 'admissions.manage'],
-  },
-  {
-    title: 'Claims Processing',
-    description: 'Process claims with bundle classification and FFS top-ups',
-    icon: 'mdi-cog-outline',
-    color: 'orange',
-    route: '/claims/automation/process',
-    permissions: ['claims.process', 'claims.automate'],
-  },
-]);
-
-// Filter navigation cards based on user permissions (preferred) or roles (fallback)
-const filteredNavigationCards = computed(() => {
-  return navigationCards.value.filter(card => {
-    // Check permissions first (preferred method)
-    if (card.permissions && card.permissions.length > 0) {
-      // User needs at least one of the specified permissions
-      return card.permissions.some(permission => authStore.hasPermission(permission));
-    }
-
-    // Fallback to role-based check for backward compatibility
-    if (card.roles && card.roles.length > 0) {
-      return card.roles.some(role => authStore.hasRole(role));
-    }
-
-    // Show if no restrictions
-    return true;
-  });
-});
-
-onMounted(async () => {
-  await loadStatistics();
-});
+const loading = ref(false)
+const loadError = ref('')
+const overview = ref({})
+const queue = ref({})
+const today = ref({})
+const month = ref({})
+const turnaround = ref({})
+const byFacility = ref([])
+const recentAdjudications = ref([])
 
 const loadStatistics = async () => {
+  loading.value = true
+  loadError.value = ''
+
   try {
-    const response = await api.get('/api/claims/statistics');
-    statistics.value = response.data.data || response.data;
+    const response = await api.get('/dashboard/claims')
+    const payload = response.data?.data ?? response.data ?? {}
+
+    overview.value = payload.overview || {}
+    queue.value = payload.queue || {}
+    today.value = payload.today || {}
+    month.value = payload.this_month || {}
+    turnaround.value = payload.turnaround || {}
+    byFacility.value = payload.by_facility || []
+    recentAdjudications.value = payload.recent_adjudications || []
   } catch (err) {
-    console.error('Failed to load statistics', err);
+    loadError.value = err?.response?.data?.message || 'Unable to load claims dashboard.'
+    error(loadError.value)
+  } finally {
+    loading.value = false
   }
-};
+}
 
-const navigateTo = (route) => {
-  router.push(route);
-};
-
+loadStatistics()
 </script>
-
-<style scoped>
-.stat-card {
-  transition: transform 0.2s;
-}
-
-.stat-card:hover {
-  transform: translateY(-4px);
-}
-
-.navigation-card {
-  cursor: pointer;
-  transition: all 0.3s;
-  border: 1px solid rgba(0, 0, 0, 0.12);
-}
-
-.navigation-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
-}
-
-.navigation-card:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-</style>
-
-

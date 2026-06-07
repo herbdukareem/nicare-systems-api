@@ -3,19 +3,20 @@
 namespace Tests\Feature;
 
 use App\Models\Admission;
+use App\Models\BenefitPackage;
 use App\Models\Claim;
 use App\Models\Enrollee;
 use App\Models\Facility;
 use App\Models\Referral;
 use App\Models\User;
 use App\Services\ClaimsAutomation\ClaimProcessingService;
-use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Foundation\Testing\DatabaseTransactions;
 use InvalidArgumentException;
 use Tests\TestCase;
 
 class ClaimBR04Test extends TestCase
 {
-    use RefreshDatabase;
+    use DatabaseTransactions;
 
     private User $user;
     private Facility $facility;
@@ -26,7 +27,18 @@ class ClaimBR04Test extends TestCase
         parent::setUp();
         $this->user     = User::factory()->create();
         $this->facility = Facility::factory()->create(['accreditation_status' => 'active']);
-        $this->enrollee = Enrollee::factory()->create(['facility_id' => $this->facility->id]);
+        $benefitPackage = BenefitPackage::first() ?: BenefitPackage::create([
+            'name' => 'Standard Package',
+            'code' => 'standard',
+            'status' => 1,
+        ]);
+        $this->enrollee = Enrollee::factory()->create([
+            'facility_id' => $this->facility->id,
+            'benefit_package_id' => $benefitPackage->id,
+            'coverage_start_date' => now()->subDays(5),
+            'coverage_end_date' => now()->addDays(30),
+            'status' => Enrollee::STATUS_ACTIVE,
+        ]);
         $this->actingAs($this->user, 'sanctum');
     }
 
@@ -36,7 +48,7 @@ class ClaimBR04Test extends TestCase
         $referral = Referral::factory()->create([
             'enrollee_id'          => $this->enrollee->id,
             'receiving_facility_id' => $this->facility->id,
-            'status'               => 'approved',
+            'status'               => Referral::STATUS_APPROVED,
             'utn'                  => 'UTN-EXPIRED-001',
             'utn_validated'        => true,
             'valid_until'          => now()->subDays(10), // expired 10 days ago
@@ -62,7 +74,7 @@ class ClaimBR04Test extends TestCase
         $referral = Referral::factory()->create([
             'enrollee_id'          => $this->enrollee->id,
             'receiving_facility_id' => $this->facility->id,
-            'status'               => 'approved',
+            'status'               => Referral::STATUS_APPROVED,
             'utn'                  => 'UTN-VALID-001',
             'utn_validated'        => true,
             'valid_until'          => now()->addDays(30), // still valid

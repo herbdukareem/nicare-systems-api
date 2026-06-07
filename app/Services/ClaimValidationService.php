@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Claim;
 use App\Models\PACode;
+use App\Models\Referral;
 
 class ClaimValidationService
 {
@@ -30,6 +31,16 @@ class ClaimValidationService
         }
 
         $referral = $claim->referral;
+        if ($referral->status !== Referral::STATUS_APPROVED) {
+            $alerts[] = [
+                'type' => 'CRITICAL',
+                'code' => 'REFERRAL_NOT_APPROVED',
+                'message' => 'Claims can only be submitted against approved referrals.',
+                'action' => 'REJECT_CLAIM',
+            ];
+            return $alerts;
+        }
+
         if (!$referral->utn_validated) {
             $alerts[] = [
                 'type' => 'CRITICAL',
@@ -62,11 +73,11 @@ class ClaimValidationService
             $admission = $claim->admission;
 
             // Check if bundle matches the principal diagnosis
-            if ($admission->bundle_id && $bundleLine->bundle_id !== $admission->bundle_id) {
+            if ($admission && $admission->service_bundle_id && (int) $bundleLine->bundle_id !== (int) $admission->service_bundle_id) {
                 $alerts[] = [
                     'type' => 'CRITICAL',
                     'code' => 'BUNDLE_DIAGNOSIS_MISMATCH',
-                    'message' => 'Bundle in claim does not match the principal ICD-10 diagnosis from the referral. Expected bundle ID: ' . $admission->bundle_id . ', but got: ' . $bundleLine->bundle_id,
+                    'message' => 'Bundle in claim does not match the principal ICD-10 diagnosis from the referral. Expected bundle ID: ' . $admission->service_bundle_id . ', but got: ' . $bundleLine->bundle_id,
                     'action' => 'REJECT_CLAIM',
                 ];
                 return $alerts;
@@ -91,7 +102,7 @@ class ClaimValidationService
 
             // Check if all FFS PA codes are approved
             $ffsWithUnapprovedPA = $ffsLines->filter(function ($line) {
-                return $line->paCode && $line->paCode->status !== 'APPROVED';
+                return !$line->paCode || $line->paCode->status !== Referral::STATUS_APPROVED;
             });
 
             if ($ffsWithUnapprovedPA->isNotEmpty()) {
@@ -177,6 +188,14 @@ class ClaimValidationService
             ];
         }
 
+        if ($referral->status !== Referral::STATUS_APPROVED) {
+            return [
+                'valid' => false,
+                'message' => 'Referral must be approved before its UTN can be used for claims.',
+                'referral' => $referral,
+            ];
+        }
+
         if (!$referral->utn_validated) {
             return [
                 'valid' => false,
@@ -237,7 +256,7 @@ class ClaimValidationService
         }
 
         // Check if all PA codes are approved
-        $unapprovedPACodes = $paCodes->where('status', '!=', 'APPROVED');
+        $unapprovedPACodes = $paCodes->where('status', '!=', Referral::STATUS_APPROVED);
         if ($unapprovedPACodes->isNotEmpty()) {
             return [
                 'valid' => false,

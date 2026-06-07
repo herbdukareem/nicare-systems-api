@@ -8,6 +8,7 @@ use App\Models\PremiumPlan;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\RateLimiter;
 
 class EnrolleeAuthController extends Controller
 {
@@ -15,24 +16,45 @@ class EnrolleeAuthController extends Controller
     {
         $request->validate([
             'enrollee_id' => 'required|string',
-            'password'    => 'required|string',
+            'password' => 'required|string',
         ]);
+
+        $throttleKey = $this->throttleKey($request);
+        if (RateLimiter::tooManyAttempts($throttleKey, 5)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Too many failed login attempts. Please try again later.',
+                'retry_after_seconds' => RateLimiter::availableIn($throttleKey),
+            ], 429);
+        }
 
         $enrollee = Enrollee::where('enrollee_id', $request->enrollee_id)->first();
 
         if (!$enrollee) {
-            return response()->json(['success' => false, 'message' => 'Invalid enrollee ID or NIN.'], 401);
+            RateLimiter::hit($throttleKey, 60);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid enrollee ID or password.',
+            ], 401);
         }
 
-        // Login priority: custom hashed password → plain NIN fallback
-        if ($enrollee->password) {
-            $authenticated = Hash::check($request->password, $enrollee->password);
-        } else {
-            $authenticated = $request->password === $enrollee->nin;
+        if (!$enrollee->password) {
+            RateLimiter::hit($throttleKey, 60);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Password activation is required before enrollee portal access. Please use the secure activation/reset flow.',
+            ], 403);
         }
 
-        if (!$authenticated) {
-            return response()->json(['success' => false, 'message' => 'Invalid enrollee ID or NIN.'], 401);
+        if (!Hash::check($request->password, $enrollee->password)) {
+            RateLimiter::hit($throttleKey, 60);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid enrollee ID or password.',
+            ], 401);
         }
 
         if ((int) $enrollee->status !== Enrollee::STATUS_ACTIVE) {
@@ -42,6 +64,8 @@ class EnrolleeAuthController extends Controller
             ], 403);
         }
 
+        RateLimiter::clear($throttleKey);
+
         $enrollee->tokens()->delete();
         $token = $enrollee->createToken('enrollee-portal')->plainTextToken;
 
@@ -50,8 +74,8 @@ class EnrolleeAuthController extends Controller
         return response()->json([
             'success' => true,
             'data' => [
-                'enrollee'           => $enrollee,
-                'token'              => $token,
+                'enrollee' => $enrollee,
+                'token' => $token,
                 'has_custom_password' => !is_null($enrollee->password),
             ],
         ]);
@@ -73,7 +97,7 @@ class EnrolleeAuthController extends Controller
 
         return response()->json([
             'success' => true,
-            'data'    => $enrollee,
+            'data' => $enrollee,
         ]);
     }
 
@@ -81,19 +105,18 @@ class EnrolleeAuthController extends Controller
     {
         $request->validate([
             'current_password' => 'required|string',
-            'new_password'     => 'required|string|min:6|confirmed',
+            'new_password' => 'required|string|min:6|confirmed',
         ]);
 
         $enrollee = $request->user();
-
-        // Verify current credentials
-        if ($enrollee->password) {
-            $valid = Hash::check($request->current_password, $enrollee->password);
-        } else {
-            $valid = $request->current_password === $enrollee->nin;
+        if (!$enrollee->password) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Password activation is required before password changes are allowed.',
+            ], 403);
         }
 
-        if (!$valid) {
+        if (!Hash::check($request->current_password, $enrollee->password)) {
             return response()->json([
                 'success' => false,
                 'message' => 'Current password is incorrect.',
@@ -113,5 +136,10 @@ class EnrolleeAuthController extends Controller
         $plans = PremiumPlan::orderBy('amount')->get();
 
         return response()->json(['success' => true, 'data' => $plans]);
+    }
+
+    private function throttleKey(Request $request): string
+    {
+        return 'enrollee-login:' . strtolower((string) $request->input('enrollee_id')) . '|' . $request->ip();
     }
 }

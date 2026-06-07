@@ -102,7 +102,7 @@ const routes = [
     component: EnrollmentApprovalPage,
     meta: {
       requiresAuth: true,
-      permissions: ['enrollees.update', 'enrollee.approve'],
+      permissions: ['enrollee.approve', 'enrollee.nin.verify'],
       title: 'Pending Approval',
       breadcrumb: 'Pending Approval',
     },
@@ -880,6 +880,17 @@ const routes = [
       breadcrumb: 'Designations',
     },
   },
+  {
+    path: '/settings/nin-provider',
+    name: 'settings-nin-provider',
+    component: () => import('../components/settings/NinProviderSettingsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['settings.nin.manage', 'settings.edit'],
+      title: 'NIN Provider Configuration',
+      breadcrumb: 'NIN Provider Configuration',
+    },
+  },
 
   // ── Legacy / device routes ─────────────────────────────────────────────────
   {
@@ -897,10 +908,19 @@ const routes = [
     meta: { requiresAuth: true, permissions: ['users.view'], title: 'Enrollment Config', breadcrumb: 'Config' },
   },
 
+  // ── Design System ──────────────────────────────────────────────────────────
+  {
+    path: '/design-system',
+    name: 'design-system',
+    component: () => import('../components/design-system/DesignSystemPage.vue'),
+    meta: { requiresAuth: true, title: 'Design System', breadcrumb: 'Design System' },
+  },
+
   // ── Default ────────────────────────────────────────────────────────────────
   { path: '/', name: 'landing', component: () => import('../components/landing/LandingPage.vue'), meta: { requiresAuth: false } },
 
   // ── Enrollee Portal ────────────────────────────────────────────────────────
+  { path: '/enroll/start', name: 'enroll-start', component: () => import('../components/enroll/PublicEnrollmentPage.vue'), meta: { requiresAuth: false, enrolleePublic: true, title: 'Start Enrollment' } },
   { path: '/enroll/login', name: 'enroll-login', component: () => import('../components/enroll/EnrolleeLogin.vue'), meta: { requiresAuth: false, enrolleePublic: true } },
   { path: '/enroll/dashboard', name: 'enroll-dashboard', component: () => import('../components/enroll/EnrolleeDashboard.vue'), meta: { requiresEnrolleeAuth: true, title: 'My Dashboard' } },
   { path: '/enroll/plans', name: 'enroll-plans', component: () => import('../components/enroll/EnrolleePlansPage.vue'), meta: { requiresEnrolleeAuth: true, title: 'Premium Plans' } },

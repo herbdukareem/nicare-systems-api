@@ -6,43 +6,34 @@
     scrollable
     @update:model-value="$emit('update:modelValue', $event)"
   >
-    <v-card rounded="xl" class="tw-overflow-hidden">
-      <!-- Header -->
-      <div
-        class="tw-flex tw-items-center tw-justify-between tw-px-5 tw-py-4"
-        :class="headerBg"
-      >
-        <div class="tw-flex tw-min-w-0 tw-items-center tw-gap-3">
-          <div
-            v-if="icon"
-            class="tw-flex tw-h-9 tw-w-9 tw-flex-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-bg-white/20"
-          >
-            <v-icon color="white" size="20">{{ icon }}</v-icon>
+    <v-card :rounded="0" class="tw-overflow-hidden tw-border tw-border-slate-200 tw-shadow-[0_30px_80px_-32px_rgba(15,23,42,0.34)]">
+      <div class="tw-flex tw-items-start tw-justify-between tw-gap-4 tw-border-b tw-border-slate-200 tw-bg-slate-50 tw-px-5 tw-py-4">
+        <div class="tw-flex tw-min-w-0 tw-items-start tw-gap-3">
+          <div v-if="icon" class="qds-icon-shell" :class="headerBg">
+            <v-icon size="18">{{ icon }}</v-icon>
           </div>
           <div class="tw-min-w-0">
-            <h2 class="tw-truncate tw-text-sm tw-font-semibold tw-leading-tight tw-text-white">{{ title }}</h2>
-            <p v-if="subtitle" class="tw-mt-0.5 tw-truncate tw-text-xs tw-text-white/70">{{ subtitle }}</p>
+            <h2 class="tw-text-base tw-font-semibold tw-text-slate-950">{{ title }}</h2>
+            <p v-if="subtitle" class="tw-mt-1 tw-text-sm tw-text-slate-500">{{ subtitle }}</p>
           </div>
         </div>
         <button
           v-if="!persistent && !loading"
           type="button"
-          class="tw-ml-4 tw-flex tw-h-7 tw-w-7 tw-flex-shrink-0 tw-items-center tw-justify-center tw-rounded-md tw-text-white/80 tw-transition-colors hover:tw-bg-white/20 hover:tw-text-white focus:tw-outline-none"
+          class="tw-inline-flex tw-h-8 tw-w-8 tw-items-center tw-justify-center tw-text-slate-400 hover:tw-bg-slate-200/70 hover:tw-text-slate-700"
           @click="$emit('update:modelValue', false)"
         >
           <v-icon size="17">mdi-close</v-icon>
         </button>
       </div>
 
-      <!-- Body -->
       <v-card-text class="tw-p-5">
         <slot />
       </v-card-text>
 
-      <!-- Actions footer -->
       <div
         v-if="$slots.actions"
-        class="tw-flex tw-items-center tw-justify-end tw-gap-2 tw-border-t tw-border-slate-100 tw-bg-slate-50 tw-px-5 tw-py-3"
+        class="tw-flex tw-flex-wrap tw-items-center tw-justify-end tw-gap-2 tw-border-t tw-border-slate-200 tw-bg-slate-50 tw-px-5 tw-py-3"
       >
         <slot name="actions" />
       </div>
@@ -76,12 +67,12 @@ const maxWidths = {
 
 const headerBg = computed(() => {
   const map = {
-    primary: 'tw-bg-gradient-to-br tw-from-cyan-800 tw-to-cyan-600',
-    success: 'tw-bg-gradient-to-br tw-from-emerald-700 tw-to-emerald-500',
-    error: 'tw-bg-gradient-to-br tw-from-red-700 tw-to-red-500',
-    warning: 'tw-bg-gradient-to-br tw-from-amber-600 tw-to-amber-500',
-    neutral: 'tw-bg-gradient-to-br tw-from-slate-700 tw-to-slate-600',
-    info: 'tw-bg-gradient-to-br tw-from-blue-700 tw-to-blue-500',
+    primary: 'qds-tone-primary',
+    success: 'qds-tone-success',
+    error: 'qds-tone-danger',
+    warning: 'qds-tone-warning',
+    neutral: 'qds-tone-neutral',
+    info: 'qds-tone-info',
   }
   return map[props.color] ?? map.primary
 })

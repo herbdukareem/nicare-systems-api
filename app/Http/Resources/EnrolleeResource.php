@@ -19,6 +19,19 @@ class EnrolleeResource extends JsonResource
             'legacy_id' => $this->legacy_id,
             'legacy_enrollee_id' => $this->legacy_enrollee_id,
             'nin' => $this->nin,
+            'nin_verification_status' => $this->ninVerificationStatus(),
+            'nin_verification_label' => $this->ninVerificationLabel(),
+            'nin_verified_at' => $this->nin_verified_at,
+            'nin_verification_provider' => $this->nin_verification_provider,
+            'nin_verification' => [
+                'status' => $this->ninVerificationStatus(),
+                'label' => $this->ninVerificationLabel(),
+                'verified_at' => $this->nin_verified_at,
+                'provider' => $this->nin_verification_provider,
+                'verified_by' => new UserResource($this->whenLoaded('ninVerifiedBy')),
+                'data' => $this->nin_verification_data,
+                'meta' => $this->nin_verification_meta,
+            ],
             'first_name' => $this->first_name,
             'last_name' => $this->last_name,
             'middle_name' => $this->middle_name,
@@ -45,8 +58,10 @@ class EnrolleeResource extends JsonResource
             'enrollee_category' => $this->whenLoaded('enrolleeCategory'),
             'premium_plan_id' => $this->premium_plan_id,
             'premium_pin_id' => $this->premium_pin_id,
+            'premium_purchase_id' => $this->premium_purchase_id,
             'premium_plan' => $this->whenLoaded('premiumPlan'),
             'premium_pin' => $this->whenLoaded('premiumPin'),
+            'premium_purchase' => $this->whenLoaded('premiumPurchase'),
             'benefit_package' => $this->whenLoaded('benefitPackage'),
             'vulnerable_group' => $this->whenLoaded('vulnerableGroup'),
             'enrollment_phase' => $this->whenLoaded('enrollmentPhase'),
@@ -77,6 +92,7 @@ class EnrolleeResource extends JsonResource
             'approval_date' => $this->approval_date,
             'status' => $this->status,
             'status_label' => $this->getStatusLabel(),
+            'enrollment_source' => $this->enrollment_source ?? 'staff',
             'creator' => new UserResource($this->whenLoaded('createdBy')),
             'approver' => new UserResource($this->whenLoaded('approvedBy')),
             'duplicate_reviewed_by' => new UserResource($this->whenLoaded('duplicateReviewedBy')),
@@ -129,5 +145,24 @@ class EnrolleeResource extends JsonResource
         }
 
         return 'expired';
+    }
+
+    private function ninVerificationStatus(): string
+    {
+        if (blank($this->nin)) {
+            return \App\Models\Enrollee::NIN_VERIFICATION_NOT_PROVIDED;
+        }
+
+        return $this->nin_verification_status ?: \App\Models\Enrollee::NIN_VERIFICATION_NOT_STARTED;
+    }
+
+    private function ninVerificationLabel(): string
+    {
+        return match ($this->ninVerificationStatus()) {
+            \App\Models\Enrollee::NIN_VERIFICATION_VERIFIED => 'Verified',
+            \App\Models\Enrollee::NIN_VERIFICATION_FAILED => 'Verification Failed',
+            \App\Models\Enrollee::NIN_VERIFICATION_NOT_PROVIDED => 'NIN Not Provided',
+            default => 'Not Verified',
+        };
     }
 }

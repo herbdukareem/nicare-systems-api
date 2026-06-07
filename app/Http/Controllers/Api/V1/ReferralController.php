@@ -104,7 +104,7 @@ class ReferralController extends BaseController
 
             // BUSINESS RULE 2: Check if enrollee has pending referral without submitted claim
             $pendingReferral = Referral::where('enrollee_id', $enrolleeId)
-                ->where('status', 'APPROVED')
+                ->where('status', Referral::STATUS_APPROVED)
                 ->where('claim_submitted', false)
                 ->first();
 
@@ -260,12 +260,12 @@ class ReferralController extends BaseController
      */
     public function approve(\App\Models\Referral $referral)
     {
-        if ($referral->status !== 'PENDING') {
+        if ($referral->status !== Referral::STATUS_PENDING) {
             return $this->sendError('Only pending referrals can be approved', [], 400);
         }
 
         $referral->update([
-            'status' => 'APPROVED',
+            'status' => Referral::STATUS_APPROVED,
             'approval_date' => now(),
         ]);
 
@@ -279,7 +279,7 @@ class ReferralController extends BaseController
                 'admission_id' => null, // Will be linked when admission is created
                 'code' => 'PA-REF-' . $referral->id,
                 'type' => \App\Models\PACode::TYPE_BUNDLE,
-                'status' => 'APPROVED',
+                'status' => Referral::STATUS_APPROVED,
                 'justification' => 'Auto-generated from approved referral with service bundle',
                 'requested_services' => [],
                 'service_selection_type' => 'bundle',
@@ -303,12 +303,12 @@ class ReferralController extends BaseController
             'rejection_reason' => ['required', 'string', 'max:1000'],
         ]);
 
-        if ($referral->status !== 'PENDING') {
+        if ($referral->status !== Referral::STATUS_PENDING) {
             return $this->sendError('Only pending referrals can be rejected', [], 400);
         }
 
         $referral->update([
-            'status' => 'REJECTED',
+            'status' => Referral::STATUS_REJECTED,
             'rejection_reason' => $validated['rejection_reason'],
         ]);
 

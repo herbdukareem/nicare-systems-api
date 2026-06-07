@@ -1,136 +1,298 @@
 <template>
   <AdminLayout>
-    <div class="tw-space-y-5">
-      <div class="tw-flex tw-flex-col tw-gap-3 lg:tw-flex-row lg:tw-items-center lg:tw-justify-between">
-        <div>
-          <h1 class="tw-text-2xl tw-font-bold tw-text-slate-950">Enrollees Management</h1>
-          <p class="tw-text-sm tw-text-slate-500">Search, filter, review, and export enrollee records.</p>
-        </div>
-        <div class="tw-flex tw-flex-wrap tw-gap-2">
-          <v-btn variant="outlined" prepend-icon="mdi-filter-remove-outline" @click="resetFilters">Reset Filters</v-btn>
-          <v-btn color="primary" variant="outlined" prepend-icon="mdi-file-excel-outline" :loading="exporting" :disabled="!canExport" @click="exportExcel">
-            Export Excel
+    <div class="tw-space-y-4">
+      <AppPageHeader title="Enrollees" icon="mdi-account-group-outline">
+        <v-btn size="small" variant="outlined" prepend-icon="mdi-refresh" :disabled="!hasLoaded" @click="loadEnrollees">
+          Refresh
+        </v-btn>
+        <v-btn size="small" variant="outlined" prepend-icon="mdi-account-check-outline" to="/enrollees/approval">
+          Pending
+        </v-btn>
+        <v-btn size="small" variant="outlined" prepend-icon="mdi-filter-remove-outline" @click="resetFilters">
+          Reset
+        </v-btn>
+        <AppExportButton label="Export" :loading="exporting" :disabled="!canExport" @click="exportExcel" />
+        <v-btn color="primary" prepend-icon="mdi-account-plus-outline" to="/enrollees/demo-enrollment">
+          New Enrollee
+        </v-btn>
+      </AppPageHeader>
+
+      <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-3 lg:tw-grid-cols-5">
+        <AppStatCard compact label="Total" icon="mdi-account-group-outline" color="primary" :value="summary.total" :loading="loading" />
+        <AppStatCard compact label="Loaded" icon="mdi-table-row" color="info" :value="enrollees.length" :loading="loading" />
+        <AppStatCard compact label="Approved" icon="mdi-check-decagram-outline" color="success" :value="summary.approved" :loading="loading" />
+        <AppStatCard compact label="Pending" icon="mdi-clock-outline" color="warning" :value="summary.pending" :loading="loading" />
+        <AppStatCard compact label="Active Coverage" icon="mdi-shield-check-outline" color="secondary" :value="summary.active_coverage" :loading="loading" />
+      </div>
+
+      <AppFilterBar :active-count="activeFilterCount" :cols="5" :advanced-cols="4" @clear="resetFilters">
+        <template #actions>
+          <v-btn size="small" color="primary" variant="flat" :loading="loading" @click="applyFilters">
+            Load
           </v-btn>
-          <v-btn color="primary" prepend-icon="mdi-account-plus-outline" to="/enrollees/demo-enrollment">New Enrollee</v-btn>
-        </div>
-      </div>
+        </template>
 
-      <section class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-p-4 tw-shadow-sm">
-        <div class="tw-mb-4 tw-flex tw-flex-col tw-gap-1 sm:tw-flex-row sm:tw-items-end sm:tw-justify-between">
-          <div>
-            <h2 class="tw-text-sm tw-font-bold tw-text-slate-900">Filter Records</h2>
-            <p class="tw-text-xs tw-text-slate-500">Choose at least one filter for faster loading on large enrollee records.</p>
-          </div>
-          <v-btn color="primary" prepend-icon="mdi-database-search-outline" :loading="loading" @click="applyFilters">Load Enrollees</v-btn>
-        </div>
+        <v-text-field
+          v-model="filters.search"
+          label="Search"
+          placeholder="ID, name, NIN, phone"
+          density="compact"
+          variant="outlined"
+          prepend-inner-icon="mdi-magnify"
+          clearable
+          hide-details
+          @keyup.enter="applyFilters"
+        />
+        <v-autocomplete
+          v-model="filters.lga_id"
+          :items="metadata.lgas"
+          item-title="name"
+          item-value="id"
+          label="LGA"
+          density="compact"
+          variant="outlined"
+          clearable
+          hide-details
+        />
+        <v-autocomplete
+          v-model="filters.ward_id"
+          :items="filteredWards"
+          item-title="name"
+          item-value="id"
+          label="Ward"
+          density="compact"
+          variant="outlined"
+          clearable
+          hide-details
+          :disabled="!filters.lga_id && filteredWards.length === 0"
+        />
+        <v-autocomplete
+          v-model="filters.facility_id"
+          :items="filteredFacilities"
+          item-title="name"
+          item-value="id"
+          label="Facility"
+          density="compact"
+          variant="outlined"
+          clearable
+          hide-details
+        />
+        <v-select
+          v-model="filters.status"
+          :items="statusOptions"
+          item-title="title"
+          item-value="value"
+          label="Status"
+          density="compact"
+          variant="outlined"
+          clearable
+          hide-details
+        />
 
-        <div class="tw-grid tw-gap-3 md:tw-grid-cols-2 xl:tw-grid-cols-4">
-          <v-text-field v-model="filters.search" label="Search" placeholder="ID, name, NIN, phone, legacy ID" density="compact" variant="outlined" prepend-inner-icon="mdi-magnify" clearable hide-details @keyup.enter="applyFilters" />
-          <v-autocomplete v-model="filters.lga_id" :items="metadata.lgas" item-title="name" item-value="id" label="LGA" density="compact" variant="outlined" clearable hide-details />
-          <v-autocomplete v-model="filters.ward_id" :items="filteredWards" item-title="name" item-value="id" label="Ward" density="compact" variant="outlined" clearable hide-details :disabled="!filters.lga_id && filteredWards.length === 0" />
-          <v-autocomplete v-model="filters.facility_id" :items="filteredFacilities" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" clearable hide-details />
-
-          <v-select v-model="filters.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding Type" density="compact" variant="outlined" clearable hide-details />
-          <v-autocomplete v-model="filters.benefactor_id" :items="filteredBenefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable hide-details />
-          <v-select v-model="filters.enrollment_phase_id" :items="metadata.enrollment_phases" item-title="name" item-value="id" label="Enrollment Phase" density="compact" variant="outlined" clearable hide-details />
-          <v-select v-model="filters.status" :items="statusOptions" item-title="title" item-value="value" label="Status" density="compact" variant="outlined" clearable hide-details />
-
-          <v-select v-model="filters.date_field" :items="dateFieldOptions" item-title="title" item-value="value" label="Date Type" density="compact" variant="outlined" hide-details />
-          <v-text-field v-model="filters.date_from" type="date" label="Date From" density="compact" variant="outlined" hide-details />
-          <v-text-field v-model="filters.date_to" type="date" label="Date To" density="compact" variant="outlined" hide-details />
-          <v-select v-model="filters.coverage_status" :items="coverageOptions" item-title="title" item-value="value" label="Coverage" density="compact" variant="outlined" clearable hide-details />
-        </div>
-      </section>
-
-      <v-alert v-if="loadError" type="error" variant="tonal" closable @click:close="loadError = ''">
-        {{ loadError }}
-      </v-alert>
-
-      <div v-if="hasLoaded" class="tw-grid tw-gap-3 md:tw-grid-cols-2 xl:tw-grid-cols-5">
-        <div v-for="card in summaryCards" :key="card.label" class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-p-4 tw-shadow-sm">
-          <div class="tw-flex tw-items-start tw-justify-between tw-gap-3">
-            <div>
-              <p class="tw-text-xs tw-font-medium tw-uppercase tw-text-slate-500">{{ card.label }}</p>
-              <p class="tw-mt-2 tw-text-2xl tw-font-bold tw-text-slate-950">{{ card.value }}</p>
-              <p v-if="card.helper" class="tw-mt-1 tw-text-xs tw-text-slate-500">{{ card.helper }}</p>
-            </div>
-            <v-icon :color="card.color" size="24">{{ card.icon }}</v-icon>
-          </div>
-        </div>
-      </div>
-
-      <section class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-shadow-sm">
-        <div class="tw-flex tw-flex-col tw-gap-3 tw-border-b tw-border-slate-200 tw-p-4 sm:tw-flex-row sm:tw-items-center sm:tw-justify-between">
-          <div>
-            <h2 class="tw-text-sm tw-font-bold tw-text-slate-900">Filtered Results</h2>
-            <p class="tw-text-xs tw-text-slate-500">{{ hasLoaded ? showingText : 'Filters are ready. Click Load Enrollees to fetch records.' }}</p>
-          </div>
-          <div class="tw-flex tw-flex-wrap tw-gap-2">
-            <v-btn size="small" variant="outlined" prepend-icon="mdi-account-check-outline" to="/enrollees/approval">Pending Approval</v-btn>
-            <v-btn size="small" variant="outlined" prepend-icon="mdi-refresh" :disabled="!hasLoaded" @click="loadEnrollees">Refresh</v-btn>
-          </div>
-        </div>
-
-        <v-skeleton-loader v-if="loading && enrollees.length === 0" type="table" class="tw-m-4" />
-
-        <div v-else class="enrollees-table-wrap">
-          <AppDataTable
-            :headers="headers"
-            :items="enrollees"
-            :loading="loading"
-            :items-length="meta.total"
-            :per-page-options="[25, 50, 100, 250]"
-            v-model:page="page"
-            v-model:items-per-page="perPage"
+        <template #advanced>
+          <v-select
+            v-model="filters.funding_type_id"
+            :items="metadata.funding_types"
+            item-title="name"
             item-value="id"
-            hover
-            @update:sort-by="handleSort"
-          >
-            <template #item.sn="{ index }">{{ serialNumber(index) }}</template>
-            <template #item.enrollee="{ item }">
-              <button class="tw-text-left tw-font-semibold tw-text-cyan-700 hover:tw-underline" @click="openDetails(item)">{{ item.enrollee_id }}</button>
-              <div v-if="item.legacy_id" class="tw-text-xs tw-text-slate-500">Legacy: {{ item.legacy_id }}</div>
-            </template>
-            <template #item.full_name="{ item }">
-              <div class="tw-font-medium tw-text-slate-900">{{ item.full_name || item.name || 'N/A' }}</div>
-            </template>
-            <template #item.lga="{ item }">{{ relationName(item.lga) || item.lga_name || 'N/A' }}</template>
-            <template #item.ward="{ item }">{{ relationName(item.ward) || item.ward_name || 'N/A' }}</template>
-            <template #item.facility="{ item }">{{ relationName(item.facility) || 'N/A' }}</template>
-            <template #item.funding="{ item }">{{ relationName(item.funding_type) || 'N/A' }}</template>
-            <template #item.benefactor="{ item }">{{ relationName(item.benefactor) || 'N/A' }}</template>
-            <template #item.phase="{ item }">{{ relationName(item.enrollment_phase) || 'N/A' }}</template>
-            <template #item.status="{ item }">
-              <v-chip size="small" :color="statusColor(item.status)" variant="flat">{{ item.status_label || statusLabel(item.status) }}</v-chip>
-            </template>
-            <template #item.created_at="{ item }">{{ formatDate(item.created_at) || 'N/A' }}</template>
-            <template #item.actions="{ item }">
-              <v-menu location="bottom end">
-                <template #activator="{ props }">
-                  <v-btn icon size="small" variant="text" v-bind="props" title="Actions"><v-icon size="18">mdi-dots-vertical</v-icon></v-btn>
-                </template>
-                <v-list density="compact" min-width="190">
-                  <v-list-item v-if="canView" prepend-icon="mdi-eye-outline" title="View Details" @click="openDetails(item)" />
-                  <v-list-item v-if="canEdit" prepend-icon="mdi-pencil-outline" title="Edit" @click="openEdit(item)" />
-                  <v-list-item v-if="canApprove && Number(item.status) === 0" prepend-icon="mdi-check-circle-outline" title="Approve" @click="approveEnrollee(item)" />
-                  <v-list-item v-if="canReject && Number(item.status) !== 2" prepend-icon="mdi-close-circle-outline" title="Reject" @click="changeStatus(item, 2)" />
-                  <v-list-item prepend-icon="mdi-card-account-details-outline" title="Print ID Card" @click="printIdCard(item)" />
-                  <v-list-item v-if="canDelete" prepend-icon="mdi-delete-outline" title="Delete" class="tw-text-red-600" @click="deleteEnrollee(item)" />
-                </v-list>
-              </v-menu>
-            </template>
-            <template #no-data>
-              <div class="tw-flex tw-flex-col tw-items-center tw-py-14 tw-text-center">
-                <v-icon size="48" color="grey">mdi-account-search-outline</v-icon>
-                <p class="tw-mt-3 tw-text-sm tw-font-semibold tw-text-slate-700">{{ hasLoaded ? 'No enrollees found for the selected filters.' : 'No records loaded yet.' }}</p>
-                <p class="tw-mt-1 tw-max-w-md tw-text-xs tw-text-slate-500">
-                  {{ hasLoaded ? 'Try changing the LGA, facility, funding type, or enrollment phase.' : 'Apply filters and click Load Enrollees.' }}
-                </p>
-              </div>
-            </template>
-          </AppDataTable>
-        </div>
-      </section>
+            label="Funding Type"
+            density="compact"
+            variant="outlined"
+            clearable
+            hide-details
+          />
+          <v-autocomplete
+            v-model="filters.benefactor_id"
+            :items="filteredBenefactors"
+            item-title="name"
+            item-value="id"
+            label="Benefactor"
+            density="compact"
+            variant="outlined"
+            clearable
+            hide-details
+          />
+          <v-select
+            v-model="filters.enrollment_phase_id"
+            :items="metadata.enrollment_phases"
+            item-title="name"
+            item-value="id"
+            label="Phase"
+            density="compact"
+            variant="outlined"
+            clearable
+            hide-details
+          />
+          <v-select
+            v-model="filters.date_field"
+            :items="dateFieldOptions"
+            item-title="title"
+            item-value="value"
+            label="Date Type"
+            density="compact"
+            variant="outlined"
+            hide-details
+          />
+          <v-text-field
+            v-model="filters.date_from"
+            type="date"
+            label="Date From"
+            density="compact"
+            variant="outlined"
+            hide-details
+          />
+          <v-text-field
+            v-model="filters.date_to"
+            type="date"
+            label="Date To"
+            density="compact"
+            variant="outlined"
+            hide-details
+          />
+          <v-select
+            v-model="filters.coverage_status"
+            :items="coverageOptions"
+            item-title="title"
+            item-value="value"
+            label="Coverage"
+            density="compact"
+            variant="outlined"
+            clearable
+            hide-details
+          />
+        </template>
+
+        <template #tags>
+          <AppBadge v-if="filters.lga_id" :label="`LGA: ${selectedLgaName}`" tone="secondary" size="sm" />
+          <AppBadge v-if="filters.ward_id" :label="`Ward: ${selectedWardName}`" tone="secondary" size="sm" />
+          <AppBadge v-if="filters.facility_id" :label="`Facility: ${selectedFacilityName}`" tone="secondary" size="sm" />
+          <AppBadge v-if="filters.funding_type_id" :label="`Funding: ${selectedFundingName}`" tone="info" size="sm" />
+          <AppBadge v-if="filters.benefactor_id" :label="`Benefactor: ${selectedBenefactorName}`" tone="info" size="sm" />
+          <AppBadge v-if="filters.enrollment_phase_id" :label="`Phase: ${selectedPhaseName}`" tone="warning" size="sm" />
+          <AppBadge v-if="filters.status !== null && filters.status !== ''" :label="`Status: ${selectedStatusLabel}`" tone="warning" size="sm" />
+          <AppBadge v-if="filters.coverage_status" :label="`Coverage: ${selectedCoverageLabel}`" tone="primary" size="sm" />
+        </template>
+      </AppFilterBar>
+
+      <AppAlert
+        v-if="loadError"
+        tone="danger"
+        :message="loadError"
+      />
+
+      <AppCard
+        title="Enrollees"
+        icon="mdi-table-account"
+        tone="primary"
+        :padded="false"
+      >
+        <template #actions>
+          <span class="tw-text-xs tw-text-slate-500">{{ matchingRecordsLabel }}</span>
+        </template>
+
+        <AppDataTable
+          v-model:page="page"
+          v-model:items-per-page="perPage"
+          :headers="headers"
+          :items="enrollees"
+          :loading="loading"
+          :items-length="meta.total"
+          :per-page-options="[25, 50, 100, 250]"
+          item-value="id"
+          hover
+          class="tw-rounded-none tw-border-0"
+          @update:sort-by="handleSort"
+        >
+          <template #item.sn="{ index }">{{ serialNumber(index) }}</template>
+          <template #item.enrollee="{ item }">
+            <button class="tw-text-left tw-font-semibold tw-text-cyan-700 hover:tw-underline" @click="openDetails(item)">
+              {{ item.enrollee_id }}
+            </button>
+            <div v-if="item.legacy_id" class="tw-text-xs tw-text-slate-500">Legacy: {{ item.legacy_id }}</div>
+          </template>
+          <template #item.full_name="{ item }">
+            <div class="tw-font-medium tw-text-slate-900">{{ item.full_name || item.name || 'N/A' }}</div>
+          </template>
+          <template #item.lga="{ item }">{{ relationName(item.lga) || item.lga_name || 'N/A' }}</template>
+          <template #item.ward="{ item }">{{ relationName(item.ward) || item.ward_name || 'N/A' }}</template>
+          <template #item.facility="{ item }">
+            <FacilityBadge v-if="relationName(item.facility)" :status="item.facility?.type || item.facility?.level_of_care || 'facility'" :label="relationName(item.facility)" size="sm" />
+            <span v-else>N/A</span>
+          </template>
+          <template #item.funding="{ item }">
+            <FundingTypeBadge v-if="relationName(item.funding_type)" :label="relationName(item.funding_type)" size="sm" />
+            <span v-else>N/A</span>
+          </template>
+          <template #item.benefactor="{ item }">
+            <BenefactorBadge v-if="relationName(item.benefactor)" :label="relationName(item.benefactor)" size="sm" />
+            <span v-else>N/A</span>
+          </template>
+          <template #item.phase="{ item }">
+            <AppBadge v-if="relationName(item.enrollment_phase)" :label="relationName(item.enrollment_phase)" tone="warning" size="sm" />
+            <span v-else>N/A</span>
+          </template>
+          <template #item.status="{ item }">
+            <EnrolleeStatusBadge
+              :status="item.status_label || statusLabel(item.status)"
+              :label="item.status_label || statusLabel(item.status)"
+              size="sm"
+            />
+          </template>
+          <template #item.created_at="{ item }">
+            <DateDisplay :value="item.created_at" format="short" />
+          </template>
+          <template #item.actions="{ item }">
+            <v-menu location="bottom end">
+              <template #activator="{ props }">
+                <v-btn icon size="small" variant="text" v-bind="props" title="Actions">
+                  <v-icon size="18">mdi-dots-vertical</v-icon>
+                </v-btn>
+              </template>
+              <v-list density="compact" min-width="210">
+                <v-list-item
+                  v-if="canView"
+                  prepend-icon="mdi-eye-outline"
+                  title="View"
+                  @click="openDetails(item)"
+                />
+                <v-list-item
+                  v-if="canEdit"
+                  prepend-icon="mdi-pencil-outline"
+                  title="Edit"
+                  @click="openEdit(item)"
+                />
+                <v-list-item
+                  prepend-icon="mdi-card-account-details-outline"
+                  title="Print ID card"
+                  @click="printIdCard(item)"
+                />
+                <v-list-item
+                  v-if="canDelete"
+                  prepend-icon="mdi-delete-outline"
+                  title="Delete"
+                  class="tw-text-red-600"
+                  @click="promptDelete(item)"
+                />
+                <v-list-item
+                  v-if="canExport"
+                  prepend-icon="mdi-file-excel-outline"
+                  title="Export"
+                  @click="exportExcel"
+                />
+              </v-list>
+            </v-menu>
+          </template>
+          <template #no-data>
+            <AppEmptyState
+              :title="hasLoaded ? 'No enrollees matched these filters' : 'No enrollees loaded yet'"
+              :description="hasLoaded
+                ? 'Try adjusting LGA, ward, facility, funding type, benefactor, or enrollment phase filters.'
+                : 'Apply your filters and load the latest enrollee records from the server.'"
+              icon="mdi-account-search-outline"
+            />
+          </template>
+        </AppDataTable>
+      </AppCard>
 
       <v-navigation-drawer v-model="detailDrawer" location="right" temporary width="560">
         <div v-if="selected" class="tw-space-y-4 tw-p-5">
@@ -139,29 +301,61 @@
               <h2 class="tw-text-xl tw-font-bold tw-text-slate-950">{{ selected.full_name || selected.name }}</h2>
               <p class="tw-text-sm tw-text-slate-500">{{ selected.enrollee_id }}</p>
             </div>
-            <v-btn icon variant="text" @click="detailDrawer = false"><v-icon>mdi-close</v-icon></v-btn>
-          </div>
-          <div class="tw-flex tw-gap-2">
-            <v-btn size="small" color="primary" variant="outlined" :disabled="!canEdit" @click="openEdit(selected)"><v-icon start size="16">mdi-pencil</v-icon>Edit</v-btn>
-            <v-btn size="small" color="primary" variant="flat" prepend-icon="mdi-card-account-details-outline" @click="printIdCard(selected)">Print ID Card</v-btn>
+            <v-btn icon variant="text" @click="detailDrawer = false">
+              <v-icon>mdi-close</v-icon>
+            </v-btn>
           </div>
 
-          <section v-for="group in detailGroups" :key="group.title" class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-p-4">
-            <h3 class="tw-mb-3 tw-text-xs tw-font-bold tw-uppercase tw-text-slate-500">{{ group.title }}</h3>
+          <div class="tw-flex tw-flex-wrap tw-gap-2">
+            <EnrolleeStatusBadge
+              :status="selected.status_label || statusLabel(selected.status)"
+              :label="selected.status_label || statusLabel(selected.status)"
+              show-icon
+            />
+            <FundingTypeBadge v-if="relationName(selected.funding_type)" :label="relationName(selected.funding_type)" />
+            <BenefactorBadge v-if="relationName(selected.benefactor)" :label="relationName(selected.benefactor)" />
+          </div>
+
+          <div class="tw-flex tw-gap-2">
+            <v-btn size="small" color="primary" variant="outlined" :disabled="!canEdit" @click="openEdit(selected)">
+              <v-icon start size="16">mdi-pencil</v-icon>
+              Edit
+            </v-btn>
+            <v-btn size="small" color="primary" variant="flat" prepend-icon="mdi-card-account-details-outline" @click="printIdCard(selected)">
+              Print ID Card
+            </v-btn>
+          </div>
+
+          <AppCard
+            v-for="group in detailGroups"
+            :key="group.title"
+            :title="group.title"
+            :icon="group.icon"
+            tone="secondary"
+          >
             <div class="tw-grid tw-gap-3 sm:tw-grid-cols-2">
               <div v-for="row in group.rows" :key="row.label">
                 <p class="tw-text-xs tw-text-slate-500">{{ row.label }}</p>
                 <p class="tw-text-sm tw-font-semibold tw-text-slate-900">{{ row.value || 'N/A' }}</p>
               </div>
             </div>
-          </section>
+          </AppCard>
         </div>
       </v-navigation-drawer>
 
-      <AppModal v-model="editDialog" title="Edit Enrollee" :subtitle="selected ? (selected.full_name || selected.name) : ''" icon="mdi-account-edit-outline" size="lg" :loading="saving">
+      <AppModal
+        v-model="editDialog"
+        title="Edit Enrollee"
+        :subtitle="selected ? (selected.full_name || selected.name) : ''"
+        icon="mdi-account-edit-outline"
+        size="lg"
+        :loading="saving"
+      >
         <template #actions>
           <v-btn variant="outlined" :disabled="saving" @click="editDialog = false">Cancel</v-btn>
-          <v-btn color="primary" variant="flat" :loading="saving" prepend-icon="mdi-content-save" @click="saveEdit">Save Changes</v-btn>
+          <v-btn color="primary" variant="flat" :loading="saving" prepend-icon="mdi-content-save" @click="saveEdit">
+            Save Changes
+          </v-btn>
         </template>
 
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-3">
@@ -183,6 +377,21 @@
           <v-textarea v-model="editForm.address" label="Address" density="compact" variant="outlined" rows="2" class="md:tw-col-span-3" />
         </div>
       </AppModal>
+
+      <AppConfirmDialog
+        v-model="deleteDialog"
+        title="Delete enrollee"
+        subtitle="This action permanently removes the enrollee record."
+        message="Delete this enrollee from the system?"
+        warning="Only proceed if you have confirmed this record should no longer exist."
+        confirm-text="Delete enrollee"
+        icon="mdi-delete-alert-outline"
+        tone="danger"
+        :loading="deleting"
+        @cancel="closeDeleteDialog"
+        @confirm="deleteEnrollee"
+        @update:model-value="handleDeleteDialogChange"
+      />
     </div>
   </AdminLayout>
 </template>
@@ -190,8 +399,22 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import AdminLayout from '../layout/AdminLayout.vue'
-import AppModal from '../common/AppModal.vue'
+import AppAlert from '../common/AppAlert.vue'
+import AppBadge from '../common/AppBadge.vue'
+import AppCard from '../common/AppCard.vue'
+import AppConfirmDialog from '../common/AppConfirmDialog.vue'
 import AppDataTable from '../common/AppDataTable.vue'
+import AppEmptyState from '../common/AppEmptyState.vue'
+import AppExportButton from '../common/AppExportButton.vue'
+import AppFilterBar from '../common/AppFilterBar.vue'
+import AppModal from '../common/AppModal.vue'
+import AppStatCard from '../common/AppStatCard.vue'
+import AppPageHeader from '../common/AppPageHeader.vue'
+import BenefactorBadge from '../common/BenefactorBadge.vue'
+import DateDisplay from '../common/DateDisplay.vue'
+import EnrolleeStatusBadge from '../common/EnrolleeStatusBadge.vue'
+import FacilityBadge from '../common/FacilityBadge.vue'
+import FundingTypeBadge from '../common/FundingTypeBadge.vue'
 import { enrolleeAPI, premiumAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
 import { useAuthStore } from '../../stores/auth'
@@ -201,27 +424,54 @@ const auth = useAuthStore()
 
 const canView = computed(() => auth.hasPermission('enrollees.view'))
 const canEdit = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollee.update'))
-const canApprove = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollee.approve'))
-const canReject = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollee.reject'))
 const canDelete = computed(() => auth.hasPermission('enrollees.delete'))
 const canExport = computed(() => auth.hasPermission('enrollees.export'))
 
-const metadata = reactive({ insurance_programmes: [], enrollee_categories: [], premium_plans: [], facilities: [], lgas: [], wards: [], funding_types: [], benefactors: [], enrollment_phases: [] })
-const filters = reactive({ search: '', lga_id: null, ward_id: null, facility_id: null, funding_type_id: null, benefactor_id: null, enrollment_phase_id: null, status: null, coverage_status: null, date_field: 'created_at', date_from: '', date_to: '' })
+const metadata = reactive({
+  insurance_programmes: [],
+  enrollee_categories: [],
+  premium_plans: [],
+  facilities: [],
+  lgas: [],
+  wards: [],
+  funding_types: [],
+  benefactors: [],
+  enrollment_phases: [],
+})
+
+const filters = reactive({
+  search: '',
+  lga_id: null,
+  ward_id: null,
+  facility_id: null,
+  funding_type_id: null,
+  benefactor_id: null,
+  enrollment_phase_id: null,
+  status: null,
+  coverage_status: null,
+  date_field: 'created_at',
+  date_from: '',
+  date_to: '',
+})
+
 const enrollees = ref([])
 const selected = ref(null)
+const deleteTarget = ref(null)
 const detailDrawer = ref(false)
 const editDialog = ref(false)
+const deleteDialog = ref(false)
 const editForm = reactive({})
 const loading = ref(false)
 const exporting = ref(false)
 const saving = ref(false)
+const deleting = ref(false)
 const hasLoaded = ref(false)
 const loadError = ref('')
 const page = ref(1)
 const perPage = ref(50)
 const sortBy = ref('created_at')
 const sortDirection = ref('desc')
+
 const meta = reactive({ total: 0, from: null, to: null })
 const summary = reactive({ total: 0, approved: 0, pending: 0, active_coverage: 0 })
 
@@ -232,17 +482,25 @@ const statusOptions = [
   { title: 'Active', value: 'active' },
   { title: 'Inactive', value: 4 },
 ]
+
 const coverageOptions = [
   { title: 'Active Coverage', value: 'active' },
   { title: 'Expired Coverage', value: 'expired' },
   { title: 'No Expiry', value: 'no_expiry' },
   { title: 'Future Coverage', value: 'future' },
 ]
+
 const dateFieldOptions = [
   { title: 'Created Date', value: 'created_at' },
   { title: 'Enrollment Date', value: 'enrollment_date' },
 ]
-const sexOptions = [{ title: 'Male', value: 1 }, { title: 'Female', value: 2 }, { title: 'Other', value: 3 }]
+
+const sexOptions = [
+  { title: 'Male', value: 1 },
+  { title: 'Female', value: 2 },
+  { title: 'Other', value: 3 },
+]
+
 const headers = [
   { title: 'S/N', key: 'sn', sortable: false, width: 72 },
   { title: 'Enrollee ID', key: 'enrollee', sortable: true },
@@ -252,7 +510,7 @@ const headers = [
   { title: 'Gender', key: 'gender', sortable: false },
   { title: 'LGA', key: 'lga', sortable: true },
   { title: 'Ward', key: 'ward', sortable: false },
-  { title: 'Facility', key: 'facility', sortable: true },
+  { title: 'Facility', key: 'facility', sortable: false },
   { title: 'Funding Type', key: 'funding', sortable: false },
   { title: 'Benefactor', key: 'benefactor', sortable: false },
   { title: 'Enrollment Phase', key: 'phase', sortable: false },
@@ -263,13 +521,9 @@ const headers = [
 
 const responseNodes = (response) => {
   const root = response?.data || {}
-  return [
-    root.data?.data?.data,
-    root.data?.data,
-    root.data,
-    root,
-  ].filter(Boolean)
+  return [root.data?.data?.data, root.data?.data, root.data, root].filter(Boolean)
 }
+
 const responseItems = (response) => {
   for (const node of responseNodes(response)) {
     if (Array.isArray(node)) return node
@@ -277,6 +531,7 @@ const responseItems = (response) => {
   }
   return []
 }
+
 const responseMeta = (response) => {
   const root = response?.data || {}
   const directMeta = root.data?.data?.meta || root.data?.meta || root.meta
@@ -285,13 +540,23 @@ const responseMeta = (response) => {
   const paginator = responseNodes(response).find((node) => node && typeof node === 'object' && !Array.isArray(node) && 'total' in node)
   return paginator || {}
 }
+
 const responseSummary = (response) => {
   const root = response?.data || {}
   return root.data?.data?.summary || root.data?.summary || root.summary || {}
 }
+
 const formatNumber = (value) => Number(value || 0).toLocaleString()
-const formatDate = (value) => (value ? new Date(value).toLocaleDateString() : null)
 const relationName = (object) => object?.name || object?.full_name || null
+const statusLabel = (status) => ({
+  0: 'Pending Approval',
+  1: 'Approved',
+  2: 'Rejected',
+  3: 'Suspended',
+  4: 'Inactive',
+}[Number(status)] || 'Unknown')
+
+const serialNumber = (index) => ((page.value - 1) * perPage.value) + index + 1
 
 const filteredWards = computed(() => metadata.wards.filter((ward) => !filters.lga_id || Number(ward.lga_id) === Number(filters.lga_id)))
 const filteredFacilities = computed(() => metadata.facilities.filter((facility) => {
@@ -299,6 +564,7 @@ const filteredFacilities = computed(() => metadata.facilities.filter((facility) 
   if (filters.lga_id) return Number(facility.lga_id) === Number(filters.lga_id)
   return true
 }))
+
 const filteredBenefactors = computed(() => {
   const linked = metadata.benefactors.filter((benefactor) => {
     const id = benefactor.funding_type_id || benefactor.funding_type?.id
@@ -307,38 +573,62 @@ const filteredBenefactors = computed(() => {
   return filters.funding_type_id && linked.length ? linked : metadata.benefactors
 })
 
-const showingText = computed(() => meta.total ? `Showing ${formatNumber(meta.from)}-${formatNumber(meta.to)} of ${formatNumber(meta.total)}` : 'No matching records')
-const summaryCards = computed(() => [
-  { label: 'Total Matching Enrollees', value: formatNumber(summary.total), icon: 'mdi-account-group-outline', color: 'primary' },
-  { label: 'Current Page Loaded', value: formatNumber(enrollees.value.length), helper: showingText.value, icon: 'mdi-table-row', color: 'cyan' },
-  { label: 'Approved Enrollees', value: formatNumber(summary.approved), icon: 'mdi-check-decagram-outline', color: 'success' },
-  { label: 'Pending Approval', value: formatNumber(summary.pending), icon: 'mdi-clock-outline', color: 'warning' },
-  { label: 'Active Coverage', value: formatNumber(summary.active_coverage), icon: 'mdi-shield-check-outline', color: 'teal' },
-])
+const activeFilterCount = computed(() => Object.entries(activeFilterParams()).length)
+const showingText = computed(() => meta.total ? `Showing ${formatNumber(meta.from)}-${formatNumber(meta.to)} of ${formatNumber(meta.total)}` : 'No matching records yet')
+const matchingRecordsLabel = computed(() => `${formatNumber(meta.total || summary.total)} matching record(s)`)
+
+const findOptionTitle = (items, id) => items.find((item) => Number(item.id) === Number(id))?.name || 'Selected'
+const selectedLgaName = computed(() => findOptionTitle(metadata.lgas, filters.lga_id))
+const selectedWardName = computed(() => findOptionTitle(metadata.wards, filters.ward_id))
+const selectedFacilityName = computed(() => findOptionTitle(metadata.facilities, filters.facility_id))
+const selectedFundingName = computed(() => findOptionTitle(metadata.funding_types, filters.funding_type_id))
+const selectedBenefactorName = computed(() => findOptionTitle(metadata.benefactors, filters.benefactor_id))
+const selectedPhaseName = computed(() => findOptionTitle(metadata.enrollment_phases, filters.enrollment_phase_id))
+const selectedStatusLabel = computed(() => statusOptions.find((item) => item.value === filters.status)?.title || 'Selected')
+const selectedCoverageLabel = computed(() => coverageOptions.find((item) => item.value === filters.coverage_status)?.title || 'Selected')
 
 const detailGroups = computed(() => {
-  const e = selected.value || {}
+  const enrollee = selected.value || {}
   return [
-    { title: 'Identity', rows: [
-      { label: 'Legacy ID', value: e.legacy_id }, { label: 'NIN', value: e.nin }, { label: 'Gender', value: e.gender },
-      { label: 'DOB', value: formatDate(e.date_of_birth) }, { label: 'Phone', value: e.phone }, { label: 'Email', value: e.email },
-      { label: 'Address', value: e.address }, { label: 'Village', value: e.village }, { label: 'Occupation', value: e.occupation },
-    ] },
-    { title: 'Funding & Enrollment', rows: [
-      { label: 'Funding Type', value: relationName(e.funding_type) }, { label: 'Benefactor', value: relationName(e.benefactor) },
-      { label: 'Enrollment Phase', value: relationName(e.enrollment_phase) }, { label: 'Status', value: e.status_label },
-      { label: 'Coverage', value: e.coverage_label }, { label: 'Created', value: formatDate(e.created_at) },
-    ] },
-    { title: 'Facility', rows: [
-      { label: 'Facility', value: relationName(e.facility) }, { label: 'HCP Code', value: e.facility?.hcp_code },
-      { label: 'LGA', value: relationName(e.lga) }, { label: 'Ward', value: relationName(e.ward) },
-    ] },
+    {
+      title: 'Identity',
+      icon: 'mdi-card-account-details-outline',
+      rows: [
+        { label: 'Legacy ID', value: enrollee.legacy_id },
+        { label: 'NIN', value: enrollee.nin },
+        { label: 'Gender', value: enrollee.gender },
+        { label: 'DOB', value: enrollee.date_of_birth ? new Date(enrollee.date_of_birth).toLocaleDateString() : null },
+        { label: 'Phone', value: enrollee.phone },
+        { label: 'Email', value: enrollee.email },
+        { label: 'Address', value: enrollee.address },
+        { label: 'Village', value: enrollee.village },
+        { label: 'Occupation', value: enrollee.occupation },
+      ],
+    },
+    {
+      title: 'Funding & Enrollment',
+      icon: 'mdi-shield-account-outline',
+      rows: [
+        { label: 'Funding Type', value: relationName(enrollee.funding_type) },
+        { label: 'Benefactor', value: relationName(enrollee.benefactor) },
+        { label: 'Enrollment Phase', value: relationName(enrollee.enrollment_phase) },
+        { label: 'Status', value: enrollee.status_label || statusLabel(enrollee.status) },
+        { label: 'Coverage', value: enrollee.coverage_label },
+        { label: 'Created', value: enrollee.created_at ? new Date(enrollee.created_at).toLocaleString() : null },
+      ],
+    },
+    {
+      title: 'Facility',
+      icon: 'mdi-hospital-box-outline',
+      rows: [
+        { label: 'Facility', value: relationName(enrollee.facility) },
+        { label: 'HCP Code', value: enrollee.facility?.hcp_code },
+        { label: 'LGA', value: relationName(enrollee.lga) },
+        { label: 'Ward', value: relationName(enrollee.ward) },
+      ],
+    },
   ]
 })
-
-const statusColor = (status) => ({ 0: 'warning', 1: 'success', 2: 'error', 3: 'orange', 4: 'grey' }[Number(status)] || 'grey')
-const statusLabel = (status) => ({ 0: 'Pending Approval', 1: 'Approved', 2: 'Rejected', 3: 'Suspended', 4: 'Inactive' }[Number(status)] || 'Unknown')
-const serialNumber = (index) => ((page.value - 1) * perPage.value) + index + 1
 
 const normalizeMetadata = (data) => {
   metadata.insurance_programmes = data.insurance_programmes || data.programmes || []
@@ -354,7 +644,11 @@ const normalizeMetadata = (data) => {
 
 const activeFilterParams = () => {
   const params = { ...filters }
-  Object.keys(params).forEach((key) => (params[key] === '' || params[key] === null || params[key] === undefined) && delete params[key])
+  Object.keys(params).forEach((key) => {
+    if (params[key] === '' || params[key] === null || params[key] === undefined) {
+      delete params[key]
+    }
+  })
   if (params.status === 'active') {
     delete params.status
     params.coverage_status = 'active'
@@ -374,8 +668,8 @@ const loadMetadata = async () => {
   try {
     const response = await premiumAPI.metadata()
     normalizeMetadata(response.data.data || {})
-  } catch (e) {
-    error(e.response?.data?.message || 'Failed to load enrollee filters')
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to load enrollee filters')
   }
 }
 
@@ -393,8 +687,8 @@ const loadEnrollees = async () => {
     Object.assign(meta, { total: 0, from: null, to: null }, responseMeta(response))
     Object.assign(summary, { total: meta.total, approved: 0, pending: 0, active_coverage: 0 }, responseSummary(response))
     hasLoaded.value = true
-  } catch (e) {
-    loadError.value = e.response?.data?.message || 'Failed to load enrollees'
+  } catch (err) {
+    loadError.value = err.response?.data?.message || 'Failed to load enrollees'
     error(loadError.value)
   } finally {
     loading.value = false
@@ -402,11 +696,25 @@ const loadEnrollees = async () => {
 }
 
 const resetFilters = () => {
-  Object.assign(filters, { search: '', lga_id: null, ward_id: null, facility_id: null, funding_type_id: null, benefactor_id: null, enrollment_phase_id: null, status: null, coverage_status: null, date_field: 'created_at', date_from: '', date_to: '' })
+  Object.assign(filters, {
+    search: '',
+    lga_id: null,
+    ward_id: null,
+    facility_id: null,
+    funding_type_id: null,
+    benefactor_id: null,
+    enrollment_phase_id: null,
+    status: null,
+    coverage_status: null,
+    date_field: 'created_at',
+    date_from: '',
+    date_to: '',
+  })
   enrollees.value = []
   Object.assign(meta, { total: 0, from: null, to: null })
   Object.assign(summary, { total: 0, approved: 0, pending: 0, active_coverage: 0 })
   hasLoaded.value = false
+  loadError.value = ''
 }
 
 const handleSort = (items) => {
@@ -417,22 +725,22 @@ const handleSort = (items) => {
 }
 
 const exportExcel = async () => {
-  const params = activeFilterParams()
-  if (Object.keys(params).length === 0 && !window.confirm('No filters are selected. Export all enrollees? This may take a while.')) return
   exporting.value = true
   try {
-    const response = await enrolleeAPI.exportExcel(params)
-    const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const response = await enrolleeAPI.exportExcel(activeFilterParams())
+    const blob = new Blob([response.data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
     const url = URL.createObjectURL(blob)
     const disposition = response.headers?.['content-disposition'] || ''
-    const match = disposition.match(/filename="?([^"]+)"?/i)
+    const match = disposition.match(/filename=\"?([^\"]+)\"?/i)
     const link = document.createElement('a')
     link.href = url
     link.download = match?.[1] || `enrollees_${new Date().toISOString().slice(0, 10)}.xlsx`
     link.click()
     URL.revokeObjectURL(url)
-  } catch (e) {
-    error(e.response?.data?.message || 'Could not export enrollees')
+  } catch (err) {
+    error(err.response?.data?.message || 'Could not export enrollees')
   } finally {
     exporting.value = false
   }
@@ -453,12 +761,22 @@ const openEdit = (item) => {
   selected.value = item
   Object.keys(editForm).forEach((key) => delete editForm[key])
   Object.assign(editForm, {
-    first_name: item.first_name, middle_name: item.middle_name, last_name: item.last_name,
-    nin: item.nin, sex: Number(item.sex || (item.gender === 'Male' ? 1 : item.gender === 'Female' ? 2 : 3)),
-    date_of_birth: item.date_of_birth?.slice?.(0, 10), phone: item.phone, email: item.email,
-    occupation: item.occupation, address: item.address, lga_id: item.lga?.id,
-    ward_id: item.ward?.id, facility_id: item.facility?.id, funding_type_id: item.funding_type?.id,
-    benefactor_id: item.benefactor?.id, enrollment_phase_id: item.enrollment_phase?.id,
+    first_name: item.first_name,
+    middle_name: item.middle_name,
+    last_name: item.last_name,
+    nin: item.nin,
+    sex: Number(item.sex || (item.gender === 'Male' ? 1 : item.gender === 'Female' ? 2 : 3)),
+    date_of_birth: item.date_of_birth?.slice?.(0, 10),
+    phone: item.phone,
+    email: item.email,
+    occupation: item.occupation,
+    address: item.address,
+    lga_id: item.lga?.id,
+    ward_id: item.ward?.id,
+    facility_id: item.facility?.id,
+    funding_type_id: item.funding_type?.id,
+    benefactor_id: item.benefactor?.id,
+    enrollment_phase_id: item.enrollment_phase?.id,
   })
   editDialog.value = true
 }
@@ -471,41 +789,40 @@ const saveEdit = async () => {
     editDialog.value = false
     selected.value = response.data.data?.data || response.data.data
     await loadEnrollees()
-  } catch (e) {
-    error(e.response?.data?.message || 'Could not update enrollee')
+  } catch (err) {
+    error(err.response?.data?.message || 'Could not update enrollee')
   } finally {
     saving.value = false
   }
 }
 
-const approveEnrollee = async (item) => {
-  try {
-    await enrolleeAPI.approve(item.id)
-    success('Enrollee approved')
-    await loadEnrollees()
-  } catch (e) {
-    error(e.response?.data?.message || 'Could not approve enrollee')
-  }
+const promptDelete = (item) => {
+  deleteTarget.value = item
+  deleteDialog.value = true
 }
 
-const changeStatus = async (item, status) => {
-  try {
-    await enrolleeAPI.updateStatus(item.id, { status })
-    success('Enrollee status updated')
-    await loadEnrollees()
-  } catch (e) {
-    error(e.response?.data?.message || 'Could not update status')
-  }
+const closeDeleteDialog = () => {
+  deleteDialog.value = false
+  deleteTarget.value = null
 }
 
-const deleteEnrollee = async (item) => {
-  if (!window.confirm(`Delete enrollee ${item.enrollee_id}?`)) return
+const handleDeleteDialogChange = (value) => {
+  deleteDialog.value = value
+  if (!value) deleteTarget.value = null
+}
+
+const deleteEnrollee = async () => {
+  if (!deleteTarget.value) return
+  deleting.value = true
   try {
-    await enrolleeAPI.delete(item.id)
+    await enrolleeAPI.delete(deleteTarget.value.id)
     success('Enrollee deleted')
+    closeDeleteDialog()
     await loadEnrollees()
-  } catch (e) {
-    error(e.response?.data?.message || 'Could not delete enrollee')
+  } catch (err) {
+    error(err.response?.data?.message || 'Could not delete enrollee')
+  } finally {
+    deleting.value = false
   }
 }
 
@@ -521,19 +838,30 @@ const printIdCard = async (item) => {
       return
     }
     setTimeout(() => URL.revokeObjectURL(url), 60000)
-  } catch (e) {
-    error(e.response?.data?.message || 'Could not generate ID card')
+  } catch (err) {
+    error(err.response?.data?.message || 'Could not generate ID card')
   }
 }
 
-watch([page, perPage], () => { if (hasLoaded.value) loadEnrollees() })
+watch([page, perPage], () => {
+  if (hasLoaded.value) loadEnrollees()
+})
+
 watch(() => filters.lga_id, () => {
-  if (filters.ward_id && !filteredWards.value.some((ward) => Number(ward.id) === Number(filters.ward_id))) filters.ward_id = null
-  if (filters.facility_id && !filteredFacilities.value.some((facility) => Number(facility.id) === Number(filters.facility_id))) filters.facility_id = null
+  if (filters.ward_id && !filteredWards.value.some((ward) => Number(ward.id) === Number(filters.ward_id))) {
+    filters.ward_id = null
+  }
+  if (filters.facility_id && !filteredFacilities.value.some((facility) => Number(facility.id) === Number(filters.facility_id))) {
+    filters.facility_id = null
+  }
 })
+
 watch(() => filters.ward_id, () => {
-  if (filters.facility_id && !filteredFacilities.value.some((facility) => Number(facility.id) === Number(filters.facility_id))) filters.facility_id = null
+  if (filters.facility_id && !filteredFacilities.value.some((facility) => Number(facility.id) === Number(filters.facility_id))) {
+    filters.facility_id = null
+  }
 })
+
 watch(() => filters.facility_id, (facilityId) => {
   const facility = metadata.facilities.find((item) => Number(item.id) === Number(facilityId))
   if (facility) {
@@ -541,26 +869,18 @@ watch(() => filters.facility_id, (facilityId) => {
     filters.ward_id = facility.ward_id || filters.ward_id
   }
 })
+
 watch(() => filters.funding_type_id, () => {
-  if (filters.benefactor_id && !filteredBenefactors.value.some((benefactor) => Number(benefactor.id) === Number(filters.benefactor_id))) filters.benefactor_id = null
+  if (filters.benefactor_id && !filteredBenefactors.value.some((benefactor) => Number(benefactor.id) === Number(filters.benefactor_id))) {
+    filters.benefactor_id = null
+  }
 })
 
 onMounted(loadMetadata)
 </script>
 
 <style scoped>
-.enrollees-table-wrap {
-  overflow-x: auto;
-}
-
-.enrollees-table-wrap :deep(.v-table__wrapper) {
-  max-height: 68vh;
-}
-
-.enrollees-table-wrap :deep(thead th) {
-  position: sticky;
-  top: 0;
-  z-index: 2;
-  background: rgb(248 250 252);
+:deep(.v-navigation-drawer__content) {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.95), rgba(255, 255, 255, 1));
 }
 </style>

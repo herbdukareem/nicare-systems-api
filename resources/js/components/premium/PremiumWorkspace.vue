@@ -55,6 +55,7 @@
             Dependants are not allowed for this plan.
           </v-alert>
           <v-switch v-if="mode === 'plans'" v-model="planForm.payment_required" label="Requires payment before PIN generation" color="primary" hide-details />
+          <v-switch v-if="mode === 'plans'" v-model="planForm.self_enrollment_enabled" label="Allow public self-enrollment" color="primary" hide-details />
           <v-select v-if="mode === 'plans' && planForm.payment_required" v-model="planForm.payment_gateway" :items="metadata.payment_gateways" item-title="name" item-value="code" label="Payment gateway" density="comfortable" variant="outlined" />
           <v-select v-if="mode === 'plans' && planForm.payment_required && metadata.merchants?.length" v-model="planForm.merchant_id" :items="metadata.merchants" item-title="name" item-value="id" label="Merchant" density="comfortable" variant="outlined" />
           <v-select v-if="mode === 'plans' && planForm.payment_required && metadata.merchant_service_types?.length" v-model="planForm.merchant_service_type_id" :items="filteredMerchantServiceTypes" item-title="type_name" item-value="id" label="Merchant service type" density="comfortable" variant="outlined" />
@@ -201,6 +202,7 @@ const blankPlanForm = () => ({
   amount: 0,
   consultant_fee: 0,
   payment_required: false,
+  self_enrollment_enabled: false,
   payment_gateway: null,
   merchant_id: null,
   merchant_service_type_id: null,
@@ -283,6 +285,7 @@ const headers = computed(() => {
       { title: 'Duration', key: 'duration_label' },
       { title: 'Family', key: 'family_label' },
       { title: 'Payment', key: 'payment_label' },
+      { title: 'Public', key: 'self_enrollment_label' },
       { title: 'Gateway', key: 'payment_gateway' },
       { title: 'Status', key: 'status' },
       { title: '', key: 'actions', sortable: false },
@@ -294,20 +297,56 @@ const headers = computed(() => {
   return [{ title: 'Enrollee', key: 'enrollee.enrollee_id' }, { title: 'Programme', key: 'programme.name' }, { title: 'Facility', key: 'facility.name' }, { title: 'Status', key: 'status' }, { title: '', key: 'actions', sortable: false }]
 })
 
+const normalizeCollection = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (Array.isArray(payload?.data)) return payload.data
+  if (Array.isArray(payload?.data?.data)) return payload.data.data
+  if (Array.isArray(payload?.data?.data?.data)) return payload.data.data.data
+  return []
+}
+
+const fetchOptionalCollection = async (requestFactory, fallback = []) => {
+  try {
+    const response = await requestFactory()
+    return normalizeCollection(response.data)
+  } catch (err) {
+    return fallback
+  }
+}
+
 const loadAll = async () => {
   loading.value = true
   try {
-    const [meta, planRes, benefactorRes] = await Promise.all([premiumAPI.metadata(), premiumAPI.plans({ per_page: 100 }), benefactorAPI.getAll()])
+    const metaPromise = premiumAPI.metadata()
+    const planPromise = premiumAPI.plans({ per_page: 100 })
+    const needsBenefactors = ['benefactors', 'sell-pin', 'purchases', 'payroll'].includes(props.mode)
+
+    const [meta, planRes, benefactorRows] = await Promise.all([
+      metaPromise,
+      planPromise,
+      needsBenefactors ? fetchOptionalCollection(() => benefactorAPI.getAll()) : Promise.resolve([]),
+    ])
+
     metadata.value = meta.data.data
-    plans.value = planRes.data.data || planRes.data
-    benefactors.value = benefactorRes.data.data || []
-    if (props.mode === 'dashboard') dashboard.value = (await premiumAPI.dashboard()).data.data
-    else if (props.mode === 'plans') rows.value = plans.value.map(formatPlanRow)
-    else if (['inventory', 'generate-pins', 'sell-pin', 'validate-pin'].includes(props.mode)) rows.value = (await premiumAPI.pins()).data.data
-    else if (props.mode === 'purchases') rows.value = (await premiumAPI.purchases()).data.data
-    else if (props.mode === 'benefactors') rows.value = benefactors.value
-    else if (props.mode === 'payroll') rows.value = (await premiumAPI.payrollBatches()).data.data
-    else rows.value = []
+    plans.value = normalizeCollection(planRes.data)
+    benefactors.value = benefactorRows
+
+    if (props.mode === 'dashboard') {
+      dashboard.value = (await premiumAPI.dashboard()).data.data
+      rows.value = []
+    } else if (props.mode === 'plans') {
+      rows.value = plans.value.map(formatPlanRow)
+    } else if (['inventory', 'generate-pins', 'sell-pin', 'validate-pin'].includes(props.mode)) {
+      rows.value = normalizeCollection((await premiumAPI.pins()).data)
+    } else if (props.mode === 'purchases') {
+      rows.value = normalizeCollection((await premiumAPI.purchases()).data)
+    } else if (props.mode === 'benefactors') {
+      rows.value = benefactors.value
+    } else if (props.mode === 'payroll') {
+      rows.value = normalizeCollection((await premiumAPI.payrollBatches()).data)
+    } else {
+      rows.value = []
+    }
   } catch (err) {
     error('Failed to load premium module data')
   } finally {
@@ -387,6 +426,7 @@ const editPlan = (plan) => {
     amount: Number(plan.amount || 0),
     consultant_fee: Number(plan.consultant_fee || 0),
     payment_required: Boolean(plan.payment_required),
+    self_enrollment_enabled: Boolean(plan.self_enrollment_enabled),
     payment_gateway: plan.payment_gateway || null,
     merchant_id: plan.merchant_id || null,
     merchant_service_type_id: plan.merchant_service_type_id || null,
@@ -466,6 +506,7 @@ const formatPlanRow = (plan) => ({
   duration_label: plan.has_no_expiry ? 'No Expiry' : `${plan.duration_days || 0} days`,
   family_label: plan.is_family_plan ? `Yes (${plan.maximum_dependants || 0})` : 'No',
   payment_label: plan.payment_required ? 'Required' : 'Not required',
+  self_enrollment_label: plan.self_enrollment_enabled ? 'Enabled' : 'Disabled',
 })
 const planPayload = () => ({
   ...planForm.value,

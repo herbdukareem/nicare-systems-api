@@ -2,42 +2,249 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Vuetify and Tailwind integration */
 @layer base {
-  /* Make Tailwind font the default */
-  html {
-    @apply tw-font-sans;
+  :root {
+    --qds-color-primary: #0b6b79;
+    --qds-color-secondary: #2563eb;
+    --qds-color-success: #0f766e;
+    --qds-color-warning: #b45309;
+    --qds-color-danger: #b42318;
+    --qds-color-info: #1d4ed8;
+    --qds-color-bg: #f4f7fb;
+    --qds-color-surface: #ffffff;
+    --qds-color-surface-muted: #f8fafc;
+    --qds-color-border: #d9e2ec;
+    --qds-color-text: #102a43;
+    --qds-color-text-secondary: #486581;
+    --qds-color-text-muted: #829ab1;
+    --qds-font-sans: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    --qds-font-heading: 'Inter', 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    --qds-radius-sm: 0px;
+    --qds-radius-md: 0px;
+    --qds-radius-lg: 0px;
+    --qds-radius-pill: 2px;
+    --qds-input-height: 34px;
+    --qds-btn-height: 34px;
+    --qds-table-row-height: 40px;
+    --qds-badge-height: 22px;
+    --qds-shadow-card: 0 16px 40px -28px rgba(15, 23, 42, 0.32);
+    --qds-shadow-dropdown: 0 18px 48px -24px rgba(15, 23, 42, 0.28);
+    --qds-shadow-modal: 0 30px 80px -32px rgba(15, 23, 42, 0.34);
   }
 
-  /* Ensure Vuetify components don't inherit unwanted Tailwind styles */
+  html {
+    @apply tw-font-sans;
+    background: var(--qds-color-bg);
+    color: var(--qds-color-text);
+    font-family: var(--qds-font-sans);
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(11, 107, 121, 0.12), transparent 28%),
+      radial-gradient(circle at top right, rgba(37, 99, 235, 0.08), transparent 24%),
+      var(--qds-color-bg);
+    color: var(--qds-color-text);
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--qds-font-heading);
+    color: var(--qds-color-text);
+    letter-spacing: -0.02em;
+  }
+
   .v-application {
-    font-family: 'Inter', sans-serif !important;
+    font-family: var(--qds-font-sans) !important;
+    background: transparent !important;
+    color: var(--qds-color-text) !important;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  textarea:focus-visible,
+  select:focus-visible {
+    outline: 2px solid rgba(11, 107, 121, 0.25);
+    outline-offset: 2px;
   }
 }
 
 @layer components {
-  /* Custom component styles that work with both Vuetify and Tailwind */
-  .app-card {
-    @apply tw-bg-white tw-rounded-lg tw-shadow-sm;
+  .qds-card {
+    background: var(--qds-color-surface);
+    border: 1px solid var(--qds-color-border);
+    border-radius: var(--qds-radius-lg);
+    box-shadow: var(--qds-shadow-card);
   }
 
-  .app-button {
-    @apply tw-px-4 tw-py-2 tw-rounded tw-font-medium tw-transition-colors;
+  .qds-card-padding {
+    padding: 0.875rem;
+  }
+
+  .qds-card-muted {
+    background: linear-gradient(180deg, var(--qds-color-surface) 0%, var(--qds-color-surface-muted) 100%);
+  }
+
+  .qds-page-shell {
+    @apply tw-space-y-4;
+  }
+
+  .qds-page-header {
+    @apply tw-flex tw-flex-col tw-gap-4 lg:tw-flex-row lg:tw-items-start lg:tw-justify-between;
+  }
+
+  .qds-page-kicker {
+    @apply tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.2em];
+    color: var(--qds-color-primary);
+  }
+
+  .qds-page-title {
+    @apply tw-text-xl tw-font-bold tw-leading-tight;
+  }
+
+  .qds-page-subtitle {
+    @apply tw-mt-0.5 tw-max-w-3xl tw-text-xs;
+    color: var(--qds-color-text-secondary);
+  }
+
+  .qds-section-title {
+    @apply tw-text-sm tw-font-semibold;
+  }
+
+  .qds-section-subtitle {
+    @apply tw-mt-0.5 tw-text-xs;
+    color: var(--qds-color-text-secondary);
+  }
+
+  .qds-icon-shell {
+    @apply tw-inline-flex tw-h-10 tw-w-10 tw-items-center tw-justify-center tw-border tw-border-transparent;
+    border-radius: var(--qds-radius-sm);
+  }
+
+  .qds-icon-shell-sm {
+    @apply tw-inline-flex tw-h-7 tw-w-7 tw-items-center tw-justify-center tw-border tw-border-transparent;
+    border-radius: var(--qds-radius-sm);
+  }
+
+  .qds-badge {
+    @apply tw-inline-flex tw-max-w-full tw-items-center tw-gap-1.5 tw-font-medium;
+    border-radius: var(--qds-radius-pill);
+  }
+
+  .qds-badge-sm {
+    @apply tw-px-2.5 tw-py-1 tw-text-[11px];
+  }
+
+  .qds-badge-md {
+    @apply tw-px-3 tw-py-1.5 tw-text-xs;
+  }
+
+  .qds-badge-lg {
+    @apply tw-px-3.5 tw-py-2 tw-text-sm;
+  }
+
+  .qds-badge-solid {
+    border: 1px solid transparent;
+  }
+
+  .qds-badge-outline {
+    background: transparent;
+  }
+
+  .qds-tone-primary {
+    background: rgba(11, 107, 121, 0.12);
+    border-color: rgba(11, 107, 121, 0.18);
+    color: var(--qds-color-primary);
+  }
+
+  .qds-tone-secondary {
+    background: rgba(37, 99, 235, 0.1);
+    border-color: rgba(37, 99, 235, 0.16);
+    color: var(--qds-color-secondary);
+  }
+
+  .qds-tone-success {
+    background: rgba(15, 118, 110, 0.1);
+    border-color: rgba(15, 118, 110, 0.16);
+    color: var(--qds-color-success);
+  }
+
+  .qds-tone-warning {
+    background: rgba(180, 83, 9, 0.1);
+    border-color: rgba(180, 83, 9, 0.16);
+    color: var(--qds-color-warning);
+  }
+
+  .qds-tone-danger {
+    background: rgba(180, 35, 24, 0.1);
+    border-color: rgba(180, 35, 24, 0.16);
+    color: var(--qds-color-danger);
+  }
+
+  .qds-tone-info {
+    background: rgba(29, 78, 216, 0.1);
+    border-color: rgba(29, 78, 216, 0.16);
+    color: var(--qds-color-info);
+  }
+
+  .qds-tone-neutral {
+    background: rgba(100, 116, 139, 0.1);
+    border-color: rgba(100, 116, 139, 0.14);
+    color: var(--qds-color-text-secondary);
+  }
+
+  .qds-alert {
+    @apply tw-border tw-p-4;
+    border-radius: var(--qds-radius-sm);
+  }
+
+  .qds-alert-info {
+    background: rgba(29, 78, 216, 0.06);
+    border-color: rgba(29, 78, 216, 0.14);
+    color: var(--qds-color-info);
+  }
+
+  .qds-alert-success {
+    background: rgba(15, 118, 110, 0.06);
+    border-color: rgba(15, 118, 110, 0.14);
+    color: var(--qds-color-success);
+  }
+
+  .qds-alert-warning {
+    background: rgba(180, 83, 9, 0.06);
+    border-color: rgba(180, 83, 9, 0.14);
+    color: var(--qds-color-warning);
+  }
+
+  .qds-alert-danger,
+  .qds-alert-error {
+    background: rgba(180, 35, 24, 0.06);
+    border-color: rgba(180, 35, 24, 0.14);
+    color: var(--qds-color-danger);
+  }
+
+  .qds-loading-overlay {
+    @apply tw-absolute tw-inset-0 tw-z-20 tw-grid tw-place-items-center;
+    background: rgba(244, 247, 251, 0.78);
+    backdrop-filter: blur(4px);
+  }
+
+  .qds-loading-panel {
+    @apply tw-flex tw-flex-col tw-items-center tw-gap-4 tw-border tw-bg-white tw-px-5 tw-py-4;
+    border-color: var(--qds-color-border);
+    box-shadow: var(--qds-shadow-card);
   }
 }
 
 @layer utilities {
-  /* Utility classes for better Vuetify integration */
   .v-btn--size-default {
     min-height: 36px !important;
   }
 
-  /* Ensure Tailwind utilities have higher specificity when needed */
   .tw-important {
     @apply !tw-important;
   }
 
-  /* Custom animations */
   .tw-animate-pulse-slow {
     animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
@@ -102,7 +309,6 @@
     animation-delay: 0.4s;
   }
 
-  /* Custom scrollbar styles */
   .tw-scrollbar-thin {
     scrollbar-width: thin;
     scrollbar-color: #d1d5db #f3f4f6;
@@ -134,14 +340,13 @@
     background: #f3f4f6;
   }
 
-  /* Hover effects and transitions */
-  .tw-hover-lift {
+  .qds-hover-lift {
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
   }
 
-  .tw-hover-lift:hover {
+  .qds-hover-lift:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 22px 44px -30px rgba(15, 23, 42, 0.45);
   }
 
   .tw-hover-scale {
@@ -160,6 +365,33 @@
     box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
   }
 
+  /* ── Zero-radius Vuetify overrides ─────────────────────────── */
+  .v-btn { border-radius: 0 !important; }
+  .v-card { border-radius: 0 !important; }
+  .v-chip { border-radius: 2px !important; }
+  .v-field,
+  .v-field__outline__start,
+  .v-field__outline__end,
+  .v-field__outline__notch { border-radius: 0 !important; }
+  .v-overlay__content,
+  .v-menu > .v-overlay__content,
+  .v-select__content { border-radius: 0 !important; }
+  .v-list { border-radius: 0 !important; }
+  .v-tooltip > .v-overlay__content { border-radius: 0 !important; }
+  .v-navigation-drawer { border-radius: 0 !important; }
+  .v-snackbar__wrapper { border-radius: 0 !important; }
+  .v-dialog > .v-overlay__content > .v-card { border-radius: 0 !important; }
+
+  /* ── Compact Vuetify input/button sizing ────────────────────── */
+  .v-field--density-compact .v-field__input {
+    min-height: var(--qds-input-height) !important;
+    padding-top: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  .v-field--density-comfortable .v-field__input {
+    min-height: 38px !important;
+  }
+
   .tw-hover-slide-right {
     transition: transform 0.2s ease-in-out;
   }
@@ -168,7 +400,6 @@
     transform: translateX(4px);
   }
 
-  /* Loading animations */
   .tw-loading-dots::after {
     content: '';
     animation: loadingDots 1.5s infinite;
@@ -181,7 +412,6 @@
   }
 }
 
-/* Keyframes for custom animations */
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -293,8 +523,15 @@
   }
 }
 
-/* Smooth transitions for all interactive elements */
-* {
+button,
+a,
+input,
+textarea,
+select,
+.v-btn,
+.v-card,
+.qds-card,
+.qds-badge {
   transition-property: color, background-color, border-color, text-decoration-color, fill, stroke, opacity, box-shadow, transform, filter, backdrop-filter;
   transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   transition-duration: 150ms;

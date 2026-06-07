@@ -146,6 +146,7 @@ export const navigationItems = [
       { name: 'Benefactors', path: '/settings/benefactors', icon: 'mdi-account-heart-outline', permissions: ['benefactor.view', 'benefactors.view'] },
       { name: 'Departments', path: '/settings/departments', icon: 'mdi-office-building-outline', permissions: ['departments.view', 'departments.manage', 'users.view'] },
       { name: 'Designations', path: '/settings/designations', icon: 'mdi-badge-account-outline', permissions: ['designations.view', 'designations.manage', 'users.view'] },
+      { name: 'NIN Provider', path: '/settings/nin-provider', icon: 'mdi-card-account-details-outline', permissions: ['settings.nin.manage', 'settings.edit'] },
       { name: 'Devices', path: '/devices/manage', icon: 'mdi-tablet-dashboard', permissions: ['users.view'] },
       { name: 'Enrollment Config', path: '/devices/config', icon: 'mdi-cog-outline', permissions: ['users.view'] },
     ],

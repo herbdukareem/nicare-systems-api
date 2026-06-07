@@ -4,6 +4,7 @@ namespace App\Http\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\Validator;
 
 /**
  * Class UpdateFacilityRequest
@@ -48,5 +49,22 @@ class UpdateFacilityRequest extends FormRequest
         if ($this->has('category') && !$this->has('ownership')) {
             $this->merge(['ownership' => $this->input('category')]);
         }
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator): void {
+            if (!$this->filled('lga_id') || !$this->filled('ward_id')) {
+                return;
+            }
+
+            $wardBelongsToLga = \App\Models\Ward::whereKey($this->input('ward_id'))
+                ->where('lga_id', $this->input('lga_id'))
+                ->exists();
+
+            if (!$wardBelongsToLga) {
+                $validator->errors()->add('ward_id', 'The selected ward does not belong to the selected LGA.');
+            }
+        });
     }
 }

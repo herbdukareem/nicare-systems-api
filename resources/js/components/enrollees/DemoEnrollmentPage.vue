@@ -147,6 +147,9 @@
               <v-alert v-if="createdEnrollee" type="success" variant="tonal">
                 Enrollee {{ createdEnrollee.enrollee_id }} created. Status: {{ createdEnrollee.status_label || createdEnrollee.status }}.
               </v-alert>
+              <v-alert v-if="approvalNotice" type="info" variant="tonal">
+                {{ approvalNotice }}
+              </v-alert>
               <v-btn v-if="createdEnrollee && Number(createdEnrollee.status) === 0" color="success" :loading="approving" @click="approveEnrollment">Approve Enrollee</v-btn>
               <div v-if="approvedEnrollee" class="tw-grid tw-grid-cols-1 md:tw-grid-cols-3 tw-gap-3 tw-text-sm">
                 <SummaryItem label="Status" value="Active" />
@@ -199,6 +202,7 @@ const principalOptions = ref([])
 const validatingPin = ref(false)
 const submitting = ref(false)
 const approving = ref(false)
+const approvalNotice = ref('')
 const createdEnrollee = ref(null)
 const approvedEnrollee = ref(null)
 const payment = ref({ pin: '', validatedPin: null })
@@ -344,11 +348,16 @@ const submitEnrollment = async () => {
 }
 const approveEnrollment = async () => {
   approving.value = true
+  approvalNotice.value = ''
   try {
     approvedEnrollee.value = (await enrolleeAPI.approve(createdEnrollee.value.id)).data.data
     success('Enrollee approved')
   } catch (err) {
-    error(err?.response?.data?.message || 'Approval failed')
+    const message = err?.response?.data?.message || 'Approval failed'
+    if (message.toLowerCase().includes('verify') && message.toLowerCase().includes('nin')) {
+      approvalNotice.value = 'This enrollee now requires approval-time NIN verification. Open the Pending Approval workspace, verify the NIN, compare the returned data, and then approve the enrollee there.'
+    }
+    error(message)
   } finally {
     approving.value = false
   }

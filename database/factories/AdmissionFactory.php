@@ -20,10 +20,9 @@ class AdmissionFactory extends Factory
         $enrollee = Enrollee::factory()->create();
         $facility = Facility::first() ?? Facility::factory()->create();
         $referral = Referral::factory()->readyForAdmission()->create([
-            'nicare_number' => $enrollee->enrollee_id,
+            'enrollee_id' => $enrollee->id,
+            'referring_facility_id' => $facility->id,
             'receiving_facility_id' => $facility->id,
-            'receiving_facility_name' => $facility->name,
-            'receiving_nicare_code' => $facility->hcp_code,
         ]);
 
         return [
@@ -32,7 +31,7 @@ class AdmissionFactory extends Factory
             'enrollee_id' => $enrollee->id,
             'nicare_number' => $enrollee->enrollee_id,
             'facility_id' => $facility->id,
-            'bundle_id' => null,
+            'service_bundle_id' => null,
             'principal_diagnosis_icd10' => fake()->regexify('[A-Z][0-9]{2}\.[0-9]'),
             'principal_diagnosis_description' => fake()->sentence(3),
             'admission_date' => now(),
@@ -61,4 +60,3 @@ class AdmissionFactory extends Factory
         ]);
     }
 }
-

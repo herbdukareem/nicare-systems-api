@@ -93,7 +93,7 @@
     <AppModal v-model="infoDialog" title="Plan Renewal Information" icon="mdi-information" size="sm">
       <div class="tw-space-y-3">
         <p class="tw-text-slate-700">
-          To renew your premium plan, please contact your NiCare agent or visit any accredited facility to purchase a new premium PIN.
+          To renew your premium plan, start a new premium application through the public enrollment flow or contact NiCare support if you need help matching the right plan.
         </p>
         <div class="tw-bg-blue-50 tw-rounded-xl tw-p-4">
           <div class="tw-font-semibold tw-text-slate-800 tw-mb-2">Contact NiCare</div>
@@ -111,8 +111,11 @@
         </p>
       </div>
       <template #actions>
-        <v-btn variant="flat" color="primary" block rounded @click="infoDialog = false">
-          Got it
+        <v-btn variant="outlined" color="primary" rounded @click="infoDialog = false">
+          Close
+        </v-btn>
+        <v-btn variant="flat" color="primary" rounded @click="$router.push('/enroll/start')">
+          Start Renewal
         </v-btn>
       </template>
     </AppModal>

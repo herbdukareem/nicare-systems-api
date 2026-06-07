@@ -26,6 +26,7 @@ return new class extends Migration
             $table->string('name')->unique();
             $table->string('label')->nullable();
             $table->text('description')->nullable();
+            $table->string('category')->default('General')->index();
             $table->timestamps();
         });
 

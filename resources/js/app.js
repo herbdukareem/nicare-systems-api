@@ -5,6 +5,7 @@ import { createPinia } from 'pinia';
 import router from './router';
 import App from './App.vue';
 import UtilsPlugin from './utils/utils';
+import { vuetifyThemeColors } from './design-system/tokens';
 
 // PrimeVue
 import PrimeVue from 'primevue/config';
@@ -35,15 +36,8 @@ const vuetify = createVuetify({
       customTheme: {
         dark: false,
         colors: {
-          primary: '#0885AB',
-          secondary: '#64748b',
-          accent: '#82B1FF',
-          error: '#FF5252',
-          info: '#2196F3',
-          success: '#4CAF50',
-          warning: '#FFC107',
-          background: '#f8fafc',
-          surface: '#ffffff',
+          ...vuetifyThemeColors,
+          accent: '#60a5fa',
         },
       },
     },
@@ -70,10 +64,10 @@ app.use(ToastService);
 const bootLoader = document.createElement('div');
 bootLoader.id = 'app-boot-loader';
 bootLoader.innerHTML = `
-  <div style="position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#fff;font-family:Inter,Arial,sans-serif">
+  <div style="position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#f4f7fb;font-family:Inter,Segoe UI,Arial,sans-serif">
     <div style="display:flex;flex-direction:column;align-items:center;gap:14px">
-      <div style="height:92px;width:92px;border-radius:999px;border:4px solid #dff3f7;display:grid;place-items:center;position:relative">
-        <div style="position:absolute;inset:-4px;border-radius:999px;border:4px solid transparent;border-top-color:#0885AB;animation:nicare-spin .8s linear infinite"></div>
+      <div style="height:92px;width:92px;border-radius:999px;border:4px solid #d9eef1;display:grid;place-items:center;position:relative;background:#fff;box-shadow:0 16px 40px -28px rgba(15,23,42,.32)">
+        <div style="position:absolute;inset:-4px;border-radius:999px;border:4px solid transparent;border-top-color:#0b6b79;animation:nicare-spin .8s linear infinite"></div>
         <img src="/logo.png" alt="NGSCHA Logo" style="height:60px;width:60px;object-fit:contain" />
       </div>
       <div style="text-align:center">

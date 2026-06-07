@@ -12,6 +12,11 @@ class Referral extends Model
 {
     use HasFactory;
 
+    public const STATUS_PENDING = 'PENDING';
+    public const STATUS_APPROVED = 'APPROVED';
+    public const STATUS_REJECTED = 'REJECTED';
+    public const STATUS_DENIED = 'DENIED';
+
     protected $guarded = ['id'];
     protected $table = 'referrals';
 
@@ -179,7 +184,7 @@ class Referral extends Model
      */
     public function isReadyForClaimSubmission(): bool
     {
-        return $this->status === 'APPROVED'
+        return $this->status === self::STATUS_APPROVED
             && $this->utn_validated
             && !$this->claim_submitted;
     }
@@ -197,7 +202,7 @@ class Referral extends Model
      */
     public function scopeReadyForClaim($query)
     {
-        return $query->where('status', 'APPROVED')
+        return $query->where('status', self::STATUS_APPROVED)
             ->where('utn_validated', true)
             ->where('claim_submitted', false);
     }
@@ -251,7 +256,7 @@ class Referral extends Model
 
         // Check if enrollee has pending referral without submitted claim
         $pendingReferral = self::where('enrollee_id', $enrolleeId)
-            ->where('status', 'APPROVED')
+            ->where('status', self::STATUS_APPROVED)
             ->where('claim_submitted', false)
             ->first();
 
@@ -272,4 +277,9 @@ class Referral extends Model
     protected $appends = [
         'case_records_data'
     ];
+
+    public function isPending(): bool
+    {
+        return $this->status === self::STATUS_PENDING;
+    }
 }

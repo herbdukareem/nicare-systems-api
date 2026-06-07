@@ -34,23 +34,58 @@ class CheckPermission
             return response()->json(['success' => false, 'message' => 'Unauthenticated.'], 401);
         }
 
-        // Flatten comma-separated permission strings (middleware('permission:a,b,c'))
-        $required = [];
-        foreach ($permissions as $perm) {
-            foreach (explode(',', $perm) as $p) {
-                $required[] = trim($p);
-            }
+        if (method_exists($user, 'hasAnyRole') && $user->hasAnyRole(['Super Admin', 'admin'])) {
+            return $next($request);
         }
 
-        foreach ($required as $permission) {
-            if ($user->hasPermission($permission)) {
-                return $next($request);
-            }
+        [$mode, $required] = $this->parsePermissions($permissions);
+
+        if ($required === []) {
+            return $next($request);
+        }
+
+        $authorized = $mode === 'all'
+            ? collect($required)->every(fn (string $permission) => $user->hasPermission($permission))
+            : collect($required)->contains(fn (string $permission) => $user->hasPermission($permission));
+
+        if ($authorized) {
+            return $next($request);
         }
 
         return response()->json([
             'success' => false,
             'message' => 'Forbidden: you do not have the required permission.',
+            'required_permissions' => $required,
+            'match_mode' => $mode,
         ], 403);
+    }
+
+    /**
+     * Parse middleware arguments.
+     *
+     * Supported forms:
+     * - permission:claims.view
+     * - permission:any,claims.view,claims.review
+     * - permission:all,claims.view,claims.review
+     */
+    private function parsePermissions(array $permissions): array
+    {
+        $parts = [];
+
+        foreach ($permissions as $permissionGroup) {
+            foreach (explode(',', $permissionGroup) as $permission) {
+                $permission = trim($permission);
+                if ($permission !== '') {
+                    $parts[] = $permission;
+                }
+            }
+        }
+
+        $mode = 'any';
+        if (isset($parts[0]) && in_array(strtolower($parts[0]), ['any', 'all'], true)) {
+            $mode = strtolower(array_shift($parts));
+        }
+
+        return [$mode, array_values(array_unique($parts))];
     }
 }

@@ -8,16 +8,26 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use InvalidArgumentException;
 
 class Claim extends Model
 {
     use HasFactory, SoftDeletes;
 
+    public const STATUS_DRAFT = 'DRAFT';
+    public const STATUS_SUBMITTED = 'SUBMITTED';
+    public const STATUS_REVIEWING = 'REVIEWING';
+    public const STATUS_APPROVED = 'APPROVED';
+    public const STATUS_REJECTED = 'REJECTED';
+
     /**
      * Statuses from which the claim is immutable (facility cannot edit).
      */
-    public const IMMUTABLE_STATUSES = ['SUBMITTED', 'REVIEWING', 'APPROVED', 'REJECTED'];
+    public const IMMUTABLE_STATUSES = [
+        self::STATUS_SUBMITTED,
+        self::STATUS_REVIEWING,
+        self::STATUS_APPROVED,
+        self::STATUS_REJECTED,
+    ];
 
     /**
      * Returns true when the claim can no longer be edited by the submitting facility.
@@ -93,7 +103,10 @@ class Claim extends Model
 
     public function serviceBundleComponents()
     {
-        // This traverses: Claim -> Referral -> ServiceBundle -> Components
+        if (!$this->referral || !$this->referral->serviceBundle) {
+            return \App\Models\BundleComponent::query()->whereRaw('1 = 0');
+        }
+
         return $this->referral->serviceBundle->components();
     }
 
@@ -162,22 +175,22 @@ class Claim extends Model
     // Scopes
     public function scopeApproved($query)
     {
-        return $query->where('status', 'APPROVED');
+        return $query->where('status', self::STATUS_APPROVED);
     }
 
     public function scopeRejected($query)
     {
-        return $query->where('status', 'REJECTED');
+        return $query->where('status', self::STATUS_REJECTED);
     }
 
     public function scopeSubmitted($query)
     {
-        return $query->where('status', 'SUBMITTED');
+        return $query->where('status', self::STATUS_SUBMITTED);
     }
 
     public function scopeDraft($query)
     {
-        return $query->where('status', 'DRAFT');
+        return $query->where('status', self::STATUS_DRAFT);
     }
 
     /**

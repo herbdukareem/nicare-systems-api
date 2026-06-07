@@ -53,8 +53,8 @@
             <div class="tw-flex-1">
               <div class="tw-flex tw-items-center tw-gap-2">
                 <h1 class="tw-text-2xl md:tw-text-3xl tw-font-bold tw-text-gray-900">{{ enrollee.name }}</h1>
-                <v-chip v-if="enrollee.nin" size="small" variant="flat" color="indigo">
-                  <v-icon start size="16">mdi-shield-check</v-icon> NIN Verified
+                <v-chip v-if="enrollee.nin_verification_label" size="small" variant="flat" :color="ninVerificationColor(enrollee.nin_verification_status)">
+                  <v-icon start size="16">mdi-shield-check</v-icon> {{ enrollee.nin_verification_label }}
                 </v-chip>
               </div>
 
@@ -187,6 +187,9 @@
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-4">
           <InfoItem label="Full Name" :value="enrollee.name" icon="mdi-account-badge" />
           <InfoItem label="NIN" :value="enrollee.nin || 'N/A'" icon="mdi-card-account-details" />
+          <InfoItem label="NIN Verification" :value="enrollee.nin_verification_label || 'Not Verified'" icon="mdi-shield-account" />
+          <InfoItem label="Verified By" :value="enrollee.nin_verification?.verified_by?.name || 'N/A'" icon="mdi-account-check-outline" />
+          <InfoItem label="Verification Provider" :value="enrollee.nin_verification_provider || 'N/A'" icon="mdi-lan-connect" />
           <InfoItem label="Date of Birth" :value="formatDate(enrollee.date_of_birth)" icon="mdi-cake-variant" />
           <InfoItem label="Age" :value="(enrollee.age || 'N/A') + ' years'" icon="mdi-account-clock" />
           <InfoItem label="Gender" :value="enrollee.gender || 'N/A'" icon="mdi-gender-male-female" />
@@ -294,7 +297,7 @@
 
 <script setup>
 import { ref, onMounted, defineComponent, h, resolveComponent } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
 import { useToast } from '../../composables/useToast'
 import { enrolleeAPI } from '../../utils/api'
@@ -302,6 +305,7 @@ import axios from 'axios'
 
 /* Toast + route */
 const route = useRoute()
+const router = useRouter()
 const { success, error } = useToast()
 
 /* State */
@@ -313,8 +317,7 @@ const statusComment = ref('')
 const fileInput = ref(null)
 const statusOptions = ref([])
 
-/* Demo stats (replace with API when ready) */
-const statistics = ref({ totalClaims: 12, totalBenefits: 45000, facilitiesVisited: 3, lastVisit: 15 })
+const statistics = ref({ totalClaims: 0, totalBenefits: 0, facilitiesVisited: 0, lastVisit: null })
 const activeCoverage = ref(null)
 
 /* -------- Small presentational components (render functions to keep SFC lean) -------- */
@@ -358,11 +361,27 @@ const StatTile = defineComponent({
 const loadEnrollee = async () => {
   loading.value = true
   try {
-    const response = await enrolleeAPI.getById(route.params.id)
-    enrollee.value = response.data.data
-    activeCoverage.value = buildActiveCoverage(enrollee.value)
-  } catch (err) {
-    error('Failed to load enrollee details')
+    const [enrolleeRes, statsRes] = await Promise.allSettled([
+      enrolleeAPI.getById(route.params.id),
+      enrolleeAPI.getStatistics(route.params.id),
+    ])
+
+    if (enrolleeRes.status === 'fulfilled') {
+      enrollee.value = enrolleeRes.value.data.data
+      activeCoverage.value = buildActiveCoverage(enrollee.value)
+    } else {
+      error('Failed to load enrollee details')
+    }
+
+    if (statsRes.status === 'fulfilled') {
+      const s = statsRes.value.data?.data || {}
+      statistics.value = {
+        totalClaims: s.total_claims ?? 0,
+        totalBenefits: s.total_benefits ?? 0,
+        facilitiesVisited: s.facilities_visited ?? 0,
+        lastVisit: s.last_visit_days ?? null,
+      }
+    }
   } finally {
     loading.value = false
   }
@@ -434,13 +453,23 @@ const updateEnrolleeStatus = async (status, comment) => {
 }
 
 const editEnrollee = () => {
-  // route to edit page here when ready
-  console.log('Edit enrollee:', enrollee.value.id)
+  router.push({ name: 'enrollees', query: { edit: enrollee.value.id } })
 }
 
 const downloadProfile = async () => {
   try {
-    // Wire real export endpoint here
+    const response = await enrolleeAPI.exportPdf(enrollee.value.id)
+    const blob = new Blob([response.data], {
+      type: response.headers['content-type'] || 'application/pdf',
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `enrollee-${enrollee.value.enrollee_id || enrollee.value.id}.pdf`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(url)
     success('Profile downloaded successfully')
   } catch {
     error('Failed to download profile')
@@ -462,6 +491,15 @@ const getStatusColor = (status) => {
     case 'suspended':
     case 'expired': return 'error'
     default: return 'grey'
+  }
+}
+
+const ninVerificationColor = (status) => {
+  switch (status) {
+    case 'verified': return 'success'
+    case 'failed': return 'error'
+    case 'not_provided': return 'grey'
+    default: return 'warning'
   }
 }
 

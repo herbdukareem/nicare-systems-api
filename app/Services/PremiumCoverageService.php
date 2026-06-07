@@ -191,6 +191,16 @@ class PremiumCoverageService
 
         DB::transaction(function () use ($batch, $plan, &$count) {
             foreach ($batch->enrollees as $row) {
+                $facility = $row->facility_id ? \App\Models\Facility::find($row->facility_id) : null;
+                $lgaId = $row->lga_id ?? $facility?->lga_id;
+                $wardId = $row->ward_id ?? $facility?->ward_id;
+
+                if (!$lgaId || !$wardId) {
+                    throw new InvalidArgumentException(
+                        "Payroll batch row for {$row->first_name} {$row->last_name} is missing LGA/ward information and could not inherit it from the selected facility."
+                    );
+                }
+
                 $enrollee = $row->enrollee_id ? Enrollee::find($row->enrollee_id) : null;
                 if (!$enrollee) {
                     $enrollee = Enrollee::create([
@@ -200,8 +210,8 @@ class PremiumCoverageService
                         'last_name' => $row->last_name,
                         'phone' => $row->phone,
                         'facility_id' => $row->facility_id,
-                        'lga_id' => 1,
-                        'ward_id' => 1,
+                        'lga_id' => $lgaId,
+                        'ward_id' => $wardId,
                         'created_by' => auth()->id(),
                         'status' => 1,
                         'enrollment_date' => now(),

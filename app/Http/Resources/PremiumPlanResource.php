@@ -27,6 +27,7 @@ class PremiumPlanResource extends JsonResource
             'maximum_dependants' => $this->maximum_dependants,
             'effective_maximum_dependants' => $this->getEffectiveMaximumDependants(),
             'payment_required' => (bool) $this->payment_required,
+            'self_enrollment_enabled' => (bool) $this->self_enrollment_enabled,
             'payment_gateway' => $this->payment_gateway,
             'merchant_id' => $this->merchant_id,
             'merchant_service_type_id' => $this->merchant_service_type_id,

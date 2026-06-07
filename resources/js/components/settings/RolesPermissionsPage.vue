@@ -1,765 +1,659 @@
 <template>
   <AdminLayout>
-    <div class="tw-container tw-mx-auto tw-p-6 tw-space-y-6">
-      <!-- Sticky Page Header -->
-      <div class="tw-sticky tw-top-0 tw-z-10 tw-bg-white/80 tw-backdrop-blur tw-border tw-border-gray-100 tw-rounded-xl tw-px-4 tw-py-3">
-        <div class="tw-flex tw-items-center tw-justify-between">
-          <div>
-            <h1 class="tw-text-2xl md:tw-text-3xl tw-font-bold tw-text-gray-900">Roles & Permissions</h1>
-            <p class="tw-text-gray-600 tw-mt-0.5">Manage system roles and their permissions</p>
-          </div>
-          <div class="tw-flex tw-gap-2">
-            <v-btn
-              color="primary"
-              variant="outlined"
-              prepend-icon="mdi-download"
-              @click="exportRoles"
-            >
-              Export
-            </v-btn>
-            <v-btn
-              color="primary"
-              prepend-icon="mdi-plus"
-              @click="openCreateDialog()"
-            >
-              Create Role
-            </v-btn>
-          </div>
-        </div>
+    <div class="tw-space-y-4">
+      <AppPageHeader title="Roles & Permissions" icon="mdi-shield-account-outline">
+        <v-btn size="small" variant="outlined" prepend-icon="mdi-view-grid-outline" @click="showPermissionMatrix = !showPermissionMatrix">
+          {{ showPermissionMatrix ? 'Hide Matrix' : 'Matrix' }}
+        </v-btn>
+        <v-btn size="small" color="primary" prepend-icon="mdi-plus" @click="openCreateDialog">Create Role</v-btn>
+      </AppPageHeader>
+
+      <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-4">
+        <AppStatCard compact label="Total Roles" :value="totalRoles" icon="mdi-shield-account-outline" color="primary" :loading="loading" />
+        <AppStatCard compact label="Permissions" :value="allPermissions.length" icon="mdi-key-outline" color="success" :loading="loading" />
+        <AppStatCard compact label="Users Assigned" :value="totalUsersWithRoles" icon="mdi-account-group-outline" color="info" :loading="loading" />
+        <AppStatCard compact label="Permission Categories" :value="permissionCategories.length" icon="mdi-shape-outline" color="warning" :loading="loading" />
       </div>
 
-      <!-- Stats -->
-      <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 xl:tw-grid-cols-4 tw-gap-4">
-        <div class="tw-bg-white tw-rounded-xl tw-border tw-border-gray-100 tw-shadow-sm tw-p-5">
-          <div class="tw-flex tw-items-center">
-            <div class="tw-p-3 tw-rounded-full tw-bg-blue-100"><v-icon color="blue" size="24">mdi-shield-account</v-icon></div>
-            <div class="tw-ml-4">
-              <p class="tw-text-sm tw-font-medium tw-text-gray-600">Total Roles</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ totalRoles.toLocaleString() }}</p>
-            </div>
-          </div>
-        </div>
-        <div class="tw-bg-white tw-rounded-xl tw-border tw-border-gray-100 tw-shadow-sm tw-p-5">
-          <div class="tw-flex tw-items-center">
-            <div class="tw-p-3 tw-rounded-full tw-bg-green-100"><v-icon color="green" size="24">mdi-key</v-icon></div>
-            <div class="tw-ml-4">
-              <p class="tw-text-sm tw-font-medium tw-text-gray-600">Permissions</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ allPermissions.length.toLocaleString() }}</p>
-            </div>
-          </div>
-        </div>
-        <div class="tw-bg-white tw-rounded-xl tw-border tw-border-gray-100 tw-shadow-sm tw-p-5">
-          <div class="tw-flex tw-items-center">
-            <div class="tw-p-3 tw-rounded-full tw-bg-purple-100"><v-icon color="purple" size="24">mdi-account-group</v-icon></div>
-            <div class="tw-ml-4">
-              <p class="tw-text-sm tw-font-medium tw-text-gray-600">Users Assigned</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ totalUsersWithRoles.toLocaleString() }}</p>
-            </div>
-          </div>
-        </div>
-        <div class="tw-bg-white tw-rounded-xl tw-border tw-border-gray-100 tw-shadow-sm tw-p-5">
-          <div class="tw-flex tw-items-center">
-            <div class="tw-p-3 tw-rounded-full tw-bg-orange-100"><v-icon color="orange" size="24">mdi-shield-check</v-icon></div>
-            <div class="tw-ml-4">
-              <p class="tw-text-sm tw-font-medium tw-text-gray-600">Permission Categories</p>
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ permissionCategories.length }}</p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <AppFilterBar :active-count="selectedRoles.length > 0 ? 1 : 0" :cols="3">
+        <v-text-field
+          v-model="searchQuery"
+          label="Search roles"
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          density="compact"
+          clearable
+          hide-details
+        />
+        <v-btn
+          size="small"
+          color="error"
+          variant="outlined"
+          prepend-icon="mdi-delete-outline"
+          :disabled="!selectedRoles.length"
+          @click="openBulkDeleteDialog"
+        >
+          Delete Selected
+        </v-btn>
 
-      <!-- Filters -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-5">
-        <div class="tw-flex tw-flex-col lg:tw-flex-row tw-gap-4 tw-items-start lg:tw-items-center tw-justify-between">
-          <div class="tw-flex tw-gap-3 tw-w-full lg:tw-w-auto">
-            <v-text-field
-              v-model="searchQuery"
-              label="Search roles..."
-              prepend-inner-icon="mdi-magnify"
-              variant="outlined"
-              density="compact"
-              clearable
-              hide-details
-              class="tw-w-full md:tw-w-80"
-            />
-            <v-btn
-              color="primary"
-              variant="outlined"
-              prepend-icon="mdi-view-grid"
-              @click="showPermissionMatrix = !showPermissionMatrix"
-            >
-              {{ showPermissionMatrix ? 'Hide' : 'Show' }} Permission Matrix
-            </v-btn>
-          </div>
+        <template #tags>
+          <AppBadge v-if="selectedRoles.length" :label="`${selectedRoles.length} role(s) selected`" tone="warning" size="sm" />
+        </template>
+        <template #actions>
+          <v-btn size="small" variant="outlined" prepend-icon="mdi-refresh" :loading="loading" @click="loadRoles">Refresh</v-btn>
+        </template>
+      </AppFilterBar>
 
-          <div class="tw-flex tw-gap-2">
-            <v-btn
-              color="warning"
-              variant="outlined"
-              size="small"
-              @click="showBulkActionsDialog = true"
-              v-if="selectedRoles.length > 0"
-            >
-              <v-icon start>mdi-cog</v-icon>
-              Bulk Actions ({{ selectedRoles.length }})
-            </v-btn>
-          </div>
-        </div>
-      </div>
-
-      <!-- Roles Table -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100">
+      <AppCard
+        title="Roles"
+        icon="mdi-format-list-bulleted-square"
+        tone="primary"
+        :padded="false"
+      >
         <AppDataTable
-          v-model="selectedRoles"
           :headers="roleHeaders"
           :items="roles"
           :items-length="totalRoles"
           :page="currentPage"
           :items-per-page="itemsPerPage"
           :loading="loading"
-          show-select
-          return-object
           item-value="id"
-          class="tw-elevation-0"
+          show-select
+          v-model:model-value="selectedRoles"
+          class="tw-rounded-none tw-border-0"
           @update:page="onUpdatePage"
           @update:items-per-page="onUpdatePerPage"
           @update:sort-by="onUpdateSort"
         >
-          <!-- Loading & Empty -->
-          <template #loading>
-            <div class="tw-p-8">
-              <v-skeleton-loader type="table-row@5"></v-skeleton-loader>
+          <template #item.name="{ item }">
+            <div class="tw-space-y-1">
+              <div class="tw-font-semibold tw-text-slate-900">{{ item.label || item.name }}</div>
+              <div class="tw-text-xs tw-text-slate-500">{{ item.name }}</div>
             </div>
           </template>
-
-          <template #bottom>
-            <div class="tw-flex tw-items-center tw-justify-between tw-px-4 tw-py-3">
-              <v-pagination
-                v-model="currentPage"
-                :length="Math.max(1, Math.ceil(totalRoles / itemsPerPage))"
-                total-visible="7"
-              />
-              <v-select
-                :items="[10,15,25,50,100]"
-                v-model="itemsPerPage"
-                label="Rows per page"
-                density="compact"
-                style="max-width: 140px"
-                hide-details
-              />
-            </div>
+          <template #item.description="{ item }">
+            <span class="tw-text-sm tw-text-slate-600">{{ item.description || 'No description provided' }}</span>
           </template>
-
-        
-
-          <!-- Permissions count -->
           <template #item.permissions_count="{ item }">
-            <v-chip size="small" color="primary" variant="outlined">
-              {{ countRolePermissions(item) }} permissions
-            </v-chip>
+            <AppBadge :label="`${countRolePermissions(item)} permissions`" tone="primary" size="sm" />
           </template>
-
-          <!-- Users count -->
           <template #item.users_count="{ item }">
-            <span class="tw-text-gray-700">{{ item.users_count || 0 }} users</span>
+            <AppBadge :label="`${item.users_count || 0} users`" tone="secondary" size="sm" />
           </template>
-
-          <!-- Created -->
           <template #item.created_at="{ item }">
-            <span class="tw-text-gray-700">{{ formatDate(item.created_at) }}</span>
+            <DateDisplay :value="item.created_at" format="short" />
           </template>
-
-          <!-- Actions -->
           <template #item.actions="{ item }">
-            <div class="tw-flex tw-space-x-1">
-              <v-btn icon size="small" variant="text" @click="viewRole(item)">
-                <v-icon size="18">mdi-eye</v-icon>
+            <div class="tw-flex tw-items-center tw-justify-end tw-gap-1">
+              <v-btn icon size="small" variant="text" title="View" @click="viewRole(item)">
+                <v-icon size="18">mdi-eye-outline</v-icon>
               </v-btn>
-              <v-btn icon size="small" variant="text" @click="editRole(item)">
-                <v-icon size="18">mdi-pencil</v-icon>
+              <v-btn icon size="small" variant="text" title="Edit" @click="editRole(item)">
+                <v-icon size="18">mdi-pencil-outline</v-icon>
+              </v-btn>
+              <v-btn icon size="small" variant="text" title="Clone" @click="cloneRole(item)">
+                <v-icon size="18">mdi-content-copy</v-icon>
               </v-btn>
               <v-btn
                 icon
                 size="small"
                 variant="text"
                 color="error"
-                @click="deleteRole(item)"
-                :disabled="item.name === 'Super Admin'"
+                :disabled="isProtectedRole(item)"
+                title="Delete"
+                @click="openDeleteDialog(item)"
               >
-                <v-icon size="18">mdi-delete</v-icon>
+                <v-icon size="18">mdi-delete-outline</v-icon>
               </v-btn>
             </div>
           </template>
-
-          <!-- No data -->
           <template #no-data>
-            <div class="tw-py-12 tw-text-center">
-              <v-icon size="40" class="tw-mb-2">mdi-shield-lock-outline</v-icon>
-              <div class="tw-font-semibold">No roles found</div>
-              <div class="tw-text-sm tw-text-gray-600">Try adjusting your search or create a new role.</div>
-            </div>
+            <AppEmptyState
+              title="No roles found"
+              description="Try a different search term or create a new role to get started."
+              icon="mdi-shield-lock-outline"
+            />
           </template>
         </AppDataTable>
-      </div>
+      </AppCard>
 
-      <!-- Permission Matrix -->
-      <div
+      <AppCard
         v-if="showPermissionMatrix"
-        class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100"
+        title="Permission Matrix"
+        icon="mdi-table-large"
+        tone="secondary"
       >
-        <div class="tw-p-5 tw-border-b tw-border-gray-200">
-          <h3 class="tw-text-lg tw-font-semibold tw-text-gray-900">Permission Matrix</h3>
-          <p class="tw-text-sm tw-text-gray-600 tw-mt-1">Visual overview of role permissions</p>
-        </div>
-
-        <div class="tw-p-5">
-          <div class="tw-overflow-x-auto">
-            <table class="tw-w-full tw-text-sm">
-              <thead>
-                <tr class="tw-border-b tw-border-gray-200">
-                  <th class="tw-text-left tw-py-3 tw-px-4 tw-font-medium tw-text-gray-900">Permission</th>
-                  <th
-                    v-for="role in roles"
-                    :key="role.id"
-                    class="tw-text-center tw-py-3 tw-px-2 tw-font-medium tw-text-gray-900 tw-min-w-[120px]"
-                  >
-                    {{ role.label || role.name }}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr
-                  v-for="permission in allPermissions"
-                  :key="permission.id"
-                  class="tw-border-b tw-border-gray-100 hover:tw-bg-gray-50"
-                >
-                  <td class="tw-py-3 tw-px-4">
-                    <div>
-                      <p class="tw-font-medium tw-text-gray-900">{{ permission.label || permission.name }}</p>
-                      <p class="tw-text-xs tw-text-gray-500" v-if="permission.description">{{ permission.description }}</p>
-                    </div>
-                  </td>
-                  <td
-                    v-for="role in roles"
-                    :key="`${permission.id}-${role.id}`"
-                    class="tw-text-center tw-py-3 tw-px-2"
-                  >
-                    <v-icon :color="hasPermission(role, permission) ? 'success' : 'grey'" size="20">
-                      {{ hasPermission(role, permission) ? 'mdi-check-circle' : 'mdi-circle-outline' }}
-                    </v-icon>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- Create/Edit Role Dialog -->
-    <AppModal v-model="showCreateRoleDialog" :title="editingRole ? 'Edit Role' : 'Create New Role'" size="lg">
-      <div class="tw-space-y-4">
-        <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-          <v-text-field v-model="roleForm.name" label="Role Name" variant="outlined" required />
-          <v-select
-            v-model="roleForm.status"
-            :items="['active', 'inactive']"
-            label="Status"
-            variant="outlined"
-            required
+        <div v-if="roles.length === 0 || allPermissions.length === 0">
+          <AppEmptyState
+            title="Permission matrix unavailable"
+            description="Load roles and permissions first to inspect the matrix."
+            icon="mdi-view-grid-outline"
           />
         </div>
+        <div v-else class="tw-overflow-x-auto">
+          <table class="tw-w-full tw-min-w-[960px] tw-text-sm">
+            <thead>
+              <tr class="tw-border-b tw-border-slate-200">
+                <th class="tw-px-4 tw-py-3 tw-text-left tw-font-semibold tw-text-slate-900">Permission</th>
+                <th
+                  v-for="role in roles"
+                  :key="role.id"
+                  class="tw-min-w-[120px] tw-px-3 tw-py-3 tw-text-center tw-font-semibold tw-text-slate-900"
+                >
+                  {{ role.label || role.name }}
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr
+                v-for="permission in allPermissions"
+                :key="permission.id"
+                class="tw-border-b tw-border-slate-100 hover:tw-bg-slate-50/70"
+              >
+                <td class="tw-px-4 tw-py-3">
+                  <div class="tw-space-y-1">
+                    <p class="tw-font-medium tw-text-slate-900">{{ permission.label || permission.name }}</p>
+                    <p class="tw-text-xs tw-text-slate-500">{{ permission.category || 'General' }}</p>
+                  </div>
+                </td>
+                <td
+                  v-for="role in roles"
+                  :key="`${permission.id}-${role.id}`"
+                  class="tw-px-3 tw-py-3 tw-text-center"
+                >
+                  <v-icon :color="hasPermission(role, permission) ? 'success' : 'grey-lighten-1'" size="18">
+                    {{ hasPermission(role, permission) ? 'mdi-check-circle' : 'mdi-circle-outline' }}
+                  </v-icon>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </AppCard>
 
-        <v-textarea v-model="roleForm.description" label="Description" variant="outlined" rows="3" />
+      <AppModal
+        v-model="showCreateRoleDialog"
+        :title="editingRole ? 'Edit Role' : 'Create Role'"
+        size="lg"
+        icon="mdi-shield-edit-outline"
+      >
+        <template #actions>
+          <v-btn variant="outlined" :disabled="saving" @click="closeRoleDialog">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="saving" @click="saveRole">
+            Save Role
+          </v-btn>
+        </template>
 
-        <div>
-          <div class="tw-flex tw-items-start tw-justify-between tw-mb-3">
-            <div>
-              <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">Permissions</h4>
-              <p class="tw-text-sm tw-text-gray-600 tw-mt-1">
-                Select permissions for this role. Users assigned this role will automatically inherit these permissions.
-              </p>
-            </div>
-            <v-chip
-              color="primary"
+        <div class="tw-space-y-5">
+          <div class="tw-grid tw-gap-4 md:tw-grid-cols-2">
+            <v-text-field v-model="roleForm.name" label="Role Name" variant="outlined" />
+            <v-select
+              v-model="roleForm.status"
+              :items="statusOptions"
+              label="Status"
               variant="outlined"
-              size="small"
-              prepend-icon="mdi-shield-check"
-            >
-              {{ roleForm.permissions.length }} selected
-            </v-chip>
+            />
+          </div>
+          <v-textarea v-model="roleForm.description" label="Description" variant="outlined" rows="3" />
+
+          <AppAlert
+            tone="info"
+            message="Users assigned to this role inherit all selected permissions after the backend sync completes."
+          />
+
+          <div class="tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-3">
+            <div class="tw-flex tw-flex-wrap tw-gap-2">
+              <AppBadge :label="`${roleForm.permissions.length} selected`" tone="primary" />
+              <AppBadge :label="`${permissionCategories.length} categories`" tone="secondary" />
+            </div>
+            <div class="tw-flex tw-gap-2">
+              <v-btn size="small" variant="outlined" prepend-icon="mdi-checkbox-multiple-marked-outline" @click="selectAllPermissions">
+                Select All
+              </v-btn>
+              <v-btn size="small" variant="outlined" color="error" prepend-icon="mdi-checkbox-multiple-blank-outline" @click="clearAllPermissions">
+                Clear All
+              </v-btn>
+            </div>
           </div>
 
-          <!-- Info Alert -->
-          <v-alert
-            type="info"
-            variant="tonal"
-            density="compact"
-            class="tw-mb-4"
-            icon="mdi-information"
-          >
-            <div class="tw-text-sm">
-              <strong>Auto-Inheritance:</strong> Any user assigned to this role will automatically have all selected permissions.
-              No need to assign permissions individually to users.
-            </div>
-          </v-alert>
-
-          <!-- Quick Actions -->
-          <div class="tw-flex tw-gap-2 tw-mb-4">
-            <v-btn
-              size="small"
-              variant="outlined"
-              color="primary"
-              prepend-icon="mdi-checkbox-multiple-marked"
-              @click="selectAllPermissions"
+          <div class="tw-grid tw-gap-4 md:tw-grid-cols-2">
+            <AppCard
+              v-for="category in permissionCategories"
+              :key="category.name"
+              :title="category.name"
+              icon="mdi-folder-key-outline"
+              tone="secondary"
             >
-              Select All
-            </v-btn>
-            <v-btn
-              size="small"
-              variant="outlined"
-              color="error"
-              prepend-icon="mdi-checkbox-multiple-blank-outline"
-              @click="clearAllPermissions"
-            >
-              Clear All
-            </v-btn>
-          </div>
+              <template #actions>
+                <v-btn size="x-small" variant="text" prepend-icon="mdi-check-all" @click="toggleCategory(category)">
+                  Toggle
+                </v-btn>
+              </template>
 
-          <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 tw-gap-4">
-            <div v-for="cat in permissionCategories" :key="cat.name">
-              <div class="tw-flex tw-items-center tw-justify-between tw-mb-1.5">
-                <h5 class="tw-font-medium tw-text-gray-700">{{ cat.name }}</h5>
-                <v-btn
-                  size="x-small"
-                  variant="text"
-                  prepend-icon="mdi-check-all"
-                  @click="toggleCategory(cat)"
-                >Toggle</v-btn>
-              </div>
-              <div class="tw-space-y-1.5">
+              <div class="tw-space-y-2">
                 <v-checkbox
-                  v-for="perm in cat.permissions"
-                  :key="perm.id"
+                  v-for="permission in category.permissions"
+                  :key="permission.id"
                   v-model="roleForm.permissions"
-                  :value="perm.id"
-                  :label="perm.name"
+                  :value="permission.id"
+                  :label="permission.label || permission.name"
                   density="compact"
                   hide-details
                 />
               </div>
-            </div>
+            </AppCard>
           </div>
         </div>
-      </div>
-      <template #actions>
-        <v-btn variant="outlined" @click="closeRoleDialog">Cancel</v-btn>
-        <v-btn color="primary" variant="flat" @click="saveRole">Save Role</v-btn>
-      </template>
-    </AppModal>
+      </AppModal>
 
-    <!-- View Role Dialog -->
-    <AppModal v-model="showViewRoleDialog" :title="viewingRole?.name ?? 'Role Details'" size="md" color="info">
-      <div v-if="viewingRole" class="tw-space-y-4">
-        <div class="tw-flex tw-items-center tw-gap-2">
-          <v-chip :color="viewingRole.status === 'active' ? 'success' : 'error'" size="small">
-            {{ viewingRole.status }}
-          </v-chip>
-        </div>
+      <AppModal
+        v-model="showViewRoleDialog"
+        :title="viewingRole?.label || viewingRole?.name || 'Role Details'"
+        :subtitle="viewingRole?.description || 'Role details'"
+        icon="mdi-eye-outline"
+        size="md"
+      >
+        <template #actions>
+          <v-btn variant="outlined" @click="showViewRoleDialog = false">Close</v-btn>
+          <v-btn color="primary" variant="flat" @click="viewingRole && editRole(viewingRole)">
+            Edit Role
+          </v-btn>
+        </template>
 
-        <div>
-          <h4 class="tw-font-medium tw-text-gray-700">Description</h4>
-          <p class="tw-text-gray-700">{{ viewingRole.description || 'No description provided' }}</p>
-        </div>
-
-        <div>
-          <h4 class="tw-font-medium tw-text-gray-700">Permissions ({{ countRolePermissions(viewingRole) }})</h4>
-          <div class="tw-mt-2 tw-flex tw-flex-wrap tw-gap-2">
-            <v-chip
-              v-for="pid in normalizePermissionIds(viewingRole)"
-              :key="pid"
-              size="small"
-              color="primary"
-              variant="outlined"
-            >
-              {{ getPermissionName(pid) }}
-            </v-chip>
+        <div v-if="viewingRole" class="tw-space-y-4">
+          <div class="tw-flex tw-flex-wrap tw-gap-2">
+            <AppBadge :label="viewingRole.status || 'active'" :tone="viewingRole.status === 'inactive' ? 'danger' : 'success'" />
+            <AppBadge :label="`${countRolePermissions(viewingRole)} permissions`" tone="primary" />
+            <AppBadge :label="`${viewingRole.users_count || 0} users`" tone="secondary" />
           </div>
-        </div>
 
-        <div>
-          <h4 class="tw-font-medium tw-text-gray-700">Statistics</h4>
-          <div class="tw-grid tw-grid-cols-2 tw-gap-4 tw-mt-2">
-            <div class="tw-text-center tw-p-3 tw-bg-gray-50 tw-rounded-lg">
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ viewingRole.users_count || 0 }}</p>
-              <p class="tw-text-sm tw-text-gray-600">Users Assigned</p>
+          <AppCard title="Permissions" icon="mdi-key-outline" tone="secondary">
+            <div class="tw-flex tw-flex-wrap tw-gap-2">
+              <AppBadge
+                v-for="permissionId in normalizePermissionIds(viewingRole)"
+                :key="permissionId"
+                :label="getPermissionName(permissionId)"
+                tone="primary"
+                size="sm"
+              />
             </div>
-            <div class="tw-text-center tw-p-3 tw-bg-gray-50 tw-rounded-lg">
-              <p class="tw-text-2xl tw-font-bold tw-text-gray-900">{{ countRolePermissions(viewingRole) }}</p>
-              <p class="tw-text-sm tw-text-gray-600">Permissions</p>
-            </div>
-          </div>
+          </AppCard>
         </div>
-      </div>
-      <template #actions>
-        <v-btn variant="outlined" @click="showViewRoleDialog = false">Close</v-btn>
-        <v-btn color="primary" variant="flat" @click="editRole(viewingRole)">Edit Role</v-btn>
-      </template>
-    </AppModal>
+      </AppModal>
 
-    <!-- Bulk Actions Dialog -->
-    <AppModal v-model="showBulkActionsDialog" :title="`Bulk Actions (${selectedRoles.length} roles)`" size="md">
-      <div class="tw-space-y-4">
-        <v-select
-          v-model="bulkAction"
-          :items="bulkActionOptions"
-          label="Select Action"
-          variant="outlined"
-          required
-        />
-        <div v-if="bulkAction === 'delete'" class="tw-p-4 tw-bg-red-50 tw-rounded-lg">
-          <p class="tw-text-red-800 tw-text-sm">
-            <v-icon color="red" size="16" class="tw-mr-1">mdi-alert</v-icon>
-            This action cannot be undone. {{ selectedRoles.length }} roles will be permanently deleted.
-          </p>
-        </div>
-        <div v-if="bulkAction === 'clone'" class="tw-p-4 tw-bg-blue-50 tw-rounded-lg">
-          <p class="tw-text-blue-800 tw-text-sm">
-            <v-icon color="blue" size="16" class="tw-mr-1">mdi-information</v-icon>
-            {{ selectedRoles.length }} roles will be cloned with their permissions.
-          </p>
-        </div>
-      </div>
-      <template #actions>
-        <v-btn variant="outlined" @click="showBulkActionsDialog = false">Cancel</v-btn>
-        <v-btn :color="bulkAction === 'delete' ? 'error' : 'primary'" variant="flat" @click="handleBulkAction" :disabled="!bulkAction">
-          {{ bulkAction === 'delete' ? 'Delete Roles' : 'Apply Action' }}
-        </v-btn>
-      </template>
-    </AppModal>
+      <AppConfirmDialog
+        v-model="deleteDialog"
+        title="Delete role"
+        subtitle="This will remove the selected role after backend confirmation."
+        :message="deleteDialogMessage"
+        warning="Protected roles cannot be deleted from this screen."
+        confirm-text="Delete role"
+        icon="mdi-delete-alert-outline"
+        tone="danger"
+        :loading="deleting"
+        @cancel="closeDeleteDialog"
+        @confirm="confirmDelete"
+        @update:model-value="handleDeleteDialogChange"
+      />
+
+      <AppConfirmDialog
+        v-model="bulkDeleteDialog"
+        title="Delete selected roles"
+        subtitle="This will call the backend bulk delete endpoint."
+        :message="`Delete ${selectedRoles.length} selected role(s)?`"
+        warning="Only non-protected roles will be sent for deletion."
+        confirm-text="Delete selected roles"
+        icon="mdi-delete-sweep-outline"
+        tone="danger"
+        :loading="deleting"
+        @cancel="closeBulkDeleteDialog"
+        @confirm="confirmBulkDelete"
+        @update:model-value="handleBulkDeleteDialogChange"
+      />
+    </div>
   </AdminLayout>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, watch } from 'vue';
-import AdminLayout from '../layout/AdminLayout.vue';
-import AppModal from '../common/AppModal.vue';
-import AppDataTable from '../common/AppDataTable.vue';
-import { useToast } from '../../composables/useToast';
-import { roleAPI, permissionAPI } from '../../utils/api';
+import { computed, onMounted, ref, watch } from 'vue'
+import AdminLayout from '../layout/AdminLayout.vue'
+import AppAlert from '../common/AppAlert.vue'
+import AppBadge from '../common/AppBadge.vue'
+import AppCard from '../common/AppCard.vue'
+import AppConfirmDialog from '../common/AppConfirmDialog.vue'
+import AppDataTable from '../common/AppDataTable.vue'
+import AppEmptyState from '../common/AppEmptyState.vue'
+import AppFilterBar from '../common/AppFilterBar.vue'
+import AppModal from '../common/AppModal.vue'
+import AppStatCard from '../common/AppStatCard.vue'
+import AppPageHeader from '../common/AppPageHeader.vue'
+import DateDisplay from '../common/DateDisplay.vue'
+import { useToast } from '../../composables/useToast'
+import { permissionAPI, roleAPI } from '../../utils/api'
 
-const { success, error } = useToast();
+const { success, error } = useToast()
 
-// reactive state
-const loading = ref(false);
-const searchQuery = ref('');
-const debouncer = ref(null);
+const loading = ref(false)
+const saving = ref(false)
+const deleting = ref(false)
+const searchQuery = ref('')
+const debouncer = ref(null)
 
-const showCreateRoleDialog = ref(false);
-const showViewRoleDialog = ref(false);
-const showPermissionMatrix = ref(false);
-const showBulkActionsDialog = ref(false);
+const showCreateRoleDialog = ref(false)
+const showViewRoleDialog = ref(false)
+const showPermissionMatrix = ref(false)
+const deleteDialog = ref(false)
+const bulkDeleteDialog = ref(false)
 
-const editingRole = ref(null);
-const viewingRole = ref(null);
-const selectedRoles = ref([]);
-const bulkAction = ref('');
-const bulkActionOptions = [
-  { title: 'Delete Roles', value: 'delete' },
-  { title: 'Clone Roles', value: 'clone' }
-];
+const editingRole = ref(null)
+const viewingRole = ref(null)
+const deleteTarget = ref(null)
+const selectedRoles = ref([])
 
-// pagination/sort (server-side)
-const roles = ref([]);
-const totalRoles = ref(0);
-const currentPage = ref(1);
-const itemsPerPage = ref(15);
-const sortBy = ref([{ key: 'created_at', order: 'desc' }]);
+const roles = ref([])
+const totalRoles = ref(0)
+const currentPage = ref(1)
+const itemsPerPage = ref(15)
+const sortBy = ref([{ key: 'created_at', order: 'desc' }])
+const allPermissions = ref([])
 
-const allPermissions = ref([]);
+const statusOptions = ['active', 'inactive']
 
-// headers
-const roleHeaders = [
-  { title: 'Role Name', key: 'name', sortable: true },
-  { title: 'Description', key: 'description', sortable: false },
-  { title: 'Permissions', key: 'permissions_count', sortable: false },
-  { title: 'Users', key: 'users_count', sortable: true },
-  { title: 'Created', key: 'created_at', sortable: true },
-  { title: 'Actions', key: 'actions', sortable: false, width: '120px' }
-];
-
-// form
 const roleForm = ref({
   name: '',
   description: '',
   status: 'active',
-  permissions: [] // array of permission IDs
-});
+  permissions: [],
+})
 
-// computed
+const roleHeaders = [
+  { title: 'Role', key: 'name', sortable: true },
+  { title: 'Description', key: 'description', sortable: false },
+  { title: 'Permissions', key: 'permissions_count', sortable: false },
+  { title: 'Users', key: 'users_count', sortable: true },
+  { title: 'Created', key: 'created_at', sortable: true },
+  { title: 'Actions', key: 'actions', align: 'end', sortable: false },
+]
+
 const permissionCategories = computed(() => {
-  // build [{name, permissions: []}]
-  const map = new Map();
-  allPermissions.value.forEach(p => {
-    const cat = p.category || 'General';
-    if (!map.has(cat)) map.set(cat, []);
-    map.get(cat).push(p);
-  });
-  return Array.from(map.entries()).map(([name, permissions]) => ({ name, permissions }));
-});
+  const groups = new Map()
+  allPermissions.value.forEach((permission) => {
+    const category = permission.category || 'General'
+    if (!groups.has(category)) groups.set(category, [])
+    groups.get(category).push(permission)
+  })
+  return Array.from(groups.entries()).map(([name, permissions]) => ({ name, permissions }))
+})
 
-const totalUsersWithRoles = computed(() =>
-  roles.value.reduce((t, r) => t + (r.users_count || 0), 0)
-);
+const totalUsersWithRoles = computed(() => roles.value.reduce((total, role) => total + Number(role.users_count || 0), 0))
+const deleteDialogMessage = computed(() => deleteTarget.value ? `Delete role "${deleteTarget.value.label || deleteTarget.value.name}"?` : 'Delete the selected role?')
 
-// utils
 const normalizePermissionIds = (role) => {
-  if (!role?.permissions) return [];
-  // supports array of ids OR array of objects
-  return role.permissions.map(p => (typeof p === 'object' ? p.id : p)).filter(Boolean);
-};
+  if (!role?.permissions) return []
+  return role.permissions.map((permission) => (typeof permission === 'object' ? permission.id : permission)).filter(Boolean)
+}
 
-const countRolePermissions = (role) => normalizePermissionIds(role).length;
+const countRolePermissions = (role) => normalizePermissionIds(role).length
+const getPermissionName = (permissionId) => allPermissions.value.find((permission) => permission.id === permissionId)?.label
+  || allPermissions.value.find((permission) => permission.id === permissionId)?.name
+  || `#${permissionId}`
 
-const getPermissionName = (permissionId) => {
-  const p = allPermissions.value.find(x => x.id === permissionId);
-  return p ? (p.label || p.name) : `#${permissionId}`;
-};
+const hasPermission = (role, permission) => normalizePermissionIds(role).includes(permission.id)
+const isProtectedRole = (role) => String(role?.name || '').toLowerCase() === 'super admin'
 
-const hasPermission = (role, permission) => {
-  const ids = normalizePermissionIds(role);
-  return ids.includes(permission.id);
-};
+const extractCollection = (response) => {
+  const data = response?.data?.data ?? response?.data ?? []
+  if (Array.isArray(data)) return { items: data, total: data.length }
+  if (Array.isArray(data?.data)) return { items: data.data, total: data.meta?.total ?? data.total ?? data.data.length }
+  return { items: [], total: 0 }
+}
 
-const formatDate = (val) => {
-  if (!val) return '—';
-  try {
-    const d = new Date(val);
-    if (Number.isNaN(+d)) return val;
-    return d.toLocaleDateString();
-  } catch {
-    return val;
-  }
-};
-
-// actions
 const openCreateDialog = () => {
-  editingRole.value = null;
-  roleForm.value = { name: '', description: '', status: 'active', permissions: [] };
-  showCreateRoleDialog.value = true;
-};
+  editingRole.value = null
+  roleForm.value = { name: '', description: '', status: 'active', permissions: [] }
+  showCreateRoleDialog.value = true
+}
+
+const closeRoleDialog = () => {
+  showCreateRoleDialog.value = false
+  editingRole.value = null
+  roleForm.value = { name: '', description: '', status: 'active', permissions: [] }
+}
 
 const viewRole = (role) => {
-  viewingRole.value = role;
-  showViewRoleDialog.value = true;
-};
+  viewingRole.value = role
+  showViewRoleDialog.value = true
+}
 
 const editRole = (role) => {
-  editingRole.value = role;
-  const ids = normalizePermissionIds(role);
+  editingRole.value = role
   roleForm.value = {
     name: role.name || '',
     description: role.description || '',
     status: role.status || 'active',
-    permissions: [...ids]
-  };
-  showViewRoleDialog.value = false;
-  showCreateRoleDialog.value = true;
-};
-
-const deleteRole = async (role) => {
-  if (!confirm(`Delete role "${role.name}"?`)) return;
-  try {
-    // Prefer API if available:
-    // await roleAPI.delete(role.id)
-    roles.value = roles.value.filter(r => r.id !== role.id);
-    totalRoles.value = Math.max(0, totalRoles.value - 1);
-    success('Role deleted successfully');
-  } catch (e) {
-    console.error(e);
-    error('Failed to delete role');
+    permissions: [...normalizePermissionIds(role)],
   }
-};
+  showViewRoleDialog.value = false
+  showCreateRoleDialog.value = true
+}
 
-const toggleCategory = (cat) => {
-  const current = new Set(roleForm.value.permissions);
-  const catIds = cat.permissions.map(p => p.id);
-  const allSelected = catIds.every(id => current.has(id));
-  if (allSelected) {
-    catIds.forEach(id => current.delete(id));
-  } else {
-    catIds.forEach(id => current.add(id));
-  }
-  roleForm.value.permissions = Array.from(current);
-};
-
-const selectAllPermissions = () => {
-  roleForm.value.permissions = allPermissions.value.map(p => p.id);
-};
-
-const clearAllPermissions = () => {
-  roleForm.value.permissions = [];
-};
+const syncPermissionsForRole = async (roleId) => {
+  await roleAPI.syncPermissions(roleId, roleForm.value.permissions)
+}
 
 const saveRole = async () => {
+  if (!roleForm.value.name.trim()) {
+    error('Role name is required')
+    return
+  }
+
+  saving.value = true
   try {
     const payload = {
-      name: roleForm.value.name,
-      label: roleForm.value.name,
+      name: roleForm.value.name.trim(),
+      label: roleForm.value.name.trim(),
       description: roleForm.value.description,
       status: roleForm.value.status,
-      permissions: roleForm.value.permissions.map(p => typeof p === 'object' ? p.id : p)
-    };
-
-    if (editingRole.value) {
-      // Update existing role
-      const response = await roleAPI.update(editingRole.value.id, payload);
-      if (response?.data?.success) {
-        // Update the role in the local list
-        const index = roles.value.findIndex(r => r.id === editingRole.value.id);
-        if (index !== -1) {
-          roles.value[index] = response.data.data;
-        }
-        success('Role updated successfully');
-      }
-    } else {
-      // Create new role
-      const response = await roleAPI.create(payload);
-      if (response?.data?.success) {
-        roles.value.unshift(response.data.data);
-        totalRoles.value += 1;
-        success('Role created successfully');
-      }
     }
-    closeRoleDialog();
-    await loadRoles(); // Reload to get fresh data
-  } catch (e) {
-    console.error(e);
-    error(e.response?.data?.message || 'Failed to save role');
-  }
-};
 
-const closeRoleDialog = () => {
-  showCreateRoleDialog.value = false;
-  editingRole.value = null;
-  roleForm.value = { name: '', description: '', status: 'active', permissions: [] };
-};
+    let response
+    if (editingRole.value) {
+      response = await roleAPI.update(editingRole.value.id, payload)
+      await syncPermissionsForRole(editingRole.value.id)
+      success('Role updated successfully')
+    } else {
+      response = await roleAPI.create(payload)
+      const roleId = response?.data?.data?.id ?? response?.data?.id
+      if (roleId) {
+        await syncPermissionsForRole(roleId)
+      }
+      success('Role created successfully')
+    }
 
-// bulk
-const handleBulkAction = async () => {
-  if (!selectedRoles.value.length) {
-    error('Please select roles first');
-    return;
-  }
-  try {
-    if (bulkAction.value === 'delete') {
-      if (!confirm(`Are you sure you want to delete ${selectedRoles.value.length} roles?`)) return;
-      await roleAPI.bulkDelete({ role_ids: selectedRoles.value.map(r => r.id) });
-      success(`Deleted ${selectedRoles.value.length} roles`);
-      selectedRoles.value = [];
-      showBulkActionsDialog.value = false;
-      await loadRoles(); // refresh after delete
-    } else if (bulkAction.value === 'clone') {
-      // implement clone with API if available
-      success('Clone feature coming soon');
-      showBulkActionsDialog.value = false;
+    closeRoleDialog()
+    await loadRoles()
+    if (response?.data?.data?.id) {
+      viewingRole.value = roles.value.find((role) => role.id === response.data.data.id) || null
     }
   } catch (err) {
-    console.error(err);
-    error('Bulk operation failed');
+    error(err.response?.data?.message || 'Failed to save role')
+  } finally {
+    saving.value = false
   }
-};
+}
 
-// server data
+const cloneRole = async (role) => {
+  try {
+    await roleAPI.clone(role.id, {
+      name: `${role.name}_copy_${Date.now()}`,
+      label: `${role.label || role.name} Copy`,
+    })
+    success(`Cloned ${role.label || role.name}`)
+    await loadRoles()
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to clone role')
+  }
+}
+
+const openDeleteDialog = (role) => {
+  if (isProtectedRole(role)) return
+  deleteTarget.value = role
+  deleteDialog.value = true
+}
+
+const closeDeleteDialog = () => {
+  deleteDialog.value = false
+  deleteTarget.value = null
+}
+
+const handleDeleteDialogChange = (value) => {
+  deleteDialog.value = value
+  if (!value) deleteTarget.value = null
+}
+
+const confirmDelete = async () => {
+  if (!deleteTarget.value) return
+  deleting.value = true
+  try {
+    await roleAPI.delete(deleteTarget.value.id)
+    success('Role deleted successfully')
+    closeDeleteDialog()
+    selectedRoles.value = selectedRoles.value.filter((id) => id !== deleteTarget.value?.id)
+    await loadRoles()
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to delete role')
+  } finally {
+    deleting.value = false
+  }
+}
+
+const openBulkDeleteDialog = () => {
+  const targets = roles.value.filter((role) => selectedRoles.value.includes(role.id) && !isProtectedRole(role))
+  if (!targets.length) {
+    error('Select at least one non-protected role to delete')
+    return
+  }
+  bulkDeleteDialog.value = true
+}
+
+const closeBulkDeleteDialog = () => {
+  bulkDeleteDialog.value = false
+}
+
+const handleBulkDeleteDialogChange = (value) => {
+  bulkDeleteDialog.value = value
+}
+
+const confirmBulkDelete = async () => {
+  const ids = roles.value
+    .filter((role) => selectedRoles.value.includes(role.id) && !isProtectedRole(role))
+    .map((role) => role.id)
+
+  if (!ids.length) {
+    error('No eligible roles selected for deletion')
+    return
+  }
+
+  deleting.value = true
+  try {
+    await roleAPI.bulkDelete({ role_ids: ids })
+    success(`Deleted ${ids.length} role(s)`)
+    selectedRoles.value = []
+    closeBulkDeleteDialog()
+    await loadRoles()
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to delete selected roles')
+  } finally {
+    deleting.value = false
+  }
+}
+
+const toggleCategory = (category) => {
+  const selected = new Set(roleForm.value.permissions)
+  const ids = category.permissions.map((permission) => permission.id)
+  const allSelected = ids.every((id) => selected.has(id))
+
+  if (allSelected) {
+    ids.forEach((id) => selected.delete(id))
+  } else {
+    ids.forEach((id) => selected.add(id))
+  }
+
+  roleForm.value.permissions = Array.from(selected)
+}
+
+const selectAllPermissions = () => {
+  roleForm.value.permissions = allPermissions.value.map((permission) => permission.id)
+}
+
+const clearAllPermissions = () => {
+  roleForm.value.permissions = []
+}
+
 const loadRoles = async () => {
-  loading.value = true;
+  loading.value = true
   try {
     const params = {
       page: currentPage.value,
       per_page: itemsPerPage.value,
-      search: searchQuery.value?.trim() || undefined
-    };
+      search: searchQuery.value?.trim() || undefined,
+    }
 
     if (Array.isArray(sortBy.value) && sortBy.value.length) {
-      params.sort_by = sortBy.value[0].key;
-      params.sort_direction = sortBy.value[0].order || 'asc';
+      params.sort_by = sortBy.value[0].key
+      params.sort_direction = sortBy.value[0].order || 'desc'
     }
 
-    const response = await roleAPI.getAll(params);
-    if (response?.data?.success) {
-      const data = response.data.data;
-      if (data && typeof data === 'object' && data.data) {
-        roles.value = data.data;
-        totalRoles.value = data.meta?.total ?? data.total ?? roles.value.length;
-      } else if (Array.isArray(data)) {
-        roles.value = data;
-        totalRoles.value = data.length;
-      } else {
-        roles.value = [];
-        totalRoles.value = 0;
-      }
-    } else {
-      roles.value = [];
-      totalRoles.value = 0;
-    }
-  } catch (e) {
-    console.error('Failed to load roles:', e);
-    error('Failed to load roles');
-    roles.value = [];
-    totalRoles.value = 0;
+    const response = await roleAPI.getAll(params)
+    const { items, total } = extractCollection(response)
+    roles.value = items
+    totalRoles.value = total
+    selectedRoles.value = selectedRoles.value.filter((id) => roles.value.some((role) => role.id === id))
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to load roles')
+    roles.value = []
+    totalRoles.value = 0
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
 const loadPermissions = async () => {
   try {
-    const response = await permissionAPI.getAll({ per_page: 1000 });
-    if (response?.data?.success) {
-      const data = response.data.data;
-      if (data && typeof data === 'object' && data.data) {
-        allPermissions.value = data.data;
-      } else if (Array.isArray(data)) {
-        allPermissions.value = data;
-      } else {
-        allPermissions.value = [];
-      }
-    } else {
-      allPermissions.value = [];
-    }
-  } catch (e) {
-    console.error('Failed to load permissions:', e);
-    error('Failed to load permissions');
-    allPermissions.value = [];
+    const response = await permissionAPI.getAll({ per_page: 1000 })
+    const { items } = extractCollection(response)
+    allPermissions.value = items
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to load permissions')
+    allPermissions.value = []
   }
-};
-
-const exportRoles = () => {
-  success('Roles exported successfully');
-};
-
-// table events
-const onUpdatePage = (p) => { currentPage.value = p; loadRoles(); };
-const onUpdatePerPage = (n) => { itemsPerPage.value = n; currentPage.value = 1; loadRoles(); };
-const onUpdateSort = (s) => { sortBy.value = s; loadRoles(); };
-
-// search debounce
-watch(searchQuery, (v) => {
-  clearTimeout(debouncer.value);
-  debouncer.value = setTimeout(() => {
-    currentPage.value = 1;
-    loadRoles();
-  }, 400);
-});
-
-// lifecycle
-onMounted(async () => {
-  await Promise.all([loadRoles(), loadPermissions()]);
-});
-</script>
-
-<style scoped>
-:deep(.v-data-table) {
-  border-radius: 0.75rem;
 }
-</style>
+
+const onUpdatePage = (page) => {
+  currentPage.value = page
+  loadRoles()
+}
+
+const onUpdatePerPage = (value) => {
+  itemsPerPage.value = value
+  currentPage.value = 1
+  loadRoles()
+}
+
+const onUpdateSort = (value) => {
+  sortBy.value = value
+  loadRoles()
+}
+
+watch(searchQuery, () => {
+  clearTimeout(debouncer.value)
+  debouncer.value = setTimeout(() => {
+    currentPage.value = 1
+    loadRoles()
+  }, 350)
+})
+
+onMounted(async () => {
+  await Promise.all([loadRoles(), loadPermissions()])
+})
+</script>

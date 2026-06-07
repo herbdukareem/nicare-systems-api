@@ -13,11 +13,13 @@ use App\Models\Facility;
 use App\Models\PremiumPin;
 use App\Services\EnrolleeDuplicateDetectionService;
 use App\Services\EnrolleeService;
+use App\Services\NinVerificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 
 /**
  * Class EnrolleeController
@@ -33,12 +35,16 @@ class EnrolleeController extends BaseController
 
     protected EnrolleeDuplicateDetectionService $duplicateService;
 
+    protected NinVerificationService $ninVerificationService;
+
     public function __construct(
         EnrolleeService $enrolleeService,
-        EnrolleeDuplicateDetectionService $duplicateService
+        EnrolleeDuplicateDetectionService $duplicateService,
+        NinVerificationService $ninVerificationService
     ) {
         $this->enrolleeService  = $enrolleeService;
         $this->duplicateService = $duplicateService;
+        $this->ninVerificationService = $ninVerificationService;
     }
 
     /**
@@ -134,10 +140,10 @@ class EnrolleeController extends BaseController
         // load related models
         $enrollee->load([
             'enrolleeType', 'insuranceProgramme', 'enrolleeCategory', 'premiumPlan',
-            'benefitPackage', 'vulnerableGroup', 'fundingType', 'benefactor',
+            'benefitPackage', 'premiumPurchase', 'vulnerableGroup', 'fundingType', 'benefactor',
             'enrollmentPhase', 'facility', 'lga', 'ward', 'principal',
             'dependants', 'duplicateFlags.matchedEnrollee', 'facilityTransfers.fromFacility',
-            'facilityTransfers.toFacility', 'createdBy', 'approvedBy',
+            'facilityTransfers.toFacility', 'createdBy', 'approvedBy', 'ninVerifiedBy',
         ])->loadCount('dependants');
         return $this->sendResponse(new EnrolleeResource($enrollee), 'Enrollee retrieved successfully');
     }
@@ -171,15 +177,26 @@ class EnrolleeController extends BaseController
             return $this->sendError('This premium plan requires payment. Approve only after a paid invoice or used Premium PIN is linked to this enrollee.', [], 422);
         }
 
+        $validated = $request->validate([
+            'coverage_start_date' => ['nullable', 'date'],
+            'coverage_end_date' => ['nullable', 'date', 'after_or_equal:coverage_start_date'],
+            'capitation_start_date' => ['nullable', 'date'],
+            'nin_merge_strategy' => ['nullable', Rule::in(['keep_provided', 'prefer_verified', 'manual'])],
+            'nin_field_selection' => ['nullable', 'array'],
+            'nin_field_selection.*' => ['nullable', Rule::in(['provided', 'verified'])],
+        ]);
+
+        try {
+            $enrollee = $this->ninVerificationService->applyApprovalSelection($enrollee, $validated, $request->user());
+        } catch (\RuntimeException $exception) {
+            return $this->sendError($exception->getMessage(), [], 422);
+        }
+
         $approvalDate = now();
         if ($plan) {
             $coverageStart = $plan->calculateCoverageStartDate($approvalDate);
             $coverageEnd = $plan->calculateCoverageEndDate($coverageStart);
         } else {
-            $validated = $request->validate([
-                'coverage_start_date' => ['nullable', 'date'],
-                'coverage_end_date' => ['nullable', 'date', 'after_or_equal:coverage_start_date'],
-            ]);
             $coverageStart = isset($validated['coverage_start_date']) ? Carbon::parse($validated['coverage_start_date']) : $approvalDate;
             $coverageEnd = isset($validated['coverage_end_date']) ? Carbon::parse($validated['coverage_end_date']) : null;
         }
@@ -194,16 +211,44 @@ class EnrolleeController extends BaseController
         ]);
 
         AuditTrail::create([
-            'enrollee_id' => $enrollee->id,
+            'auditable_type' => Enrollee::class,
+            'auditable_id' => $enrollee->id,
             'action' => 'approved',
             'description' => 'Enrollee approved',
             'user_id' => auth()->id(),
+            'new_values' => [
+                'status' => Enrollee::STATUS_ACTIVE,
+                'coverage_start_date' => $coverageStart->toDateString(),
+                'coverage_end_date' => $coverageEnd?->toDateString(),
+            ],
         ]);
 
         return $this->sendResponse(
-            new EnrolleeResource($enrollee->fresh(['insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage', 'facility'])),
+            new EnrolleeResource($enrollee->fresh(['insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage', 'facility', 'ninVerifiedBy'])),
             'Enrollee approved successfully'
         );
+    }
+
+    public function verifyNin(Request $request, Enrollee $enrollee)
+    {
+        $validated = $request->validate([
+            'consent' => ['nullable', 'boolean'],
+        ]);
+
+        try {
+            $verification = $this->ninVerificationService->verify(
+                $enrollee,
+                $request->user(),
+                (bool) ($validated['consent'] ?? true)
+            );
+        } catch (\RuntimeException $exception) {
+            return $this->sendError($exception->getMessage(), [], 422);
+        }
+
+        return $this->sendResponse([
+            'enrollee' => new EnrolleeResource($enrollee->fresh(['facility', 'fundingType', 'benefactor', 'insuranceProgramme', 'premiumPlan', 'ninVerifiedBy'])),
+            'verification' => $verification,
+        ], 'NIN verified successfully.');
     }
 
     public function pendingApproval(Request $request)
@@ -213,8 +258,9 @@ class EnrolleeController extends BaseController
         $query = Enrollee::query()
             ->with([
                 'insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'fundingType',
-                'benefactor', 'enrollmentPhase', 'facility', 'lga', 'ward', 'principal',
+                'benefactor', 'enrollmentPhase', 'facility', 'lga', 'ward', 'principal', 'premiumPurchase',
                 'duplicateFlags',
+                'ninVerifiedBy',
             ])
             ->where('status', Enrollee::STATUS_PENDING);
 
@@ -520,12 +566,33 @@ class EnrolleeController extends BaseController
     public function getStatistics(Enrollee $enrollee)
     {
         try {
-            // TODO: Implement real statistics queries
+            $baseQuery = \App\Models\Claim::where('enrollee_id', $enrollee->id);
+
+            $totalClaims = (clone $baseQuery)->count();
+
+            $totalBenefits = (clone $baseQuery)
+                ->whereIn('status', [\App\Models\Claim::STATUS_APPROVED])
+                ->sum('total_amount_claimed');
+
+            $facilitiesVisited = (clone $baseQuery)
+                ->whereNotNull('facility_id')
+                ->distinct('facility_id')
+                ->count('facility_id');
+
+            $lastClaim = (clone $baseQuery)
+                ->whereNotNull('service_date')
+                ->orderByDesc('service_date')
+                ->first();
+
+            $lastVisitDays = $lastClaim?->service_date
+                ? (int) $lastClaim->service_date->diffInDays(now())
+                : null;
+
             $statistics = [
-                'total_claims' => 0, // Count from claims table
-                'total_benefits' => 0, // Sum from claims table
-                'facilities_visited' => 0, // Count distinct facilities from claims
-                'last_visit_days' => null, // Days since last claim
+                'total_claims'      => $totalClaims,
+                'total_benefits'    => (float) $totalBenefits,
+                'facilities_visited' => $facilitiesVisited,
+                'last_visit_days'   => $lastVisitDays,
             ];
 
             return $this->sendResponse($statistics, 'Statistics retrieved successfully');
@@ -729,6 +796,10 @@ class EnrolleeController extends BaseController
             ->exists();
 
         if ($hasPaidInvoice) {
+            return true;
+        }
+
+        if ($enrollee->premiumPurchase && $enrollee->premiumPurchase->payment_status === 'confirmed') {
             return true;
         }
 

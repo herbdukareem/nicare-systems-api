@@ -82,3 +82,8 @@ export const enrolleePortalAPI = {
   changePassword: (data) => enrolleeHttp.post('/enroll/change-password', data),
   plans:          () => enrolleeHttp.get('/enroll/plans'),
 };
+
+export const publicEnrollmentAPI = {
+  metadata: (params = {}) => enrolleeHttp.get('/public/enrollment/metadata', { params }),
+  createApplication: (data) => enrolleeHttp.post('/public/enrollment/applications', data),
+};

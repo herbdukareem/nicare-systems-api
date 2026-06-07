@@ -1,646 +1,655 @@
 <template>
   <AdminLayout>
-    <div class="tw-space-y-6">
-      <!-- Page Header -->
-      <div class="tw-flex tw-items-center tw-justify-between">
-        <div>
-          <h1 class="tw-text-3xl tw-font-bold tw-text-gray-900">Facilities</h1>
-          <p class="tw-text-gray-600 tw-mt-1">Manage healthcare facilities and providers</p>
-        </div>
-        <div class="tw-flex tw-space-x-3">
-          <v-btn 
-            color="primary" 
-            variant="outlined" 
-            prepend-icon="mdi-map-marker"
-            @click="showMapView = !showMapView"
-          >
-            {{ showMapView ? 'List View' : 'Map View' }}
-          </v-btn>
-          <v-btn 
-            color="primary" 
-            prepend-icon="mdi-plus"
-            @click="showAddDialog = true"
-          >
-            Add Facility
-          </v-btn>
-        </div>
+    <div class="tw-space-y-4">
+      <AppPageHeader title="Facilities" icon="mdi-hospital-building">
+        <v-btn size="small" variant="outlined" prepend-icon="mdi-refresh" :loading="loading" @click="loadFacilities">Refresh</v-btn>
+        <v-btn size="small" color="primary" prepend-icon="mdi-plus" @click="openCreateDialog">Add Facility</v-btn>
+      </AppPageHeader>
+
+      <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-4">
+        <AppStatCard compact label="Total Facilities" :value="facilityStats.total" icon="mdi-hospital-building" color="primary" :loading="loading" />
+        <AppStatCard compact label="Active" :value="facilityStats.active" icon="mdi-check-circle-outline" color="success" :loading="loading" />
+        <AppStatCard compact label="Inactive / Pending" :value="facilityStats.inactive" icon="mdi-alert-circle-outline" color="warning" :loading="loading" />
+        <AppStatCard compact label="LGAs Covered" :value="facilityStats.lgas" icon="mdi-map-marker-multiple-outline" color="info" :loading="loading" />
       </div>
 
-      <!-- Statistics Cards -->
-      <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 xl:tw-grid-cols-4 tw-gap-4">
-        <AppStatCard label="Total Facilities" :value="facilityStats.total" icon="mdi-hospital-building" color="blue" :loading="statsLoading" />
-        <AppStatCard label="Active" :value="facilityStats.active" icon="mdi-check-circle" color="green" :loading="statsLoading" />
-        <AppStatCard label="Pending / Inactive" :value="facilityStats.inactive" icon="mdi-clock-outline" color="orange" :loading="statsLoading" />
-        <AppStatCard label="LGAs Covered" :value="facilityStats.lgas" icon="mdi-map-marker-multiple" color="purple" :loading="statsLoading" />
-      </div>
+      <AppFilterBar :active-count="activeFilterCount" :cols="5" @clear="resetFilters">
+        <v-text-field
+          v-model="searchQuery"
+          label="Search facilities"
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          density="compact"
+          clearable
+          hide-details
+          @keyup.enter="loadFacilities"
+        />
+        <v-select
+          v-model="filters.type"
+          :items="facilityTypes"
+          label="Facility Type"
+          variant="outlined"
+          density="compact"
+          clearable
+          hide-details
+        />
+        <v-select
+          v-model="filters.lga_id"
+          :items="lgas"
+          item-title="name"
+          item-value="id"
+          label="LGA"
+          variant="outlined"
+          density="compact"
+          clearable
+          hide-details
+        />
+        <v-select
+          v-model="filters.ward_id"
+          :items="filteredWards"
+          item-title="name"
+          item-value="id"
+          label="Ward"
+          variant="outlined"
+          density="compact"
+          clearable
+          hide-details
+        />
+        <v-select
+          v-model="filters.status"
+          :items="statusOptions"
+          item-title="title"
+          item-value="value"
+          label="Status"
+          variant="outlined"
+          density="compact"
+          clearable
+          hide-details
+        />
 
-      <!-- Filters -->
-      <div class="tw-bg-white tw-rounded-lg tw-shadow-sm tw-p-6">
-        <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-lg:tw-grid-cols-5 tw-gap-4">
-          <!-- Search -->
-          <div class="tw-lg:tw-col-span-2">
-            <v-text-field
-              v-model="searchQuery"
-              label="Search facilities..."
-              prepend-inner-icon="mdi-magnify"
-              variant="outlined"
-              density="compact"
-              clearable
-            />
-          </div>
-          
-          <!-- Type Filter -->
-          <v-select
-            v-model="filters.type"
-            :items="facilityTypes"
-            label="Facility Type"
-            variant="outlined"
-            density="compact"
-            clearable
-          />
-          
-          <!-- LGA Filter -->
-          <v-select
-            v-model="filters.lga"
-            :items="lgaOptions"
-            label="LGA"
-            variant="outlined"
-            density="compact"
-            clearable
-          />
-          
-          <!-- Status Filter -->
-          <v-select
-            v-model="filters.status"
-            :items="statusOptions"
-            label="Status"
-            variant="outlined"
-            density="compact"
-            clearable
-          />
-        </div>
-      </div>
+        <template #tags>
+          <AppBadge v-if="filters.type" :label="`Type: ${filters.type}`" tone="secondary" size="sm" />
+          <AppBadge v-if="filters.lga_id" :label="`LGA: ${selectedLgaName}`" tone="secondary" size="sm" />
+          <AppBadge v-if="filters.ward_id" :label="`Ward: ${selectedWardName}`" tone="secondary" size="sm" />
+          <AppBadge v-if="filters.status !== null" :label="`Status: ${selectedStatusLabel}`" tone="warning" size="sm" />
+        </template>
+        <template #actions>
+          <v-btn size="small" color="primary" prepend-icon="mdi-filter-check-outline" :loading="loading" @click="loadFacilities">Load</v-btn>
+        </template>
+      </AppFilterBar>
 
-      <!-- Data Table -->
-      <div class="tw-bg-white tw-rounded-lg tw-shadow-sm">
+      <AppCard
+        title="Facilities"
+        icon="mdi-format-list-bulleted"
+        tone="primary"
+        :padded="false"
+      >
         <AppDataTable
+          v-model:page="currentPage"
           v-model:items-per-page="itemsPerPage"
           :headers="headers"
           :items="facilities"
+          :items-length="totalFacilities"
           :loading="loading"
-          :search="searchQuery"
-          class="tw-elevation-0"
           item-value="id"
+          class="tw-rounded-none tw-border-0"
+          @update:sort-by="onUpdateSort"
         >
-          <!-- Custom header -->
-          <template v-slot:toolbar>
-            <div class="tw-p-4 tw-border-b tw-border-gray-200">
-              <div class="tw-flex tw-items-center tw-justify-between">
-                <h3 class="tw-text-lg tw-font-semibold tw-text-gray-900">
-                  Facilities List
-                </h3>
-                <v-chip size="small" color="primary">
-                  {{ facilities.length }} facilities
-                </v-chip>
-              </div>
+          <template #item.name="{ item }">
+            <div class="tw-space-y-1">
+              <div class="tw-font-semibold tw-text-slate-900">{{ item.name }}</div>
+              <div class="tw-text-xs tw-text-slate-500">{{ item.hcp_code || 'No HCP code' }}</div>
             </div>
           </template>
-
-          <!-- Status column -->
-          <template v-slot:item.status="{ item }">
-            <v-chip
-              :color="getStatusColor(item.status)"
-              size="small"
-              variant="flat"
-            >
-              {{ item.status }}
-            </v-chip>
+          <template #item.type="{ item }">
+            <FacilityBadge :status="item.type || item.level_of_care" :label="item.type || item.level_of_care || 'Unknown'" size="sm" />
           </template>
-
-          <!-- Type column -->
-          <template v-slot:item.type="{ item }">
-            <div class="tw-flex tw-items-center tw-space-x-2">
-              <v-icon :color="getTypeColor(item.type)" size="16">
-                {{ getTypeIcon(item.type) }}
-              </v-icon>
-              <span>{{ item.type }}</span>
+          <template #item.lga="{ item }">{{ item.lga?.name || 'N/A' }}</template>
+          <template #item.ward="{ item }">{{ item.ward?.name || 'N/A' }}</template>
+          <template #item.capacity="{ item }">
+            <div class="tw-space-y-1">
+              <div class="tw-font-semibold tw-text-slate-900">{{ item.enrollees_count ?? item.current_enrollees_count ?? 0 }}</div>
+              <div class="tw-text-xs tw-text-slate-500">Configured: {{ item.capacity ?? 0 }}</div>
             </div>
           </template>
-
-          <!-- Actions column -->
-          <template v-slot:item.actions="{ item }">
-            <div class="tw-flex tw-space-x-1">
-              <v-btn icon size="small" variant="text" @click="viewFacility(item)">
-                <v-icon size="16">mdi-eye</v-icon>
+          <template #item.status="{ item }">
+            <div class="tw-flex tw-flex-wrap tw-gap-2">
+              <AppStatusBadge :status="item.status === 1 ? 'Active' : 'Inactive'" :label="item.status === 1 ? 'Active' : 'Inactive'" size="sm" />
+              <AppBadge :label="item.accreditation_status || 'active'" :tone="item.accreditation_status === 'suspended' ? 'warning' : item.accreditation_status === 'revoked' ? 'danger' : 'success'" size="sm" />
+            </div>
+          </template>
+          <template #item.created_at="{ item }">
+            <DateDisplay :value="item.created_at" format="short" />
+          </template>
+          <template #item.actions="{ item }">
+            <div class="tw-flex tw-items-center tw-justify-end tw-gap-1">
+              <v-btn icon size="small" variant="text" title="View" @click="viewFacility(item)">
+                <v-icon size="18">mdi-eye-outline</v-icon>
               </v-btn>
-              <v-btn icon size="small" variant="text" @click="editFacility(item)">
-                <v-icon size="16">mdi-pencil</v-icon>
+              <v-btn icon size="small" variant="text" title="Edit" @click="editFacility(item)">
+                <v-icon size="18">mdi-pencil-outline</v-icon>
               </v-btn>
-              <v-btn icon size="small" variant="text" color="error" @click="deleteFacility(item)">
-                <v-icon size="16">mdi-delete</v-icon>
+              <v-btn icon size="small" variant="text" color="error" title="Delete" @click="openDeleteDialog(item)">
+                <v-icon size="18">mdi-delete-outline</v-icon>
               </v-btn>
             </div>
+          </template>
+          <template #no-data>
+            <AppEmptyState
+              title="No facilities found"
+              description="Adjust your search or filters to find matching facilities."
+              icon="mdi-hospital-box-outline"
+            />
           </template>
         </AppDataTable>
-      </div>
-    </div>
+      </AppCard>
 
-    <!-- Add/Edit Dialog -->
-    <AppModal v-model="showAddDialog" :title="editingFacility ? 'Edit Facility' : 'Add New Facility'" icon="mdi-hospital-building" size="lg">
-      <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
-        <v-text-field v-model="facilityForm.name" label="Facility Name" variant="outlined" required />
-        <v-select v-model="facilityForm.type" :items="facilityTypes" label="Facility Type" variant="outlined" required />
-        <v-text-field v-model="facilityForm.address" label="Address" variant="outlined" required />
-        <v-select v-model="facilityForm.lga" :items="lgaOptions" label="LGA" variant="outlined" required />
-        <v-text-field v-model="facilityForm.phone" label="Phone Number" variant="outlined" />
-        <v-text-field v-model="facilityForm.email" label="Email" variant="outlined" />
-      </div>
-      <template #actions>
-        <v-btn variant="outlined" @click="closeDialog">Cancel</v-btn>
-        <v-btn color="primary" variant="flat" @click="saveFacility">Save</v-btn>
-      </template>
-    </AppModal>
+      <AppModal
+        v-model="showAddDialog"
+        :title="editingFacility ? 'Edit Facility' : 'Add Facility'"
+        icon="mdi-hospital-building"
+        size="lg"
+      >
+        <template #actions>
+          <v-btn variant="outlined" :disabled="saving" @click="closeDialog">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="saving" @click="saveFacility">
+            Save Facility
+          </v-btn>
+        </template>
 
-    <!-- View Facility Dialog -->
-    <AppModal v-model="showViewDialog" :title="viewingFacility?.name ?? 'Facility Details'" :subtitle="viewingFacility ? `${viewingFacility.type} • ${viewingFacility.lga}` : ''" size="2xl">
-      <div v-if="viewingFacility" class="tw-space-y-6">
-        <div class="tw-flex tw-justify-end">
-          <v-btn size="small" color="primary" prepend-icon="mdi-pencil" @click="editFromView(viewingFacility)">Edit Facility</v-btn>
+        <div class="tw-grid tw-gap-4 md:tw-grid-cols-2">
+          <v-text-field v-model="facilityForm.hcp_code" label="HCP Code" variant="outlined" />
+          <v-text-field v-model="facilityForm.name" label="Facility Name" variant="outlined" />
+          <v-select v-model="facilityForm.ownership" :items="ownershipOptions" label="Ownership" variant="outlined" />
+          <v-select v-model="facilityForm.type" :items="facilityTypes" label="Facility Type" variant="outlined" />
+          <v-select v-model="facilityForm.lga_id" :items="lgas" item-title="name" item-value="id" label="LGA" variant="outlined" />
+          <v-select v-model="facilityForm.ward_id" :items="formWards" item-title="name" item-value="id" label="Ward" variant="outlined" />
+          <v-text-field v-model="facilityForm.phone" label="Phone" variant="outlined" />
+          <v-text-field v-model="facilityForm.email" label="Email" variant="outlined" />
+          <v-text-field v-model="facilityForm.capacity" type="number" label="Capacity" variant="outlined" />
+          <v-select v-model="facilityForm.status" :items="statusOptions" item-title="title" item-value="value" label="Status" variant="outlined" />
+          <v-select
+            v-model="facilityForm.accreditation_status"
+            :items="accreditationOptions"
+            label="Accreditation Status"
+            variant="outlined"
+          />
+          <v-textarea v-model="facilityForm.address" label="Address" variant="outlined" rows="3" class="md:tw-col-span-2" />
         </div>
+      </AppModal>
 
-        <!-- Facility Information -->
-        <div>
-          <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Facility Information</h4>
-          <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-lg:tw-grid-cols-3 tw-gap-4">
-            <div>
-              <p class="tw-text-sm tw-text-gray-600">Facility Name</p>
-              <p class="tw-font-medium">{{ viewingFacility.name }}</p>
-            </div>
-            <div>
-              <p class="tw-text-sm tw-text-gray-600">Type</p>
-              <v-chip size="small" color="primary" variant="outlined">{{ viewingFacility.type }}</v-chip>
-            </div>
-            <div>
-              <p class="tw-text-sm tw-text-gray-600">Status</p>
-              <v-chip size="small" :color="getStatusColor(viewingFacility.status)" variant="flat">{{ viewingFacility.status }}</v-chip>
-            </div>
-            <div>
-              <p class="tw-text-sm tw-text-gray-600">Address</p>
-              <p class="tw-font-medium">{{ viewingFacility.address }}</p>
-            </div>
-            <div>
-              <p class="tw-text-sm tw-text-gray-600">LGA</p>
-              <p class="tw-font-medium">{{ viewingFacility.lga }}</p>
-            </div>
-            <div>
-              <p class="tw-text-sm tw-text-gray-600">Phone</p>
-              <p class="tw-font-medium">{{ viewingFacility.phone || 'N/A' }}</p>
-            </div>
+      <AppModal
+        v-model="showViewDialog"
+        :title="viewingFacility?.name || 'Facility Details'"
+        :subtitle="viewingFacility ? `${viewingFacility.type || 'Facility'} • ${viewingFacility.lga?.name || 'No LGA'}` : ''"
+        icon="mdi-office-building-outline"
+        size="2xl"
+      >
+        <template #actions>
+          <v-btn variant="outlined" @click="showViewDialog = false">Close</v-btn>
+          <v-btn color="primary" variant="flat" @click="viewingFacility && editFacility(viewingFacility)">
+            Edit Facility
+          </v-btn>
+        </template>
+
+        <div v-if="viewingFacility" class="tw-space-y-6">
+          <div class="tw-flex tw-flex-wrap tw-gap-2">
+            <FacilityBadge :status="viewingFacility.type || viewingFacility.level_of_care" :label="viewingFacility.type || viewingFacility.level_of_care || 'Unknown'" />
+            <AppStatusBadge :status="viewingFacility.status === 1 ? 'Active' : 'Inactive'" :label="viewingFacility.status === 1 ? 'Active' : 'Inactive'" />
+            <AppBadge :label="viewingFacility.accreditation_status || 'active'" :tone="viewingFacility.accreditation_status === 'suspended' ? 'warning' : viewingFacility.accreditation_status === 'revoked' ? 'danger' : 'success'" />
           </div>
-        </div>
 
-        <!-- Facility Statistics -->
-        <div>
-          <h4 class="tw-text-lg tw-font-medium tw-text-gray-900 tw-mb-4">Statistics</h4>
-          <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-4 tw-gap-4">
-            <div class="tw-text-center tw-p-4 tw-bg-blue-50 tw-rounded-lg">
-              <p class="tw-text-2xl tw-font-bold tw-text-blue-600">{{ facilityEnrollees.length }}</p>
-              <p class="tw-text-sm tw-text-gray-600">Total Enrollees</p>
-            </div>
-            <div class="tw-text-center tw-p-4 tw-bg-green-50 tw-rounded-lg">
-              <p class="tw-text-2xl tw-font-bold tw-text-green-600">{{ getActiveEnrollees() }}</p>
-              <p class="tw-text-sm tw-text-gray-600">Active Enrollees</p>
-            </div>
-            <div class="tw-text-center tw-p-4 tw-bg-purple-50 tw-rounded-lg">
-              <p class="tw-text-2xl tw-font-bold tw-text-purple-600">45</p>
-              <p class="tw-text-sm tw-text-gray-600">Monthly Visits</p>
-            </div>
-            <div class="tw-text-center tw-p-4 tw-bg-orange-50 tw-rounded-lg">
-              <p class="tw-text-2xl tw-font-bold tw-text-orange-600">₦125,000</p>
-              <p class="tw-text-sm tw-text-gray-600">Monthly Claims</p>
-            </div>
+          <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-4">
+            <AppStatCard compact label="Current Enrollees" :value="facilityEnrolleeMeta.total" icon="mdi-account-group-outline" color="primary" />
+            <AppStatCard compact label="Configured Capacity" :value="Number(viewingFacility.capacity || 0)" icon="mdi-hospital-box-outline" color="secondary" />
+            <AppStatCard compact label="Status" :value="viewingFacility.status === 1 ? 'Active' : 'Inactive'" icon="mdi-check-circle-outline" color="success" />
+            <AppStatCard compact label="Created" :value="viewingFacility.created_at ? new Date(viewingFacility.created_at).toLocaleDateString() : 'N/A'" icon="mdi-calendar-clock-outline" color="info" />
           </div>
-        </div>
 
-        <!-- Enrollees List -->
-        <div>
-          <div class="tw-flex tw-items-center tw-justify-between tw-mb-4">
-            <h4 class="tw-text-lg tw-font-medium tw-text-gray-900">Enrollees at this Facility</h4>
-            <div class="tw-flex tw-space-x-2">
+          <AppCard title="Facility Information" icon="mdi-information-outline" tone="secondary">
+            <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-3">
+              <div><p class="tw-text-xs tw-text-slate-500">HCP Code</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.hcp_code || 'N/A' }}</p></div>
+              <div><p class="tw-text-xs tw-text-slate-500">Ownership</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.ownership || viewingFacility.category || 'N/A' }}</p></div>
+              <div><p class="tw-text-xs tw-text-slate-500">Type</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.type || 'N/A' }}</p></div>
+              <div><p class="tw-text-xs tw-text-slate-500">LGA</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.lga?.name || 'N/A' }}</p></div>
+              <div><p class="tw-text-xs tw-text-slate-500">Ward</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.ward?.name || 'N/A' }}</p></div>
+              <div><p class="tw-text-xs tw-text-slate-500">Phone</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.phone || 'N/A' }}</p></div>
+              <div><p class="tw-text-xs tw-text-slate-500">Email</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.email || 'N/A' }}</p></div>
+              <div class="md:tw-col-span-2 xl:tw-col-span-3"><p class="tw-text-xs tw-text-slate-500">Address</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.address || 'N/A' }}</p></div>
+            </div>
+          </AppCard>
+
+          <AppCard
+            title="Facility Enrollees"
+            icon="mdi-account-supervisor-outline"
+            tone="primary"
+            :padded="false"
+          >
+            <template #actions>
               <v-text-field
                 v-model="enrolleeSearchQuery"
-                label="Search enrollees..."
+                label="Search enrollees"
                 prepend-inner-icon="mdi-magnify"
                 variant="outlined"
                 density="compact"
                 clearable
-                class="tw-w-64"
+                hide-details
+                class="tw-min-w-[220px]"
               />
-              <v-btn color="primary" variant="outlined" prepend-icon="mdi-download" @click="exportFacilityEnrollees">Export</v-btn>
-            </div>
-          </div>
+            </template>
 
-          <AppDataTable
-            :headers="enrolleeHeaders"
-            :items="filteredFacilityEnrollees"
-            :loading="loadingEnrollees"
-            class="tw-elevation-0 tw-border tw-border-gray-200 tw-rounded-lg"
-            item-value="id"
-            :items-per-page="10"
-          >
-            <template v-slot:item.status="{ item }">
-              <v-chip size="small" :color="getEnrolleeStatusColor(item.status)" variant="flat">{{ item.status }}</v-chip>
-            </template>
-            <template v-slot:item.type="{ item }">
-              <v-chip size="small" color="primary" variant="outlined">{{ item.type }}</v-chip>
-            </template>
-            <template v-slot:item.actions="{ item }">
-              <div class="tw-flex tw-space-x-1">
-                <v-btn icon size="small" variant="text" @click="viewEnrolleeFromFacility(item)">
-                  <v-icon size="16">mdi-eye</v-icon>
-                </v-btn>
-                <v-btn icon size="small" variant="text" @click="editEnrolleeFromFacility(item)">
-                  <v-icon size="16">mdi-pencil</v-icon>
-                </v-btn>
-              </div>
-            </template>
-            <template v-slot:no-data>
-              <div class="tw-text-center tw-py-8">
-                <v-icon size="48" color="grey">mdi-account-group</v-icon>
-                <p class="tw-text-gray-500 tw-mt-2">No enrollees found for this facility</p>
-              </div>
-            </template>
-          </AppDataTable>
+            <AppDataTable
+              :headers="enrolleeHeaders"
+              :items="facilityEnrollees"
+              :items-length="facilityEnrolleeMeta.total"
+              :loading="loadingEnrollees"
+              item-value="id"
+              class="tw-rounded-none tw-border-0"
+            >
+              <template #item.name="{ item }">
+                <div class="tw-space-y-1">
+                  <div class="tw-font-semibold tw-text-slate-900">{{ item.full_name || item.name || [item.first_name, item.last_name].filter(Boolean).join(' ') || 'N/A' }}</div>
+                  <div class="tw-text-xs tw-text-slate-500">{{ item.enrollee_id || 'No enrollee ID' }}</div>
+                </div>
+              </template>
+              <template #item.type="{ item }">
+                <AppBadge :label="item.enrollee_type?.name || item.type || 'N/A'" tone="secondary" size="sm" />
+              </template>
+              <template #item.status="{ item }">
+                <AppStatusBadge :status="item.status_label || item.status || 'Unknown'" :label="item.status_label || item.status || 'Unknown'" size="sm" />
+              </template>
+              <template #item.phone="{ item }">{{ item.phone || 'N/A' }}</template>
+              <template #no-data>
+                <AppEmptyState
+                  title="No enrollees found"
+                  description="This facility has no enrollees matching the current search."
+                  icon="mdi-account-group-outline"
+                />
+              </template>
+            </AppDataTable>
+          </AppCard>
         </div>
-      </div>
-      <template #actions>
-        <v-btn variant="outlined" @click="showViewDialog = false">Close</v-btn>
-      </template>
-    </AppModal>
+      </AppModal>
+
+      <AppConfirmDialog
+        v-model="deleteDialog"
+        title="Delete facility"
+        subtitle="This action will remove the selected facility after backend confirmation."
+        :message="deleteDialogMessage"
+        warning="Only delete a facility when you are certain it should no longer exist."
+        confirm-text="Delete facility"
+        icon="mdi-delete-alert-outline"
+        tone="danger"
+        :loading="deleting"
+        @cancel="closeDeleteDialog"
+        @confirm="confirmDelete"
+        @update:model-value="handleDeleteDialogChange"
+      />
+    </div>
   </AdminLayout>
 </template>
 
 <script setup>
-import { ref, onMounted, watch } from 'vue';
-import { useRouter } from 'vue-router';
-import AdminLayout from '../layout/AdminLayout.vue';
-import AppStatCard from '../common/AppStatCard.vue';
-import { useToast } from '../../composables/useToast';
-import { facilityAPI } from '../../utils/api';
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import AdminLayout from '../layout/AdminLayout.vue'
+import AppBadge from '../common/AppBadge.vue'
+import AppCard from '../common/AppCard.vue'
+import AppConfirmDialog from '../common/AppConfirmDialog.vue'
+import AppDataTable from '../common/AppDataTable.vue'
+import AppEmptyState from '../common/AppEmptyState.vue'
+import AppFilterBar from '../common/AppFilterBar.vue'
+import AppStatCard from '../common/AppStatCard.vue'
+import AppModal from '../common/AppModal.vue'
+import AppPageHeader from '../common/AppPageHeader.vue'
+import AppStatusBadge from '../common/AppStatusBadge.vue'
+import DateDisplay from '../common/DateDisplay.vue'
+import FacilityBadge from '../common/FacilityBadge.vue'
+import { facilityAPI, lgaAPI, wardAPI } from '../../utils/api'
+import { useToast } from '../../composables/useToast'
 
-const router = useRouter();
-const { success, error } = useToast();
+const { success, error } = useToast()
 
-// Stats
-const statsLoading = ref(false);
-const facilityStats = ref({ total: 0, active: 0, inactive: 0, lgas: 0 });
+const loading = ref(false)
+const loadingEnrollees = ref(false)
+const saving = ref(false)
+const deleting = ref(false)
+const facilities = ref([])
+const lgas = ref([])
+const wards = ref([])
+const totalFacilities = ref(0)
+const currentPage = ref(1)
+const itemsPerPage = ref(15)
+const sortBy = ref([{ key: 'created_at', order: 'desc' }])
+const searchQuery = ref('')
+const enrolleeSearchQuery = ref('')
+const searchDebouncer = ref(null)
+const enrolleeSearchDebouncer = ref(null)
 
-// Reactive data
-const loading = ref(false);
-const loadingEnrollees = ref(false);
-const searchQuery = ref('');
-const enrolleeSearchQuery = ref('');
-const showAddDialog = ref(false);
-const showViewDialog = ref(false);
-const showMapView = ref(false);
-const editingFacility = ref(null);
-const viewingFacility = ref(null);
-const itemsPerPage = ref(10);
-const saving = ref(false);
+const showAddDialog = ref(false)
+const showViewDialog = ref(false)
+const deleteDialog = ref(false)
+const editingFacility = ref(null)
+const viewingFacility = ref(null)
+const deleteTarget = ref(null)
 
-// Filters
-const filters = ref({
+const facilityEnrollees = ref([])
+const facilityEnrolleeMeta = reactive({ total: 0 })
+const facilityStats = reactive({ total: 0, active: 0, inactive: 0, lgas: 0 })
+
+const filters = reactive({
   type: null,
-  lga: null,
-  status: null
-});
+  lga_id: null,
+  ward_id: null,
+  status: null,
+})
 
-// Form data
-const facilityForm = ref({
+const facilityForm = reactive({
+  hcp_code: '',
   name: '',
-  type: '',
+  ownership: 'Public',
+  type: 'Primary',
   address: '',
-  lga: '',
   phone: '',
-  email: ''
-});
+  email: '',
+  lga_id: null,
+  ward_id: null,
+  capacity: '',
+  status: 1,
+  accreditation_status: 'active',
+})
 
-// Options
-const facilityTypes = ['Hospital', 'Clinic', 'Pharmacy', 'Laboratory', 'Diagnostic Center'];
-const lgaOptions = ['Abuja Municipal', 'Gwagwalada', 'Kuje', 'Bwari', 'Kwali', 'Abaji'];
-const statusOptions = ['Active', 'Inactive', 'Pending', 'Suspended'];
+const facilityTypes = ['Primary', 'Secondary', 'Tertiary']
+const ownershipOptions = ['Public', 'Private', 'Faith-Based']
+const accreditationOptions = ['active', 'suspended', 'revoked']
+const statusOptions = [
+  { title: 'Active', value: 1 },
+  { title: 'Inactive', value: 0 },
+]
 
-// Table headers
 const headers = [
-  { title: 'Name', key: 'name', sortable: true },
+  { title: 'Facility', key: 'name', sortable: true },
   { title: 'Type', key: 'type', sortable: true },
-  { title: 'LGA', key: 'lga', sortable: true },
-  { title: 'Address', key: 'address', sortable: false },
-  { title: 'Phone', key: 'phone', sortable: false },
-  { title: 'Status', key: 'status', sortable: true },
-  { title: 'Actions', key: 'actions', sortable: false, width: '120px' }
-];
+  { title: 'LGA', key: 'lga', sortable: false },
+  { title: 'Ward', key: 'ward', sortable: false },
+  { title: 'Capacity', key: 'capacity', sortable: false },
+  { title: 'Status', key: 'status', sortable: false },
+  { title: 'Created', key: 'created_at', sortable: true },
+  { title: 'Actions', key: 'actions', align: 'end', sortable: false },
+]
 
-// Enrollee table headers for facility view
 const enrolleeHeaders = [
-  { title: 'Name', key: 'name', sortable: true },
-  { title: 'Enrollee ID', key: 'enrollee_id', sortable: true },
-  { title: 'Type', key: 'type', sortable: true },
-  { title: 'Status', key: 'status', sortable: true },
+  { title: 'Enrollee', key: 'name', sortable: false },
+  { title: 'Type', key: 'type', sortable: false },
+  { title: 'Status', key: 'status', sortable: false },
   { title: 'Phone', key: 'phone', sortable: false },
-  { title: 'Actions', key: 'actions', sortable: false, width: '100px' }
-];
+]
 
-// Mock enrollee data for facilities
-const facilityEnrollees = ref([
-  {
-    id: 1,
-    name: 'John Doe',
-    enrollee_id: 'ENG001',
-    type: 'Principal',
-    status: 'Active',
-    phone: '+234 801 234 5678',
-    email: 'john.doe@email.com',
-    facility_id: 1
-  },
-  {
-    id: 2,
-    name: 'Jane Smith',
-    enrollee_id: 'ENG002',
-    type: 'Spouse',
-    status: 'Active',
-    phone: '+234 802 345 6789',
-    email: 'jane.smith@email.com',
-    facility_id: 1
-  },
-  {
-    id: 3,
-    name: 'Mike Johnson',
-    enrollee_id: 'ENG003',
-    type: 'Principal',
-    status: 'Inactive',
-    phone: '+234 803 456 7890',
-    email: 'mike.johnson@email.com',
-    facility_id: 2
-  }
-]);
+const activeFilterCount = computed(() => [searchQuery.value, filters.type, filters.lga_id, filters.ward_id, filters.status].filter((value) => value !== null && value !== '').length)
+const filteredWards = computed(() => wards.value.filter((ward) => !filters.lga_id || Number(ward.lga_id) === Number(filters.lga_id)))
+const formWards = computed(() => wards.value.filter((ward) => !facilityForm.lga_id || Number(ward.lga_id) === Number(facilityForm.lga_id)))
+const selectedLgaName = computed(() => lgas.value.find((item) => Number(item.id) === Number(filters.lga_id))?.name || 'Selected')
+const selectedWardName = computed(() => wards.value.find((item) => Number(item.id) === Number(filters.ward_id))?.name || 'Selected')
+const selectedStatusLabel = computed(() => statusOptions.find((item) => Number(item.value) === Number(filters.status))?.title || 'Selected')
+const deleteDialogMessage = computed(() => deleteTarget.value ? `Delete facility "${deleteTarget.value.name}"?` : 'Delete the selected facility?')
 
-// Data
-const facilities = ref([]);
-const totalFacilities = ref(0);
-const currentPage = ref(1);
-
-// Computed properties
-const filteredFacilityEnrollees = computed(() => {
-  if (!viewingFacility.value) return [];
-
-  let enrollees = facilityEnrollees.value.filter(
-    enrollee => enrollee.facility_id === viewingFacility.value.id
-  );
-
-  if (enrolleeSearchQuery.value) {
-    const query = enrolleeSearchQuery.value.toLowerCase();
-    enrollees = enrollees.filter(enrollee =>
-      enrollee.name.toLowerCase().includes(query) ||
-      enrollee.enrollee_id.toLowerCase().includes(query) ||
-      enrollee.phone.includes(query)
-    );
+const buildFacilityParams = () => {
+  const params = {
+    page: currentPage.value,
+    per_page: itemsPerPage.value,
+    sort_by: sortBy.value[0]?.key || 'created_at',
+    sort_direction: sortBy.value[0]?.order || 'desc',
   }
 
-  return enrollees;
-});
+  if (searchQuery.value.trim()) params.search = searchQuery.value.trim()
+  if (filters.type) params.type = filters.type
+  if (filters.lga_id) params.lga_id = filters.lga_id
+  if (filters.ward_id) params.ward_id = filters.ward_id
+  if (filters.status !== null) params.status = filters.status
 
-// Methods
-const getStatusColor = (status) => {
-  switch (status.toLowerCase()) {
-    case 'active': return 'success';
-    case 'pending': return 'warning';
-    case 'inactive': return 'error';
-    case 'suspended': return 'error';
-    default: return 'grey';
-  }
-};
+  return params
+}
 
-const getEnrolleeStatusColor = (status) => {
-  switch (status?.toLowerCase()) {
-    case 'active': return 'success';
-    case 'inactive': return 'warning';
-    case 'suspended': return 'error';
-    case 'pending': return 'info';
-    default: return 'grey';
-  }
-};
+const extractCollection = (response) => {
+  const payload = response?.data?.data ?? response?.data ?? []
+  if (Array.isArray(payload)) return { items: payload, total: payload.length }
+  if (Array.isArray(payload?.data)) return { items: payload.data, total: payload.meta?.total ?? payload.total ?? payload.data.length }
+  return { items: [], total: 0 }
+}
 
-const getActiveEnrollees = () => {
-  if (!viewingFacility.value) return 0;
-  return facilityEnrollees.value.filter(
-    enrollee => enrollee.facility_id === viewingFacility.value.id &&
-    enrollee.status.toLowerCase() === 'active'
-  ).length;
-};
-
-const getTypeColor = (type) => {
-  switch (type.toLowerCase()) {
-    case 'hospital': return 'blue';
-    case 'clinic': return 'green';
-    case 'pharmacy': return 'orange';
-    case 'laboratory': return 'purple';
-    case 'diagnostic center': return 'teal';
-    default: return 'grey';
-  }
-};
-
-const getTypeIcon = (type) => {
-  switch (type.toLowerCase()) {
-    case 'hospital': return 'mdi-hospital-building';
-    case 'clinic': return 'mdi-medical-bag';
-    case 'pharmacy': return 'mdi-pill';
-    case 'laboratory': return 'mdi-test-tube';
-    case 'diagnostic center': return 'mdi-stethoscope';
-    default: return 'mdi-hospital-marker';
-  }
-};
-
-const viewFacility = async (facility) => {
-  viewingFacility.value = facility;
-  showViewDialog.value = true;
-
-  // Load enrollees for this facility
-  loadingEnrollees.value = true;
+const loadReferenceData = async () => {
   try {
-    // In a real app, this would be an API call
-    await new Promise(resolve => setTimeout(resolve, 500));
-    // facilityEnrollees is already filtered in the computed property
+    const [lgaResponse, wardResponse] = await Promise.all([
+      lgaAPI.getAll({ per_page: 500 }),
+      wardAPI.getAll({ per_page: 1000 }),
+    ])
+    lgas.value = extractCollection(lgaResponse).items
+    wards.value = extractCollection(wardResponse).items
   } catch (err) {
-    error('Failed to load facility enrollees');
-  } finally {
-    loadingEnrollees.value = false;
+    error(err.response?.data?.message || 'Failed to load facility reference data')
   }
-};
+}
+
+const loadFacilities = async () => {
+  loading.value = true
+  try {
+    const response = await facilityAPI.getAll(buildFacilityParams())
+    const { items, total } = extractCollection(response)
+    facilities.value = items
+    totalFacilities.value = total
+    facilityStats.total = total
+    facilityStats.active = items.filter((facility) => Number(facility.status) === 1).length
+    facilityStats.inactive = items.filter((facility) => Number(facility.status) !== 1).length
+    facilityStats.lgas = new Set(items.map((facility) => facility.lga?.id).filter(Boolean)).size
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to load facilities')
+    facilities.value = []
+    totalFacilities.value = 0
+  } finally {
+    loading.value = false
+  }
+}
+
+const loadFacilityEnrollees = async () => {
+  if (!viewingFacility.value?.id) return
+  loadingEnrollees.value = true
+  try {
+    const response = await facilityAPI.getEnrollees(viewingFacility.value.id, {
+      per_page: 50,
+      search: enrolleeSearchQuery.value || undefined,
+    })
+    const { items, total } = extractCollection(response)
+    facilityEnrollees.value = items
+    facilityEnrolleeMeta.total = total
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to load facility enrollees')
+    facilityEnrollees.value = []
+    facilityEnrolleeMeta.total = 0
+  } finally {
+    loadingEnrollees.value = false
+  }
+}
+
+const openCreateDialog = () => {
+  editingFacility.value = null
+  resetFacilityForm()
+  showAddDialog.value = true
+}
 
 const editFacility = (facility) => {
-  editingFacility.value = facility;
-  Object.assign(facilityForm.value, facility);
-  showAddDialog.value = true;
-};
+  editingFacility.value = facility
+  Object.assign(facilityForm, {
+    hcp_code: facility.hcp_code || '',
+    name: facility.name || '',
+    ownership: facility.ownership || facility.category || 'Public',
+    type: facility.type || 'Primary',
+    address: facility.address || '',
+    phone: facility.phone || '',
+    email: facility.email || '',
+    lga_id: facility.lga?.id || null,
+    ward_id: facility.ward?.id || null,
+    capacity: facility.capacity ?? '',
+    status: Number(facility.status ?? 1),
+    accreditation_status: facility.accreditation_status || 'active',
+  })
+  showViewDialog.value = false
+  showAddDialog.value = true
+}
 
-const editFromView = (facility) => {
-  showViewDialog.value = false;
-  editFacility(facility);
-};
-
-const deleteFacility = (facility) => {
-  if (confirm(`Are you sure you want to delete ${facility.name}?`)) {
-    success('Facility deleted successfully');
+const viewFacility = async (facility) => {
+  try {
+    const response = await facilityAPI.getById(facility.id)
+    viewingFacility.value = response.data?.data?.data || response.data?.data || facility
+  } catch {
+    viewingFacility.value = facility
   }
-};
+  showViewDialog.value = true
+  enrolleeSearchQuery.value = ''
+  await loadFacilityEnrollees()
+}
 
-const saveFacility = () => {
-  // Save logic here
-  closeDialog();
-  success('Facility saved successfully');
-};
+const saveFacility = async () => {
+  if (!facilityForm.hcp_code || !facilityForm.name || !facilityForm.lga_id || !facilityForm.ward_id) {
+    error('HCP code, facility name, LGA, and ward are required')
+    return
+  }
+
+  saving.value = true
+  try {
+    const payload = {
+      hcp_code: facilityForm.hcp_code,
+      name: facilityForm.name,
+      ownership: facilityForm.ownership,
+      category: facilityForm.ownership,
+      type: facilityForm.type,
+      address: facilityForm.address,
+      phone: facilityForm.phone,
+      email: facilityForm.email,
+      lga_id: facilityForm.lga_id,
+      ward_id: facilityForm.ward_id,
+      capacity: facilityForm.capacity === '' ? null : Number(facilityForm.capacity),
+      status: Number(facilityForm.status),
+      accreditation_status: facilityForm.accreditation_status,
+    }
+
+    if (editingFacility.value) {
+      await facilityAPI.update(editingFacility.value.id, payload)
+      success('Facility updated successfully')
+    } else {
+      await facilityAPI.create(payload)
+      success('Facility created successfully')
+    }
+
+    closeDialog()
+    await loadFacilities()
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to save facility')
+  } finally {
+    saving.value = false
+  }
+}
 
 const closeDialog = () => {
-  showAddDialog.value = false;
-  editingFacility.value = null;
-  Object.keys(facilityForm.value).forEach(key => {
-    facilityForm.value[key] = '';
-  });
-};
-
-const viewEnrolleeFromFacility = (enrollee) => {
-  // Navigate to enrollee detail or open enrollee view dialog
-  router.push(`/enrollees/${enrollee.id}`);
-};
-
-const editEnrolleeFromFacility = (enrollee) => {
-  // Navigate to enrollee edit page
-  router.push(`/enrollees/${enrollee.id}/edit`);
-};
-
-const exportFacilityEnrollees = async () => {
-  try {
-    const enrollees = filteredFacilityEnrollees.value;
-    const csvData = enrollees.map(enrollee => ({
-      Name: enrollee.name,
-      'Enrollee ID': enrollee.enrollee_id,
-      Type: enrollee.type,
-      Status: enrollee.status,
-      Phone: enrollee.phone,
-      Email: enrollee.email
-    }));
-
-    // Convert to CSV
-    const headers = Object.keys(csvData[0]);
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => headers.map(header => `"${row[header]}"`).join(','))
-    ].join('\n');
-
-    // Create download
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${viewingFacility.value.name.replace(/\s+/g, '_')}_enrollees.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-
-    success('Enrollees data exported successfully');
-  } catch (err) {
-    error('Failed to export enrollees data');
-  }
-};
-
-// API Methods
-const loadFacilities = async () => {
-  loading.value = true;
-  try {
-    const params = {
-      page: currentPage.value,
-      per_page: itemsPerPage.value,
-      sort_by: 'created_at',
-      sort_direction: 'desc'
-    };
-
-    // Add filters if they have values
-    if (searchQuery.value && searchQuery.value.trim()) {
-      params.search = searchQuery.value.trim();
-    }
-    if (filters.value.type) {
-      params.type = filters.value.type;
-    }
-    if (filters.value.lga) {
-      params.lga_id = filters.value.lga;
-    }
-    if (filters.value.status) {
-      params.status = filters.value.status;
-    }
-
-    const response = await facilityAPI.getAll(params);
-
-    if (response?.data?.success) {
-      const responseData = response.data.data;
-
-      if (responseData && typeof responseData === 'object' && responseData.data) {
-        facilities.value = responseData.data;
-        totalFacilities.value = responseData.meta?.total || responseData.total || 0;
-      } else if (Array.isArray(responseData)) {
-        facilities.value = responseData;
-        totalFacilities.value = responseData.length;
-      } else {
-        facilities.value = [];
-        totalFacilities.value = 0;
-      }
-    } else {
-      facilities.value = [];
-      totalFacilities.value = 0;
-    }
-  } catch (err) {
-    console.error('Failed to load facilities:', err);
-    error('Failed to load facilities');
-    facilities.value = [];
-    totalFacilities.value = 0;
-  } finally {
-    loading.value = false;
-  }
-};
-
-// Watch for filter changes
-watch([searchQuery, filters], () => {
-  currentPage.value = 1;
-  loadFacilities();
-}, { deep: true, debounce: 300 });
-
-const loadFacilityStats = async () => {
-  statsLoading.value = true;
-  try {
-    const res = await facilityAPI.getAll({ per_page: 1 });
-    const d = res.data?.data ?? res.data;
-    const meta = d?.meta ?? d;
-    facilityStats.value.total = meta?.total ?? 0;
-    const allRes = await facilityAPI.getAll({ per_page: 500, fields: 'id,status,lga_id' });
-    const allData = allRes.data?.data ?? allRes.data;
-    const list = allData?.data ?? allData ?? [];
-    facilityStats.value.active = list.filter(f => f.status === 1 || f.status === 'active').length;
-    facilityStats.value.inactive = list.filter(f => f.status !== 1 && f.status !== 'active').length;
-    facilityStats.value.lgas = new Set(list.map(f => f.lga_id).filter(Boolean)).size;
-  } catch { /* stats are non-critical */ } finally {
-    statsLoading.value = false;
-  }
-};
-
-onMounted(() => {
-  loadFacilities();
-  loadFacilityStats();
-});
-</script>
-
-<style scoped>
-:deep(.v-data-table) {
-  border-radius: 0.5rem;
+  showAddDialog.value = false
+  editingFacility.value = null
+  resetFacilityForm()
 }
-</style>
+
+const resetFacilityForm = () => {
+  Object.assign(facilityForm, {
+    hcp_code: '',
+    name: '',
+    ownership: 'Public',
+    type: 'Primary',
+    address: '',
+    phone: '',
+    email: '',
+    lga_id: null,
+    ward_id: null,
+    capacity: '',
+    status: 1,
+    accreditation_status: 'active',
+  })
+}
+
+const openDeleteDialog = (facility) => {
+  deleteTarget.value = facility
+  deleteDialog.value = true
+}
+
+const closeDeleteDialog = () => {
+  deleteDialog.value = false
+  deleteTarget.value = null
+}
+
+const handleDeleteDialogChange = (value) => {
+  deleteDialog.value = value
+  if (!value) deleteTarget.value = null
+}
+
+const confirmDelete = async () => {
+  if (!deleteTarget.value) return
+  deleting.value = true
+  try {
+    await facilityAPI.delete(deleteTarget.value.id)
+    success('Facility deleted successfully')
+    closeDeleteDialog()
+    await loadFacilities()
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to delete facility')
+  } finally {
+    deleting.value = false
+  }
+}
+
+const onUpdateSort = (value) => {
+  sortBy.value = value
+  loadFacilities()
+}
+
+const resetFilters = () => {
+  searchQuery.value = ''
+  filters.type = null
+  filters.lga_id = null
+  filters.ward_id = null
+  filters.status = null
+  currentPage.value = 1
+  loadFacilities()
+}
+
+watch([currentPage, itemsPerPage], () => {
+  loadFacilities()
+})
+
+watch(searchQuery, () => {
+  clearTimeout(searchDebouncer.value)
+  searchDebouncer.value = setTimeout(() => {
+    currentPage.value = 1
+    loadFacilities()
+  }, 350)
+})
+
+watch(() => filters.lga_id, () => {
+  if (filters.ward_id && !filteredWards.value.some((ward) => Number(ward.id) === Number(filters.ward_id))) {
+    filters.ward_id = null
+  }
+})
+
+watch(() => facilityForm.lga_id, () => {
+  if (facilityForm.ward_id && !formWards.value.some((ward) => Number(ward.id) === Number(facilityForm.ward_id))) {
+    facilityForm.ward_id = null
+  }
+})
+
+watch(enrolleeSearchQuery, () => {
+  if (!showViewDialog.value) return
+  clearTimeout(enrolleeSearchDebouncer.value)
+  enrolleeSearchDebouncer.value = setTimeout(() => {
+    loadFacilityEnrollees()
+  }, 300)
+})
+
+onMounted(async () => {
+  await loadReferenceData()
+  await loadFacilities()
+})
+</script>

@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('enrollment_phases', function (Blueprint $table) {
             $table->id();
             $table->string('name', 20);
-            $table->foreignId('benefactor_id')->constrained();
+            $table->foreignId('benefactor_id')->constrained('benefactors')->restrictOnDelete();
             $table->unsignedTinyInteger('status')->default(1);
             $table->timestamps();
 

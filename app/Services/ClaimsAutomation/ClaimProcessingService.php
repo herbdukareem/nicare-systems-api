@@ -6,6 +6,7 @@ use App\Models\Admission;
 use App\Models\AuditTrail;
 use App\Models\Claim;
 use App\Models\ClaimLine;
+use App\Models\Referral;
 use App\Services\ClaimValidationService;
 use App\Services\EligibilityService;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
@@ -13,37 +14,21 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Request;
 use InvalidArgumentException;
 
-/**
- * ClaimProcessingService
- * 
- * Handles complete claim workflow: creation, validation, approval, rejection
- */
 class ClaimProcessingService
 {
-    private ClaimValidationService $validationService;
-
-    public function __construct(ClaimValidationService $validationService)
+    public function __construct(private ClaimValidationService $validationService)
     {
-        $this->validationService = $validationService;
     }
 
-    /**
-     * Create a new claim from an admission
-     * 
-     * @param int $admissionId
-     * @param array $data - claim_date, submitted_by, etc.
-     * @return Claim
-     * @throws ModelNotFoundException
-     */
     public function createClaim(int $admissionId, array $data): Claim
     {
         $admission = Admission::find($admissionId);
         if (!$admission) {
-            throw new ModelNotFoundException("Admission not found");
+            throw new ModelNotFoundException('Admission not found');
         }
 
-        if ($admission->status !== 'active') {
-            throw new InvalidArgumentException("Admission must be active to create a claim");
+        if (!$this->admissionStatusIs($admission, 'active')) {
+            throw new InvalidArgumentException('Admission must be active to create a claim');
         }
 
         $serviceDate = $data['service_date'] ?? $data['claim_date'] ?? now();
@@ -53,20 +38,18 @@ class ClaimProcessingService
             $serviceDate
         );
 
-        // Check no claim exists for this admission
         if ($admission->claim) {
-            throw new InvalidArgumentException("Claim already exists for this admission");
+            throw new InvalidArgumentException('Claim already exists for this admission');
         }
-
-        // Get UTN from admission's referral
-        $utn = $admission->referral?->utn;
 
         $claim = new Claim([
             'admission_id' => $admissionId,
+            'referral_id' => $admission->referral_id,
             'enrollee_id' => $admission->enrollee_id,
             'facility_id' => $admission->facility_id,
-            'utn' => $utn, // Denormalized for faster lookups
-            'status' => 'DRAFT',
+            'utn' => $admission->referral?->utn,
+            'claim_number' => Claim::generateClaimNumber(),
+            'status' => Claim::STATUS_DRAFT,
             'claim_date' => $data['claim_date'] ?? now(),
             'service_date' => $serviceDate,
             'submitted_by' => auth()->id(),
@@ -77,48 +60,35 @@ class ClaimProcessingService
         return $claim;
     }
 
-    /**
-     * Create a new claim from an admission with line items
-     *
-     * @param int $admissionId
-     * @param string $claimDate
-     * @param array $lineItems
-     * @return Claim
-     * @throws ModelNotFoundException
-     * @throws InvalidArgumentException
-     */
     public function createClaimWithLineItems(int $admissionId, string $claimDate, array $lineItems): Claim
     {
         $admission = Admission::find($admissionId);
         if (!$admission) {
-            throw new ModelNotFoundException("Admission not found");
+            throw new ModelNotFoundException('Admission not found');
         }
 
-        if ($admission->status !== 'discharged') {
-            throw new InvalidArgumentException("Admission must be discharged to create a claim");
+        if (!$this->admissionStatusIs($admission, 'discharged')) {
+            throw new InvalidArgumentException('Admission must be discharged to create a claim');
         }
 
-        // Check no claim exists for this admission
         if ($admission->claim) {
-            throw new InvalidArgumentException("Claim already exists for this admission");
+            throw new InvalidArgumentException('Claim already exists for this admission');
         }
 
-        // Get UTN from admission's referral
-        $utn = $admission->referral?->utn;
+        $referral = $admission->referral;
+        $utn = $referral?->utn;
 
         if (!$utn) {
-            throw new InvalidArgumentException("Admission must have a valid UTN");
+            throw new InvalidArgumentException('Admission must have a valid UTN');
         }
 
-        // Validate UTN is validated
-        if (!$admission->referral->utn_validated) {
-            throw new InvalidArgumentException("UTN must be validated before creating a claim");
+        if (!$referral->utn_validated) {
+            throw new InvalidArgumentException('UTN must be validated before creating a claim');
         }
 
-        // BR-04: referral UTN must not be expired at claim creation
-        if ($admission->referral->isExpired()) {
+        if ($referral->isExpired()) {
             throw new InvalidArgumentException(
-                "Cannot create claim: The referral UTN has expired (valid until: {$admission->referral->valid_until}). A new referral is required."
+                "Cannot create claim: The referral UTN has expired (valid until: {$referral->valid_until}). A new referral is required."
             );
         }
 
@@ -128,77 +98,93 @@ class ClaimProcessingService
             $claimDate
         );
 
-        // Use transaction to ensure atomicity
-        return DB::transaction(function () use ($admission, $utn, $claimDate, $lineItems) {
-            // Create the claim
-            $claim = new Claim([
+        return DB::transaction(function () use ($admission, $referral, $claimDate, $lineItems): Claim {
+            $claim = Claim::create([
                 'admission_id' => $admission->id,
+                'referral_id' => $admission->referral_id,
                 'enrollee_id' => $admission->enrollee_id,
                 'facility_id' => $admission->facility_id,
-                'utn' => $utn,
-                'status' => 'DRAFT',
+                'utn' => $referral?->utn,
+                'status' => Claim::STATUS_DRAFT,
                 'claim_date' => $claimDate,
                 'service_date' => $claimDate,
-                'claim_number' => 'CLM-' . strtoupper(uniqid()),
+                'claim_number' => Claim::generateClaimNumber(),
                 'submitted_by' => auth()->id(),
             ]);
 
-            $claim->save();
+            [$bundleAmount, $ffsAmount] = $this->createClaimLineItems($claim, $lineItems, $referral, $admission, 0, null, []);
 
-            // Create line items
-            $bundleAmount = 0;
-            $ffsAmount = 0;
-
-            foreach ($lineItems as $lineItem) {
-                $lineTotal = (float) $lineItem['line_total'];
-
-                ClaimLine::create([
-                    'claim_id' => $claim->id,
-                    'pa_code_id' => $lineItem['pa_code_id'],
-                    'tariff_type' => $lineItem['tariff_type'],
-                    'service_type' => $lineItem['service_type'],
-                    'service_description' => $lineItem['service_description'],
-                    'quantity' => $lineItem['quantity'],
-                    'unit_price' => $lineItem['unit_price'],
-                    'line_total' => $lineTotal,
-                    'reporting_type' => $lineItem['reporting_type'],
-                    'reported_diagnosis_code' => $lineItem['reported_diagnosis_code'] ?? null,
-                ]);
-
-                // Accumulate amounts
-                if ($lineItem['tariff_type'] === 'BUNDLE') {
-                    $bundleAmount += $lineTotal;
-                } else {
-                    $ffsAmount += $lineTotal;
-                }
-            }
-
-            // Update claim totals
             $claim->update([
                 'bundle_amount' => $bundleAmount,
                 'ffs_amount' => $ffsAmount,
+                'total_amount' => $bundleAmount + $ffsAmount,
                 'total_amount_claimed' => $bundleAmount + $ffsAmount,
             ]);
 
-            return $claim->fresh(['lineItems', 'admission', 'coveragePeriod', 'enrollee', 'facility']);
+            return $claim->fresh(['lineItems', 'admission', 'referral', 'enrollee', 'facility']);
         });
     }
 
-    /**
-     * Submit a claim for review
-     *
-     * @param Claim $claim
-     * @return Claim
-     * @throws InvalidArgumentException
-     */
+    public function createDraftClaimFromReferral(Referral $referral, array $data, ?Admission $admission = null): Claim
+    {
+        $serviceDate = $admission?->admission_date ?? ($data['claim_date'] ?? now());
+
+        app(EligibilityService::class)->assertFacilityMatchesCoverage(
+            $referral->enrollee_id,
+            (int) $referral->receiving_facility_id,
+            $serviceDate
+        );
+
+        return DB::transaction(function () use ($referral, $data, $admission, $serviceDate): Claim {
+            $claim = Claim::create([
+                'referral_id' => $referral->id,
+                'admission_id' => $admission?->id,
+                'enrollee_id' => $referral->enrollee_id,
+                'facility_id' => $referral->receiving_facility_id,
+                'claim_number' => Claim::generateClaimNumber(),
+                'utn' => $referral->utn,
+                'status' => Claim::STATUS_DRAFT,
+                'claim_date' => $data['claim_date'] ?? now(),
+                'service_date' => $serviceDate,
+                'submitted_by' => auth()->id(),
+            ]);
+
+            [$bundleAmount, $ffsAmount] = $this->createClaimLineItems(
+                $claim,
+                $data['line_items'] ?? [],
+                $referral,
+                $admission,
+                (float) ($data['bundle_amount'] ?? 0),
+                isset($data['bundle_pa_code_id']) ? (int) $data['bundle_pa_code_id'] : null,
+                $data['bundle_components'] ?? []
+            );
+
+            $totalAmount = $bundleAmount + $ffsAmount;
+            $claim->update([
+                'bundle_amount' => $bundleAmount,
+                'ffs_amount' => $ffsAmount,
+                'total_amount' => $totalAmount,
+                'total_amount_claimed' => $totalAmount,
+            ]);
+
+            $this->writeAudit($claim, 'claim_created', "Claim {$claim->claim_number} created as draft.", [], [
+                'status' => Claim::STATUS_DRAFT,
+                'bundle_amount' => $bundleAmount,
+                'ffs_amount' => $ffsAmount,
+            ]);
+
+            return $claim->fresh(['referral', 'admission', 'enrollee', 'facility', 'lineItems.paCode']);
+        });
+    }
+
     public function submitClaim(Claim $claim): Claim
     {
-        if ($claim->status !== 'DRAFT') {
-            throw new InvalidArgumentException("Only DRAFT claims can be submitted");
+        if ($claim->status !== Claim::STATUS_DRAFT) {
+            throw new InvalidArgumentException('Only DRAFT claims can be submitted');
         }
 
         if ($claim->lineItems()->count() === 0) {
-            throw new InvalidArgumentException("Claim must have at least one line item");
+            throw new InvalidArgumentException('Claim must have at least one line item');
         }
 
         app(EligibilityService::class)->assertFacilityMatchesCoverage(
@@ -208,158 +194,175 @@ class ClaimProcessingService
         );
 
         $claim->update([
-            'status' => 'SUBMITTED',
+            'status' => Claim::STATUS_SUBMITTED,
             'submitted_at' => now(),
         ]);
 
-        // Mark referral as claim submitted
         if ($claim->referral) {
             $claim->referral->markClaimSubmitted();
         }
 
-        // BR-09: write audit trail entry
-        AuditTrail::create([
-            'auditable_type' => Claim::class,
-            'auditable_id'   => $claim->id,
-            'action'         => 'claim_submitted',
-            'description'    => "Claim {$claim->claim_number} submitted for review",
-            'user_id'        => auth()->id(),
-            'old_values'     => ['status' => 'DRAFT'],
-            'new_values'     => ['status' => 'SUBMITTED'],
-            'ip_address'     => Request::ip(),
+        $this->writeAudit($claim, 'claim_submitted', "Claim {$claim->claim_number} submitted for review.", [
+            'status' => Claim::STATUS_DRAFT,
+        ], [
+            'status' => Claim::STATUS_SUBMITTED,
         ]);
 
-        return $claim;
+        return $claim->fresh(['referral', 'admission', 'enrollee', 'facility', 'lineItems']);
     }
 
-    /**
-     * Validate a claim and return alerts
-     * 
-     * @param Claim $claim
-     * @return array - validation alerts
-     */
     public function validateClaim(Claim $claim): array
     {
         return $this->validationService->runChecks($claim);
     }
 
-    /**
-     * Approve a claim.
-     *
-     * BR-06: The user who submitted the claim cannot be the one who approves it.
-     * BR-09: Every state change is written to the audit trail.
-     */
     public function approveClaim(Claim $claim, array $data = []): Claim
     {
-        if ($claim->status !== 'SUBMITTED' && $claim->status !== 'REVIEWING') {
+        if (!$this->isReviewable($claim)) {
             throw new InvalidArgumentException(
                 "Only SUBMITTED or REVIEWING claims can be approved. Current status: {$claim->status}"
             );
         }
 
-        // BR-06: four-eyes principle — submitter cannot approve their own claim
-        if ($claim->submitted_by && $claim->submitted_by === auth()->id()) {
-            throw new InvalidArgumentException(
-                "BR-06 violation: The user who submitted this claim cannot approve it. A different officer must approve."
-            );
-        }
+        $this->assertDifferentAdjudicator($claim);
 
         $oldStatus = $claim->status;
-
         $claim->update([
-            'status' => 'APPROVED',
+            'status' => Claim::STATUS_APPROVED,
             'approved_at' => now(),
             'approved_by' => auth()->id(),
-            'approval_comments' => $data['approval_comments'] ?? null,
+            'reviewed_by' => $claim->reviewed_by ?? auth()->id(),
+            'reviewed_at' => $claim->reviewed_at ?? now(),
+            'approved_amount' => $data['approved_amount'] ?? ($claim->approved_amount ?? $claim->total_amount_claimed),
+            'approval_comments' => $data['approval_comments'] ?? $data['comments'] ?? null,
+            'payment_code' => $data['payment_code'] ?? $claim->payment_code,
         ]);
 
-        // BR-09: write audit trail entry
-        AuditTrail::create([
-            'auditable_type' => Claim::class,
-            'auditable_id'   => $claim->id,
-            'action'         => 'claim_approved',
-            'description'    => "Claim {$claim->claim_number} approved. Previous status: {$oldStatus}",
-            'user_id'        => auth()->id(),
-            'old_values'     => ['status' => $oldStatus],
-            'new_values'     => ['status' => 'APPROVED', 'approval_comments' => $data['approval_comments'] ?? null],
-            'ip_address'     => Request::ip(),
+        $this->writeAudit($claim, 'claim_approved', "Claim {$claim->claim_number} approved. Previous status: {$oldStatus}", [
+            'status' => $oldStatus,
+        ], [
+            'status' => Claim::STATUS_APPROVED,
+            'approved_amount' => $claim->approved_amount,
         ]);
 
-        return $claim;
+        return $claim->fresh(['referral', 'admission', 'enrollee', 'facility', 'lineItems']);
     }
 
-    /**
-     * Reject a claim.
-     *
-     * BR-06: The user who submitted the claim cannot be the one who rejects it.
-     * BR-09: Every state change is written to the audit trail.
-     */
     public function rejectClaim(Claim $claim, array $data = []): Claim
     {
-        if ($claim->status !== 'SUBMITTED' && $claim->status !== 'REVIEWING') {
+        if (!$this->isReviewable($claim)) {
             throw new InvalidArgumentException(
                 "Only SUBMITTED or REVIEWING claims can be rejected. Current status: {$claim->status}"
             );
         }
 
-        // BR-06: four-eyes principle — submitter cannot reject their own claim
-        if ($claim->submitted_by && $claim->submitted_by === auth()->id()) {
-            throw new InvalidArgumentException(
-                "BR-06 violation: The user who submitted this claim cannot reject it. A different officer must adjudicate."
-            );
-        }
+        $this->assertDifferentAdjudicator($claim);
 
         if (empty($data['rejection_reason'])) {
-            throw new InvalidArgumentException("A rejection reason is mandatory when rejecting a claim.");
+            throw new InvalidArgumentException('A rejection reason is mandatory when rejecting a claim.');
         }
 
         $oldStatus = $claim->status;
-
         $claim->update([
-            'status' => 'REJECTED',
+            'status' => Claim::STATUS_REJECTED,
             'rejected_at' => now(),
             'rejected_by' => auth()->id(),
+            'reviewed_by' => $claim->reviewed_by ?? auth()->id(),
+            'reviewed_at' => $claim->reviewed_at ?? now(),
             'rejection_reason' => $data['rejection_reason'],
         ]);
 
-        // BR-09: write audit trail entry
-        AuditTrail::create([
-            'auditable_type' => Claim::class,
-            'auditable_id'   => $claim->id,
-            'action'         => 'claim_rejected',
-            'description'    => "Claim {$claim->claim_number} rejected. Reason: {$data['rejection_reason']}",
-            'user_id'        => auth()->id(),
-            'old_values'     => ['status' => $oldStatus],
-            'new_values'     => ['status' => 'REJECTED', 'rejection_reason' => $data['rejection_reason']],
-            'ip_address'     => Request::ip(),
+        $this->writeAudit($claim, 'claim_rejected', "Claim {$claim->claim_number} rejected.", [
+            'status' => $oldStatus,
+        ], [
+            'status' => Claim::STATUS_REJECTED,
+            'rejection_reason' => $data['rejection_reason'],
         ]);
 
-        return $claim;
+        return $claim->fresh(['referral', 'admission', 'enrollee', 'facility', 'lineItems']);
     }
 
-    /**
-     * Move claim to review status
-     * 
-     * @param Claim $claim
-     * @return Claim
-     */
-    public function moveToReview(Claim $claim): Claim
+    public function moveToReview(Claim $claim, array $data = []): Claim
     {
-        if ($claim->status !== 'SUBMITTED') {
-            throw new InvalidArgumentException("Only SUBMITTED claims can move to REVIEWING");
+        if ($claim->status !== Claim::STATUS_SUBMITTED) {
+            throw new InvalidArgumentException('Only SUBMITTED claims can move to REVIEWING');
         }
 
-        $claim->update(['status' => 'REVIEWING']);
+        $this->assertDifferentAdjudicator($claim);
 
-        return $claim;
+        $claim->update([
+            'status' => Claim::STATUS_REVIEWING,
+            'reviewed_by' => auth()->id(),
+            'reviewed_at' => now(),
+            'approval_comments' => $data['comments'] ?? $claim->approval_comments,
+        ]);
+
+        $this->writeAudit($claim, 'claim_reviewing', "Claim {$claim->claim_number} moved to review.", [
+            'status' => Claim::STATUS_SUBMITTED,
+        ], [
+            'status' => Claim::STATUS_REVIEWING,
+        ]);
+
+        return $claim->fresh(['referral', 'admission', 'enrollee', 'facility', 'lineItems']);
     }
 
-    /**
-     * Get claim summary with totals
-     * 
-     * @param Claim $claim
-     * @return array
-     */
+    public function reviewClaim(Claim $claim, array $data): Claim
+    {
+        if (!$this->isReviewable($claim) && $claim->status !== Claim::STATUS_SUBMITTED) {
+            throw new InvalidArgumentException('Only submitted or reviewing claims can be processed');
+        }
+
+        return DB::transaction(function () use ($claim, $data): Claim {
+            $adjustedFfsAmount = $this->applyLineItemAdjustments($claim, $data['line_item_adjustments'] ?? []);
+            $finalApprovedAmount = $data['approved_amount'] ?? (($claim->bundle_amount ?? 0) + $adjustedFfsAmount);
+
+            return match ($data['status']) {
+                Claim::STATUS_REVIEWING => $this->moveToReview($claim, $data),
+                Claim::STATUS_APPROVED => $this->approveClaim($claim, [
+                    'approved_amount' => $finalApprovedAmount,
+                    'approval_comments' => $data['comments'] ?? null,
+                    'payment_code' => $data['payment_code'] ?? null,
+                ]),
+                Claim::STATUS_REJECTED => $this->rejectClaim($claim, [
+                    'rejection_reason' => $data['comments'] ?? $data['rejection_reason'] ?? null,
+                ]),
+                default => throw new InvalidArgumentException('Unsupported claim review status.'),
+            };
+        });
+    }
+
+    public function batchReviewClaims(array $claimIds, string $decision, array $data = []): array
+    {
+        $processed = 0;
+        $errors = [];
+        $claims = [];
+
+        foreach ($claimIds as $claimId) {
+            $claim = Claim::find($claimId);
+            if (!$claim) {
+                $errors[] = "Claim {$claimId} was not found.";
+                continue;
+            }
+
+            try {
+                $claims[] = match ($decision) {
+                    Claim::STATUS_APPROVED => $this->approveClaim($claim, $data),
+                    Claim::STATUS_REJECTED => $this->rejectClaim($claim, $data),
+                    default => throw new InvalidArgumentException('Unsupported batch review decision.'),
+                };
+                $processed++;
+            } catch (\Throwable $e) {
+                $errors[] = "Claim {$claim->claim_number}: {$e->getMessage()}";
+            }
+        }
+
+        return [
+            'processed_count' => $processed,
+            'errors' => $errors,
+            'claims' => $claims,
+        ];
+    }
+
     public function getClaimSummary(Claim $claim): array
     {
         $bundleTotal = $claim->lineItems()
@@ -380,5 +383,119 @@ class ClaimProcessingService
             'bundle_items_count' => $claim->lineItems()->where('tariff_type', 'BUNDLE')->count(),
             'ffs_items_count' => $claim->lineItems()->where('tariff_type', 'FFS')->count(),
         ];
+    }
+
+    private function createClaimLineItems(
+        Claim $claim,
+        array $lineItems,
+        Referral $referral,
+        ?Admission $admission,
+        float $bundleAmount,
+        ?int $bundlePaCodeId,
+        array $bundleComponents
+    ): array {
+        $ffsAmount = 0;
+
+        if ($bundleAmount > 0) {
+            ClaimLine::create([
+                'claim_id' => $claim->id,
+                'case_record_id' => $referral->service_bundle_id,
+                'pa_code_id' => $bundlePaCodeId,
+                'bundle_id' => $admission?->service_bundle_id ?? $referral->service_bundle_id,
+                'bundle_component_id' => $bundleComponents[0]['bundle_component_id'] ?? null,
+                'service_description' => $referral->serviceBundle?->name ?? 'Bundle Claim',
+                'quantity' => 1,
+                'unit_price' => $bundleAmount,
+                'line_total' => $bundleAmount,
+                'tariff_type' => 'BUNDLE',
+                'service_type' => 'service',
+                'reporting_type' => 'IN_BUNDLE',
+            ]);
+        }
+
+        foreach ($lineItems as $lineItem) {
+            $lineTotal = (float) ($lineItem['line_total'] ?? ((float) $lineItem['unit_price'] * (int) $lineItem['quantity']));
+            $ffsAmount += $lineTotal;
+
+            ClaimLine::create([
+                'claim_id' => $claim->id,
+                'pa_code_id' => $lineItem['pa_code_id'],
+                'case_record_id' => $lineItem['case_record_id'] ?? null,
+                'service_description' => $lineItem['service_description'],
+                'quantity' => $lineItem['quantity'],
+                'unit_price' => $lineItem['unit_price'],
+                'line_total' => $lineTotal,
+                'tariff_type' => $lineItem['tariff_type'],
+                'service_type' => $lineItem['service_type'] ?? 'service',
+                'reporting_type' => $lineItem['reporting_type'] ?? ($lineItem['tariff_type'] === 'BUNDLE' ? 'IN_BUNDLE' : 'FFS_TOP_UP'),
+                'bundle_id' => $lineItem['bundle_id'] ?? null,
+                'bundle_component_id' => $lineItem['bundle_component_id'] ?? null,
+            ]);
+        }
+
+        return [$bundleAmount, $ffsAmount];
+    }
+
+    private function applyLineItemAdjustments(Claim $claim, array $adjustments): float
+    {
+        if ($adjustments === []) {
+            return (float) $claim->lineItems()->where('tariff_type', 'FFS')->sum('line_total');
+        }
+
+        $adjustedFfsAmount = 0;
+        foreach ($adjustments as $adjustment) {
+            $lineItem = $claim->lineItems()->find($adjustment['id']);
+            if (!$lineItem) {
+                continue;
+            }
+
+            $approvedQty = !empty($adjustment['included']) ? (int) $adjustment['approved_quantity'] : 0;
+            $approvedAmount = $approvedQty * (float) $lineItem->unit_price;
+
+            $lineItem->update([
+                'approved_quantity' => $approvedQty,
+                'approved_amount' => $approvedAmount,
+                'is_approved' => (bool) $adjustment['included'],
+            ]);
+
+            if ($lineItem->tariff_type === 'FFS' && !empty($adjustment['included'])) {
+                $adjustedFfsAmount += $approvedAmount;
+            }
+        }
+
+        return $adjustedFfsAmount;
+    }
+
+    private function admissionStatusIs(Admission $admission, string $expected): bool
+    {
+        return strtolower((string) $admission->status) === strtolower($expected);
+    }
+
+    private function isReviewable(Claim $claim): bool
+    {
+        return in_array($claim->status, [Claim::STATUS_SUBMITTED, Claim::STATUS_REVIEWING], true);
+    }
+
+    private function assertDifferentAdjudicator(Claim $claim): void
+    {
+        if ($claim->submitted_by && (int) $claim->submitted_by === (int) auth()->id()) {
+            throw new InvalidArgumentException(
+                'BR-06 violation: The user who submitted this claim cannot adjudicate it. A different officer must review it.'
+            );
+        }
+    }
+
+    private function writeAudit(Claim $claim, string $action, string $description, array $oldValues, array $newValues): void
+    {
+        AuditTrail::create([
+            'auditable_type' => Claim::class,
+            'auditable_id' => $claim->id,
+            'action' => $action,
+            'description' => $description,
+            'user_id' => auth()->id(),
+            'old_values' => $oldValues,
+            'new_values' => $newValues,
+            'ip_address' => Request::ip(),
+        ]);
     }
 }

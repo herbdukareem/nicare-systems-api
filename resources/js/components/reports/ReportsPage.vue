@@ -1,196 +1,350 @@
 <template>
   <AdminLayout>
-    <div class="tw-space-y-6">
-
-      <AppPageHeader title="Reports" subtitle="Generate and download system reports" icon="mdi-file-chart" icon-color="primary">
-        <v-btn variant="outlined" prepend-icon="mdi-refresh" :loading="loading" @click="fetchData">Refresh</v-btn>
+    <div class="tw-space-y-4">
+      <AppPageHeader title="Reports" icon="mdi-file-chart-outline">
+        <v-btn size="small" variant="outlined" prepend-icon="mdi-refresh" :loading="loading" @click="fetchData">Refresh</v-btn>
       </AppPageHeader>
 
-      <!-- Summary Stats -->
-      <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 xl:tw-grid-cols-4 tw-gap-4">
-        <AppStatCard label="Total Enrollees" :value="stats.total_enrollees" icon="mdi-account-group" color="blue" :loading="loading" />
-        <AppStatCard label="Active Facilities" :value="stats.active_facilities" icon="mdi-hospital-building" color="green" :loading="loading" />
-        <AppStatCard label="Total Referrals" :value="stats.total_referrals" icon="mdi-file-send" color="orange" :loading="loading" />
-        <AppStatCard label="Paid Claims" :value="stats.paid_claims" icon="mdi-cash-check" color="teal" :loading="loading" />
+      <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-4">
+        <AppStatCard compact label="Total Enrollees" :value="stats.total_enrollees" icon="mdi-account-group-outline" color="primary" :loading="loading" />
+        <AppStatCard compact label="Active Facilities" :value="stats.active_facilities" icon="mdi-hospital-building" color="success" :loading="loading" />
+        <AppStatCard compact label="Total Referrals" :value="stats.total_referrals" icon="mdi-file-send-outline" color="warning" :loading="loading" />
+        <AppStatCard compact label="Paid Claims" :value="stats.paid_claims" icon="mdi-cash-check" color="info" :loading="loading" />
       </div>
 
-      <!-- Report Categories -->
-      <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 xl:tw-grid-cols-3 tw-gap-4">
-        <v-card
-          v-for="report in reportCategories"
-          :key="report.key"
-          class="tw-border tw-border-gray-100 tw-rounded-xl tw-shadow-sm hover:tw-shadow-md tw-transition-all tw-duration-200 tw-cursor-pointer"
-          elevation="0"
-          @click="openReport(report)"
-        >
-          <v-card-text class="tw-p-6">
-            <div class="tw-flex tw-items-start tw-gap-4">
-              <div :class="`tw-p-3 tw-rounded-xl tw-bg-${report.color}-50 tw-shrink-0`">
-                <v-icon :color="report.color" size="28">{{ report.icon }}</v-icon>
-              </div>
-              <div class="tw-flex-1 tw-min-w-0">
-                <h3 class="tw-font-semibold tw-text-gray-900 tw-text-base">{{ report.title }}</h3>
-                <p class="tw-text-sm tw-text-gray-500 tw-mt-1">{{ report.description }}</p>
-                <div class="tw-flex tw-flex-wrap tw-gap-1 tw-mt-3">
-                  <v-chip
-                    v-for="fmt in report.formats"
-                    :key="fmt"
-                    size="x-small"
-                    variant="outlined"
-                    color="primary"
-                  >{{ fmt }}</v-chip>
-                </div>
-              </div>
-              <v-icon color="grey-lighten-1" size="20">mdi-chevron-right</v-icon>
-            </div>
-          </v-card-text>
-        </v-card>
-      </div>
-
-      <!-- Recent Activity -->
-      <v-card class="tw-border tw-border-gray-100 tw-shadow-sm tw-rounded-xl" elevation="0">
-        <v-card-title class="tw-px-6 tw-pt-5 tw-pb-2 tw-flex tw-items-center tw-gap-2">
-          <v-icon size="20" color="primary">mdi-history</v-icon>
-          <span class="tw-text-base tw-font-semibold">Recent System Activity</span>
-        </v-card-title>
-        <v-divider />
-        <v-card-text class="tw-p-0">
-          <div v-if="loading" class="tw-py-12 tw-flex tw-justify-center">
-            <v-progress-circular indeterminate color="primary" />
-          </div>
-          <div v-else-if="activities.length === 0">
-            <AppEmptyState icon="mdi-history" title="No recent activity" description="No activity records available." />
-          </div>
-          <v-list v-else density="compact" lines="two">
-            <v-list-item
-              v-for="act in activities.slice(0, 10)"
-              :key="act.id"
-              class="tw-border-b tw-border-gray-50 last:tw-border-b-0"
-            >
-              <template #prepend>
-                <v-avatar :color="act.color || 'primary'" size="36">
-                  <v-icon size="18" color="white">{{ act.icon || 'mdi-circle-small' }}</v-icon>
-                </v-avatar>
-              </template>
-              <v-list-item-title class="tw-text-sm tw-font-medium">{{ act.title || act.description }}</v-list-item-title>
-              <v-list-item-subtitle class="tw-text-xs">{{ act.subtitle || act.time }}</v-list-item-subtitle>
-              <template #append>
-                <span class="tw-text-xs tw-text-gray-400">{{ formatRelative(act.created_at || act.time) }}</span>
-              </template>
-            </v-list-item>
-          </v-list>
-        </v-card-text>
-      </v-card>
-
-      <!-- Report Generate Dialog -->
-      <AppModal v-model="reportDialog" :title="selectedReport?.title ?? 'Generate Report'" size="sm">
-        <div class="tw-space-y-4">
-          <p class="tw-text-sm tw-text-gray-600">{{ selectedReport?.description }}</p>
-          <v-text-field label="Start Date" type="date" variant="outlined" density="compact" v-model="reportForm.date_from" />
-          <v-text-field label="End Date" type="date" variant="outlined" density="compact" v-model="reportForm.date_to" />
-          <v-select
-            label="Format"
-            :items="selectedReport?.formats ?? []"
-            v-model="reportForm.format"
-            variant="outlined"
-            density="compact"
-          />
-        </div>
-        <template #actions>
-          <v-btn variant="outlined" @click="reportDialog = false">Cancel</v-btn>
-          <v-btn color="primary" variant="flat" prepend-icon="mdi-download" :loading="generating" @click="generateReport">Generate</v-btn>
+      <AppFilterBar :active-count="activeFilterCount" :cols="4" @clear="resetFilters">
+        <v-text-field
+          v-model="reportForm.from_date"
+          label="From Date"
+          type="date"
+          density="compact"
+          variant="outlined"
+          hide-details
+        />
+        <v-text-field
+          v-model="reportForm.to_date"
+          label="To Date"
+          type="date"
+          density="compact"
+          variant="outlined"
+          hide-details
+        />
+        <v-select
+          v-model="reportForm.format"
+          :items="formatOptions"
+          label="Format"
+          density="compact"
+          variant="outlined"
+          hide-details
+        />
+        <template #tags>
+          <AppBadge v-if="reportForm.from_date" :label="`From: ${reportForm.from_date}`" tone="secondary" size="sm" />
+          <AppBadge v-if="reportForm.to_date" :label="`To: ${reportForm.to_date}`" tone="secondary" size="sm" />
+          <AppBadge :label="`Format: ${reportForm.format}`" tone="primary" size="sm" />
         </template>
-      </AppModal>
+        <template #actions>
+          <v-btn size="small" color="primary" prepend-icon="mdi-file-refresh-outline" :loading="loading" @click="fetchData">Apply</v-btn>
+        </template>
+      </AppFilterBar>
 
+      <AppCard
+        title="Available Reports"
+        icon="mdi-database-export-outline"
+        tone="success"
+      >
+        <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-3">
+          <AppCard
+            v-for="report in availableReports"
+            :key="report.key"
+            :title="report.title"
+            :subtitle="report.description"
+            :icon="report.icon"
+            :tone="report.tone"
+            hover
+            full-height
+          >
+            <template #actions>
+              <AppBadge label="Available" tone="success" size="sm" />
+            </template>
+
+            <div class="tw-space-y-4">
+              <div class="tw-flex tw-flex-wrap tw-gap-2">
+                <AppBadge
+                  v-for="fmt in report.formats"
+                  :key="fmt"
+                  :label="fmt.toUpperCase()"
+                  tone="primary"
+                  size="sm"
+                  :outline="reportForm.format.toLowerCase() !== fmt"
+                />
+              </div>
+              <div class="tw-flex tw-flex-wrap tw-gap-2">
+                <AppExportButton
+                  :label="`Download ${reportForm.format.toUpperCase()}`"
+                  :loading="generating && activeReportKey === report.key"
+                  @click="generateReport(report)"
+                />
+                <v-btn variant="text" prepend-icon="mdi-information-outline" @click="previewReport(report)">
+                  Details
+                </v-btn>
+              </div>
+            </div>
+          </AppCard>
+        </div>
+      </AppCard>
+
+      <AppCard
+        title="Unavailable / TODO"
+        icon="mdi-progress-clock"
+        tone="warning"
+      >
+        <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-3">
+          <AppCard
+            v-for="report in todoReports"
+            :key="report.key"
+            :title="report.title"
+            :subtitle="report.description"
+            :icon="report.icon"
+            tone="warning"
+            muted
+            full-height
+          >
+            <template #actions>
+              <AppBadge label="TODO" tone="warning" size="sm" />
+            </template>
+            <div class="tw-space-y-3">
+              <p class="tw-text-sm tw-text-slate-600">{{ report.todo }}</p>
+              <v-btn variant="outlined" color="warning" disabled prepend-icon="mdi-lock-outline">
+                Backend endpoint required
+              </v-btn>
+            </div>
+          </AppCard>
+        </div>
+      </AppCard>
+
+      <AppCard
+        title="Recent System Activity"
+        icon="mdi-history"
+        tone="secondary"
+      >
+        <div v-if="loading" class="tw-py-12 tw-flex tw-justify-center">
+          <v-progress-circular indeterminate color="primary" />
+        </div>
+        <AppEmptyState
+          v-else-if="activities.length === 0"
+          icon="mdi-history"
+          title="No recent activity"
+          description="No activity records are currently available from the dashboard feed."
+        />
+        <div v-else class="tw-space-y-3">
+          <div
+            v-for="activity in activities.slice(0, 10)"
+            :key="activity.id"
+            class="tw-flex tw-items-start tw-justify-between tw-gap-3 tw-border tw-border-slate-200 tw-bg-slate-50/70 tw-px-3 tw-py-2"
+          >
+            <div class="tw-flex tw-items-start tw-gap-3">
+              <div class="qds-icon-shell qds-tone-secondary">
+                <v-icon size="18">{{ activity.icon || 'mdi-history' }}</v-icon>
+              </div>
+              <div>
+                <p class="tw-text-sm tw-font-semibold tw-text-slate-900">{{ activity.title || activity.description }}</p>
+                <p class="tw-text-xs tw-text-slate-500">{{ activity.subtitle || 'System activity event' }}</p>
+              </div>
+            </div>
+            <span class="tw-text-xs tw-text-slate-400">{{ formatRelative(activity.created_at || activity.time) }}</span>
+          </div>
+        </div>
+      </AppCard>
+
+      <AppModal
+        v-model="reportDialog"
+        :title="selectedReport?.title || 'Report details'"
+        :subtitle="selectedReport?.description || ''"
+        icon="mdi-file-chart-outline"
+        size="md"
+      >
+        <template #actions>
+          <v-btn variant="outlined" @click="reportDialog = false">Close</v-btn>
+          <AppExportButton
+            :label="`Download ${reportForm.format.toUpperCase()}`"
+            :loading="generating && activeReportKey === selectedReport?.key"
+            @click="selectedReport && generateReport(selectedReport)"
+          />
+        </template>
+
+        <div class="tw-space-y-4">
+          <AppAlert
+            tone="info"
+            :message="selectedReport?.notes || 'This report is generated by the backend reporting endpoint using the current filter inputs above.'"
+          />
+          <div class="tw-flex tw-flex-wrap tw-gap-2">
+            <AppBadge
+              v-for="fmt in selectedReport?.formats || []"
+              :key="fmt"
+              :label="fmt.toUpperCase()"
+              tone="primary"
+              size="sm"
+              :outline="reportForm.format.toLowerCase() !== fmt"
+            />
+          </div>
+        </div>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue';
-import AdminLayout from '../layout/AdminLayout.vue';
-import AppPageHeader from '../common/AppPageHeader.vue';
-import AppStatCard from '../common/AppStatCard.vue';
-import AppEmptyState from '../common/AppEmptyState.vue';
-import AppModal from '../common/AppModal.vue';
-import { dashboardAPI } from '../../utils/api';
-import { useToast } from '../../composables/useToast';
+import { computed, onMounted, ref } from 'vue'
+import AdminLayout from '../layout/AdminLayout.vue'
+import AppAlert from '../common/AppAlert.vue'
+import AppBadge from '../common/AppBadge.vue'
+import AppCard from '../common/AppCard.vue'
+import AppEmptyState from '../common/AppEmptyState.vue'
+import AppExportButton from '../common/AppExportButton.vue'
+import AppFilterBar from '../common/AppFilterBar.vue'
+import AppModal from '../common/AppModal.vue'
+import AppStatCard from '../common/AppStatCard.vue'
+import AppPageHeader from '../common/AppPageHeader.vue'
+import { dashboardAPI } from '../../utils/api'
+import api from '../../utils/api'
+import { useToast } from '../../composables/useToast'
 
-const { showToast } = useToast();
+const { success, error } = useToast()
 
-const loading = ref(false);
-const generating = ref(false);
-const reportDialog = ref(false);
-const selectedReport = ref(null);
-const activities = ref([]);
-const stats = ref({ total_enrollees: 0, active_facilities: 0, total_referrals: 0, paid_claims: 0 });
-const reportForm = ref({ date_from: '', date_to: '', format: 'PDF' });
+const loading = ref(false)
+const generating = ref(false)
+const reportDialog = ref(false)
+const selectedReport = ref(null)
+const activeReportKey = ref('')
+const activities = ref([])
+const stats = ref({
+  total_enrollees: 0,
+  active_facilities: 0,
+  total_referrals: 0,
+  paid_claims: 0,
+})
 
-const reportCategories = [
-  { key: 'enrollees', title: 'Enrollee Report', description: 'List of all enrolled beneficiaries, status, and coverage details.', icon: 'mdi-account-group', color: 'blue', formats: ['PDF', 'Excel', 'CSV'] },
-  { key: 'facilities', title: 'Facility Report', description: 'Healthcare facility listings, accreditation, and performance data.', icon: 'mdi-hospital-building', color: 'green', formats: ['PDF', 'Excel'] },
-  { key: 'referrals', title: 'Referrals Report', description: 'Pre-authorization referral activity, approvals, denials, and UTN validations.', icon: 'mdi-file-send', color: 'orange', formats: ['PDF', 'Excel', 'CSV'] },
-  { key: 'claims', title: 'Claims Report', description: 'Claims submitted, reviewed, approved, and paid by facility or period.', icon: 'mdi-cash-multiple', color: 'teal', formats: ['PDF', 'Excel'] },
-  { key: 'payments', title: 'Payment Report', description: 'Payment batches processed, amounts disbursed, and outstanding balances.', icon: 'mdi-bank-transfer', color: 'indigo', formats: ['PDF', 'Excel'] },
-  { key: 'premium', title: 'Premium & Coverage Report', description: 'PIN sales, coverage activations, and premium collection summaries.', icon: 'mdi-shield-account', color: 'purple', formats: ['PDF', 'Excel', 'CSV'] },
-  { key: 'financial', title: 'Financial Summary', description: 'High-level financial performance including revenue, claims ratio, and capitation.', icon: 'mdi-chart-bar', color: 'red', formats: ['PDF', 'Excel'] },
-  { key: 'audit', title: 'Audit Trail Report', description: 'System activity log for compliance and governance purposes.', icon: 'mdi-clipboard-text-clock', color: 'grey', formats: ['PDF', 'CSV'] },
-  { key: 'capitation', title: 'Capitation Report', description: 'Monthly capitation calculations, disbursements, and facility summaries.', icon: 'mdi-receipt', color: 'amber', formats: ['PDF', 'Excel'] },
-];
+const reportForm = ref({
+  from_date: '',
+  to_date: '',
+  format: 'pdf',
+})
+
+const formatOptions = ['pdf', 'excel', 'csv']
+
+const availableReports = [
+  { key: 'executive-summary', title: 'Executive Summary', description: 'High-level enrollee, facility, claims, and referral KPI overview.', icon: 'mdi-chart-box-outline', tone: 'primary', formats: ['pdf'], notes: 'PDF-only by backend rule.' },
+  { key: 'enrollment-summary', title: 'Enrollment Summary', description: 'Grouped enrollee counts across geography, gender, type, and status.', icon: 'mdi-account-group-outline', tone: 'success', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'mobile-enrollment-activity', title: 'Mobile Enrollment Activity', description: 'Operational feed for mobile enrollment and officer activity.', icon: 'mdi-cellphone-arrow-down', tone: 'info', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'offline-sync-summary', title: 'Offline Sync Summary', description: 'Sync throughput, duplicates, failures, and processing time metrics.', icon: 'mdi-sync-alert', tone: 'warning', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'facility-utilization', title: 'Facility Utilization', description: 'Provider usage, referral/admission/claim counts, and claim amounts.', icon: 'mdi-hospital-box-outline', tone: 'secondary', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'referral-preauth', title: 'Referral Pre-Auth', description: 'Referral status breakdown and approval turnaround analytics.', icon: 'mdi-file-send-outline', tone: 'warning', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'admission', title: 'Admission Report', description: 'Admissions, discharge counts, and ward-day averages by facility.', icon: 'mdi-bed-outline', tone: 'info', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'capitation', title: 'Capitation Report', description: 'Computed capitation, paid amounts, and outstanding balances by period.', icon: 'mdi-cash-sync', tone: 'success', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'financial-liability', title: 'Financial Liability', description: 'Outstanding approved claims broken into aging buckets.', icon: 'mdi-scale-balance', tone: 'danger', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'payment', title: 'Payment Report', description: 'Claim payment batch status and total amount tracking.', icon: 'mdi-bank-transfer-out', tone: 'primary', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'rejected-claims', title: 'Rejected Claims', description: 'Rejected claim counts grouped by facility and rejection reason.', icon: 'mdi-close-circle-outline', tone: 'danger', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'audit-activity', title: 'Audit Activity', description: 'Action-level audit aggregation for governance and compliance review.', icon: 'mdi-clipboard-text-clock-outline', tone: 'secondary', formats: ['pdf', 'excel', 'csv'] },
+  { key: 'user-activity', title: 'User Activity', description: 'Aggregated user actions grouped from the audit trail.', icon: 'mdi-account-clock-outline', tone: 'info', formats: ['pdf', 'excel', 'csv'] },
+]
+
+const todoReports = [
+  { key: 'benefactor-utilization', title: 'Benefactor Utilization', description: 'Benefactor-level utilization and spend analysis.', icon: 'mdi-hand-heart-outline', todo: 'No dedicated backend report type exists yet for benefactor-level operational reporting.' },
+  { key: 'lga-ward-coverage', title: 'LGA / Ward Coverage', description: 'Geographic enrollment coverage and facility distribution metrics.', icon: 'mdi-map-marker-radius-outline', todo: 'Needs a backend report that joins enrollee coverage, LGAs, wards, and facility counts.' },
+  { key: 'renewal-churn', title: 'Renewal & Churn', description: 'Premium renewal expiry, churn, and reactivation analysis.', icon: 'mdi-refresh-circle-outline', todo: 'Coverage and renewal analytics are not yet exposed through the reporting endpoint.' },
+  { key: 'approval-aging', title: 'Enrollment Approval Aging', description: 'Queue aging for pending enrollee approvals by facility, LGA, and funding source.', icon: 'mdi-timer-sand', todo: 'Needs a new reporting endpoint backed by enrollment approval timestamps and dimensions.' },
+  { key: 'service-entitlement', title: 'Benefit Package Service Entitlement', description: 'Package-level allowed service utilization and exceptions.', icon: 'mdi-shield-plus-outline', todo: 'Requires backend entitlement modeling before a trustworthy report can be generated.' },
+  { key: 'claims-tat', title: 'Claims Turnaround Time', description: 'Submission-to-review and review-to-payment turnaround metrics.', icon: 'mdi-timeline-clock-outline', todo: 'No dedicated turnaround-time reporting endpoint exists yet.' },
+]
+
+const activeFilterCount = computed(() => [reportForm.value.from_date, reportForm.value.to_date, reportForm.value.format].filter(Boolean).length)
 
 async function fetchData() {
-  loading.value = true;
+  loading.value = true
   try {
     const [overviewRes, activityRes] = await Promise.allSettled([
       dashboardAPI.getOverview(),
       dashboardAPI.getRecentActivities(),
-    ]);
+    ])
+
     if (overviewRes.status === 'fulfilled') {
-      const d = overviewRes.value.data?.data ?? overviewRes.value.data;
+      const data = overviewRes.value.data?.data ?? overviewRes.value.data
       stats.value = {
-        total_enrollees: d?.total_enrollees ?? d?.enrollees?.total ?? 0,
-        active_facilities: d?.active_facilities ?? d?.facilities?.active ?? 0,
-        total_referrals: d?.total_referrals ?? d?.referrals?.total ?? 0,
-        paid_claims: d?.paid_claims ?? d?.claims?.paid ?? 0,
-      };
+        total_enrollees: data?.total_enrollees ?? data?.enrollees?.total ?? 0,
+        active_facilities: data?.active_facilities ?? data?.facilities?.active ?? 0,
+        total_referrals: data?.total_referrals ?? data?.referrals?.total ?? 0,
+        paid_claims: data?.paid_claims ?? data?.claims?.paid ?? 0,
+      }
     }
+
     if (activityRes.status === 'fulfilled') {
-      const d = activityRes.value.data?.data ?? activityRes.value.data;
-      activities.value = Array.isArray(d) ? d : (d?.activities ?? d?.data ?? []);
+      const data = activityRes.value.data?.data ?? activityRes.value.data
+      activities.value = Array.isArray(data) ? data : (data?.activities ?? data?.data ?? [])
     }
-  } catch {
-    // non-critical
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
-function openReport(report) {
-  selectedReport.value = report;
-  reportForm.value = { date_from: '', date_to: '', format: report.formats[0] };
-  reportDialog.value = true;
+function resetFilters() {
+  reportForm.value = {
+    from_date: '',
+    to_date: '',
+    format: 'pdf',
+  }
 }
 
-async function generateReport() {
-  generating.value = true;
+function previewReport(report) {
+  selectedReport.value = report
+  reportDialog.value = true
+}
+
+async function generateReport(report) {
+  generating.value = true
+  activeReportKey.value = report.key
   try {
-    showToast(`${selectedReport.value.title} generation coming soon`, 'info');
-    reportDialog.value = false;
+    const response = await api.get(`/reports/${report.key}`, {
+      params: {
+        ...reportForm.value,
+      },
+      responseType: 'blob',
+      showGlobalLoader: true,
+      loaderTitle: 'Generating report',
+      loaderSubtitle: `Preparing ${report.title.toLowerCase()}`,
+    })
+
+    const blob = new Blob([response.data], {
+      type: response.headers['content-type'] || 'application/octet-stream',
+    })
+    const downloadUrl = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    const extension = reportForm.value.format.toLowerCase()
+    link.href = downloadUrl
+    link.download = `${report.key}-${new Date().toISOString().slice(0, 10)}.${extension}`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    window.URL.revokeObjectURL(downloadUrl)
+    success(`${report.title} downloaded successfully`)
+    reportDialog.value = false
+  } catch (err) {
+    error(err?.response?.data?.message || `Failed to generate ${report.title}`)
   } finally {
-    generating.value = false;
+    generating.value = false
+    activeReportKey.value = ''
   }
 }
 
-function formatRelative(d) {
-  if (!d) return '';
-  const diff = Date.now() - new Date(d).getTime();
-  const m = Math.floor(diff / 60000);
-  if (m < 1) return 'just now';
-  if (m < 60) return `${m}m ago`;
-  const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
-  return new Date(d).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' });
+function formatRelative(dateValue) {
+  if (!dateValue) return ''
+  const diff = Date.now() - new Date(dateValue).getTime()
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  return new Date(dateValue).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' })
 }
 
-onMounted(fetchData);
+onMounted(fetchData)
 </script>

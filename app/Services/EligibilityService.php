@@ -19,6 +19,13 @@ class EligibilityService
         $coverage = $this->getActiveCoverage($enrollee);
 
         if (!$coverage) {
+            $enrolleeRecord = $enrollee instanceof Enrollee ? $enrollee->fresh() : Enrollee::find($enrollee);
+            if ($enrolleeRecord?->coverage_start_date && $enrolleeRecord->coverage_start_date->isFuture()) {
+                throw new InvalidArgumentException(
+                    'BR-11 violation: Enrollee is still in the waiting period until ' . $enrolleeRecord->coverage_start_date->toDateString() . '.'
+                );
+            }
+
             throw new InvalidArgumentException('BR-11 violation: Enrollee is not eligible for care without active coverage.');
         }
 
@@ -30,6 +37,13 @@ class EligibilityService
 
     public function assertNotInWaitingPeriod(Enrollee|int $enrollee): void
     {
+        $enrolleeRecord = $enrollee instanceof Enrollee ? $enrollee : Enrollee::findOrFail($enrollee);
+
+        if ($enrolleeRecord->coverage_start_date && $enrolleeRecord->coverage_start_date->isFuture()) {
+            throw new InvalidArgumentException(
+                'BR-11 violation: Enrollee is still in the waiting period until ' . $enrolleeRecord->coverage_start_date->toDateString() . '.'
+            );
+        }
     }
 
     public function assertCoverageCoversDate(Enrollee|int $enrollee, CarbonInterface|string $date): Enrollee
@@ -63,6 +77,10 @@ class EligibilityService
     {
         if (empty($coverage->benefit_package_id)) {
             throw new InvalidArgumentException('Enrollee does not have an assigned benefit package.');
+        }
+
+        if ($coverage->relationLoaded('benefitPackage') && $coverage->benefitPackage && !(bool) $coverage->benefitPackage->status) {
+            throw new InvalidArgumentException('Enrollee benefit package is inactive.');
         }
     }
 
