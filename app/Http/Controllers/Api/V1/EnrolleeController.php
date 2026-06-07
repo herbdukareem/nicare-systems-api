@@ -17,6 +17,7 @@ use App\Services\NinVerificationService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -286,6 +287,8 @@ class EnrolleeController extends BaseController
 
     public function bulkIdCard(Request $request)
     {
+        $this->extendPdfExecutionWindow();
+
         $data = $request->validate([
             'benefactor_id'            => ['nullable', 'exists:benefactors,id'],
             'facility_id'              => ['nullable', 'exists:facilities,id'],
@@ -333,6 +336,7 @@ class EnrolleeController extends BaseController
             ->orderBy('last_name')
             ->limit(200)
             ->get();
+        $this->hydratePdfPhotoSources($enrollees);
 
         $w = round(85.6 * 72 / 25.4, 2);
         $h = round(54.0 * 72 / 25.4, 2);
@@ -349,10 +353,13 @@ class EnrolleeController extends BaseController
 
     public function idCard(Enrollee $enrollee)
     {
+        $this->extendPdfExecutionWindow();
+
         $enrollee->load([
             'insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage',
             'facility', 'lga', 'ward',
         ]);
+        $enrollee->setAttribute('pdf_photo_src', $this->resolvePdfPhotoSource($enrollee->image_url));
 
         // Fetch QR code as base64 so DomPDF can embed it without remote-URL issues
         $qrBase64 = null;
@@ -370,7 +377,7 @@ class EnrolleeController extends BaseController
         $w = round(85.6 * 72 / 25.4, 2); // 242.39
         $h = round(54.0 * 72 / 25.4, 2); // 152.91
 
-        $pdf = Pdf::setOptions(['isRemoteEnabled' => true])->loadView('pdf.enrollee-id-card', [
+        $pdf = Pdf::setOptions(['isRemoteEnabled' => false])->loadView('pdf.enrollee-id-card', [
             'enrollee'    => $enrollee,
             'qrBase64'    => $qrBase64,
             'generatedAt' => now(),
@@ -381,6 +388,8 @@ class EnrolleeController extends BaseController
 
     public function bulkEnrollmentSlip(Request $request)
     {
+        $this->extendPdfExecutionWindow(120);
+
         $data = $request->validate([
             'benefactor_id' => ['nullable', 'exists:benefactors,id'],
             'facility_id' => ['nullable', 'exists:facilities,id'],
@@ -443,8 +452,9 @@ class EnrolleeController extends BaseController
             ->orderBy('last_name')
             ->limit(500)
             ->get();
+        $this->hydratePdfPhotoSources($enrollees);
 
-        $pdf = Pdf::setOptions(['isRemoteEnabled' => true])->loadView('pdf.bulk-enrollment-slip', [
+        $pdf = Pdf::setOptions(['isRemoteEnabled' => false])->loadView('pdf.bulk-enrollment-slip', [
             'enrollees' => $enrollees,
             'filters' => $data,
             'generatedBy' => auth()->user(),
@@ -785,6 +795,96 @@ class EnrolleeController extends BaseController
             ->get();
 
         return $this->sendResponse($transfers, 'Transfer history retrieved successfully');
+    }
+
+    private function extendPdfExecutionWindow(int $seconds = 120): void
+    {
+        if (function_exists('set_time_limit')) {
+            @set_time_limit($seconds);
+        }
+
+        @ini_set('max_execution_time', (string) $seconds);
+    }
+
+    private function hydratePdfPhotoSources(Collection $enrollees): void
+    {
+        $enrollees->each(function (Enrollee $enrollee): void {
+            $enrollee->setAttribute('pdf_photo_src', $this->resolvePdfPhotoSource($enrollee->image_url));
+        });
+    }
+
+    private function resolvePdfPhotoSource(?string $imageUrl): ?string
+    {
+        if (!$imageUrl) {
+            return null;
+        }
+
+        if (preg_match('#^data:#i', $imageUrl)) {
+            return $imageUrl;
+        }
+
+        $publicPath = ltrim((string) parse_url($imageUrl, PHP_URL_PATH), '/');
+        if ($publicPath !== '' && str_starts_with($publicPath, 'storage/')) {
+            $diskPath = substr($publicPath, strlen('storage/'));
+            return $this->buildDiskImageDataUri('public', $diskPath);
+        }
+
+        $passportDisk = config('filesystems.enrollee_passport_disk', config('filesystems.default', 'public'));
+        $passportBaseUrl = rtrim((string) config("filesystems.disks.{$passportDisk}.url"), '/');
+        if ($passportBaseUrl !== '' && str_starts_with($imageUrl, $passportBaseUrl . '/')) {
+            $diskPath = ltrim(substr($imageUrl, strlen($passportBaseUrl)), '/');
+            return $this->buildDiskImageDataUri($passportDisk, $diskPath);
+        }
+
+        if (!preg_match('#^https?://#i', $imageUrl)) {
+            return null;
+        }
+
+        try {
+            $context = stream_context_create([
+                'http' => ['timeout' => 5],
+                'ssl' => ['verify_peer' => true, 'verify_peer_name' => true],
+            ]);
+            $bytes = @file_get_contents($imageUrl, false, $context);
+
+            if ($bytes === false) {
+                return null;
+            }
+
+            return $this->buildImageDataUri($bytes, $this->guessImageMimeType($imageUrl));
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function buildDiskImageDataUri(string $disk, ?string $path): ?string
+    {
+        if (!$path) {
+            return null;
+        }
+
+        try {
+            $bytes = Storage::disk($disk)->get($path);
+            return $this->buildImageDataUri($bytes, $this->guessImageMimeType($path));
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function buildImageDataUri(string $bytes, string $mimeType): string
+    {
+        return 'data:' . $mimeType . ';base64,' . base64_encode($bytes);
+    }
+
+    private function guessImageMimeType(string $path): string
+    {
+        return match (strtolower(pathinfo(parse_url($path, PHP_URL_PATH) ?: $path, PATHINFO_EXTENSION))) {
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'bmp' => 'image/bmp',
+            default => 'image/jpeg',
+        };
     }
 
     private function hasSatisfiedRequiredPayment(Enrollee $enrollee): bool

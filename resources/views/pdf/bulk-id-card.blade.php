@@ -94,16 +94,11 @@
 <body>
 
 @foreach($enrollees as $enrollee)
-@php
-  $qrData    = urlencode($enrollee->enrollee_id ?: "ID-{$enrollee->id}");
-  $qrUrl     = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={$qrData}";
-  $photoSrc  = null;
-  if ($enrollee->image_url) {
-    $photoSrc = preg_match('#^(https?://|data:)#i', $enrollee->image_url)
-      ? $enrollee->image_url
-      : url($enrollee->image_url);
-  }
-@endphp
+  @php
+    $qrData    = urlencode($enrollee->enrollee_id ?: "ID-{$enrollee->id}");
+    $qrUrl     = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&data={$qrData}";
+    $photoSrc  = $enrollee->pdf_photo_src ?? null;
+  @endphp
 
 {{-- FRONT --}}
 <div class="front">

@@ -148,15 +148,10 @@
             </tr>
           </table>
         </td>
-        <td class="photo-td">
-          @php
-            $photoSrc = null;
-            if ($enrollee->image_url) {
-              $photoSrc = preg_match('#^(https?://|data:)#i', $enrollee->image_url)
-                ? $enrollee->image_url
-                : url($enrollee->image_url);
-            }
-          @endphp
+          <td class="photo-td">
+            @php
+              $photoSrc = $enrollee->pdf_photo_src ?? null;
+            @endphp
           @if($photoSrc)
             <img class="passport" src="{{ $photoSrc }}" alt="Photo">
           @else

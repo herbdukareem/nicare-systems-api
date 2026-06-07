@@ -265,12 +265,7 @@
   $coverageEnd   = $enrollee->coverage_end_date
     ? optional($enrollee->coverage_end_date)->format('d M Y')
     : 'No Expiry';
-  $photoSrc = null;
-  if ($enrollee->image_url) {
-    $photoSrc = preg_match('#^(https?://|data:)#i', $enrollee->image_url)
-      ? $enrollee->image_url
-      : url($enrollee->image_url);
-  }
+  $photoSrc = $enrollee->pdf_photo_src ?? null;
 @endphp
 
 <div class="slip">
