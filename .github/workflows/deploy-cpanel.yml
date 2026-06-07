@@ -69,6 +69,7 @@ jobs:
       - name: Sync application files
         run: |
           rsync -az \
+            -e "ssh -p $CPANEL_SSH_PORT" \
             --omit-dir-times \
             --no-perms \
             --no-owner \
