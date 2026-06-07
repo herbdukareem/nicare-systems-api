@@ -32,7 +32,7 @@ jobs:
     env:
       CPANEL_DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
       CPANEL_SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
-      CPANEL_SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
+      CPANEL_SSH_PORT: ${{ secrets.CPANEL_SSH_PORT || '2222' }}
       CPANEL_SSH_USERNAME: ${{ secrets.CPANEL_SSH_USERNAME }}
 
     steps:
