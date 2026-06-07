@@ -4,10 +4,10 @@
     <header class="el-nav">
       <div class="el-nav__inner">
         <div class="el-nav__brand" @click="$router.push('/enroll/dashboard')">
-          <img :src="'/logo.png'" alt="NiCare" class="el-nav__logo" @error="logoErr = true" v-if="!logoErr" />
+          <img v-if="org.logo_url && !logoErr" :src="org.logo_url" alt="Organization logo" class="el-nav__logo" @error="logoErr = true" />
           <div v-else class="el-nav__logo-fb"><v-icon color="white" size="20">mdi-hospital-box</v-icon></div>
           <div>
-            <span class="el-nav__name">NiCare</span>
+            <span class="el-nav__name">{{ org.scheme_name }}</span>
             <span class="el-nav__sub tw-hidden sm:tw-inline"> · Enrollee Portal</span>
           </div>
         </div>
@@ -85,25 +85,29 @@
     <!-- FOOTER -->
     <footer class="el-footer">
       <div class="el-footer__inner">
-        <span>© {{ new Date().getFullYear() }} Niger State Contributory Health Agency</span>
+        <span>© {{ new Date().getFullYear() }} {{ org.agency_name }}</span>
         <span class="tw-hidden sm:tw-inline">·</span>
-        <span class="tw-hidden sm:tw-inline">Hotline: 08162653801</span>
+        <span class="tw-hidden sm:tw-inline">Hotline: {{ org.hotline }}</span>
         <span class="tw-hidden sm:tw-inline">·</span>
-        <span class="tw-hidden sm:tw-inline">nicare.nigerstate.gov.ng</span>
+        <span class="tw-hidden sm:tw-inline">{{ org.website }}</span>
       </div>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useEnrolleeAuthStore } from '../../../stores/enrolleeAuth';
 import { useToast } from '../../../composables/useToast';
+import { useOrganizationSettings } from '../../../composables/useOrganizationSettings';
 
 const router = useRouter();
 const enrolleeAuth = useEnrolleeAuthStore();
 const { success } = useToast();
+const { settings: org, fetchSettings } = useOrganizationSettings();
+
+onMounted(fetchSettings);
 
 const logoErr = ref(false);
 const drawerOpen = ref(false);

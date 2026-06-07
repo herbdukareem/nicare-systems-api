@@ -102,10 +102,12 @@
 import { ref, computed, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useEnrolleeAuthStore } from '../../stores/enrolleeAuth';
+import { useOrganizationSettings } from '../../composables/useOrganizationSettings';
 import EnrolleeLayout from './layout/EnrolleeLayout.vue';
 
 const router = useRouter();
 const enrolleeAuth = useEnrolleeAuthStore();
+const { settings: org, fetchSettings } = useOrganizationSettings();
 
 const loading = ref(false);
 const enrollee = computed(() => enrolleeAuth.enrollee);
@@ -184,14 +186,15 @@ const coverageFields = computed(() => [
   { label: 'Facility',        value: enrollee.value?.facility?.name },
 ]);
 
-const quickActions = [
+const quickActions = computed(() => [
   { icon: 'mdi-refresh-circle', label: 'Renew Plan',       bg: '#eff6ff', color: '#2563eb', onClick: () => router.push('/enroll/plans') },
   { icon: 'mdi-account-edit',   label: 'Edit Profile',     bg: '#f0fdf4', color: '#16a34a', onClick: () => router.push('/enroll/profile') },
   { icon: 'mdi-lock-reset',     label: 'Change Password',  bg: '#faf5ff', color: '#9333ea', onClick: () => router.push('/enroll/change-password') },
-  { icon: 'mdi-phone-outline',  label: 'Contact Agency',   bg: '#fff7ed', color: '#ea580c', onClick: () => window.open('tel:08162653801') },
-];
+  { icon: 'mdi-phone-outline',  label: 'Contact Agency',   bg: '#fff7ed', color: '#ea580c', onClick: () => window.open(`tel:${org.value.hotline}`) },
+]);
 
 onMounted(async () => {
+  fetchSettings();
   if (!enrollee.value) {
     loading.value = true;
     await enrolleeAuth.fetchMe();

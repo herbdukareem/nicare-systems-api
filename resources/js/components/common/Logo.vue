@@ -19,7 +19,7 @@
   </div>
 </template>
 <script setup>
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import logoImage from '../../../images/logo.png';
 
 const props = defineProps({
@@ -44,13 +44,22 @@ const props = defineProps({
   iconColor: {
     type: String,
     default: 'primary'
+  },
+  src: {
+    type: String,
+    default: ''
   }
 });
 
 const showFallback = ref(false);
 
-// Logo URL - use imported image or fallback to public path
-const logoUrl = computed(() => logoImage || '/logo.png');
+watch(() => props.src, () => {
+  showFallback.value = false;
+});
+
+// Logo URL - prefer an explicitly supplied source (e.g. the org's uploaded logo),
+// then the bundled image, then the public path fallback.
+const logoUrl = computed(() => props.src || logoImage || '/logo.png');
 
 // Size mappings
 const sizeClasses = {

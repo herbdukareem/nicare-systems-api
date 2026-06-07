@@ -93,16 +93,16 @@
     <AppModal v-model="infoDialog" title="Plan Renewal Information" icon="mdi-information" size="sm">
       <div class="tw-space-y-3">
         <p class="tw-text-slate-700">
-          To renew your premium plan, start a new premium application through the public enrollment flow or contact NiCare support if you need help matching the right plan.
+          To renew your premium plan, start a new premium application through the public enrollment flow or contact {{ org.scheme_name }} support if you need help matching the right plan.
         </p>
         <div class="tw-bg-blue-50 tw-rounded-xl tw-p-4">
-          <div class="tw-font-semibold tw-text-slate-800 tw-mb-2">Contact NiCare</div>
+          <div class="tw-font-semibold tw-text-slate-800 tw-mb-2">Contact {{ org.scheme_name }}</div>
           <div class="tw-text-sm tw-text-slate-600">
             <div class="tw-flex tw-items-center tw-gap-2 tw-mb-1">
-              <v-icon size="16" color="primary">mdi-phone</v-icon> 08162653801
+              <v-icon size="16" color="primary">mdi-phone</v-icon> {{ org.hotline }}
             </div>
             <div class="tw-flex tw-items-center tw-gap-2">
-              <v-icon size="16" color="primary">mdi-web</v-icon> nicare.nigerstate.gov.ng
+              <v-icon size="16" color="primary">mdi-web</v-icon> {{ org.website }}
             </div>
           </div>
         </div>
@@ -126,10 +126,12 @@
 import { ref, computed, onMounted } from 'vue';
 import { useEnrolleeAuthStore } from '../../stores/enrolleeAuth';
 import { enrolleePortalAPI } from '../../utils/enrolleeApi';
+import { useOrganizationSettings } from '../../composables/useOrganizationSettings';
 import EnrolleeLayout from './layout/EnrolleeLayout.vue';
 import AppModal from '../common/AppModal.vue';
 
 const enrolleeAuth = useEnrolleeAuthStore();
+const { settings: org, fetchSettings } = useOrganizationSettings();
 const loadingPlans = ref(false);
 const plans = ref([]);
 const infoDialog = ref(false);
@@ -146,6 +148,7 @@ const selectPlan = (plan) => {
 };
 
 onMounted(async () => {
+  fetchSettings();
   loadingPlans.value = true;
   try {
     const res = await enrolleePortalAPI.plans();

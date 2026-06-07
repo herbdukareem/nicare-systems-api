@@ -13,10 +13,10 @@
       ]"
     >
       <div class="tw-flex tw-h-16 tw-items-center tw-gap-3 tw-border-b tw-border-slate-200 tw-px-4">
-        <Logo size="lg" variant="square" />
+        <Logo size="lg" variant="square" :src="org.logo_url" />
         <div class="tw-min-w-0">
-          <p class="tw-text-sm tw-font-bold tw-leading-5 tw-text-slate-950">NGSCHA</p>
-          <p class="tw-text-xs tw-text-slate-500">NiCare Systems</p>
+          <p class="tw-text-sm tw-font-bold tw-leading-5 tw-text-slate-950 tw-truncate">{{ org.scheme_name }}</p>
+          <p class="tw-text-xs tw-text-slate-500 tw-truncate">{{ org.agency_name }}</p>
         </div>
       </div>
 
@@ -118,10 +118,11 @@
 </template>
 
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { useToast } from '../../composables/useToast';
+import { useOrganizationSettings } from '../../composables/useOrganizationSettings';
 import { canAccessNavigationItem, navigationItems } from '../../navigation';
 import Breadcrumb from '../common/Breadcrumb.vue';
 import Logo from '../common/Logo.vue';
@@ -131,6 +132,9 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const { success } = useToast();
+const { settings: org, fetchSettings } = useOrganizationSettings();
+
+onMounted(fetchSettings);
 
 const sidebarOpen = ref(false);
 const logoutLoading = ref(false);
