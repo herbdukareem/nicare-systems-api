@@ -891,6 +891,17 @@ const routes = [
       breadcrumb: 'NIN Provider Configuration',
     },
   },
+  {
+    path: '/settings/organization',
+    name: 'settings-organization',
+    component: () => import('../components/settings/OrganizationSettingsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['settings.organization.manage', 'settings.edit'],
+      title: 'Organization Settings',
+      breadcrumb: 'Organization Settings',
+    },
+  },
 
   // ── Legacy / device routes ─────────────────────────────────────────────────
   {

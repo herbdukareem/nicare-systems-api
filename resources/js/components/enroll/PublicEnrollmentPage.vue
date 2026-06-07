@@ -5,17 +5,18 @@
       <div class="enroll__topbar-inner">
         <span><v-icon size="14">mdi-flag-outline</v-icon> Niger State Government</span>
         <span class="enroll__topbar-spacer" />
-        <span>Hotline: 08162653801</span>
+        <span>Hotline: {{ org.hotline }}</span>
       </div>
     </div>
 
     <header class="enroll__header">
       <div class="enroll__header-inner">
         <div class="enroll__brand">
-          <div class="enroll__brand-mark"><v-icon color="white" size="20">mdi-hospital-box</v-icon></div>
+          <img v-if="org.logo_url && !logoErr" :src="org.logo_url" alt="Organization logo" class="enroll__brand-mark enroll__brand-logo" @error="logoErr = true" />
+          <div v-else class="enroll__brand-mark"><v-icon color="white" size="20">mdi-hospital-box</v-icon></div>
           <div>
-            <div class="enroll__brand-name">NiCare Enrollment</div>
-            <div class="enroll__brand-sub">Niger State Contributory Health Agency</div>
+            <div class="enroll__brand-name">{{ org.scheme_name }} Enrollment</div>
+            <div class="enroll__brand-sub">{{ org.agency_name }}</div>
           </div>
         </div>
         <div class="enroll__header-actions">
@@ -236,9 +237,12 @@ import AppBadge from '../common/AppBadge.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
 import FacilityBadge from '../common/FacilityBadge.vue'
 import MoneyDisplay from '../common/MoneyDisplay.vue'
+import { useOrganizationSettings } from '../../composables/useOrganizationSettings'
 
 const { error } = useToast()
+const { settings: org, fetchSettings } = useOrganizationSettings()
 
+const logoErr = ref(false)
 const loading = ref(false)
 const submitting = ref(false)
 const metadata = ref({
@@ -387,7 +391,10 @@ watch(() => form.ward_id, async () => {
   await fetchMetadata()
 })
 
-onMounted(fetchMetadata)
+onMounted(() => {
+  fetchSettings()
+  fetchMetadata()
+})
 </script>
 
 <style scoped>
@@ -442,6 +449,12 @@ onMounted(fetchMetadata)
   display: grid;
   place-items: center;
   background: var(--qds-color-primary);
+}
+.enroll__brand-logo {
+  object-fit: contain;
+  background: var(--qds-color-surface-muted);
+  border: 1px solid var(--qds-color-border);
+  padding: 4px;
 }
 .enroll__brand-name {
   font-size: 14px;

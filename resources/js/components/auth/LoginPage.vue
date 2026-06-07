@@ -4,10 +4,11 @@
     <div class="staff-login__left">
       <div class="staff-login__left-inner">
         <div class="staff-login__brand">
-          <div class="staff-login__brand-mark"><v-icon color="white" size="22">mdi-hospital-box</v-icon></div>
+          <img v-if="org.logo_url && !logoErr" :src="org.logo_url" alt="Organization logo" class="staff-login__brand-mark staff-login__brand-logo" @error="logoErr = true" />
+          <div v-else class="staff-login__brand-mark"><v-icon color="white" size="22">mdi-hospital-box</v-icon></div>
           <div>
-            <div class="staff-login__brand-name">NGSCHA</div>
-            <div class="staff-login__brand-sub">Niger State Contributory Health Agency</div>
+            <div class="staff-login__brand-name">{{ org.scheme_name }}</div>
+            <div class="staff-login__brand-sub">{{ org.agency_name }}</div>
           </div>
         </div>
 
@@ -38,9 +39,10 @@
     <div class="staff-login__right">
       <div class="staff-login__form-wrap">
         <div class="staff-login__mobile-header">
-          <div class="staff-login__brand-mark"><v-icon color="white" size="20">mdi-hospital-box</v-icon></div>
+          <img v-if="org.logo_url && !logoErr" :src="org.logo_url" alt="Organization logo" class="staff-login__brand-mark staff-login__brand-logo" @error="logoErr = true" />
+          <div v-else class="staff-login__brand-mark"><v-icon color="white" size="20">mdi-hospital-box</v-icon></div>
           <div>
-            <div class="staff-login__brand-name-sm">NGSCHA Admin</div>
+            <div class="staff-login__brand-name-sm">{{ org.scheme_name }} Admin</div>
           </div>
         </div>
 
@@ -114,7 +116,7 @@
         </form>
 
         <p class="staff-login__copyright">
-          &copy; {{ new Date().getFullYear() }} Niger State Contributory Health Agency. All rights reserved.
+          &copy; {{ new Date().getFullYear() }} {{ org.agency_name }}. All rights reserved.
         </p>
       </div>
     </div>
@@ -144,16 +146,21 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useAuthStore } from '../../stores/auth';
 import { useToast } from '../../composables/useToast';
+import { useOrganizationSettings } from '../../composables/useOrganizationSettings';
 import AppModal from '../common/AppModal.vue';
 import ceremonyImg from '/resources/assets/ngscha-ceremony.png';
 
 const router = useRouter();
 const authStore = useAuthStore();
 const { success, error } = useToast();
+const { settings: org, fetchSettings } = useOrganizationSettings();
+const logoErr = ref(false);
+
+onMounted(fetchSettings);
 
 // Form data
 const form = reactive({
@@ -290,6 +297,11 @@ const handleForgotPassword = async () => {
   display: grid;
   place-items: center;
   background: var(--qds-color-primary);
+}
+.staff-login__brand-logo {
+  object-fit: contain;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 4px;
 }
 .staff-login__brand-name {
   font-size: 18px;

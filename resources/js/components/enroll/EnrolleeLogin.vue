@@ -4,11 +4,11 @@
     <div class="enroll-login__left">
       <div class="enroll-login__left-inner">
         <div class="enroll-login__brand">
-          <img :src="'/logo.png'" alt="NiCare" class="enroll-login__logo" @error="logoErr = true" v-if="!logoErr" />
+          <img v-if="org.logo_url && !logoErr" :src="org.logo_url" alt="Organization logo" class="enroll-login__logo" @error="logoErr = true" />
           <div v-else class="enroll-login__logo-fb"><v-icon color="white" size="22">mdi-hospital-box</v-icon></div>
           <div>
-            <div class="enroll-login__brand-name">NiCare</div>
-            <div class="enroll-login__brand-sub">Health Insurance System</div>
+            <div class="enroll-login__brand-name">{{ org.scheme_name }}</div>
+            <div class="enroll-login__brand-sub">{{ org.scheme_tagline }}</div>
           </div>
         </div>
 
@@ -36,9 +36,9 @@
       <div class="enroll-login__form-wrap">
         <!-- Mobile header -->
         <div class="enroll-login__mobile-header">
-          <img :src="'/logo.png'" alt="NiCare" class="enroll-login__logo-sm" v-if="!logoErr" />
+          <img v-if="org.logo_url && !logoErr" :src="org.logo_url" alt="Organization logo" class="enroll-login__logo-sm" />
           <div>
-            <div class="enroll-login__brand-name-sm">NiCare</div>
+            <div class="enroll-login__brand-name-sm">{{ org.scheme_name }}</div>
             <div class="enroll-login__brand-sub-sm">Enrollee Portal</div>
           </div>
         </div>
@@ -105,7 +105,7 @@
         </p>
 
         <p class="enroll-login__copyright">
-          &copy; {{ new Date().getFullYear() }} Niger State Contributory Health Agency
+          &copy; {{ new Date().getFullYear() }} {{ org.agency_name }}
         </p>
       </div>
     </div>
@@ -113,15 +113,19 @@
 </template>
 
 <script setup>
-import { reactive, ref } from 'vue';
+import { reactive, ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useEnrolleeAuthStore } from '../../stores/enrolleeAuth';
 import { useToast } from '../../composables/useToast';
+import { useOrganizationSettings } from '../../composables/useOrganizationSettings';
 import AppAlert from '../common/AppAlert.vue';
 
 const router = useRouter();
 const enrolleeAuth = useEnrolleeAuthStore();
 const { success, error } = useToast();
+const { settings: org, fetchSettings } = useOrganizationSettings();
+
+onMounted(fetchSettings);
 
 const logoErr = ref(false);
 const loading = ref(false);

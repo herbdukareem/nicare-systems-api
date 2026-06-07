@@ -307,6 +307,16 @@ export const ninProviderAPI = {
   updateConfig: (data) => api.put('/settings/nin-provider', data),
 };
 
+export const organizationSettingsAPI = {
+  getPublic: () => api.get('/organization-settings'),
+  getConfig: () => api.get('/settings/organization'),
+  updateConfig: (data) => api.put('/settings/organization', data),
+  uploadLogo: (formData) => api.post('/settings/organization/logo', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  removeLogo: () => api.delete('/settings/organization/logo'),
+};
+
 export const securityAPI = {
   getDashboard: () => api.get('/pas/security/dashboard'),
   getLogs: (params) => api.get('/pas/security/logs', { params }),

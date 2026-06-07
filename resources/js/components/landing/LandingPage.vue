@@ -7,7 +7,7 @@
         <span class="gov__topbar-sep">|</span>
         <span>An official agency website</span>
         <span class="gov__topbar-spacer" />
-        <span>Hotline: 08162653801</span>
+        <span>Hotline: {{ org.hotline }}</span>
       </div>
     </div>
 
@@ -15,13 +15,13 @@
     <header class="gov__header">
       <div class="gov__header-inner">
         <div class="gov__brand">
-          <img :src="'/logo.png'" alt="NiCare emblem" class="gov__logo" @error="logoErr = true" v-if="!logoErr" />
+          <img v-if="org.logo_url && !logoErr" :src="org.logo_url" alt="Organization logo" class="gov__logo" @error="logoErr = true" />
           <div v-else class="gov__logo-fallback">
             <v-icon color="white" size="26">mdi-hospital-box</v-icon>
           </div>
           <div>
-            <div class="gov__brand-name">Niger State Contributory Health Agency</div>
-            <div class="gov__brand-sub">NiCare — Health Insurance Scheme</div>
+            <div class="gov__brand-name">{{ org.agency_name }}</div>
+            <div class="gov__brand-sub">{{ org.scheme_name }} — {{ org.scheme_tagline }}</div>
           </div>
         </div>
         <nav class="gov__nav">
@@ -46,11 +46,8 @@
     <!-- ── INTRO BANNER ────────────────────────────────────────────────── -->
     <section class="gov__banner">
       <div class="gov__banner-inner">
-        <h1 class="gov__banner-title">Health Insurance Coverage for the People of Niger State</h1>
-        <p class="gov__banner-sub">
-          NiCare is the State's contributory health insurance scheme, providing access to quality healthcare
-          across approved facilities in all 25 Local Government Areas.
-        </p>
+        <h1 class="gov__banner-title">{{ org.hero_title }}</h1>
+        <p class="gov__banner-sub">{{ org.hero_description }}</p>
         <div class="gov__banner-actions">
           <v-btn color="primary" variant="flat" size="large" @click="router.push('/enroll/start')">
             Apply for enrollment
@@ -119,20 +116,17 @@
       <div class="gov__footer-inner">
         <div class="gov__footer-col">
           <div class="gov__footer-brand">
-            <img :src="'/logo.png'" alt="Logo" class="gov__footer-logo" v-if="!logoErr" />
-            <span>Niger State Contributory Health Agency</span>
+            <img v-if="org.logo_url && !logoErr" :src="org.logo_url" alt="Organization logo" class="gov__footer-logo" />
+            <span>{{ org.about_title }}</span>
           </div>
-          <p class="gov__footer-text">
-            Statutory body responsible for administering the State's contributory health insurance scheme
-            under the enabling law establishing NGSCHA.
-          </p>
+          <p class="gov__footer-text">{{ org.about_description }}</p>
         </div>
         <div class="gov__footer-col">
           <h5 class="gov__footer-heading">Contact</h5>
           <ul class="gov__footer-list">
-            <li>Hotline: 08162653801</li>
-            <li>nicare.nigerstate.gov.ng</li>
-            <li>Minna, Niger State, Nigeria</li>
+            <li>Hotline: {{ org.hotline }}</li>
+            <li>{{ org.website }}</li>
+            <li>{{ org.address }}</li>
           </ul>
         </div>
         <div class="gov__footer-col">
@@ -145,18 +139,22 @@
         </div>
       </div>
       <div class="gov__footer-bottom">
-        <span>&copy; {{ new Date().getFullYear() }} Niger State Contributory Health Agency. All rights reserved.</span>
+        <span>&copy; {{ new Date().getFullYear() }} {{ org.agency_name }}. All rights reserved.</span>
       </div>
     </footer>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { onMounted, ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { useOrganizationSettings } from '../../composables/useOrganizationSettings';
 
 const router = useRouter();
 const logoErr = ref(false);
+
+const { settings: org, fetchSettings } = useOrganizationSettings();
+onMounted(fetchSettings);
 
 const stats = [
   { value: '100,000+', label: 'Enrollees registered' },

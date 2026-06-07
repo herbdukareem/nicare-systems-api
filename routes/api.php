@@ -65,6 +65,7 @@ use App\Http\Controllers\Api\ClaimsDashboardController;
 use App\Http\Controllers\Api\CapitationController;
 use App\Http\Controllers\Api\MobileSyncController;
 use App\Http\Controllers\Api\NinProviderConfigurationController;
+use App\Http\Controllers\Api\OrganizationSettingsController;
 use App\Http\Controllers\Api\PublicEnrollmentController;
 use App\Http\Controllers\Api\EnrolleeImportController;
 use App\Http\Controllers\Api\EnrolleeController as EnrolleeApiController;
@@ -93,6 +94,8 @@ Route::get('test', function () {
 
 // ── Enrollee portal auth routes ────────────────────────────────────────────────
 use App\Http\Controllers\Api\EnrolleeAuthController;
+
+Route::get('organization-settings', [OrganizationSettingsController::class, 'show'])->middleware('throttle:60,1');
 
 Route::post('enroll/login', [EnrolleeAuthController::class, 'login'])->middleware('security');
 Route::get('enroll/plans', [EnrolleeAuthController::class, 'plans']);
@@ -292,6 +295,14 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,settings.nin.manage,settings.edit');
     Route::put('settings/nin-provider', [NinProviderConfigurationController::class, 'update'])
         ->middleware('permission:any,settings.nin.manage,settings.edit');
+    Route::get('settings/organization', [OrganizationSettingsController::class, 'show'])
+        ->middleware('permission:any,settings.organization.manage,settings.edit');
+    Route::put('settings/organization', [OrganizationSettingsController::class, 'update'])
+        ->middleware('permission:any,settings.organization.manage,settings.edit');
+    Route::post('settings/organization/logo', [OrganizationSettingsController::class, 'uploadLogo'])
+        ->middleware('permission:any,settings.organization.manage,settings.edit');
+    Route::delete('settings/organization/logo', [OrganizationSettingsController::class, 'removeLogo'])
+        ->middleware('permission:any,settings.organization.manage,settings.edit');
     Route::apiResource('lgas', LgaController::class);
     Route::get('lgas/{lga}/wards', [LgaController::class, 'wards']);
     Route::apiResource('wards', WardController::class);
