@@ -486,6 +486,7 @@ const sortDirection = ref('desc')
 
 const meta = reactive({ total: 0, from: null, to: null })
 const summary = reactive({ total: 0, approved: 0, pending: 0, active_coverage: 0 })
+const summaryLoading = ref(false)
 
 const statusOptions = [
   { title: 'Pending Approval', value: 0 },
@@ -676,6 +677,13 @@ const tableParams = () => ({
   sort_direction: sortDirection.value,
 })
 
+const summaryParams = () => ({
+  ...activeFilterParams(),
+  page: 1,
+  per_page: 1,
+  include_summary: true,
+})
+
 const loadMetadata = async () => {
   try {
     const response = await premiumAPI.metadata()
@@ -687,23 +695,47 @@ const loadMetadata = async () => {
 
 const applyFilters = () => {
   page.value = 1
-  loadEnrollees()
+  loadPage()
 }
 
 const loadEnrollees = async () => {
   loading.value = true
   loadError.value = ''
   try {
-    const response = await enrolleeAPI.getAll(tableParams())
+    const response = await enrolleeAPI.getAll(tableParams(), {
+      timeout: 60000,
+    })
     enrollees.value = responseItems(response)
     Object.assign(meta, { total: 0, from: null, to: null }, responseMeta(response))
-    Object.assign(summary, { total: meta.total, approved: 0, pending: 0, active_coverage: 0 }, responseSummary(response))
+    summary.total = meta.total || 0
     hasLoaded.value = true
   } catch (err) {
     loadError.value = err.response?.data?.message || 'Failed to load enrollees'
     error(loadError.value)
   } finally {
     loading.value = false
+  }
+}
+
+const loadSummary = async () => {
+  summaryLoading.value = true
+  try {
+    const response = await enrolleeAPI.getAll(summaryParams(), {
+      timeout: 60000,
+      showGlobalLoader: false,
+    })
+    Object.assign(summary, { total: meta.total || 0, approved: 0, pending: 0, active_coverage: 0 }, responseSummary(response))
+  } catch {
+    summary.total = meta.total || summary.total || 0
+  } finally {
+    summaryLoading.value = false
+  }
+}
+
+const loadPage = async () => {
+  await loadEnrollees()
+  if (hasLoaded.value) {
+    void loadSummary()
   }
 }
 
@@ -733,7 +765,7 @@ const handleSort = (items) => {
   const sort = Array.isArray(items) ? items[0] : null
   sortBy.value = sort?.key || 'created_at'
   sortDirection.value = sort?.order || 'desc'
-  if (hasLoaded.value) loadEnrollees()
+  if (hasLoaded.value) loadPage()
 }
 
 const exportExcel = async () => {
@@ -856,7 +888,7 @@ const printIdCard = async (item) => {
 }
 
 watch([page, perPage], () => {
-  if (hasLoaded.value) loadEnrollees()
+  if (hasLoaded.value) loadPage()
 })
 
 watch(() => filters.lga_id, () => {
@@ -888,7 +920,10 @@ watch(() => filters.funding_type_id, () => {
   }
 })
 
-onMounted(loadMetadata)
+onMounted(async () => {
+  await loadMetadata()
+  await loadPage()
+})
 </script>
 
 <style scoped>

@@ -26,9 +26,19 @@ class PublicEnrollmentService
     public function submitApplication(array $data): array
     {
         $plan = PremiumPlan::with(['programme', 'benefitPackage'])->findOrFail($data['premium_plan_id']);
+        $enrollmentMethod = $data['enrollment_method'] ?? 'online_payment';
+        $pin = null;
 
         if (!$plan->isSelfEnrollmentEnabled()) {
             throw new RuntimeException('The selected premium plan is not available for self-enrollment.');
+        }
+
+        if ($enrollmentMethod === 'premium_pin') {
+            $pin = $this->premiumCoverageService->validatePin($data['premium_pin']);
+
+            if ((int) $pin->premium_plan_id !== (int) $plan->id) {
+                throw new RuntimeException('Premium PIN does not belong to the selected premium plan.');
+            }
         }
 
         $facility = Facility::findOrFail($data['facility_id']);
@@ -41,18 +51,20 @@ class PublicEnrollmentService
             throw new RuntimeException('The selected facility does not belong to the selected ward.');
         }
 
-        if ($plan->requiresPayment() && blank($data['email'] ?? null)) {
+        $requiresHostedPayment = $enrollmentMethod !== 'premium_pin' && $plan->requiresPayment();
+
+        if ($requiresHostedPayment && blank($data['email'] ?? null)) {
             throw new RuntimeException('Email address is required for plans that use secure online payment.');
         }
 
-        $paymentReference = $plan->requiresPayment()
+        $paymentReference = $requiresHostedPayment
             ? (($data['payment_reference'] ?? null) ?: $this->generatedPaymentReference())
             : null;
         $passportPath = $this->storePassport($data['passport'] ?? null);
 
         $paymentCheckout = null;
 
-        if ($plan->requiresPayment()) {
+        if ($requiresHostedPayment) {
             $paymentCheckout = $this->billingCheckoutService->initializePremiumEnrollmentPlanCheckout(
                 $plan,
                 [
@@ -68,10 +80,10 @@ class PublicEnrollmentService
             );
         }
 
-        $result = DB::transaction(function () use ($data, $plan, $paymentReference, $paymentCheckout, $passportPath) {
+        $result = DB::transaction(function () use ($data, $plan, $pin, $enrollmentMethod, $requiresHostedPayment, $paymentReference, $paymentCheckout, $passportPath) {
             $purchase = null;
 
-            if ($plan->requiresPayment()) {
+            if ($requiresHostedPayment) {
                 $purchase = $this->premiumCoverageService->createPurchase([
                     'premium_plan_id' => $plan->id,
                     'payer_type' => 'individual',
@@ -129,22 +141,33 @@ class PublicEnrollmentService
                     : Enrollee::NIN_VERIFICATION_NOT_STARTED,
             ]);
 
+            if ($pin) {
+                $enrollee = $this->premiumCoverageService->usePinForPendingEnrollment($pin, $enrollee, $plan);
+            }
+
             return [
-                'enrollee' => $enrollee->load(['premiumPlan', 'premiumPurchase', 'benefitPackage', 'facility', 'lga', 'ward', 'insuranceProgramme']),
+                'enrollee' => $enrollee->load(['premiumPlan', 'premiumPin', 'premiumPurchase', 'benefitPackage', 'facility', 'lga', 'ward', 'insuranceProgramme']),
                 'purchase' => $purchase?->load(['plan']),
-                'requires_payment' => $plan->requiresPayment(),
+                'requires_payment' => $requiresHostedPayment,
+                'enrollment_method' => $enrollmentMethod,
                 'payment_checkout' => $paymentCheckout,
-                'next_steps' => $plan->requiresPayment()
+                'next_steps' => $requiresHostedPayment
                     ? [
                         'Complete the secure online payment using the launched checkout page.',
                         'Your application will remain pending until payment is confirmed and an approval officer verifies your NIN.',
                         'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
                     ]
+                    : ($enrollmentMethod === 'premium_pin'
+                        ? [
+                            'Your Premium PIN has been accepted and cannot be used again.',
+                            'Your application will remain pending until an approval officer verifies your NIN.',
+                            'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
+                        ]
                     : [
                         'Your application has been submitted for approval.',
                         'An approval officer will verify your NIN before activating your coverage.',
                         'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
-                    ],
+                    ]),
             ];
         });
 

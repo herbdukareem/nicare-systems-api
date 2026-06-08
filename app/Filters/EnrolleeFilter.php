@@ -3,6 +3,8 @@
 namespace App\Filters;
 
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Class EnrolleeFilter
@@ -93,13 +95,49 @@ class EnrolleeFilter
                     }
                     break;
                 case 'nin':
-                    $query->where('nin', $value);
+                    $query->where('nin', 'like', "%{$value}%");
                     break;
                 case 'enrollee_id':
-                    $query->where('enrollee_id', $value);
+                    $query->where('enrollee_id', 'like', "%{$value}%");
                     break;
                 case 'legacy_id':
                     $query->where('legacy_id', $value);
+                    break;
+                case 'nin_state':
+                    if ($value === 'with_nin') {
+                        $query->whereNotNull('nin')->where('nin', '!=', '');
+                    } elseif ($value === 'without_nin') {
+                        $query->where(function (Builder $ninQuery): void {
+                            $ninQuery->whereNull('nin')->orWhere('nin', '');
+                        });
+                    }
+                    break;
+                case 'duplicate_nin_only':
+                    if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                        // A `whereIn('nin', $closure)` with GROUP BY/HAVING inside is
+                        // optimized by MySQL as a dependent subquery — re-executed for
+                        // every outer row (catastrophic at 100k+ rows: hours, not seconds).
+                        // Computing the duplicate-NIN set once and caching it briefly turns
+                        // the filter into a plain indexed `WHERE nin IN (...)` lookup, and
+                        // avoids redoing the expensive grouping for both the count and the
+                        // page queries that `paginate()` issues.
+                        $duplicateNins = Cache::remember(
+                            'enrollees:duplicate-nin-values',
+                            now()->addMinutes(5),
+                            fn () => self::duplicateNinValuesSubquery()->pluck('matched_nin')->all()
+                        );
+
+                        if (empty($duplicateNins)) {
+                            $query->whereRaw('1 = 0');
+                        } else {
+                            $query->whereIn('nin', $duplicateNins);
+                        }
+                    }
+                    break;
+                case 'duplicate_flag_only':
+                    if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                        $query->where('is_possible_duplicate', true);
+                    }
                     break;
                 case 'date_of_birth_from':
                     $query->whereDate('date_of_birth', '>=', $value);
@@ -154,6 +192,16 @@ class EnrolleeFilter
             }
         }
         return $query;
+    }
+
+    private static function duplicateNinValuesSubquery(): \Illuminate\Database\Query\Builder
+    {
+        return DB::table('enrollees')
+            ->select('nin as matched_nin')
+            ->whereNotNull('nin')
+            ->where('nin', '!=', '')
+            ->groupBy('nin')
+            ->havingRaw('COUNT(*) > 1');
     }
 
     /**

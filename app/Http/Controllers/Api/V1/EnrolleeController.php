@@ -56,23 +56,9 @@ class EnrolleeController extends BaseController
      */
     public function index(Request $request)
     {
-        $filters = $request->only([
-            'first_name', 'last_name', 'status', 'gender', 'facility_id',
-            'lga_id', 'ward_id', 'nin', 'enrollee_id', 'date_of_birth_from',
-            'date_of_birth_to', 'enrollee_type_id', 'search', 'date_from',
-            'date_to', 'approval_date_from', 'approval_date_to', 'age_from', 'age_to'
-            , 'insurance_programme_id', 'enrollee_category_id', 'premium_plan_id',
-            'funding_type_id', 'benefactor_id', 'enrollment_phase_id',
-            'coverage_status', 'legacy_id', 'date_field'
-        ]);
-
-        // Handle array parameters
-        $arrayFilters = ['status', 'lga_id', 'ward_id', 'facility_id', 'enrollee_type_id', 'gender', 'insurance_programme_id', 'enrollee_category_id', 'premium_plan_id', 'funding_type_id', 'benefactor_id', 'enrollment_phase_id'];
-        foreach ($arrayFilters as $filter) {
-            if ($request->has($filter) && is_string($request->$filter)) {
-                $filters[$filter] = explode(',', $request->$filter);
-            }
-        }
+        $filters = $this->extractIndexFilters($request);
+        $includeSummary = $request->boolean('include_summary', false);
+        $includeDuplicateNin = $request->boolean('include_duplicate_nin', false);
 
         $perPage = (int) $request->get('per_page', 15);
         $sortBy = $request->get('sort_by', 'created_at');
@@ -80,8 +66,12 @@ class EnrolleeController extends BaseController
 
         $enrollees = $this->enrolleeService->paginate($filters, $perPage, $sortBy, $sortDirection);
         $rows = $enrollees->getCollection()
-            ->map(fn (Enrollee $enrollee): array => (new EnrolleeResource($enrollee))->resolve($request))
+            ->map(fn (Enrollee $enrollee): array => $this->transformListEnrollee($enrollee))
             ->values();
+
+        if ($includeDuplicateNin) {
+            $rows = $this->attachDuplicateNinCounts($rows);
+        }
 
         return response()->json([
             'success' => true,
@@ -96,9 +86,56 @@ class EnrolleeController extends BaseController
                     'from' => $enrollees->firstItem(),
                     'to' => $enrollees->lastItem(),
                 ],
-                'summary' => $this->enrolleeService->summary($filters),
+                'summary' => $includeSummary ? $this->enrolleeService->summary($filters) : null,
             ],
         ]);
+    }
+
+    public function integritySummary(Request $request)
+    {
+        $filters = $this->extractIndexFilters($request);
+        $base = $this->enrolleeService->query($filters);
+
+        $summary = [
+            'total' => (clone $base)->count(),
+            'with_nin' => (clone $base)->whereNotNull('nin')->where('nin', '!=', '')->count(),
+            'without_nin' => (clone $base)->where(function ($query): void {
+                $query->whereNull('nin')->orWhere('nin', '');
+            })->count(),
+            'duplicate_nin_records' => (clone $base)
+                ->joinSub($this->duplicateNinValuesQuery(), 'duplicate_nins', function ($join) {
+                    $join->on('duplicate_nins.nin', '=', 'enrollees.nin');
+                })
+                ->count('enrollees.id'),
+            'possible_duplicates' => (clone $base)->where('is_possible_duplicate', true)->count(),
+            'verified_nin' => (clone $base)
+                ->whereNotNull('nin')
+                ->where('nin', '!=', '')
+                ->where('nin_verification_status', Enrollee::NIN_VERIFICATION_VERIFIED)
+                ->count(),
+            'unverified_nin' => (clone $base)
+                ->whereNotNull('nin')
+                ->where('nin', '!=', '')
+                ->where(function ($query): void {
+                    $query->whereNull('nin_verification_status')
+                        ->orWhereIn('nin_verification_status', [
+                            Enrollee::NIN_VERIFICATION_NOT_STARTED,
+                            Enrollee::NIN_VERIFICATION_FAILED,
+                        ]);
+                })
+                ->count(),
+            'unresolved_duplicate_flags' => EnrolleeDuplicateFlag::query()
+                ->where('resolved', false)
+                ->where(function ($query) use ($filters) {
+                    $query->whereIn('enrollee_id', $this->filteredEnrolleeIdQuery($filters))
+                        ->orWhereIn('matched_enrollee_id', $this->filteredEnrolleeIdQuery($filters));
+                })
+                ->count(),
+        ];
+
+        return $this->sendResponse([
+            'summary' => $summary,
+        ], 'Enrollee integrity summary retrieved successfully.');
     }
 
     /**
@@ -567,6 +604,63 @@ class EnrolleeController extends BaseController
         }
     }
 
+    public function bulkUpdateStatus(Request $request)
+    {
+        $validated = $request->validate([
+            'enrollee_ids' => ['required', 'array', 'min:1'],
+            'enrollee_ids.*' => ['integer', 'exists:enrollees,id'],
+            'status' => ['required', 'integer', 'in:0,1,2,3,4'],
+            'comment' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        $enrollees = Enrollee::query()
+            ->whereIn('id', $validated['enrollee_ids'])
+            ->get();
+
+        if ($enrollees->isEmpty()) {
+            return $this->sendError('No matching enrollees were found for bulk status update.', [], 422);
+        }
+
+        $updatedCount = 0;
+
+        foreach ($enrollees as $enrollee) {
+            $oldStatus = (int) $enrollee->status;
+            $newStatus = (int) $validated['status'];
+
+            if ($oldStatus === $newStatus) {
+                continue;
+            }
+
+            $enrollee->update([
+                'status' => $newStatus,
+                'updated_at' => now(),
+            ]);
+
+            AuditTrail::create([
+                'auditable_type' => Enrollee::class,
+                'auditable_id' => $enrollee->id,
+                'action' => 'bulk_status_changed',
+                'description' => 'Status changed from ' . $this->statusLabel($oldStatus) . ' to ' . $this->statusLabel($newStatus) . ' via bulk update',
+                'user_id' => auth()->id(),
+                'ip_address' => $request->ip(),
+                'old_values' => ['status' => $oldStatus],
+                'new_values' => [
+                    'status' => $newStatus,
+                    'comment' => $validated['comment'] ?? null,
+                ],
+            ]);
+
+            $updatedCount++;
+        }
+
+        return $this->sendResponse([
+            'updated_count' => $updatedCount,
+            'requested_count' => count($validated['enrollee_ids']),
+            'status' => (int) $validated['status'],
+            'status_label' => $this->statusLabel((int) $validated['status']),
+        ], 'Enrollee statuses updated successfully.');
+    }
+
     /**
      * Get enrollee statistics.
      *
@@ -620,12 +714,19 @@ class EnrolleeController extends BaseController
      * GET /api/enrollees/duplicates
      * List all unresolved duplicate flags with matched enrollees.
      */
-    public function listDuplicates()
+    public function listDuplicates(Request $request)
     {
-        $flags = EnrolleeDuplicateFlag::with(['enrollee', 'matchedEnrollee', 'flaggedBy'])
+        $perPage = max(1, min((int) $request->get('per_page', 20), 100));
+
+        $flags = EnrolleeDuplicateFlag::query()
+            ->select(['id', 'enrollee_id', 'matched_enrollee_id', 'match_type', 'created_at'])
+            ->with([
+                'enrollee:id,enrollee_id,first_name,last_name,middle_name,nin',
+                'matchedEnrollee:id,enrollee_id,first_name,last_name,middle_name,nin',
+            ])
             ->where('resolved', false)
             ->orderByDesc('created_at')
-            ->paginate(20);
+            ->paginate($perPage);
 
         return $this->sendResponse($flags, 'Duplicate flags retrieved successfully');
     }
@@ -683,6 +784,179 @@ class EnrolleeController extends BaseController
         ]);
 
         return $this->sendResponse($flag->fresh(), 'Duplicate flag resolved successfully');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function extractIndexFilters(Request $request): array
+    {
+        $filters = $request->only([
+            'first_name', 'last_name', 'status', 'gender', 'facility_id',
+            'lga_id', 'ward_id', 'nin', 'enrollee_id', 'date_of_birth_from',
+            'date_of_birth_to', 'enrollee_type_id', 'search', 'date_from',
+            'date_to', 'approval_date_from', 'approval_date_to', 'age_from', 'age_to',
+            'insurance_programme_id', 'enrollee_category_id', 'premium_plan_id',
+            'funding_type_id', 'benefactor_id', 'enrollment_phase_id',
+            'coverage_status', 'legacy_id', 'date_field', 'nin_state',
+            'duplicate_nin_only', 'duplicate_flag_only',
+        ]);
+
+        foreach ([
+            'status', 'lga_id', 'ward_id', 'facility_id', 'enrollee_type_id', 'gender',
+            'insurance_programme_id', 'enrollee_category_id', 'premium_plan_id',
+            'funding_type_id', 'benefactor_id', 'enrollment_phase_id',
+        ] as $filter) {
+            if ($request->has($filter) && is_string($request->$filter)) {
+                $filters[$filter] = explode(',', $request->$filter);
+            }
+        }
+
+        return $filters;
+    }
+
+    private function duplicateNinValuesQuery()
+    {
+        return Enrollee::query()
+            ->select('nin')
+            ->whereNotNull('nin')
+            ->where('nin', '!=', '')
+            ->groupBy('nin')
+            ->havingRaw('COUNT(*) > 1');
+    }
+
+    private function filteredEnrolleeIdQuery(array $filters)
+    {
+        return $this->enrolleeService->query($filters)->select('enrollees.id');
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function transformListEnrollee(Enrollee $enrollee): array
+    {
+        $statusLabel = $this->statusLabel((int) $enrollee->status);
+        $ninVerificationStatus = blank($enrollee->nin)
+            ? Enrollee::NIN_VERIFICATION_NOT_PROVIDED
+            : ($enrollee->nin_verification_status ?: Enrollee::NIN_VERIFICATION_NOT_STARTED);
+
+        $ninVerificationLabel = match ($ninVerificationStatus) {
+            Enrollee::NIN_VERIFICATION_VERIFIED => 'Verified',
+            Enrollee::NIN_VERIFICATION_FAILED => 'Verification Failed',
+            Enrollee::NIN_VERIFICATION_NOT_PROVIDED => 'NIN Not Provided',
+            default => 'Not Verified',
+        };
+
+        return [
+            'id' => $enrollee->id,
+            'enrollee_id' => $enrollee->enrollee_id,
+            'legacy_id' => $enrollee->legacy_id,
+            'legacy_enrollee_id' => $enrollee->legacy_enrollee_id,
+            'nin' => $enrollee->nin,
+            'nin_verification_status' => $ninVerificationStatus,
+            'nin_verification_label' => $ninVerificationLabel,
+            'nin_verified_at' => $enrollee->nin_verified_at,
+            'nin_verification_provider' => $enrollee->nin_verification_provider,
+            'first_name' => $enrollee->first_name,
+            'last_name' => $enrollee->last_name,
+            'middle_name' => $enrollee->middle_name,
+            'name' => trim(implode(' ', array_filter([$enrollee->first_name, $enrollee->middle_name, $enrollee->last_name]))),
+            'full_name' => $enrollee->full_name,
+            'email' => $enrollee->email,
+            'phone' => $enrollee->phone,
+            'date_of_birth' => $enrollee->date_of_birth,
+            'sex' => $enrollee->sex,
+            'gender' => $enrollee->sex == 1 ? 'Male' : ($enrollee->sex == 2 ? 'Female' : 'Other'),
+            'marital_status' => $enrollee->marital_status,
+            'address' => $enrollee->address,
+            'village' => $enrollee->village,
+            'pregnant' => $enrollee->pregnant,
+            'disability' => $enrollee->disability,
+            'occupation' => $enrollee->occupation,
+            'image_url' => $enrollee->image_url,
+            'facility' => $enrollee->relationLoaded('facility') && $enrollee->facility ? [
+                'id' => $enrollee->facility->id,
+                'name' => $enrollee->facility->name,
+                'hcp_code' => $enrollee->facility->hcp_code,
+                'type' => $enrollee->facility->type,
+                'lga_id' => $enrollee->facility->lga_id,
+                'ward_id' => $enrollee->facility->ward_id,
+            ] : null,
+            'facility_name' => $enrollee->relationLoaded('facility') ? $enrollee->facility?->name : null,
+            'lga' => $enrollee->relationLoaded('lga') && $enrollee->lga ? [
+                'id' => $enrollee->lga->id,
+                'name' => $enrollee->lga->name,
+            ] : null,
+            'lga_name' => $enrollee->relationLoaded('lga') ? $enrollee->lga?->name : null,
+            'ward' => $enrollee->relationLoaded('ward') && $enrollee->ward ? [
+                'id' => $enrollee->ward->id,
+                'name' => $enrollee->ward->name,
+                'lga_id' => $enrollee->ward->lga_id,
+            ] : null,
+            'ward_name' => $enrollee->relationLoaded('ward') ? $enrollee->ward?->name : null,
+            'funding_type' => $enrollee->relationLoaded('fundingType') && $enrollee->fundingType ? [
+                'id' => $enrollee->fundingType->id,
+                'name' => $enrollee->fundingType->name,
+            ] : null,
+            'benefactor' => $enrollee->relationLoaded('benefactor') && $enrollee->benefactor ? [
+                'id' => $enrollee->benefactor->id,
+                'name' => $enrollee->benefactor->name,
+            ] : null,
+            'enrollment_phase' => $enrollee->relationLoaded('enrollmentPhase') && $enrollee->enrollmentPhase ? [
+                'id' => $enrollee->enrollmentPhase->id,
+                'name' => $enrollee->enrollmentPhase->name,
+                'benefactor_id' => $enrollee->enrollmentPhase->benefactor_id,
+            ] : null,
+            'capitation_start_date' => $enrollee->capitation_start_date,
+            'coverage_start_date' => $enrollee->coverage_start_date,
+            'coverage_end_date' => $enrollee->coverage_end_date,
+            'coverage_label' => $enrollee->coverage_label,
+            'approval_date' => $enrollee->approval_date,
+            'status' => $enrollee->status,
+            'status_label' => $statusLabel,
+            'enrollment_source' => $enrollee->enrollment_source ?? 'staff',
+            'enrollment_date' => $enrollee->enrollment_date,
+            'relationship_to_principal' => $enrollee->relationship_to_principal,
+            'is_possible_duplicate' => (bool) $enrollee->is_possible_duplicate,
+            'duplicate_reviewed' => (bool) $enrollee->duplicate_reviewed,
+            'created_at' => $enrollee->created_at,
+            'updated_at' => $enrollee->updated_at,
+        ];
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return Collection<int, array<string, mixed>>
+     */
+    private function attachDuplicateNinCounts(Collection $rows): Collection
+    {
+        $nins = $rows->pluck('nin')
+            ->filter(fn ($nin) => filled($nin))
+            ->unique()
+            ->values();
+
+        if ($nins->isEmpty()) {
+            return $rows->map(function (array $row): array {
+                $row['duplicate_nin_count'] = 0;
+                $row['has_duplicate_nin'] = false;
+
+                return $row;
+            });
+        }
+
+        $counts = Enrollee::query()
+            ->selectRaw('nin, COUNT(*) as aggregate')
+            ->whereIn('nin', $nins->all())
+            ->groupBy('nin')
+            ->pluck('aggregate', 'nin');
+
+        return $rows->map(function (array $row) use ($counts): array {
+            $count = (int) ($row['nin'] ? ($counts[$row['nin']] ?? 0) : 0);
+            $row['duplicate_nin_count'] = $count;
+            $row['has_duplicate_nin'] = $count > 1;
+
+            return $row;
+        });
     }
 
     // =========================================================================

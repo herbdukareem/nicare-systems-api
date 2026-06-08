@@ -42,7 +42,7 @@ class BillingCheckoutService
         ], $configuration);
     }
 
-    public function initializePurchaseCheckout(PremiumPurchase $purchase): array
+    public function initializePurchaseCheckout(PremiumPurchase $purchase, ?string $callbackPath = null): array
     {
         $plan = $purchase->plan()->firstOrFail();
         if (blank($purchase->payer_email)) {
@@ -61,7 +61,7 @@ class BillingCheckoutService
         }
 
         $callbackBase = rtrim(config('app.url'), '/');
-        $callbackPath = '/premium/purchases?checkout_return=1';
+        $callbackPath ??= '/premium/purchases?checkout_return=1';
         $callbackUrl = "{$callbackBase}{$callbackPath}&purchase_id={$purchase->id}&payment_reference={$purchase->payment_reference}";
 
         return $this->gatewayManager->gateway($gatewayCode)->initializeCheckout([

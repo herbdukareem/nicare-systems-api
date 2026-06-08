@@ -84,6 +84,8 @@ class PublicEnrollmentController extends BaseController
             'lga_id' => ['required', 'exists:lgas,id'],
             'ward_id' => ['required', 'exists:wards,id'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
+            'enrollment_method' => ['nullable', Rule::in(['online_payment', 'premium_pin'])],
+            'premium_pin' => ['nullable', 'required_if:enrollment_method,premium_pin', 'string', 'max:255'],
             'payment_reference' => ['nullable', 'string', 'max:255'],
             'passport' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
         ]);
@@ -98,6 +100,7 @@ class PublicEnrollmentController extends BaseController
             'enrollee' => new EnrolleeResource($result['enrollee']),
             'purchase' => $result['purchase'],
             'requires_payment' => $result['requires_payment'],
+            'enrollment_method' => $result['enrollment_method'],
             'payment_checkout' => $result['payment_checkout'] ?? null,
             'next_steps' => $result['next_steps'],
         ], 'Self-enrollment application submitted successfully.', 201);

@@ -378,7 +378,7 @@ watch(() => form.value.ward_id, () => {
 })
 watch(principalSearch, async (value) => {
   if (!value || value.length < 2) return
-  const response = await enrolleeAPI.getAll({ search: value, per_page: 10 })
+  const response = await enrolleeAPI.getAll({ search: value, per_page: 10, include_summary: false })
   const records = response.data.data?.data || response.data.data || []
   principalOptions.value = records.map((item) => ({ ...item, label: `${item.enrollee_id} - ${item.full_name || `${item.first_name} ${item.last_name}`}` }))
 })

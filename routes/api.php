@@ -69,6 +69,7 @@ use App\Http\Controllers\Api\OrganizationSettingsController;
 use App\Http\Controllers\Api\PaymentGatewayConfigurationController;
 use App\Http\Controllers\Api\PublicEnrollmentController;
 use App\Http\Controllers\Api\PublicEnrollmentPaymentController;
+use App\Http\Controllers\Api\PublicPremiumPinController;
 use App\Http\Controllers\Api\EnrolleeImportController;
 use App\Http\Controllers\Api\EnrolleeController as EnrolleeApiController;
 use App\Http\Controllers\Api\ExtendedReportingController;
@@ -105,6 +106,9 @@ Route::prefix('public/enrollment')->middleware(['security'])->group(function () 
     Route::get('metadata', [PublicEnrollmentController::class, 'metadata'])->middleware('throttle:30,1');
     Route::post('applications', [PublicEnrollmentController::class, 'store'])->middleware('throttle:10,1');
     Route::get('payments/{reference}/verify', [PublicEnrollmentPaymentController::class, 'verify'])->middleware('throttle:20,1');
+    Route::post('pin-purchases', [PublicPremiumPinController::class, 'store'])->middleware('throttle:10,1');
+    Route::get('pin-purchases/{reference}/verify', [PublicPremiumPinController::class, 'verify'])->middleware('throttle:20,1');
+    Route::get('pin-purchases/{reference}/docket', [PublicPremiumPinController::class, 'docket'])->middleware('throttle:20,1');
 });
 
 Route::middleware(['auth:sanctum', 'enrollee'])->prefix('enroll')->group(function () {
@@ -168,6 +172,14 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,enrollees.view,enrollee.print-id-card');
     Route::get('enrollees', [EnrolleeController::class, 'index'])
         ->middleware('permission:enrollees.view');
+    Route::get('enrollees/integrity/summary', [EnrolleeController::class, 'integritySummary'])
+        ->middleware('permission:any,enrollees.view,enrollees.update,enrollee.approve,enrollee.nin.verify');
+    Route::get('enrollees/duplicates', [EnrolleeController::class, 'listDuplicates'])
+        ->middleware('permission:any,enrollees.view,enrollees.update,enrollee.approve,enrollee.nin.verify');
+    Route::post('enrollees/duplicates/{flag}/resolve', [EnrolleeController::class, 'resolveDuplicate'])
+        ->middleware('permission:any,enrollees.update,enrollees.edit,enrollee.approve,enrollee.nin.verify');
+    Route::post('enrollees/bulk-update-status', [EnrolleeController::class, 'bulkUpdateStatus'])
+        ->middleware('permission:any,enrollees.update,enrollees.edit,enrollee.approve');
     Route::post('enrollees', [EnrolleeController::class, 'store'])
         ->middleware('permission:enrollees.create');
     Route::get('enrollees/{enrollee}', [EnrolleeController::class, 'show'])
@@ -492,8 +504,6 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('enrollees/import/{batch}', [EnrolleeImportController::class, 'status']);
 
     // ─── Phase 2: Enrollee Duplicates ────────────────────────────────────────────
-    Route::get('enrollees/duplicates', [EnrolleeApiController::class, 'listDuplicates']);
-    Route::post('enrollees/duplicates/{flag}/resolve', [EnrolleeApiController::class, 'resolveDuplicate']);
 
     // ─── Phase 2: Enrollee Facility Transfers ────────────────────────────────────
     Route::post('enrollees/{enrollee}/transfer', [EnrolleeApiController::class, 'transfer']);

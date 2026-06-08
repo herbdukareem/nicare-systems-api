@@ -89,4 +89,12 @@ export const publicEnrollmentAPI = {
     headers: data instanceof FormData ? { 'Content-Type': 'multipart/form-data' } : undefined,
   }),
   verifyPayment: (reference) => enrolleeHttp.get(`/public/enrollment/payments/${encodeURIComponent(reference)}/verify`),
+  purchasePins: (data) => enrolleeHttp.post('/public/enrollment/pin-purchases', data),
+  verifyPinPurchase: (reference, token) => enrolleeHttp.get(`/public/enrollment/pin-purchases/${encodeURIComponent(reference)}/verify`, {
+    params: { token },
+  }),
+  downloadPinDocket: (reference, token) => enrolleeHttp.get(`/public/enrollment/pin-purchases/${encodeURIComponent(reference)}/docket`, {
+    params: { token },
+    responseType: 'blob',
+  }),
 };

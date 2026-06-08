@@ -55,6 +55,9 @@
           <v-btn variant="outlined" color="primary" size="large" @click="router.push('/enroll/login')">
             Check application status
           </v-btn>
+          <v-btn variant="text" color="primary" size="large" @click="router.push('/enroll/pins')">
+            Purchase Premium PINs
+          </v-btn>
         </div>
       </div>
       <div class="gov__banner-figures">
@@ -133,6 +136,7 @@
           <h5 class="gov__footer-heading">Quick Links</h5>
           <ul class="gov__footer-list gov__footer-list--links">
             <li><a @click="router.push('/enroll/start')">Apply for enrollment</a></li>
+            <li><a @click="router.push('/enroll/pins')">Purchase Premium PINs</a></li>
             <li><a @click="router.push('/enroll/login')">Enrollee portal</a></li>
             <li><a @click="router.push('/login')">Staff &amp; admin login</a></li>
           </ul>

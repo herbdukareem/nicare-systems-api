@@ -41,6 +41,7 @@ const breadcrumbMappings = {
   '/dashboard/premium': [{ name: 'Premium Dashboard' }],
   '/dashboard/preauth': [{ name: 'Preauthorization Dashboard' }],
   '/enrollees': [{ name: 'Enrollment', path: '/enrollees' }, { name: 'Enrollees List' }],
+  '/enrollees/integrity': [{ name: 'Enrollment', path: '/enrollees' }, { name: 'NIN & Duplicates' }],
   '/enrollment/change-facility': [{ name: 'Enrollment' }, { name: 'Change of Facility' }],
   '/enrollment/id-cards': [{ name: 'Enrollment' }, { name: 'ID Card Printing' }],
   '/enrollment/phases': [{ name: 'Enrollment' }, { name: 'Enrollment Phases' }],

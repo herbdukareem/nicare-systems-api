@@ -17,6 +17,51 @@ use Illuminate\Database\Eloquent\Builder;
 class EnrolleeService
 {
     /**
+     * @var array<int, string>
+     */
+    private const LIST_COLUMNS = [
+        'id',
+        'enrollee_id',
+        'legacy_id',
+        'legacy_enrollee_id',
+        'nin',
+        'nin_verification_status',
+        'nin_verified_at',
+        'nin_verification_provider',
+        'first_name',
+        'last_name',
+        'middle_name',
+        'email',
+        'phone',
+        'date_of_birth',
+        'sex',
+        'marital_status',
+        'address',
+        'village',
+        'pregnant',
+        'disability',
+        'occupation',
+        'image_url',
+        'facility_id',
+        'lga_id',
+        'ward_id',
+        'funding_type_id',
+        'benefactor_id',
+        'enrollment_phase_id',
+        'capitation_start_date',
+        'coverage_start_date',
+        'coverage_end_date',
+        'approval_date',
+        'status',
+        'enrollment_date',
+        'relationship_to_principal',
+        'is_possible_duplicate',
+        'duplicate_reviewed',
+        'created_at',
+        'updated_at',
+    ];
+
+    /**
      * Get a paginated list of enrollees with optional filters.
      *
      * @param  array<string, mixed>  $filters
@@ -32,12 +77,15 @@ class EnrolleeService
         $perPage = max(1, min($perPage, 250));
 
         return $this->applySorting($query, $sortBy, $sortDirection)
+            ->select(self::LIST_COLUMNS)
             ->with([
-                'enrolleeType', 'insuranceProgramme', 'enrolleeCategory', 'premiumPlan',
-                'benefitPackage', 'facility', 'lga', 'ward', 'benefactor', 'fundingType',
-                'enrollmentPhase',
+                'facility:id,name,hcp_code,lga_id,ward_id,type',
+                'lga:id,name',
+                'ward:id,name,lga_id',
+                'benefactor:id,name',
+                'fundingType:id,name',
+                'enrollmentPhase:id,name,benefactor_id',
             ])
-            ->withCount('dependants')
             ->paginate($perPage);
     }
 
@@ -66,7 +114,7 @@ class EnrolleeService
                 ->where('status', Enrollee::STATUS_ACTIVE)
                 ->whereNotNull('coverage_start_date')
                 ->whereDate('coverage_start_date', '<=', $today)
-                ->where(function (Builder $query) use ($today): void {
+                ->where(function ($query) use ($today): void {
                     $query->whereNull('coverage_end_date')
                         ->orWhereDate('coverage_end_date', '>=', $today);
                 })

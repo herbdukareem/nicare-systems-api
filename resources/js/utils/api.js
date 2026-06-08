@@ -115,7 +115,10 @@ export const authAPI = {
 };
 
 export const enrolleeAPI = {
-  getAll: (params) => api.get('/enrollees', { params }),
+  getAll: (params, config = {}) => api.get('/enrollees', { ...config, params }),
+  integritySummary: (params) => api.get('/enrollees/integrity/summary', { params }),
+  getDuplicateFlags: (params) => api.get('/enrollees/duplicates', { params }),
+  resolveDuplicateFlag: (id, data) => api.post(`/enrollees/duplicates/${id}/resolve`, data),
   getById: (id) => api.get(`/enrollees/${id}`),
   create: (data) => api.post('/enrollees', data),
   verifyNin: (id, data = {}) => api.post(`/enrollees/${id}/verify-nin`, data),
@@ -123,6 +126,7 @@ export const enrolleeAPI = {
   pendingApproval: (params) => api.get('/enrollees/pending-approval', { params }),
   update: (id, data) => api.put(`/enrollees/${id}`, data),
   updateStatus: (id, data) => api.put(`/enrollees/${id}/status`, data),
+  bulkUpdateStatus: (data) => api.post('/enrollees/bulk-update-status', data),
   delete: (id) => api.delete(`/enrollees/${id}`),
   idCard: (id) => api.get(`/enrollees/${id}/id-card`, { responseType: 'blob' }),
   bulkEnrollmentSlip: (params) => api.get('/enrollees/bulk-enrollment-slip', {

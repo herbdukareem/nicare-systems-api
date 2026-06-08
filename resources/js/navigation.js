@@ -16,23 +16,13 @@ export const navigationItems = [
     icon: 'mdi-account-multiple-plus-outline',
     children: [
       { name: 'All Enrollees', path: '/enrollees', icon: 'mdi-account-group-outline', permissions: ['enrollees.view'] },
-      { name: 'Demo Enrollment', path: '/enrollees/demo-enrollment', icon: 'mdi-account-plus-outline', permissions: ['enrollees.create'] },
       { name: 'Pending Approval', path: '/enrollees/approval', icon: 'mdi-account-check-outline', permissions: ['enrollees.update', 'enrollee.approve'] },
+      { name: 'NIN & Duplicates', path: '/enrollees/integrity', icon: 'mdi-shield-account-outline', permissions: ['enrollees.view', 'enrollees.update', 'enrollee.approve', 'enrollee.nin.verify'] },
+      { name: 'Demo Enrollment', path: '/enrollees/demo-enrollment', icon: 'mdi-account-plus-outline', permissions: ['enrollees.create'] },
       { name: 'Bulk Enrollment Slip', path: '/enrollees/bulk-enrollment-slip', icon: 'mdi-file-document-multiple-outline', permissions: ['enrollees.view', 'enrollee.print-bulk-slip'] },
       { name: 'Bulk ID Cards', path: '/enrollees/bulk-id-card', icon: 'mdi-card-account-details-star-outline', permissions: ['enrollees.view'] },
       { name: 'Mobile Sync', path: '/enrollment/mobile-sync', icon: 'mdi-cellphone-sync', permissions: ['mobile-sync.push', 'mobile-sync.status'] },
       { name: 'Change Facility', path: '/enrollment/change-facility', icon: 'mdi-hospital-marker', permissions: ['enrollees.update'] },
-    ],
-  },
-  {
-    name: 'Setup',
-    icon: 'mdi-cog-outline',
-    children: [
-      { name: 'Locations', path: '/setup/locations', icon: 'mdi-map-marker-multiple-outline', permissions: ['setup.lga.view', 'setup.ward.view'] },
-      { name: 'Facilities', path: '/setup/facilities', icon: 'mdi-hospital-box-outline', permissions: ['setup.facility.view', 'facilities.view'] },
-      { name: 'Benefit Packages', path: '/setup/benefit-packages', icon: 'mdi-package-variant-closed-check', permissions: ['setup.benefit-package.view'] },
-      { name: 'Funding Types', path: '/setup/funding-types', icon: 'mdi-cash-multiple', permissions: ['setup.funding-type.view'] },
-      { name: 'Benefactors', path: '/setup/benefactors', icon: 'mdi-account-heart-outline', permissions: ['setup.benefactor.view', 'benefactor.view'] },
     ],
   },
   {
@@ -42,6 +32,16 @@ export const navigationItems = [
       { name: 'Facilities', path: '/facilities', icon: 'mdi-hospital-box-outline', permissions: ['facilities.view'] },
       { name: 'DO Assignments', path: '/do-facilities', icon: 'mdi-account-hard-hat-outline', permissions: ['facilities.assign'] },
       { name: 'Assigned Referrals', path: '/do/assigned-referrals', icon: 'mdi-clipboard-list-outline', permissions: ['facilities.view-own', 'referrals.view'] },
+    ],
+  },
+  {
+    name: 'Setup',
+    icon: 'mdi-cog-outline',
+    children: [
+      { name: 'Locations', path: '/setup/locations', icon: 'mdi-map-marker-multiple-outline', permissions: ['setup.lga.view', 'setup.ward.view'] },
+      { name: 'Benefit Packages', path: '/setup/benefit-packages', icon: 'mdi-package-variant-closed-check', permissions: ['setup.benefit-package.view'] },
+      { name: 'Funding Types', path: '/setup/funding-types', icon: 'mdi-cash-multiple', permissions: ['setup.funding-type.view'] },
+      { name: 'Benefactors', path: '/setup/benefactors', icon: 'mdi-account-heart-outline', permissions: ['setup.benefactor.view', 'benefactor.view'] },
     ],
   },
   {
@@ -55,7 +55,6 @@ export const navigationItems = [
       { name: 'Sell PIN', path: '/premium/sell-pin', icon: 'mdi-point-of-sale', permissions: ['premium.pin.sell'] },
       { name: 'Validate PIN', path: '/premium/validate-pin', icon: 'mdi-key-check', permissions: ['premium.pin.view'] },
       { name: 'Purchases', path: '/premium/purchases', icon: 'mdi-receipt-text-outline', permissions: ['premium.purchase.view'] },
-      { name: 'Benefactors', path: '/premium/benefactors', icon: 'mdi-account-heart-outline', permissions: ['benefactor.view', 'benefactors.view'] },
       { name: 'Payroll', path: '/premium/payroll', icon: 'mdi-upload-outline', permissions: ['payroll-upload.view'] },
       { name: 'Eligibility', path: '/premium/eligibility', icon: 'mdi-magnify-scan', permissions: ['eligibility.lookup'] },
     ],
@@ -143,7 +142,6 @@ export const navigationItems = [
     children: [
       { name: 'Users', path: '/settings/users', icon: 'mdi-account-multiple-outline', permissions: ['users.view'] },
       { name: 'Roles & Permissions', path: '/settings/roles', icon: 'mdi-shield-lock-outline', permissions: ['roles.view', 'permissions.view'] },
-      { name: 'Benefactors', path: '/settings/benefactors', icon: 'mdi-account-heart-outline', permissions: ['benefactor.view', 'benefactors.view'] },
       { name: 'Departments', path: '/settings/departments', icon: 'mdi-office-building-outline', permissions: ['departments.view', 'departments.manage', 'users.view'] },
       { name: 'Designations', path: '/settings/designations', icon: 'mdi-badge-account-outline', permissions: ['designations.view', 'designations.manage', 'users.view'] },
       { name: 'NIN Provider', path: '/settings/nin-provider', icon: 'mdi-card-account-details-outline', permissions: ['settings.nin.manage', 'settings.edit'] },

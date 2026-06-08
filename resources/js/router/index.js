@@ -14,6 +14,7 @@ const BenefactorsPage = () => import('../components/settings/BenefactorsPage.vue
 const RolesPermissionsPage = () => import('../components/settings/RolesPermissionsPage.vue');
 const PendingEnrolleesPage = () => import('../components/enrollees/PendingEnrolleesPage.vue');
 const EnrollmentApprovalPage = () => import('../components/enrollees/EnrollmentApprovalPage.vue');
+const EnrolleeIntegrityPage = () => import('../components/enrollees/EnrolleeIntegrityPage.vue');
 const BulkEnrollmentSlipPage = () => import('../components/enrollees/BulkEnrollmentSlipPage.vue');
 const SetupWorkspace = () => import('../components/setup/SetupWorkspace.vue');
 
@@ -105,6 +106,17 @@ const routes = [
       permissions: ['enrollee.approve', 'enrollee.nin.verify'],
       title: 'Pending Approval',
       breadcrumb: 'Pending Approval',
+    },
+  },
+  {
+    path: '/enrollees/integrity',
+    name: 'enrollee-integrity',
+    component: EnrolleeIntegrityPage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.view', 'enrollees.update', 'enrollee.approve', 'enrollee.nin.verify'],
+      title: 'NIN & Duplicates',
+      breadcrumb: 'NIN & Duplicates',
     },
   },
   {
@@ -943,6 +955,7 @@ const routes = [
 
   // ── Enrollee Portal ────────────────────────────────────────────────────────
   { path: '/enroll/start', name: 'enroll-start', component: () => import('../components/enroll/PublicEnrollmentPage.vue'), meta: { requiresAuth: false, enrolleePublic: true, title: 'Start Enrollment' } },
+  { path: '/enroll/pins', name: 'enroll-pins', component: () => import('../components/enroll/PublicPremiumPinPurchasePage.vue'), meta: { requiresAuth: false, enrolleePublic: true, title: 'Purchase Premium PINs' } },
   { path: '/enroll/login', name: 'enroll-login', component: () => import('../components/enroll/EnrolleeLogin.vue'), meta: { requiresAuth: false, enrolleePublic: true } },
   { path: '/enroll/dashboard', name: 'enroll-dashboard', component: () => import('../components/enroll/EnrolleeDashboard.vue'), meta: { requiresEnrolleeAuth: true, title: 'My Dashboard' } },
   { path: '/enroll/plans', name: 'enroll-plans', component: () => import('../components/enroll/EnrolleePlansPage.vue'), meta: { requiresEnrolleeAuth: true, title: 'Premium Plans' } },

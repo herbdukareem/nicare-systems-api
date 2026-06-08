@@ -20,6 +20,9 @@
           </div>
         </div>
         <div class="enroll__header-actions">
+          <v-btn variant="text" color="primary" @click="$router.push('/enroll/pins')">
+            <v-icon start size="18">mdi-key-plus</v-icon> Buy Premium PINs
+          </v-btn>
           <v-btn variant="text" @click="$router.push('/')">
             <v-icon start size="18">mdi-arrow-left</v-icon> Home
           </v-btn>
@@ -34,12 +37,21 @@
       <h1 class="enroll__title">Apply for Enrollment</h1>
       <p class="enroll__lede">Select a plan, complete your details, and submit your application for review.</p>
 
-      <AppAlert
-        v-if="successSummary"
-        tone="success"
-        title="Application submitted"
-        :message="successSummary"
-      />
+      <div v-if="successSummary" ref="successArea" class="enroll__success">
+        <AppAlert
+          tone="success"
+          title="Application submitted successfully"
+          :message="successSummary"
+        />
+      </div>
+
+      <div v-if="submissionError" ref="errorArea" class="enroll__error">
+        <AppAlert
+          tone="danger"
+          title="Application could not be submitted"
+          :message="submissionError"
+        />
+      </div>
 
       <AppAlert
         v-if="paymentSummary"
@@ -189,8 +201,27 @@
                 />
               </div>
 
+              <div v-if="selectedPlan?.payment_required" class="tw-mt-4 tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
+                <h3 class="tw-text-sm tw-font-semibold tw-text-slate-900">How would you like to enroll?</h3>
+                <v-radio-group v-model="form.enrollment_method" inline hide-details class="tw-mt-2">
+                  <v-radio label="Enroll and pay online" value="online_payment" />
+                  <v-radio label="Use a Premium PIN" value="premium_pin" />
+                </v-radio-group>
+                <v-text-field
+                  v-if="form.enrollment_method === 'premium_pin'"
+                  v-model="form.premium_pin"
+                  label="Valid unused Premium PIN"
+                  variant="outlined"
+                  density="compact"
+                  class="tw-mt-3"
+                  :error-messages="errors.premium_pin"
+                  hint="The PIN must be paid, unused, and issued for the selected plan."
+                  persistent-hint
+                />
+              </div>
+
               <AppAlert
-                v-if="selectedPlan?.payment_required"
+                v-if="selectedPlan?.payment_required && form.enrollment_method !== 'premium_pin'"
                 class="tw-mt-3"
                 tone="info"
                 title="Secure online payment"
@@ -268,17 +299,53 @@
         </div>
       </div>
     </div>
+
+    <AppModal
+      v-model="successDialog"
+      title="Application submitted successfully"
+      subtitle="Your application has been received"
+      icon="mdi-check-circle-outline"
+      color="success"
+      size="sm"
+    >
+      <div class="tw-space-y-4">
+        <div class="tw-flex tw-items-center tw-gap-3 tw-bg-emerald-50 tw-p-4 tw-text-emerald-950">
+          <v-icon color="success" size="28">mdi-check-decagram</v-icon>
+          <div>
+            <div class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-emerald-700">Enrollee reference</div>
+            <div class="tw-mt-1 tw-text-xl tw-font-extrabold">{{ submittedEnrolleeId }}</div>
+          </div>
+        </div>
+
+        <p class="tw-text-sm tw-leading-6 tw-text-slate-600">{{ successSummary }}</p>
+
+        <div v-if="successNextSteps.length">
+          <h3 class="tw-text-sm tw-font-semibold tw-text-slate-900">What happens next</h3>
+          <ol class="tw-mt-2 tw-space-y-2">
+            <li v-for="(step, index) in successNextSteps" :key="step" class="tw-flex tw-gap-2 tw-text-sm tw-leading-5 tw-text-slate-600">
+              <span class="tw-font-bold tw-text-emerald-700">{{ index + 1 }}.</span>
+              <span>{{ step }}</span>
+            </li>
+          </ol>
+        </div>
+      </div>
+
+      <template #actions>
+        <v-btn color="success" variant="flat" @click="successDialog = false">Close</v-btn>
+      </template>
+    </AppModal>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from '../../composables/useToast'
 import { publicEnrollmentAPI } from '../../utils/enrolleeApi'
 import AppAlert from '../common/AppAlert.vue'
 import AppBadge from '../common/AppBadge.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
+import AppModal from '../common/AppModal.vue'
 import FacilityBadge from '../common/FacilityBadge.vue'
 import MoneyDisplay from '../common/MoneyDisplay.vue'
 import { useOrganizationSettings } from '../../composables/useOrganizationSettings'
@@ -305,6 +372,12 @@ const metadata = ref({
 })
 const errors = reactive({})
 const successSummary = ref('')
+const successDialog = ref(false)
+const submittedEnrolleeId = ref('')
+const successNextSteps = ref([])
+const successArea = ref(null)
+const errorArea = ref(null)
+const submissionError = ref('')
 const paymentSummary = ref('')
 
 const form = reactive({
@@ -325,6 +398,8 @@ const form = reactive({
   password: '',
   password_confirmation: '',
   payment_reference: '',
+  enrollment_method: 'online_payment',
+  premium_pin: '',
 })
 
 const sexOptions = [
@@ -383,14 +458,28 @@ const fetchMetadata = async () => {
 }
 
 const selectPlan = (plan) => {
+  if (form.premium_plan_id !== plan.id) {
+    form.premium_pin = ''
+  }
   form.premium_plan_id = plan.id
+  if (!plan.payment_required) {
+    form.enrollment_method = 'online_payment'
+  }
   successSummary.value = ''
+  submissionError.value = ''
 }
 
 const resetForm = () => {
   clearErrors()
   successSummary.value = ''
+  submissionError.value = ''
+  submittedEnrolleeId.value = ''
+  successNextSteps.value = []
   paymentSummary.value = ''
+  clearApplicationFields()
+}
+
+const clearApplicationFields = () => {
   passportFile.value = null
   setPassportPreview('')
   Object.assign(form, {
@@ -411,11 +500,23 @@ const resetForm = () => {
     password: '',
     password_confirmation: '',
     payment_reference: '',
+    enrollment_method: 'online_payment',
+    premium_pin: '',
   })
 
   if (passportInput.value) {
     passportInput.value.value = ''
   }
+}
+
+const scrollToSuccess = async () => {
+  await nextTick()
+  successArea.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+const scrollToError = async () => {
+  await nextTick()
+  errorArea.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 const openCheckoutWindow = (authorizationUrl) => {
@@ -455,6 +556,7 @@ const verifyReturnedPayment = async (reference) => {
 const submitApplication = async () => {
   clearErrors()
   successSummary.value = ''
+  submissionError.value = ''
   paymentSummary.value = ''
   submitting.value = true
 
@@ -481,33 +583,32 @@ const submitApplication = async () => {
 
     successSummary.value = responseData?.requires_payment
       ? `Application ${enrolleeId} submitted. We are opening ${activePaymentGatewayLabel.value} for payment reference ${paymentRef}. Approval continues after payment confirmation and NIN verification.`
+      : responseData?.enrollment_method === 'premium_pin'
+        ? `Application ${enrolleeId} submitted. Your Premium PIN has been accepted, and the application is awaiting approval and NIN verification.`
       : `Application ${enrolleeId} submitted and is awaiting approval and NIN verification.`
 
-    Object.assign(form, {
-      payment_reference: responseData?.purchase?.payment_reference || '',
-      password: '',
-      password_confirmation: '',
-    })
-
-    passportFile.value = null
-    setPassportPreview(responseData?.enrollee?.image_url || '')
-
-    if (passportInput.value) {
-      passportInput.value.value = ''
-    }
+    submittedEnrolleeId.value = enrolleeId || ''
+    successNextSteps.value = responseData?.next_steps || []
+    successDialog.value = true
+    clearApplicationFields()
+    scrollToSuccess()
 
     if (responseData?.requires_payment && checkout?.authorization_url) {
       openCheckoutWindow(checkout.authorization_url)
     }
   } catch (err) {
+    const message = err?.response?.data?.message || 'Unable to submit your application right now.'
+
     if (err.response?.status === 422) {
       const serverErrors = err.response?.data?.errors || {}
       Object.entries(serverErrors).forEach(([key, value]) => {
         errors[key] = value
       })
-    } else {
-      error(err?.response?.data?.message || 'Unable to submit your application right now.')
     }
+
+    submissionError.value = message
+    error(message)
+    scrollToError()
   } finally {
     submitting.value = false
   }
@@ -653,6 +754,34 @@ onMounted(() => {
   font-size: 13px;
   color: var(--qds-color-text-secondary);
   margin-bottom: 16px;
+}
+
+.enroll__success {
+  margin-bottom: 16px;
+  scroll-margin-top: 20px;
+  border: 1px solid #6ee7b7;
+  background: #d1fae5;
+  box-shadow: 0 10px 28px rgba(5, 150, 105, 0.12);
+}
+
+.enroll__success :deep(.qds-alert) {
+  border: 0;
+  background: transparent;
+  color: #064e3b;
+}
+
+.enroll__error {
+  margin-bottom: 16px;
+  scroll-margin-top: 20px;
+  border: 1px solid #fda4af;
+  background: #fff1f2;
+  box-shadow: 0 10px 28px rgba(190, 18, 60, 0.1);
+}
+
+.enroll__error :deep(.qds-alert) {
+  border: 0;
+  background: transparent;
+  color: #881337;
 }
 
 .enroll__panel {

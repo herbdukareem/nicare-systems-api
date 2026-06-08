@@ -152,6 +152,54 @@ class PremiumCoverageService
         });
     }
 
+    public function usePinForPendingEnrollment(PremiumPin $pin, Enrollee $enrollee, PremiumPlan $plan): Enrollee
+    {
+        return DB::transaction(function () use ($pin, $enrollee, $plan) {
+            $lockedPin = PremiumPin::with(['purchase', 'plan'])->lockForUpdate()->findOrFail($pin->id);
+
+            if ($lockedPin->isExpired()) {
+                $lockedPin->update(['status' => PremiumPin::STATUS_EXPIRED]);
+                throw new InvalidArgumentException('Premium PIN has expired.');
+            }
+
+            if (
+                $lockedPin->status !== PremiumPin::STATUS_SOLD
+                || $lockedPin->used_at
+                || $lockedPin->used_by_enrollee_id
+                || !$lockedPin->purchase
+                || $lockedPin->purchase->payment_status !== 'confirmed'
+            ) {
+                throw new InvalidArgumentException('Premium PIN is invalid, unpaid, or has already been used.');
+            }
+
+            if ((int) $lockedPin->premium_plan_id !== (int) $plan->id) {
+                throw new InvalidArgumentException('Premium PIN does not belong to the selected premium plan.');
+            }
+
+            $enrollee->update([
+                'premium_pin_id' => $lockedPin->id,
+                'premium_purchase_id' => $lockedPin->premium_purchase_id,
+            ]);
+
+            $old = $lockedPin->toArray();
+            $lockedPin->update([
+                'status' => PremiumPin::STATUS_USED,
+                'used_at' => now(),
+                'used_by_enrollee_id' => $enrollee->id,
+            ]);
+
+            $this->audit->record(
+                $lockedPin,
+                'premium_pin_used_for_pending_enrollment',
+                "Premium PIN {$lockedPin->serial_number} used for pending enrollee {$enrollee->enrollee_id}.",
+                $old,
+                $lockedPin->fresh()->toArray()
+            );
+
+            return $enrollee->fresh();
+        });
+    }
+
     public function confirmPurchase(PremiumPurchase $purchase, ?int $confirmedBy = null): PremiumPurchase
     {
         if ($purchase->sold_by && (int) $purchase->sold_by === (int) ($confirmedBy ?? auth()->id())) {
