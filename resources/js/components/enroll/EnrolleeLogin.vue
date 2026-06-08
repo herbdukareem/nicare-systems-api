@@ -45,17 +45,17 @@
 
         <div class="enroll-login__heading">
           <h1>Enrollee Sign In</h1>
-          <p>Sign in with your Enrollee ID and portal password.</p>
+          <p>Sign in with your Enrollee ID, email, or phone number and portal password.</p>
         </div>
 
         <AppAlert v-if="errorMsg" tone="danger" :message="errorMsg" class="tw-mb-4" />
 
         <form @submit.prevent="handleLogin" class="enroll-login__form">
           <div>
-            <label class="enroll-login__label">Enrollee ID</label>
+            <label class="enroll-login__label">Enrollee ID, email, or phone number</label>
             <v-text-field
               v-model="form.enrollee_id"
-              placeholder="e.g. NGSCHA000001234"
+              placeholder="e.g. NG2606081547367048 or your email"
               variant="outlined"
               density="compact"
               prepend-inner-icon="mdi-card-account-details-outline"
@@ -147,7 +147,7 @@ const handleLogin = async () => {
   fieldErrors.password = [];
   errorMsg.value = '';
 
-  if (!form.enrollee_id) { fieldErrors.enrollee_id = ['Enrollee ID is required']; return; }
+  if (!form.enrollee_id) { fieldErrors.enrollee_id = ['Enrollee ID, email, or phone number is required']; return; }
   if (!form.password)    { fieldErrors.password = ['Password is required']; return; }
 
   loading.value = true;
@@ -156,7 +156,7 @@ const handleLogin = async () => {
     success('Welcome back! Redirecting to your portal…');
     router.push('/enroll/dashboard');
   } catch (err) {
-      const msg = err.response?.data?.message || 'Invalid enrollee ID or password.';
+      const msg = err.response?.data?.message || 'Invalid enrollee ID, email, phone number, or password.';
     if (err.response?.status === 422) {
       const errs = err.response.data.errors || {};
       if (errs.enrollee_id) fieldErrors.enrollee_id = errs.enrollee_id;

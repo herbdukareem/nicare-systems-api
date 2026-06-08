@@ -32,10 +32,10 @@
               <span
                 class="tw-absolute tw-bottom-2 tw-left-2 tw-inline-block tw-w-3 tw-h-3 tw-rounded-full tw-ring-2 tw-ring-white"
                 :class="{
-                  'tw-bg-green-500': (enrollee.status || '').toLowerCase() === 'active',
-                  'tw-bg-orange-500': (enrollee.status || '').toLowerCase() === 'pending',
-                  'tw-bg-red-500': ['suspended','expired'].includes((enrollee.status || '').toLowerCase()),
-                  'tw-bg-gray-400': !enrollee.status
+                  'tw-bg-green-500': isActiveStatus(enrollee.status),
+                  'tw-bg-orange-500': Number(enrollee.status) === 0,
+                  'tw-bg-red-500': [2, 3, 4].includes(Number(enrollee.status)),
+                  'tw-bg-gray-400': enrollee.status === null || enrollee.status === undefined
                 }"
               />
               <!-- Upload -->
@@ -67,7 +67,7 @@
 
               <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-mt-3">
                 <v-chip :color="getStatusColor(enrollee.status)" size="small" variant="flat" class="tw-capitalize">
-                  <v-icon start size="16">mdi-check-circle</v-icon>{{ enrollee.status || 'unknown' }}
+                  <v-icon start size="16">mdi-check-circle</v-icon>{{ statusLabel(enrollee) }}
                 </v-chip>
                 <v-chip color="primary" size="small" variant="outlined">
                   <v-icon start size="16">mdi-badge-account</v-icon>{{ enrollee.type || 'N/A' }}
@@ -107,76 +107,6 @@
           <div class="tw-flex tw-flex-col sm:tw-flex-row tw-gap-2 sm:tw-items-start">
             <v-btn color="primary" variant="outlined" prepend-icon="mdi-pencil" @click="editEnrollee">Edit Profile</v-btn>
             <v-btn color="primary" prepend-icon="mdi-download" @click="downloadProfile">Download PDF</v-btn>
-          </div>
-        </div>
-      </div>
-
-      <!-- Status Management -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
-        <div class="tw-flex tw-items-center tw-justify-between tw-mb-4">
-          <h2 class="tw-text-xl tw-font-semibold tw-text-gray-900">Status Management</h2>
-          <v-alert
-            density="comfortable"
-            :type="(enrollee.status || '').toLowerCase() === 'active' ? 'success' : 'warning'"
-            variant="tonal"
-            class="tw-w-auto"
-          >
-            Current: <strong class="tw-capitalize">{{ enrollee.status || 'unknown' }}</strong>
-          </v-alert>
-        </div>
-
-        <div class="tw-grid tw-grid-cols-1 lg:tw-grid-cols-2 tw-gap-6">
-          <!-- Current -->
-          <div class="tw-bg-gray-50 tw-rounded-xl tw-p-4">
-            <div class="tw-flex tw-items-center tw-justify-between">
-              <div>
-                <v-chip :color="getStatusColor(enrollee.status)" size="large" variant="flat" class="tw-capitalize">
-                  {{ enrollee.status }}
-                </v-chip>
-                <p class="tw-text-sm tw-text-gray-600 tw-mt-2">Last updated: {{ formatDate(enrollee.updated_at) }}</p>
-              </div>
-              <v-btn
-                :color="(enrollee.status || '').toLowerCase() === 'active' ? 'orange' : 'green'"
-                variant="outlined"
-                @click="toggleStatus"
-                :loading="updatingStatus"
-              >
-                {{ (enrollee.status || '').toLowerCase() === 'active' ? 'Disable' : 'Enable' }}
-              </v-btn>
-            </div>
-          </div>
-
-          <!-- Change -->
-          <div>
-            <div class="tw-grid tw-grid-cols-1 tw-gap-4">
-              <v-select
-                v-model="newStatus"
-                :items="statusOptions"
-                item-title="label"
-                item-value="value"
-                label="Select New Status"
-                variant="outlined"
-                density="comfortable"
-                clearable
-              />
-              <v-textarea
-                v-model="statusComment"
-                label="Comment (Optional)"
-                variant="outlined"
-                density="comfortable"
-                rows="3"
-                placeholder="Add a comment about this status change..."
-              />
-              <v-btn
-                color="primary"
-                @click="updateStatus"
-                :loading="updatingStatus"
-                :disabled="!newStatus || newStatus === enrollee.status"
-                block
-              >
-                Update Status
-              </v-btn>
-            </div>
           </div>
         </div>
       </div>
@@ -288,9 +218,13 @@
       </div>
     </div>
 
-    <!-- Fallback -->
-    <div v-else class="tw-flex tw-justify-center tw-items-center tw-h-64">
-      <v-progress-circular indeterminate color="primary" size="64" />
+    <div v-else-if="loadError" class="tw-max-w-2xl tw-mx-auto tw-mt-8">
+      <v-alert type="error" variant="tonal" title="Unable to open enrollee profile">
+        {{ loadError }}
+        <template #append>
+          <v-btn variant="outlined" color="error" :loading="loading" @click="loadEnrollee">Retry</v-btn>
+        </template>
+      </v-alert>
     </div>
   </AdminLayout>
 </template>
@@ -301,7 +235,6 @@ import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
 import { useToast } from '../../composables/useToast'
 import { enrolleeAPI } from '../../utils/api'
-import axios from 'axios'
 
 /* Toast + route */
 const route = useRoute()
@@ -311,11 +244,8 @@ const { success, error } = useToast()
 /* State */
 const enrollee = ref(null)
 const loading = ref(false)
-const updatingStatus = ref(false)
-const newStatus = ref(null)
-const statusComment = ref('')
+const loadError = ref('')
 const fileInput = ref(null)
-const statusOptions = ref([])
 
 const statistics = ref({ totalClaims: 0, totalBenefits: 0, facilitiesVisited: 0, lastVisit: null })
 const activeCoverage = ref(null)
@@ -360,44 +290,32 @@ const StatTile = defineComponent({
 /* Methods */
 const loadEnrollee = async () => {
   loading.value = true
+  loadError.value = ''
   try {
-    const [enrolleeRes, statsRes] = await Promise.allSettled([
-      enrolleeAPI.getById(route.params.id),
-      enrolleeAPI.getStatistics(route.params.id),
-    ])
-
-    if (enrolleeRes.status === 'fulfilled') {
-      enrollee.value = enrolleeRes.value.data.data
-      activeCoverage.value = buildActiveCoverage(enrollee.value)
-    } else {
-      error('Failed to load enrollee details')
-    }
-
-    if (statsRes.status === 'fulfilled') {
-      const s = statsRes.value.data?.data || {}
-      statistics.value = {
-        totalClaims: s.total_claims ?? 0,
-        totalBenefits: s.total_benefits ?? 0,
-        facilitiesVisited: s.facilities_visited ?? 0,
-        lastVisit: s.last_visit_days ?? null,
-      }
-    }
+    const response = await enrolleeAPI.getById(route.params.id)
+    enrollee.value = response.data.data
+    activeCoverage.value = buildActiveCoverage(enrollee.value)
+    loadStatistics()
+  } catch (err) {
+    loadError.value = err.response?.data?.message || 'Failed to load enrollee details.'
+    error(loadError.value)
   } finally {
     loading.value = false
   }
 }
 
-const loadStatusOptions = async () => {
+const loadStatistics = async () => {
   try {
-    const response = await axios.get('/api/dashboard/status-options')
-    if (response.data.success) {
-      statusOptions.value = Object.entries(response.data.data).map(([value, label]) => ({
-        value: isNaN(Number(value)) ? label : label, // backend sometimes sends numeric keys; we want string status values
-        label: label.charAt(0).toUpperCase() + label.slice(1),
-      }))
+    const response = await enrolleeAPI.getStatistics(route.params.id)
+    const s = response.data?.data || {}
+    statistics.value = {
+      totalClaims: s.total_claims ?? 0,
+      totalBenefits: s.total_benefits ?? 0,
+      facilitiesVisited: s.facilities_visited ?? 0,
+      lastVisit: s.last_visit_days ?? null,
     }
   } catch (err) {
-    console.error('Failed to load status options:', err)
+    console.error('Failed to load enrollee statistics:', err)
   }
 }
 
@@ -412,43 +330,13 @@ const handleFileUpload = async (event) => {
   try {
     const formData = new FormData()
     formData.append('passport', file)
-    const response = await axios.post(`/api/v1/enrollees/${enrollee.value.id}/upload-passport`, formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    })
+    const response = await enrolleeAPI.uploadPassport(enrollee.value.id, formData)
     if (response.data.success) {
       success('Passport photo uploaded successfully')
       enrollee.value.image_url = response.data.data.image_url
     }
   } catch {
     error('Failed to upload passport photo')
-  }
-}
-
-const toggleStatus = async () => {
-  const current = (enrollee.value.status || '').toLowerCase()
-  const next = current === 'active' ? 'suspended' : 'active'
-  await updateEnrolleeStatus(next, `Status ${next === 'active' ? 'enabled' : 'disabled'} by admin`)
-}
-
-const updateStatus = async () => {
-  if (!newStatus.value) return
-  await updateEnrolleeStatus(newStatus.value, statusComment.value)
-}
-
-const updateEnrolleeStatus = async (status, comment) => {
-  updatingStatus.value = true
-  try {
-    const response = await axios.put(`/api/v1/enrollees/${enrollee.value.id}/status`, { status, comment })
-    if (response.data.success) {
-      success('Enrollee status updated successfully')
-      enrollee.value.status = response.data.data.status
-      newStatus.value = null
-      statusComment.value = ''
-    }
-  } catch {
-    error('Failed to update enrollee status')
-  } finally {
-    updatingStatus.value = false
   }
 }
 
@@ -484,12 +372,24 @@ const copy = async (text) => {
   } catch { /* noop */ }
 }
 
+const statusLabels = {
+  0: 'Pending',
+  1: 'Active',
+  2: 'Rejected',
+  3: 'Suspended',
+  4: 'Expired / Inactive',
+}
+
+const statusLabel = (record) => record?.status_label || statusLabels[Number(record?.status)] || 'Unknown'
+const isActiveStatus = (status) => Number(status) === 1
+
 const getStatusColor = (status) => {
-  switch ((status || '').toLowerCase()) {
-    case 'active': return 'success'
-    case 'pending': return 'warning'
-    case 'suspended':
-    case 'expired': return 'error'
+  switch (Number(status)) {
+    case 1: return 'success'
+    case 0: return 'warning'
+    case 2:
+    case 3:
+    case 4: return 'error'
     default: return 'grey'
   }
 }
@@ -542,6 +442,5 @@ const buildActiveCoverage = (record) => {
 /* Lifecycle */
 onMounted(() => {
   loadEnrollee()
-  loadStatusOptions()
 })
 </script>

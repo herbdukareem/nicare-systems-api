@@ -70,7 +70,7 @@ class PublicEnrollmentController extends BaseController
     {
         $validated = $request->validate([
             'premium_plan_id' => ['required', 'exists:premium_plans,id'],
-            'nin' => ['nullable', 'string', 'max:255', 'unique:enrollees,nin'],
+            'nin' => ['required', 'string', 'max:255', 'unique:enrollees,nin'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],

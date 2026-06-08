@@ -28,14 +28,15 @@ class EnrolleeAuthController extends Controller
             ], 429);
         }
 
-        $enrollee = Enrollee::where('enrollee_id', $request->enrollee_id)->first();
+        $identifier = trim((string) $request->enrollee_id);
+        $enrollee = $this->findEnrolleeByIdentifier($identifier);
 
         if (!$enrollee) {
             RateLimiter::hit($throttleKey, 60);
 
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid enrollee ID or password.',
+                'message' => 'Invalid enrollee ID, email, phone number, or password.',
             ], 401);
         }
 
@@ -53,14 +54,14 @@ class EnrolleeAuthController extends Controller
 
             return response()->json([
                 'success' => false,
-                'message' => 'Invalid enrollee ID or password.',
+                'message' => 'Invalid enrollee ID, email, phone number, or password.',
             ], 401);
         }
 
-        if ((int) $enrollee->status !== Enrollee::STATUS_ACTIVE) {
+        if (!in_array((int) $enrollee->status, [Enrollee::STATUS_PENDING, Enrollee::STATUS_ACTIVE], true)) {
             return response()->json([
                 'success' => false,
-                'message' => 'Your account is not active. Please contact the agency.',
+                'message' => 'Your account cannot access the portal in its current status. Please contact the agency.',
             ], 403);
         }
 
@@ -140,6 +141,21 @@ class EnrolleeAuthController extends Controller
 
     private function throttleKey(Request $request): string
     {
-        return 'enrollee-login:' . strtolower((string) $request->input('enrollee_id')) . '|' . $request->ip();
+        return 'enrollee-login:' . strtolower(trim((string) $request->input('enrollee_id'))) . '|' . $request->ip();
+    }
+
+    private function findEnrolleeByIdentifier(string $identifier): ?Enrollee
+    {
+        $enrollee = Enrollee::where('enrollee_id', $identifier)->first();
+
+        if ($enrollee) {
+            return $enrollee;
+        }
+
+        if (filter_var($identifier, FILTER_VALIDATE_EMAIL)) {
+            return Enrollee::where('email', $identifier)->first();
+        }
+
+        return Enrollee::where('phone', $identifier)->first();
     }
 }

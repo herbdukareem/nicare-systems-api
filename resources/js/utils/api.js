@@ -126,6 +126,9 @@ export const enrolleeAPI = {
   pendingApproval: (params) => api.get('/enrollees/pending-approval', { params }),
   update: (id, data) => api.put(`/enrollees/${id}`, data),
   updateStatus: (id, data) => api.put(`/enrollees/${id}/status`, data),
+  uploadPassport: (id, data) => api.post(`/enrollees/${id}/upload-passport`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
   bulkUpdateStatus: (data) => api.post('/enrollees/bulk-update-status', data),
   delete: (id) => api.delete(`/enrollees/${id}`),
   idCard: (id) => api.get(`/enrollees/${id}/id-card`, { responseType: 'blob' }),

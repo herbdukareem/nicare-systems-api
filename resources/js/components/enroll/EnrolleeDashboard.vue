@@ -1,85 +1,78 @@
 <template>
   <EnrolleeLayout>
-    <!-- Page header -->
-    <div class="tw-mb-6">
-      <h1 class="tw-text-2xl tw-font-bold tw-text-slate-900">
-        Welcome, {{ firstName }}
-      </h1>
-      <p class="tw-text-sm tw-text-slate-500">Here's your health insurance overview</p>
-    </div>
+    <AppPageHeader
+      class="tw-mb-6"
+      :title="`Welcome, ${firstName}`"
+      subtitle="Here is your health insurance overview"
+      kicker="Enrollee portal"
+      icon="mdi-view-dashboard-outline"
+    />
 
-    <div v-if="loading" class="tw-flex tw-justify-center tw-py-16">
-      <v-progress-circular indeterminate color="primary" size="48" />
+    <div v-if="loading" class="tw-grid tw-gap-4 md:tw-grid-cols-2">
+      <AppSkeleton v-for="index in 4" :key="index" type="article" />
     </div>
 
     <template v-else-if="enrollee">
       <!-- Status banner -->
-      <v-alert
-        :type="coverageAlertType"
-        variant="tonal"
+      <AppAlert
+        :tone="coverageAlertTone"
+        :title="coverageStatusLabel"
         class="tw-mb-6"
         :icon="coverageAlertIcon"
-        rounded="lg"
       >
-        <strong>{{ coverageStatusLabel }}</strong>
         <span v-if="enrollee.coverage_end_date" class="tw-ml-2 tw-text-sm">
           — expires {{ formatDate(enrollee.coverage_end_date) }}
         </span>
-      </v-alert>
+      </AppAlert>
 
       <!-- Stat cards -->
-      <div class="tw-grid tw-grid-cols-2 md:tw-grid-cols-4 tw-gap-4 tw-mb-6">
-        <div v-for="stat in statCards" :key="stat.label" class="ep-stat-card">
-          <div class="ep-stat-card__icon" :style="{ background: stat.iconBg }">
-            <v-icon :color="stat.iconColor" size="22">{{ stat.icon }}</v-icon>
-          </div>
-          <div class="ep-stat-card__value" :class="stat.valueClass">{{ stat.value }}</div>
-          <div class="ep-stat-card__label">{{ stat.label }}</div>
-        </div>
+      <div class="tw-grid tw-grid-cols-1 sm:tw-grid-cols-2 xl:tw-grid-cols-4 tw-gap-4 tw-mb-6">
+        <AppMetricCard v-for="stat in statCards" :key="stat.label" class="ep-metric-card" :title="stat.label" :helper="stat.helper" :icon="stat.icon" :tone="stat.tone" hover>
+          <template #value>
+            <div class="ep-metric-card__value" :class="{ 'ep-metric-card__value--id': stat.isId }" :title="stat.value">
+              {{ stat.value }}
+            </div>
+          </template>
+          <template #aside>
+            <EnrolleeStatusBadge v-if="stat.isStatus" :status="enrollee.status" :label="stat.value" size="sm" />
+            <v-btn v-else-if="stat.action" icon size="small" variant="tonal" :color="stat.tone" :aria-label="stat.actionLabel" @click="stat.action">
+              <v-icon size="17">{{ stat.actionIcon }}</v-icon>
+              <v-tooltip activator="parent">{{ stat.actionLabel }}</v-tooltip>
+            </v-btn>
+          </template>
+        </AppMetricCard>
       </div>
 
       <!-- Two column layout -->
       <div class="tw-grid md:tw-grid-cols-2 tw-gap-6">
         <!-- Personal Details -->
-        <div class="ep-card">
-          <div class="ep-card__head">
-            <v-icon color="primary" size="20">mdi-account-details</v-icon>
-            <span class="ep-card__title">Personal Details</span>
-          </div>
-          <div class="ep-card__body">
+        <AppCard title="Personal Details" icon="mdi-account-details" full-height>
+          <div>
             <div class="ep-field" v-for="f in personalFields" :key="f.label">
               <span class="ep-field__label">{{ f.label }}</span>
               <span class="ep-field__value">{{ f.value || '—' }}</span>
             </div>
           </div>
-        </div>
+        </AppCard>
 
         <!-- Coverage Info -->
-        <div class="ep-card">
-          <div class="ep-card__head">
-            <v-icon color="primary" size="20">mdi-shield-check</v-icon>
-            <span class="ep-card__title">Coverage & Plan</span>
-          </div>
-          <div class="ep-card__body">
+        <AppCard title="Coverage & Plan" icon="mdi-shield-check" full-height>
+          <template #actions>
+            <v-btn color="primary" variant="tonal" size="small" @click="$router.push('/enroll/plans')">
+              <v-icon start size="16">mdi-refresh</v-icon> Renew Plan
+            </v-btn>
+          </template>
+          <div>
             <div class="ep-field" v-for="f in coverageFields" :key="f.label">
               <span class="ep-field__label">{{ f.label }}</span>
               <span class="ep-field__value">{{ f.value || '—' }}</span>
             </div>
           </div>
-          <div class="ep-card__footer">
-            <v-btn color="primary" variant="tonal" size="small" rounded @click="$router.push('/enroll/plans')">
-              <v-icon start size="16">mdi-refresh</v-icon> Renew Plan
-            </v-btn>
-          </div>
-        </div>
+        </AppCard>
 
         <!-- Quick Actions -->
-        <div class="ep-card md:tw-col-span-2">
-          <div class="ep-card__head">
-            <v-icon color="primary" size="20">mdi-lightning-bolt</v-icon>
-            <span class="ep-card__title">Quick Actions</span>
-          </div>
-          <div class="tw-grid tw-grid-cols-2 sm:tw-grid-cols-4 tw-gap-3 tw-p-4">
+        <AppCard class="md:tw-col-span-2" title="Quick Actions" icon="mdi-lightning-bolt">
+          <div class="tw-grid tw-grid-cols-2 sm:tw-grid-cols-4 tw-gap-3">
             <div v-for="action in quickActions" :key="action.label" class="ep-action" @click="action.onClick">
               <div class="ep-action__icon" :style="{ background: action.bg }">
                 <v-icon :color="action.color" size="24">{{ action.icon }}</v-icon>
@@ -87,14 +80,11 @@
               <span class="ep-action__label">{{ action.label }}</span>
             </div>
           </div>
-        </div>
+        </AppCard>
       </div>
     </template>
 
-    <div v-else class="tw-text-center tw-py-16 tw-text-slate-500">
-      <v-icon size="48" class="tw-mb-3">mdi-account-alert</v-icon>
-      <p>Could not load your profile. Please refresh.</p>
-    </div>
+    <AppErrorState v-else title="Could not load your profile" message="Please refresh the page or sign in again." />
   </EnrolleeLayout>
 </template>
 
@@ -104,10 +94,19 @@ import { useRouter } from 'vue-router';
 import { useEnrolleeAuthStore } from '../../stores/enrolleeAuth';
 import { useOrganizationSettings } from '../../composables/useOrganizationSettings';
 import EnrolleeLayout from './layout/EnrolleeLayout.vue';
+import AppAlert from '../common/AppAlert.vue';
+import AppCard from '../common/AppCard.vue';
+import AppErrorState from '../common/AppErrorState.vue';
+import AppMetricCard from '../common/AppMetricCard.vue';
+import AppPageHeader from '../common/AppPageHeader.vue';
+import AppSkeleton from '../common/AppSkeleton.vue';
+import EnrolleeStatusBadge from '../common/EnrolleeStatusBadge.vue';
+import { useToast } from '../../composables/useToast';
 
 const router = useRouter();
 const enrolleeAuth = useEnrolleeAuthStore();
 const { settings: org, fetchSettings } = useOrganizationSettings();
+const { success } = useToast();
 
 const loading = ref(false);
 const enrollee = computed(() => enrolleeAuth.enrollee);
@@ -127,7 +126,7 @@ const hasCoverage = computed(() => {
   return !end || new Date(end) >= new Date();
 });
 
-const coverageAlertType = computed(() => hasCoverage.value ? 'success' : (isActive.value ? 'warning' : 'error'));
+const coverageAlertTone = computed(() => hasCoverage.value ? 'success' : (isActive.value ? 'warning' : 'danger'));
 const coverageAlertIcon = computed(() => hasCoverage.value ? 'mdi-shield-check' : 'mdi-shield-alert');
 const coverageStatusLabel = computed(() => {
   if (hasCoverage.value) return 'Your health coverage is active';
@@ -135,35 +134,47 @@ const coverageStatusLabel = computed(() => {
   return `Account status: ${statusLabel.value}`;
 });
 
+const copyEnrolleeId = async () => {
+  await navigator.clipboard.writeText(enrollee.value?.enrollee_id || '');
+  success('Enrollee ID copied.');
+};
+
 const statCards = computed(() => [
   {
     icon: 'mdi-card-account-details',
-    iconBg: '#eff6ff',
-    iconColor: '#2563eb',
+    tone: 'primary',
     value: enrollee.value?.enrollee_id || '—',
     label: 'Enrollee ID',
+    helper: 'Your unique NiCare reference',
+    isId: true,
+    action: copyEnrolleeId,
+    actionIcon: 'mdi-content-copy',
+    actionLabel: 'Copy enrollee ID',
   },
   {
     icon: 'mdi-hospital-building',
-    iconBg: '#f0fdf4',
-    iconColor: '#16a34a',
+    tone: 'success',
     value: enrollee.value?.facility?.name || '—',
     label: 'Primary Facility',
+    helper: enrollee.value?.facility?.name ? 'Assigned healthcare provider' : 'No facility assigned yet',
   },
   {
     icon: 'mdi-shield-star',
-    iconBg: '#faf5ff',
-    iconColor: '#9333ea',
+    tone: 'secondary',
     value: enrollee.value?.premium_plan?.name || enrollee.value?.benefit_package?.name || '—',
     label: 'Current Plan',
+    helper: hasCoverage.value ? 'Coverage is currently active' : 'Review or renew your coverage',
+    action: () => router.push('/enroll/plans'),
+    actionIcon: 'mdi-arrow-right',
+    actionLabel: 'View premium plans',
   },
   {
     icon: 'mdi-account-check',
-    iconBg: isActive.value ? '#f0fdf4' : '#fff7ed',
-    iconColor: isActive.value ? '#16a34a' : '#ea580c',
+    tone: isActive.value ? 'success' : 'warning',
     value: statusLabel.value,
     label: 'Account Status',
-    valueClass: isActive.value ? 'tw-text-green-600' : 'tw-text-orange-500',
+    helper: isActive.value ? 'Your account is approved' : 'Approval or review may be required',
+    isStatus: true,
   },
 ]);
 
@@ -204,63 +215,32 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.ep-stat-card {
-  background: white;
-  border-radius: 16px;
-  padding: 20px 16px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  border: 1px solid #e2e8f0;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.ep-stat-card__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  display: grid;
-  place-items: center;
-}
-.ep-stat-card__value {
-  font-size: 15px;
-  font-weight: 700;
-  color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.ep-stat-card__label {
-  font-size: 12px;
-  color: #64748b;
+.ep-metric-card :deep(.qds-card-padding) {
+  padding-top: 0.75rem;
 }
 
-.ep-card {
-  background: white;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-  overflow: hidden;
-}
-.ep-card__head {
-  display: flex;
+.ep-metric-card :deep(.tw-items-end) {
   align-items: center;
-  gap: 8px;
-  padding: 16px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  background: #f8fafc;
 }
-.ep-card__title {
-  font-size: 15px;
+
+.ep-metric-card__value {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.95rem;
   font-weight: 700;
+  line-height: 1.35;
   color: #0f172a;
 }
-.ep-card__body {
-  padding: 12px 20px;
-}
-.ep-card__footer {
-  padding: 12px 20px;
-  border-top: 1px solid #f1f5f9;
-  background: #f8fafc;
+
+.ep-metric-card__value--id {
+  display: block;
+  overflow: hidden;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.84rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ep-field {

@@ -1,0 +1,1 @@
+import{P as e,Q as t,S as a,T as l,al as o}from"./vue-Vk_6O6LP.js";const s={__name:"AppSkeleton",props:{type:{type:String,default:"article"},loading:{type:Boolean,default:!0}},setup:s=>(n,p)=>{const d=e("v-skeleton-loader");return t(),a(d,{type:s.type,loading:s.loading,class:"tw-rounded-2xl"},{default:l(()=>[o(n.$slots,"default")]),_:3},8,["type","loading"])}};export{s as _};

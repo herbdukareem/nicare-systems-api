@@ -1,12 +1,9 @@
 <template>
   <EnrolleeLayout>
-    <div class="tw-mb-6">
-      <h1 class="tw-text-2xl tw-font-bold tw-text-slate-900">My Profile</h1>
-      <p class="tw-text-sm tw-text-slate-500">Your personal and enrollment information</p>
-    </div>
+    <AppPageHeader class="tw-mb-6" title="My Profile" subtitle="Your personal and enrollment information" kicker="Enrollee portal" icon="mdi-account-outline" />
 
-    <div v-if="loading" class="tw-flex tw-justify-center tw-py-16">
-      <v-progress-circular indeterminate color="primary" size="48" />
+    <div v-if="loading" class="tw-grid tw-gap-4 md:tw-grid-cols-2">
+      <AppSkeleton v-for="index in 4" :key="index" type="article" />
     </div>
 
     <template v-else-if="enrollee">
@@ -25,67 +22,49 @@
           <h2 class="ep-profile-hero__name">{{ enrollee.full_name }}</h2>
           <div class="ep-profile-hero__id">{{ enrollee.enrollee_id }}</div>
           <div class="tw-flex tw-gap-2 tw-mt-2 tw-flex-wrap">
-            <v-chip size="small" :color="statusColor" label>{{ statusLabel }}</v-chip>
-            <v-chip size="small" color="primary" variant="tonal" label v-if="enrollee.premium_plan?.name || enrollee.benefit_package?.name">
-              {{ enrollee.premium_plan?.name || enrollee.benefit_package?.name }}
-            </v-chip>
+            <EnrolleeStatusBadge :status="enrollee.status" :label="statusLabel" />
+            <AppBadge v-if="enrollee.premium_plan?.name || enrollee.benefit_package?.name" :label="enrollee.premium_plan?.name || enrollee.benefit_package?.name" tone="info" />
           </div>
         </div>
       </div>
 
       <!-- Details sections -->
       <div class="tw-grid md:tw-grid-cols-2 tw-gap-6">
-        <div class="ep-card">
-          <div class="ep-card__head">
-            <v-icon color="primary" size="18">mdi-account</v-icon>
-            <span class="ep-card__title">Personal Information</span>
-          </div>
-          <div class="ep-card__body">
+        <AppCard title="Personal Information" icon="mdi-account" full-height>
+          <div>
             <div class="ep-row" v-for="f in personalSection" :key="f.label">
               <span class="ep-row__label">{{ f.label }}</span>
               <span class="ep-row__value">{{ f.value || '—' }}</span>
             </div>
           </div>
-        </div>
+        </AppCard>
 
-        <div class="ep-card">
-          <div class="ep-card__head">
-            <v-icon color="primary" size="18">mdi-shield-check</v-icon>
-            <span class="ep-card__title">Enrollment & Coverage</span>
-          </div>
-          <div class="ep-card__body">
+        <AppCard title="Enrollment & Coverage" icon="mdi-shield-check" full-height>
+          <div>
             <div class="ep-row" v-for="f in enrollmentSection" :key="f.label">
               <span class="ep-row__label">{{ f.label }}</span>
               <span class="ep-row__value">{{ f.value || '—' }}</span>
             </div>
           </div>
-        </div>
+        </AppCard>
 
-        <div class="ep-card">
-          <div class="ep-card__head">
-            <v-icon color="primary" size="18">mdi-map-marker</v-icon>
-            <span class="ep-card__title">Location Details</span>
-          </div>
-          <div class="ep-card__body">
+        <AppCard title="Location Details" icon="mdi-map-marker" full-height>
+          <div>
             <div class="ep-row" v-for="f in locationSection" :key="f.label">
               <span class="ep-row__label">{{ f.label }}</span>
               <span class="ep-row__value">{{ f.value || '—' }}</span>
             </div>
           </div>
-        </div>
+        </AppCard>
 
-        <div class="ep-card">
-          <div class="ep-card__head">
-            <v-icon color="primary" size="18">mdi-hospital-building</v-icon>
-            <span class="ep-card__title">Facility & Programme</span>
-          </div>
-          <div class="ep-card__body">
+        <AppCard title="Facility & Programme" icon="mdi-hospital-building" full-height>
+          <div>
             <div class="ep-row" v-for="f in facilitySection" :key="f.label">
               <span class="ep-row__label">{{ f.label }}</span>
               <span class="ep-row__value">{{ f.value || '—' }}</span>
             </div>
           </div>
-        </div>
+        </AppCard>
       </div>
 
       <!-- Actions -->
@@ -99,10 +78,9 @@
       </div>
     </template>
 
-    <div v-else class="tw-text-center tw-py-16 tw-text-slate-500">
-      <v-icon size="48" class="tw-mb-3">mdi-account-alert</v-icon>
-      <p>Could not load your profile. Please refresh.</p>
-    </div>
+    <AppErrorState v-else title="Could not load your profile" message="Please refresh the profile or sign in again.">
+      <v-btn color="primary" variant="outlined" @click="refresh">Retry</v-btn>
+    </AppErrorState>
   </EnrolleeLayout>
 </template>
 
@@ -110,6 +88,12 @@
 import { ref, computed, onMounted } from 'vue';
 import { useEnrolleeAuthStore } from '../../stores/enrolleeAuth';
 import EnrolleeLayout from './layout/EnrolleeLayout.vue';
+import AppBadge from '../common/AppBadge.vue';
+import AppCard from '../common/AppCard.vue';
+import AppErrorState from '../common/AppErrorState.vue';
+import AppPageHeader from '../common/AppPageHeader.vue';
+import AppSkeleton from '../common/AppSkeleton.vue';
+import EnrolleeStatusBadge from '../common/EnrolleeStatusBadge.vue';
 
 const enrolleeAuth = useEnrolleeAuthStore();
 const loading = ref(false);
@@ -117,7 +101,6 @@ const enrollee = computed(() => enrolleeAuth.enrollee);
 
 const fmt = (d) => d ? new Date(d).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 
-const statusColor = computed(() => ({ 0: 'warning', 1: 'success', 2: 'error', 3: 'warning', 4: 'error' }[enrollee.value?.status] ?? 'default'));
 const statusLabel = computed(() => ({ 0: 'Pending', 1: 'Active', 2: 'Rejected', 3: 'Suspended', 4: 'Expired' }[enrollee.value?.status] ?? 'Unknown'));
 
 const personalSection = computed(() => [
@@ -204,28 +187,6 @@ onMounted(async () => {
   color: rgba(255,255,255,0.7);
   font-family: monospace;
 }
-
-.ep-card {
-  background: white;
-  border-radius: 16px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-  overflow: hidden;
-}
-.ep-card__head {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 20px;
-  border-bottom: 1px solid #f1f5f9;
-  background: #f8fafc;
-}
-.ep-card__title {
-  font-size: 14px;
-  font-weight: 700;
-  color: #0f172a;
-}
-.ep-card__body { padding: 4px 20px 12px; }
 
 .ep-row {
   display: flex;

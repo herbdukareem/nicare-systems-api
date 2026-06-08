@@ -66,17 +66,15 @@
     <main class="el-main">
       <div class="el-main__inner">
         <!-- Password change nudge -->
-        <v-alert
+        <AppAlert
           v-if="!enrolleeAuth.hasCustomPassword"
-          type="warning"
-          variant="tonal"
           class="tw-mb-5"
-          density="compact"
-          closable
+          tone="warning"
+          title="Secure your portal account"
         >
           Your default password is your NIN.
           <router-link to="/enroll/change-password" class="tw-font-semibold tw-underline">Set a secure password →</router-link>
-        </v-alert>
+        </AppAlert>
 
         <slot />
       </div>
@@ -101,6 +99,7 @@ import { useRouter } from 'vue-router';
 import { useEnrolleeAuthStore } from '../../../stores/enrolleeAuth';
 import { useToast } from '../../../composables/useToast';
 import { useOrganizationSettings } from '../../../composables/useOrganizationSettings';
+import AppAlert from '../../common/AppAlert.vue';
 
 const router = useRouter();
 const enrolleeAuth = useEnrolleeAuthStore();

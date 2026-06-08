@@ -13,7 +13,7 @@ const DEFAULTS = {
   about_title: 'Niger State Contributory Health Agency',
   about_description: "Statutory body responsible for administering the State's contributory health insurance scheme under the enabling law establishing NGSCHA.",
   logo_path: null,
-  logo_url: null,
+  logo_url: '/logo.png',
 };
 
 // Shared module-level state — fetched once and reused across pages
@@ -35,7 +35,11 @@ const fetchSettings = async () => {
   pendingFetch = organizationSettingsAPI.getPublic()
     .then((response) => {
       const data = response.data?.data || {};
-      settings.value = { ...DEFAULTS, ...data };
+      settings.value = {
+        ...DEFAULTS,
+        ...data,
+        logo_url: data.logo_url || DEFAULTS.logo_url,
+      };
       loaded.value = true;
       return settings.value;
     })

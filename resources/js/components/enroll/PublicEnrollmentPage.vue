@@ -122,7 +122,7 @@
                 <v-text-field v-model="form.first_name" label="First name" variant="outlined" density="compact" :error-messages="errors.first_name" />
                 <v-text-field v-model="form.last_name" label="Last name" variant="outlined" density="compact" :error-messages="errors.last_name" />
                 <v-text-field v-model="form.middle_name" label="Middle name" variant="outlined" density="compact" :error-messages="errors.middle_name" />
-                <v-text-field v-model="form.nin" label="NIN (optional)" variant="outlined" density="compact" :error-messages="errors.nin" />
+                <v-text-field v-model="form.nin" label="NIN" variant="outlined" density="compact" required :error-messages="errors.nin" />
                 <v-text-field v-model="form.phone" label="Phone number" variant="outlined" density="compact" :error-messages="errors.phone" />
                 <v-text-field v-model="form.email" label="Email address" variant="outlined" density="compact" :error-messages="errors.email" />
                 <v-text-field v-model="form.date_of_birth" label="Date of birth" type="date" variant="outlined" density="compact" :error-messages="errors.date_of_birth" />

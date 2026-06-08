@@ -1,25 +1,14 @@
 <template>
   <EnrolleeLayout>
     <div class="tw-max-w-xl tw-mx-auto">
-      <div class="tw-mb-6">
-        <h1 class="tw-text-2xl tw-font-bold tw-text-slate-900">Change Password</h1>
-        <p class="tw-text-sm tw-text-slate-500">
-          Set a secure custom password for your enrollee account
-        </p>
-      </div>
+      <AppPageHeader class="tw-mb-6" title="Change Password" subtitle="Set a secure custom password for your enrollee account" kicker="Enrollee portal" icon="mdi-lock-outline" />
 
-      <v-alert type="info" variant="tonal" class="tw-mb-5" rounded="lg" v-if="!enrolleeAuth.hasCustomPassword">
-        <strong>Default password active.</strong> Your current password is your NIN. We recommend setting a custom password for better security.
-      </v-alert>
+      <AppAlert v-if="!enrolleeAuth.hasCustomPassword" class="tw-mb-5" tone="info" title="Default password active" message="Set a custom password for better account security." />
 
-      <v-alert type="success" variant="tonal" class="tw-mb-5" v-if="successMsg" rounded="lg">
-        {{ successMsg }}
-      </v-alert>
-      <v-alert type="error" variant="tonal" class="tw-mb-5" v-if="errorMsg" rounded="lg">
-        {{ errorMsg }}
-      </v-alert>
+      <AppAlert v-if="successMsg" class="tw-mb-5" tone="success" title="Password updated" :message="successMsg" />
+      <AppAlert v-if="errorMsg" class="tw-mb-5" tone="danger" title="Password could not be updated" :message="errorMsg" />
 
-      <div class="ep-change-pwd-card">
+      <AppCard title="Update portal password" subtitle="Confirm your current password before choosing a new one" icon="mdi-shield-lock-outline">
         <form @submit.prevent="handleSubmit">
           <div class="tw-space-y-5">
             <div>
@@ -110,21 +99,17 @@
             </v-btn>
           </div>
         </form>
-      </div>
+      </AppCard>
 
       <!-- Tips -->
-      <div class="ep-tips tw-mt-6">
-        <div class="ep-tips__title">
-          <v-icon size="16" color="primary">mdi-lightbulb</v-icon>
-          Password Tips
-        </div>
+      <AppCard class="tw-mt-6" title="Password Tips" icon="mdi-lightbulb-outline" tone="info" muted>
         <ul class="ep-tips__list">
           <li>Use at least 6 characters</li>
           <li>Mix letters, numbers, and symbols</li>
           <li>Avoid using your NIN or enrollee ID as your new password</li>
           <li>Do not share your password with anyone</li>
         </ul>
-      </div>
+      </AppCard>
     </div>
   </EnrolleeLayout>
 </template>
@@ -135,6 +120,9 @@ import { useEnrolleeAuthStore } from '../../stores/enrolleeAuth';
 import { enrolleePortalAPI } from '../../utils/enrolleeApi';
 import { useToast } from '../../composables/useToast';
 import EnrolleeLayout from './layout/EnrolleeLayout.vue';
+import AppAlert from '../common/AppAlert.vue';
+import AppCard from '../common/AppCard.vue';
+import AppPageHeader from '../common/AppPageHeader.vue';
 
 const enrolleeAuth = useEnrolleeAuthStore();
 const { success } = useToast();
@@ -235,33 +223,11 @@ const handleSubmit = async () => {
   color: #374151;
   margin-bottom: 6px;
 }
-.ep-change-pwd-card {
-  background: white;
-  border-radius: 20px;
-  padding: 32px;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-}
 .ep-strength-bar {
   height: 4px;
   flex: 1;
   border-radius: 999px;
   transition: background 0.3s;
-}
-.ep-tips {
-  background: #eff6ff;
-  border: 1px solid #bfdbfe;
-  border-radius: 12px;
-  padding: 16px 20px;
-}
-.ep-tips__title {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 700;
-  color: #1d4ed8;
-  margin-bottom: 8px;
 }
 .ep-tips__list {
   font-size: 13px;

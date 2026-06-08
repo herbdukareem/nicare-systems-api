@@ -1,39 +1,40 @@
 <template>
   <EnrolleeLayout>
-    <div class="tw-mb-6">
-      <h1 class="tw-text-2xl tw-font-bold tw-text-slate-900">Premium Plans</h1>
-      <p class="tw-text-sm tw-text-slate-500">View available plans and renew your health coverage</p>
-    </div>
+    <AppPageHeader class="tw-mb-6" title="Premium Plans" subtitle="View available plans and renew your health coverage" kicker="Enrollee portal" icon="mdi-shield-star-outline" />
 
     <!-- Current plan -->
-    <div v-if="currentPlan" class="ep-current-plan tw-mb-6">
+    <AppCard v-if="currentPlan" class="tw-mb-6" title="Your Current Plan" icon="mdi-shield-check" tone="success" muted>
       <div class="tw-flex tw-items-center tw-gap-3 tw-mb-1">
-        <v-icon color="white" size="20">mdi-shield-check</v-icon>
-        <span class="tw-font-bold tw-text-white">Your Current Plan</span>
+        <v-icon color="success" size="20">mdi-shield-check</v-icon>
+        <span class="tw-font-bold tw-text-slate-900">Current coverage</span>
       </div>
-      <div class="tw-text-white tw-text-lg tw-font-bold">{{ currentPlan.name }}</div>
-      <div class="tw-text-white/75 tw-text-sm tw-mt-1">
+      <div class="tw-text-lg tw-font-bold tw-text-slate-950">{{ currentPlan.name }}</div>
+      <div class="tw-mt-1 tw-text-sm tw-text-slate-600">
         Coverage: {{ formatDate(enrolleeAuth.enrollee?.coverage_start_date) }}
         <template v-if="enrolleeAuth.enrollee?.coverage_end_date">
           → {{ formatDate(enrolleeAuth.enrollee.coverage_end_date) }}
         </template>
         <template v-else>· No Expiry</template>
       </div>
-    </div>
+    </AppCard>
 
     <!-- Plans grid -->
-    <div v-if="loadingPlans" class="tw-flex tw-justify-center tw-py-16">
-      <v-progress-circular indeterminate color="primary" size="48" />
+    <div v-if="loadingPlans" class="tw-grid tw-gap-4 sm:tw-grid-cols-2 lg:tw-grid-cols-3">
+      <AppSkeleton v-for="index in 3" :key="index" type="article, actions" />
     </div>
 
     <div v-else-if="plans.length" class="tw-grid sm:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-6">
-      <div
+      <AppCard
         v-for="plan in plans"
         :key="plan.id"
         class="ep-plan-card"
         :class="{ 'ep-plan-card--current': currentPlan?.id === plan.id }"
+        :tone="currentPlan?.id === plan.id ? 'success' : 'primary'"
+        :padded="false"
+        hover
+        full-height
       >
-        <div v-if="currentPlan?.id === plan.id" class="ep-plan-card__badge">Current Plan</div>
+        <AppBadge v-if="currentPlan?.id === plan.id" class="ep-plan-card__badge" label="Current Plan" tone="success" size="sm" />
 
         <div class="ep-plan-card__head">
           <v-icon color="primary" size="28" class="tw-mb-2">mdi-shield-star</v-icon>
@@ -81,13 +82,10 @@
             {{ currentPlan?.id === plan.id ? 'Currently Active' : 'Select Plan' }}
           </v-btn>
         </div>
-      </div>
+      </AppCard>
     </div>
 
-    <div v-else class="tw-text-center tw-py-16 tw-text-slate-500">
-      <v-icon size="48" class="tw-mb-3">mdi-shield-off</v-icon>
-      <p>No active plans available at this time.</p>
-    </div>
+    <AppEmptyState v-else icon="mdi-shield-off-outline" title="No active plans available" description="There are no premium plans available for renewal at this time." />
 
     <!-- Renewal info dialog -->
     <AppModal v-model="infoDialog" title="Plan Renewal Information" icon="mdi-information" size="sm">
@@ -129,6 +127,11 @@ import { enrolleePortalAPI } from '../../utils/enrolleeApi';
 import { useOrganizationSettings } from '../../composables/useOrganizationSettings';
 import EnrolleeLayout from './layout/EnrolleeLayout.vue';
 import AppModal from '../common/AppModal.vue';
+import AppBadge from '../common/AppBadge.vue';
+import AppCard from '../common/AppCard.vue';
+import AppEmptyState from '../common/AppEmptyState.vue';
+import AppPageHeader from '../common/AppPageHeader.vue';
+import AppSkeleton from '../common/AppSkeleton.vue';
 
 const enrolleeAuth = useEnrolleeAuthStore();
 const { settings: org, fetchSettings } = useOrganizationSettings();
@@ -162,41 +165,19 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-.ep-current-plan {
-  background: linear-gradient(135deg, #0885ab, #0d3b6e);
-  border-radius: 16px;
-  padding: 20px 24px;
-}
-
 .ep-plan-card {
-  background: white;
-  border-radius: 20px;
-  border: 2px solid #e2e8f0;
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
   position: relative;
-}
-.ep-plan-card:hover {
-  border-color: #0885ab;
-  box-shadow: 0 8px 24px rgba(8,133,171,0.12);
-  transform: translateY(-3px);
 }
 .ep-plan-card--current {
   border-color: #16a34a;
-  box-shadow: 0 4px 16px rgba(22,163,74,0.12);
 }
 .ep-plan-card__badge {
   position: absolute;
   top: 12px;
   right: 12px;
-  background: #16a34a;
-  color: white;
-  font-size: 11px;
-  font-weight: 700;
-  padding: 3px 10px;
-  border-radius: 999px;
 }
 .ep-plan-card__head {
   padding: 28px 24px 20px;
