@@ -335,6 +335,26 @@ export const organizationSettingsAPI = {
   removeLogo: () => api.delete('/settings/organization/logo'),
 };
 
+export const enrollmentSchemaAPI = {
+  list: (params) => api.get('/enrollment-form-schemas', { params }),
+  get: (id) => api.get(`/enrollment-form-schemas/${id}`),
+  create: (data) => api.post('/enrollment-form-schemas', data),
+  update: (id, data) => api.put(`/enrollment-form-schemas/${id}`, data),
+  publish: (id) => api.post(`/enrollment-form-schemas/${id}/publish`),
+  revoke: (id) => api.post(`/enrollment-form-schemas/${id}/revoke`),
+  archive: (id) => api.delete(`/enrollment-form-schemas/${id}`),
+};
+
+export const officerDeviceAPI = {
+  list: (params) => api.get('/officer-devices', { params }),
+  revoke: (id) => api.post(`/officer-devices/${id}/revoke`),
+  assignments: (params) => api.get('/officer-enrollment-assignments', { params }),
+  assignEnrollment: (data) => api.post('/officer-enrollment-assignments', data),
+  updateAssignment: (id, data) => api.patch(`/officer-enrollment-assignments/${id}`, data),
+  removeAssignment: (id) => api.delete(`/officer-enrollment-assignments/${id}`),
+  setEnrollmentStatus: (userId, enabled) => api.patch(`/users/${userId}/mobile-enrollment-status`, { enabled }),
+};
+
 export const securityAPI = {
   getDashboard: () => api.get('/pas/security/dashboard'),
   getLogs: (params) => api.get('/pas/security/logs', { params }),

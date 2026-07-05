@@ -13,9 +13,9 @@ class NinProviderConfigService
      */
     public function getConfig(): array
     {
-        $fieldMap = $this->decodeJson(
-            Configuration::getValue(self::KEY_PREFIX . 'FIELD_MAP'),
-            $this->defaultFieldMap()
+        $fieldMap = array_merge(
+            $this->defaultFieldMap(),
+            $this->decodeJson(Configuration::getValue(self::KEY_PREFIX . 'FIELD_MAP'), [])
         );
 
         return [
@@ -76,6 +76,7 @@ class NinProviderConfigService
             'gender' => 'gender',
             'phone' => 'phone',
             'photo' => 'photo',
+            'address' => 'address',
         ];
     }
 

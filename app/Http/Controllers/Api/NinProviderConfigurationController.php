@@ -43,6 +43,7 @@ class NinProviderConfigurationController extends BaseController
             'field_map.gender' => ['required', 'string'],
             'field_map.phone' => ['nullable', 'string'],
             'field_map.photo' => ['nullable', 'string'],
+            'field_map.address' => ['nullable', 'string'],
         ]);
 
         return $this->sendResponse(

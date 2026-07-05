@@ -57,6 +57,7 @@ protected $guarded = ['id'];
         'nin_verified_at' => 'datetime',
         'nin_verification_data' => 'array',
         'nin_verification_meta' => 'array',
+        'enrollment_extra_fields' => 'array',
         'duplicate_reviewed' => 'boolean',
         'duplicate_reviewed_at' => 'datetime',
         'status' => 'integer',
@@ -148,6 +149,16 @@ protected $guarded = ['id'];
     public function enrollmentPhase()
     {
         return $this->belongsTo(EnrollmentPhase::class, 'enrollment_phase_id');
+    }
+
+    public function enrollmentFormSchema()
+    {
+        return $this->belongsTo(EnrollmentFormSchema::class, 'enrollment_form_schema_id');
+    }
+
+    public function mobileEnrollmentRecord()
+    {
+        return $this->belongsTo(MobileEnrollmentRecord::class, 'mobile_enrollment_record_id');
     }
 
     /**

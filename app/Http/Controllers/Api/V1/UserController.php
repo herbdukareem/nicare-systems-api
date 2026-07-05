@@ -238,7 +238,26 @@ class UserController extends BaseController
     public function withRoles(Request $request)
     {
         $perPage = (int) $request->get('per_page', 15);
-        $users = User::with('roles')->paginate($perPage);
+        $users = User::with('roles')
+            ->when($request->filled('role'), function ($query) use ($request) {
+                $role = $request->query('role');
+                $query->whereHas('roles', function ($roleQuery) use ($role) {
+                    is_numeric($role)
+                        ? $roleQuery->where('roles.id', (int) $role)
+                        : $roleQuery->where('roles.name', (string) $role);
+                });
+            })
+            ->when($request->filled('search'), function ($query) use ($request) {
+                $search = (string) $request->query('search');
+                $query->where(function ($searchQuery) use ($search) {
+                    $searchQuery->where('name', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")
+                        ->orWhere('username', 'like', "%{$search}%");
+                });
+            })
+            ->orderBy('name')
+            ->paginate($perPage);
+
         return $this->sendResponse(UserResource::collection($users), 'Users with roles retrieved successfully');
     }
 

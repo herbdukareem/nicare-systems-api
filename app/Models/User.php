@@ -27,11 +27,16 @@ class User extends Authenticatable
     'phone',
     'username',
     'status',
+    'mobile_enrollment_disabled_at',
     'password',
     'userable_id',
     'userable_type',
     'current_role_id',
 ];
+
+    protected $casts = [
+        'mobile_enrollment_disabled_at' => 'datetime',
+    ];
 
     protected $hidden = [
         'password',
@@ -153,6 +158,21 @@ class User extends Authenticatable
         return $this->belongsToMany(Facility::class, 'd_o_facilities', 'user_id', 'facility_id')
                     ->withPivot('assigned_at')
                     ->withTimestamps();
+    }
+
+    public function officerEnrollmentAssignments()
+    {
+        return $this->hasMany(OfficerEnrollmentAssignment::class);
+    }
+
+    public function activeOfficerEnrollmentAssignments()
+    {
+        return $this->officerEnrollmentAssignments()->where('enabled', true);
+    }
+
+    public function mobileEnrollmentEnabled(): bool
+    {
+        return $this->mobile_enrollment_disabled_at === null;
     }
 
     /**

@@ -98,6 +98,7 @@
               <v-text-field v-model="form.field_map.gender" label="Map: Gender" variant="outlined" density="comfortable" />
               <v-text-field v-model="form.field_map.phone" label="Map: Phone" variant="outlined" density="comfortable" />
               <v-text-field v-model="form.field_map.photo" label="Map: Photo" variant="outlined" density="comfortable" />
+              <v-text-field v-model="form.field_map.address" label="Map: Address" variant="outlined" density="comfortable" />
             </div>
           </div>
         </AppCard>
@@ -155,6 +156,7 @@ const defaultFieldMap = () => ({
   gender: 'gender',
   phone: 'phone',
   photo: 'photo',
+  address: 'address',
 })
 
 const form = reactive({

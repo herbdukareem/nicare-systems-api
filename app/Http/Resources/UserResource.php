@@ -21,6 +21,8 @@ class UserResource extends JsonResource
             'username' => $this->username,
             'status' => $this->status,
             'status_label' => $this->getStatusLabel(),
+            'mobile_enrollment_disabled_at' => $this->mobile_enrollment_disabled_at,
+            'mobile_enrollment_enabled' => $this->mobileEnrollmentEnabled(),
             'userable_type' => $this->userable_type,
             'userable_id' => $this->userable_id,
             'current_role_id' => $this->current_role_id,

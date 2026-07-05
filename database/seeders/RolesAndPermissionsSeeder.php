@@ -41,6 +41,8 @@ class RolesAndPermissionsSeeder extends Seeder
                 'enrollees.import',
                 'mobile-sync.push',
                 'mobile-sync.status',
+                'mobile-device.register',
+                'mobile-enrollment.sync',
             ],
             'Setup' => [
                 'setup.lga.view',
@@ -244,6 +246,8 @@ class RolesAndPermissionsSeeder extends Seeder
                 'settings.edit',
                 'settings.nin.manage',
                 'settings.payment-gateway.manage',
+                'settings.enrollment-schema.manage',
+                'settings.mobile-device.manage',
                 'impersonate_users',
             ],
             'Feedback & Tasks' => [
@@ -293,7 +297,7 @@ class RolesAndPermissionsSeeder extends Seeder
                     'group-enrollment.', 'payroll-upload.', 'subsidy-batch.', 'eligibility.', 'referrals.',
                     'pa_codes.', 'admissions.', 'utn.', 'claims.', 'payment_batches.', 'capitation.', 'payments.',
                     'reports.', 'analytics.', 'feedback.', 'users.view', 'roles.view', 'permissions.view',
-                ]), ['settings.nin.manage', 'settings.payment-gateway.manage'])),
+                ]), ['settings.nin.manage', 'settings.payment-gateway.manage', 'settings.enrollment-schema.manage', 'settings.mobile-device.manage'])),
             ],
             'enrollment-officer' => [
                 'label' => 'Enrollment Officer',
@@ -308,7 +312,15 @@ class RolesAndPermissionsSeeder extends Seeder
             'mobile-enrollment-officer' => [
                 'label' => 'Mobile Enrollment Officer',
                 'description' => 'Captures enrollee data from mobile devices.',
-                'permissions' => ['enrollees.create', 'mobile-sync.push', 'mobile-sync.status'],
+                'permissions' => [
+                    'enrollees.create',
+                    'mobile-sync.push',
+                    'mobile-sync.status',
+                    'mobile-device.register',
+                    'mobile-enrollment.sync',
+                    'premium.pin.view',
+                    'premium.pin.sell',
+                ],
             ],
             'desk-officer' => [
                 'label' => 'Desk Officer',

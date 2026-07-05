@@ -73,6 +73,10 @@ use App\Http\Controllers\Api\PublicPremiumPinController;
 use App\Http\Controllers\Api\EnrolleeImportController;
 use App\Http\Controllers\Api\EnrolleeController as EnrolleeApiController;
 use App\Http\Controllers\Api\ExtendedReportingController;
+use App\Http\Controllers\Api\EnrollmentFormSchemaController;
+use App\Http\Controllers\Api\MobileV1Controller;
+use App\Http\Controllers\Api\OfficerDeviceController;
+use App\Http\Controllers\Api\OfficerEnrollmentAssignmentController;
 
 /*
 |--------------------------------------------------------------------------
@@ -124,6 +128,20 @@ Route::post('logout', [AuthController::class, 'logout'])->middleware('auth:sanct
 Route::post('forget-password', [AuthController::class, 'forgetPassword']);
 Route::post('reset-password', [AuthController::class, 'resetPassword']);
 Route::get('user', [AuthController::class, 'user'])->middleware('auth:sanctum');
+
+Route::middleware(['auth:sanctum'])->prefix('mobile/v1')->group(function () {
+    Route::post('devices/register', [MobileV1Controller::class, 'registerDevice']);
+    Route::get('bootstrap', [MobileV1Controller::class, 'bootstrap'])->middleware('permission:any,mobile-sync.push,mobile-sync.status,enrollees.create');
+    Route::get('metadata', [MobileV1Controller::class, 'metadata'])->middleware('permission:any,mobile-sync.push,mobile-sync.status,enrollees.create');
+    Route::post('pin-purchases', [MobileV1Controller::class, 'createPinPurchase'])->middleware('permission:any,mobile-sync.push,enrollees.create,premium.pin.generate,premium.pin.sell');
+    Route::get('pin-purchases/{reference}/verify', [MobileV1Controller::class, 'verifyPinPurchase'])->middleware('permission:any,mobile-sync.push,enrollees.create,premium.pin.generate,premium.pin.sell');
+    Route::post('pins/validate', [MobileV1Controller::class, 'validatePin'])->middleware('permission:any,mobile-sync.push,enrollees.create,premium.pin.view');
+    Route::post('nin/verify', [MobileV1Controller::class, 'verifyNin'])->middleware('permission:any,mobile-sync.push,enrollees.create,enrollee.nin.verify');
+    Route::post('enrollments/sync', [MobileV1Controller::class, 'syncEnrollments'])->middleware('permission:any,mobile-sync.push,enrollees.create');
+    Route::get('enrollments/sync/{batch}', [MobileV1Controller::class, 'syncStatus'])->middleware('permission:any,mobile-sync.status,enrollees.create');
+    Route::get('enrollments/failed', [MobileV1Controller::class, 'failed'])->middleware('permission:any,mobile-sync.status,enrollees.create');
+    Route::post('enrollments/{record}/attachments', [MobileV1Controller::class, 'uploadAttachment'])->middleware('permission:any,mobile-sync.push,enrollees.create');
+});
 
 // Dashboard routes
 Route::middleware('auth:sanctum')->group(function () {
@@ -324,6 +342,27 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,settings.payment-gateway.manage,settings.edit');
     Route::put('settings/payment-gateways', [PaymentGatewayConfigurationController::class, 'update'])
         ->middleware('permission:any,settings.payment-gateway.manage,settings.edit');
+    Route::apiResource('enrollment-form-schemas', EnrollmentFormSchemaController::class)
+        ->parameters(['enrollment-form-schemas' => 'schema'])
+        ->middleware('permission:any,users.view,settings.edit,enrollees.create');
+    Route::post('enrollment-form-schemas/{schema}/publish', [EnrollmentFormSchemaController::class, 'publish'])
+        ->middleware('permission:any,users.view,settings.edit,enrollees.create');
+    Route::post('enrollment-form-schemas/{schema}/revoke', [EnrollmentFormSchemaController::class, 'revoke'])
+        ->middleware('permission:any,users.view,settings.edit,enrollees.create');
+    Route::get('officer-devices', [OfficerDeviceController::class, 'index'])
+        ->middleware('permission:any,users.view,settings.edit');
+    Route::post('officer-devices/{device}/revoke', [OfficerDeviceController::class, 'revoke'])
+        ->middleware('permission:any,users.view,settings.edit');
+    Route::get('officer-enrollment-assignments', [OfficerEnrollmentAssignmentController::class, 'index'])
+        ->middleware('permission:any,users.view,settings.edit,settings.mobile-device.manage');
+    Route::post('officer-enrollment-assignments', [OfficerEnrollmentAssignmentController::class, 'store'])
+        ->middleware('permission:any,users.view,settings.edit,settings.mobile-device.manage');
+    Route::patch('officer-enrollment-assignments/{assignment}', [OfficerEnrollmentAssignmentController::class, 'update'])
+        ->middleware('permission:any,users.view,settings.edit,settings.mobile-device.manage');
+    Route::delete('officer-enrollment-assignments/{assignment}', [OfficerEnrollmentAssignmentController::class, 'destroy'])
+        ->middleware('permission:any,users.view,settings.edit,settings.mobile-device.manage');
+    Route::patch('users/{user}/mobile-enrollment-status', [OfficerEnrollmentAssignmentController::class, 'setOfficerEnrollmentStatus'])
+        ->middleware('permission:any,users.view,settings.edit,settings.mobile-device.manage');
     Route::apiResource('lgas', LgaController::class);
     Route::get('lgas/{lga}/wards', [LgaController::class, 'wards']);
     Route::apiResource('wards', WardController::class);

@@ -930,15 +930,13 @@ const routes = [
   {
     path: '/devices/manage',
     name: 'devices-manage',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    props: { title: 'Manage Devices', subtitle: 'Device management and configuration', icon: 'mdi-tablet' },
+    component: () => import('../components/settings/DeviceManagementPage.vue'),
     meta: { requiresAuth: true, permissions: ['users.view'], title: 'Manage Devices', breadcrumb: 'Devices' },
   },
   {
     path: '/devices/config',
     name: 'devices-config',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    props: { title: 'Enrollment Configuration', subtitle: 'Configure enrollment settings', icon: 'mdi-cog' },
+    component: () => import('../components/settings/EnrollmentConfigurationPage.vue'),
     meta: { requiresAuth: true, permissions: ['users.view'], title: 'Enrollment Config', breadcrumb: 'Config' },
   },
 

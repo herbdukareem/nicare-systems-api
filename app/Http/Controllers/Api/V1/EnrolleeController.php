@@ -10,6 +10,7 @@ use App\Models\Enrollee;
 use App\Models\EnrolleeDuplicateFlag;
 use App\Models\EnrolleeFacilityTransfer;
 use App\Models\Facility;
+use App\Models\MobileEnrollmentRecord;
 use App\Models\PremiumPin;
 use App\Services\EnrolleeDuplicateDetectionService;
 use App\Services\EnrolleeService;
@@ -247,6 +248,19 @@ class EnrolleeController extends BaseController
             'coverage_start_date' => $coverageStart->toDateString(),
             'coverage_end_date' => $coverageEnd?->toDateString(),
         ]);
+
+        MobileEnrollmentRecord::query()
+            ->where(function ($query) use ($enrollee) {
+                $query->where('enrollee_id', $enrollee->id);
+                if ($enrollee->mobile_enrollment_record_id) {
+                    $query->orWhere('id', $enrollee->mobile_enrollment_record_id);
+                }
+            })
+            ->update([
+                'status' => MobileEnrollmentRecord::STATUS_APPROVED,
+                'status_reason' => 'Enrollee approved on web. Coverage is active.',
+                'synced_at' => now(),
+            ]);
 
         AuditTrail::create([
             'auditable_type' => Enrollee::class,
