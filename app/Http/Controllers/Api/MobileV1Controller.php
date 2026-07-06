@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Api\V1\BaseController;
 use App\Models\BenefitPackage;
 use App\Models\Benefactor;
+use App\Models\Enrollee;
 use App\Models\EnrolleeCategory;
 use App\Models\Facility;
 use App\Models\FundingType;
@@ -230,22 +231,14 @@ class MobileV1Controller extends BaseController
     public function syncStatus(Request $request, string $batch)
     {
         $device = $this->activeDevice($request);
-        $records = MobileEnrollmentRecord::with(['enrollee:id,enrollee_id,first_name,last_name,status', 'duplicateOf:id,enrollee_id,first_name,last_name'])
+        $records = MobileEnrollmentRecord::with($this->mobileStatusRelations())
             ->where('officer_device_id', $device->id)
             ->where('sync_batch_id', $batch)
             ->get();
 
-        $records->each(function (MobileEnrollmentRecord $record) {
-            if ($record->enrollee && (int) $record->enrollee->status === \App\Models\Enrollee::STATUS_ACTIVE && $record->status !== MobileEnrollmentRecord::STATUS_APPROVED) {
-                $record->forceFill([
-                    'status' => MobileEnrollmentRecord::STATUS_APPROVED,
-                    'status_reason' => 'Enrollee approved on web. Coverage is active.',
-                    'synced_at' => now(),
-                ])->save();
-            }
-        });
+        $this->reconcileApprovedMobileRecords($records);
 
-        $records = $records->fresh(['enrollee:id,enrollee_id,first_name,last_name,status', 'duplicateOf:id,enrollee_id,first_name,last_name']);
+        $records = $this->freshMobileStatusRecords($records);
 
         return $this->sendResponse([
             'sync_batch_id' => $batch,
@@ -253,6 +246,60 @@ class MobileV1Controller extends BaseController
             'counts' => $records->groupBy('status')->map->count(),
             'records' => $records,
         ], 'Mobile sync status retrieved.');
+    }
+
+    public function enrollmentStatuses(Request $request)
+    {
+        $device = $this->activeDevice($request);
+        $validated = $request->validate([
+            'client_record_ids' => ['nullable', 'array'],
+            'client_record_ids.*' => ['string', 'max:120'],
+            'backend_record_ids' => ['nullable', 'array'],
+            'backend_record_ids.*' => ['integer'],
+        ]);
+
+        $clientRecordIds = collect($validated['client_record_ids'] ?? [])
+            ->filter(fn ($id) => is_string($id) && trim($id) !== '')
+            ->map(fn ($id) => trim($id))
+            ->unique()
+            ->values();
+
+        $backendRecordIds = collect($validated['backend_record_ids'] ?? [])
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($clientRecordIds->isEmpty() && $backendRecordIds->isEmpty()) {
+            return $this->sendResponse([
+                'total' => 0,
+                'counts' => [],
+                'records' => [],
+            ], 'Mobile enrollment statuses retrieved.');
+        }
+
+        $records = MobileEnrollmentRecord::with($this->mobileStatusRelations())
+            ->where('officer_device_id', $device->id)
+            ->where(function (Builder $query) use ($clientRecordIds, $backendRecordIds) {
+                if ($clientRecordIds->isNotEmpty()) {
+                    $query->whereIn('client_record_id', $clientRecordIds);
+                }
+
+                if ($backendRecordIds->isNotEmpty()) {
+                    $method = $clientRecordIds->isNotEmpty() ? 'orWhereIn' : 'whereIn';
+                    $query->{$method}('id', $backendRecordIds);
+                }
+            })
+            ->get();
+
+        $this->reconcileApprovedMobileRecords($records);
+        $records = $this->freshMobileStatusRecords($records);
+
+        return $this->sendResponse([
+            'total' => $records->count(),
+            'counts' => $records->groupBy('status')->map->count(),
+            'records' => $records,
+        ], 'Mobile enrollment statuses retrieved.');
     }
 
     public function failed(Request $request)
@@ -312,6 +359,40 @@ class MobileV1Controller extends BaseController
         return is_string($since) && $since !== ''
             ? $query->where('updated_at', '>', $since)
             : $query;
+    }
+
+    private function mobileStatusRelations(): array
+    {
+        return [
+            'enrollee:id,enrollee_id,first_name,last_name,status',
+            'duplicateOf:id,enrollee_id,first_name,last_name',
+        ];
+    }
+
+    private function reconcileApprovedMobileRecords($records): void
+    {
+        $records->each(function (MobileEnrollmentRecord $record) {
+            if ($record->enrollee && (int) $record->enrollee->status === Enrollee::STATUS_ACTIVE && $record->status !== MobileEnrollmentRecord::STATUS_APPROVED) {
+                $record->forceFill([
+                    'status' => MobileEnrollmentRecord::STATUS_APPROVED,
+                    'status_reason' => 'Enrollee approved on web. Coverage is active.',
+                    'synced_at' => now(),
+                ])->save();
+            }
+        });
+    }
+
+    private function freshMobileStatusRecords($records)
+    {
+        $ids = $records->pluck('id')->filter()->values();
+
+        if ($ids->isEmpty()) {
+            return $records;
+        }
+
+        return MobileEnrollmentRecord::with($this->mobileStatusRelations())
+            ->whereKey($ids)
+            ->get();
     }
 
     private function officerEnrollmentScope(Request $request): array

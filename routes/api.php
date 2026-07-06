@@ -138,6 +138,7 @@ Route::middleware(['auth:sanctum'])->prefix('mobile/v1')->group(function () {
     Route::post('pins/validate', [MobileV1Controller::class, 'validatePin'])->middleware('permission:any,mobile-sync.push,enrollees.create,premium.pin.view');
     Route::post('nin/verify', [MobileV1Controller::class, 'verifyNin'])->middleware('permission:any,mobile-sync.push,enrollees.create,enrollee.nin.verify');
     Route::post('enrollments/sync', [MobileV1Controller::class, 'syncEnrollments'])->middleware('permission:any,mobile-sync.push,enrollees.create');
+    Route::post('enrollments/status', [MobileV1Controller::class, 'enrollmentStatuses'])->middleware('permission:any,mobile-sync.status,enrollees.create');
     Route::get('enrollments/sync/{batch}', [MobileV1Controller::class, 'syncStatus'])->middleware('permission:any,mobile-sync.status,enrollees.create');
     Route::get('enrollments/failed', [MobileV1Controller::class, 'failed'])->middleware('permission:any,mobile-sync.status,enrollees.create');
     Route::post('enrollments/{record}/attachments', [MobileV1Controller::class, 'uploadAttachment'])->middleware('permission:any,mobile-sync.push,enrollees.create');
