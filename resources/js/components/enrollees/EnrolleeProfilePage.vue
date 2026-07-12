@@ -409,6 +409,7 @@ const getMaritalStatus = (status) => {
     case 2: return 'Married'
     case 3: return 'Divorced'
     case 4: return 'Widowed'
+    case 5: return 'Not Stated'
     default: return 'N/A'
   }
 }

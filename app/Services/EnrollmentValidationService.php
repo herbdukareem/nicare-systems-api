@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Models\EnrollmentFormSchema;
+use App\Models\Enrollee;
 use App\Models\Facility;
 use App\Models\PremiumPlan;
 use App\Models\Ward;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
 class EnrollmentValidationService
@@ -25,7 +27,9 @@ class EnrollmentValidationService
             'phone' => ['nullable', 'string', 'max:255'],
             'date_of_birth' => ['required', 'date'],
             'sex' => ['required', 'integer', 'in:1,2'],
-            'marital_status' => ['nullable', 'integer', 'in:1,2,3,4'],
+            'marital_status' => ['nullable', 'integer', Rule::in(array_keys(Enrollee::MARITAL_STATUS_OPTIONS))],
+            'occupation' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::OCCUPATION_OPTIONS)],
+            'disability' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::DISABILITY_OPTIONS)],
             'address' => ['nullable', 'string'],
             'facility_id' => ['required', 'integer', 'exists:facilities,id'],
             'lga_id' => ['required', 'integer', 'exists:lgas,id'],

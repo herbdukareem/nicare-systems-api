@@ -19,6 +19,7 @@ use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Request as FacadeRequest;
+use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
 use Barryvdh\DomPDF\Facade\Pdf;
 
@@ -166,12 +167,12 @@ class EnrolleeController extends Controller
             'email' => 'nullable|email|unique:enrollees,email',
             'date_of_birth' => 'required|date',
             'sex' => 'required|integer|in:1,2',
-            'marital_status' => 'nullable|integer|in:1,2,3,4',
+            'marital_status' => ['nullable', 'integer', Rule::in(array_keys(Enrollee::MARITAL_STATUS_OPTIONS))],
             'address' => 'nullable|string',
             'village' => 'nullable|string|max:255',
             'pregnant' => 'nullable|boolean',
-            'disability' => 'nullable|string|max:255',
-            'occupation' => 'nullable|string|max:255',
+            'disability' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::DISABILITY_OPTIONS)],
+            'occupation' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::OCCUPATION_OPTIONS)],
             'facility_id' => 'required|exists:facilities,id',
             'lga_id' => 'required|exists:lgas,id',
             'ward_id' => 'required|exists:wards,id',
@@ -261,12 +262,12 @@ class EnrolleeController extends Controller
             'email' => 'nullable|email|unique:enrollees,email,' . $enrollee->id,
             'date_of_birth' => 'sometimes|date',
             'sex' => 'sometimes|integer|in:1,2',
-            'marital_status' => 'nullable|integer|in:1,2,3,4',
+            'marital_status' => ['nullable', 'integer', Rule::in(array_keys(Enrollee::MARITAL_STATUS_OPTIONS))],
             'address' => 'nullable|string',
             'village' => 'nullable|string|max:255',
             'pregnant' => 'nullable|boolean',
-            'disability' => 'nullable|string|max:255',
-            'occupation' => 'nullable|string|max:255',
+            'disability' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::DISABILITY_OPTIONS)],
+            'occupation' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::OCCUPATION_OPTIONS)],
             'facility_id' => 'sometimes|exists:facilities,id',
             'lga_id' => 'sometimes|exists:lgas,id',
             'ward_id' => 'sometimes|exists:wards,id',

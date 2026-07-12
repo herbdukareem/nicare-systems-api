@@ -166,8 +166,7 @@ const routes = [
   {
     path: '/enrollment/mobile-sync',
     name: 'enrollment-mobile-sync',
-    component: () => import('../components/common/ComingSoonPage.vue'),
-    props: { title: 'Mobile Sync', subtitle: 'Sync mobile enrollment data', icon: 'mdi-cellphone-sync' },
+    component: () => import('../components/enrollees/MobileSyncPage.vue'),
     meta: {
       requiresAuth: true,
       permissions: ['mobile-sync.push', 'mobile-sync.status'],

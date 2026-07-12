@@ -109,7 +109,7 @@ const personalSection = computed(() => [
   { label: 'Last Name',       value: enrollee.value?.last_name },
   { label: 'Date of Birth',   value: fmt(enrollee.value?.date_of_birth) },
   { label: 'Gender',          value: enrollee.value?.sex === 1 ? 'Male' : enrollee.value?.sex === 2 ? 'Female' : null },
-  { label: 'Marital Status',  value: ({ 1: 'Single', 2: 'Married', 3: 'Divorced', 4: 'Widowed' })[enrollee.value?.marital_status] },
+  { label: 'Marital Status',  value: ({ 1: 'Single', 2: 'Married', 3: 'Divorced', 4: 'Widowed', 5: 'Not Stated' })[enrollee.value?.marital_status] },
   { label: 'Phone',           value: enrollee.value?.phone },
   { label: 'Email',           value: enrollee.value?.email },
   { label: 'NIN',             value: enrollee.value?.nin ? '••••••••••••' + enrollee.value.nin.slice(-3) : null },

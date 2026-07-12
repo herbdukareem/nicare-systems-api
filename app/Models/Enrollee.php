@@ -23,6 +23,48 @@ class Enrollee extends Authenticatable
     public const STATUS_SUSPENDED = 3;
     public const STATUS_EXPIRED = 4;
 
+    public const MARITAL_STATUS_OPTIONS = [
+        1 => 'Single',
+        2 => 'Married',
+        3 => 'Divorced',
+        4 => 'Widowed',
+        5 => 'Not Stated',
+    ];
+
+    public const OCCUPATION_OPTIONS = [
+        'Student',
+        'Farmer',
+        'Trader/Business Owner',
+        'Civil Servant',
+        'Private Sector Employee',
+        'Teacher/Lecturer',
+        'Health Worker',
+        'Artisan',
+        'Driver/Transport Worker',
+        'Security Personnel',
+        'Religious Leader',
+        'Homemaker',
+        'Retired',
+        'Unemployed',
+        'Self-Employed',
+        'Other',
+        'Not Stated',
+    ];
+
+    public const DISABILITY_OPTIONS = [
+        'None',
+        'Visual Impairment',
+        'Hearing Impairment',
+        'Speech Impairment',
+        'Physical/Mobility Disability',
+        'Intellectual Disability',
+        'Learning Disability',
+        'Mental/Psychosocial Disability',
+        'Albinism',
+        'Multiple Disabilities',
+        'Others',
+    ];
+
     public const NIN_VERIFICATION_NOT_STARTED = 'not_started';
     public const NIN_VERIFICATION_NOT_PROVIDED = 'not_provided';
     public const NIN_VERIFICATION_VERIFIED = 'verified';
@@ -58,6 +100,7 @@ protected $guarded = ['id'];
         'nin_verification_data' => 'array',
         'nin_verification_meta' => 'array',
         'enrollment_extra_fields' => 'array',
+        'enrollment_location_audit' => 'array',
         'duplicate_reviewed' => 'boolean',
         'duplicate_reviewed_at' => 'datetime',
         'status' => 'integer',

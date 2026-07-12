@@ -74,6 +74,7 @@ use App\Http\Controllers\Api\EnrolleeImportController;
 use App\Http\Controllers\Api\EnrolleeController as EnrolleeApiController;
 use App\Http\Controllers\Api\ExtendedReportingController;
 use App\Http\Controllers\Api\EnrollmentFormSchemaController;
+use App\Http\Controllers\Api\MobileEnrollmentMonitorController;
 use App\Http\Controllers\Api\MobileV1Controller;
 use App\Http\Controllers\Api\OfficerDeviceController;
 use App\Http\Controllers\Api\OfficerEnrollmentAssignmentController;
@@ -364,6 +365,10 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,users.view,settings.edit,settings.mobile-device.manage');
     Route::patch('users/{user}/mobile-enrollment-status', [OfficerEnrollmentAssignmentController::class, 'setOfficerEnrollmentStatus'])
         ->middleware('permission:any,users.view,settings.edit,settings.mobile-device.manage');
+    Route::get('mobile-enrollment-monitor', [MobileEnrollmentMonitorController::class, 'index'])
+        ->middleware('permission:any,mobile-sync.push,mobile-sync.status');
+    Route::get('mobile-enrollment-monitor/{record}', [MobileEnrollmentMonitorController::class, 'show'])
+        ->middleware('permission:any,mobile-sync.push,mobile-sync.status');
     Route::apiResource('lgas', LgaController::class);
     Route::get('lgas/{lga}/wards', [LgaController::class, 'wards']);
     Route::apiResource('wards', WardController::class);

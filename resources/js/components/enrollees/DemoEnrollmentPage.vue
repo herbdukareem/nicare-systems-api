@@ -37,9 +37,9 @@
               <v-text-field v-model="form.email" label="Email" variant="outlined" density="comfortable" />
               <v-textarea v-model="form.address" label="Address" rows="2" variant="outlined" density="comfortable" />
               <v-text-field v-model="form.village" label="Village" variant="outlined" density="comfortable" />
-              <v-text-field v-model="form.occupation" label="Occupation" variant="outlined" density="comfortable" />
+              <v-select v-model="form.occupation" :items="occupationOptions" label="Occupation" variant="outlined" density="comfortable" />
               <v-switch v-model="form.pregnant" label="Pregnant" color="primary" hide-details />
-              <v-text-field v-model="form.disability" label="Disability" variant="outlined" density="comfortable" />
+              <v-select v-model="form.disability" :items="disabilityOptions" label="Disability" variant="outlined" density="comfortable" />
             </section>
           </v-stepper-window-item>
 
@@ -264,7 +264,9 @@ const flowSteps = [
   'Enrollee becomes active and eligible for care/capitation.',
 ]
 const sexOptions = [{ title: 'Male', value: 1 }, { title: 'Female', value: 2 }]
-const maritalOptions = [{ title: 'Single', value: 1 }, { title: 'Married', value: 2 }, { title: 'Divorced', value: 3 }, { title: 'Widowed', value: 4 }]
+const maritalOptions = [{ title: 'Single', value: 1 }, { title: 'Married', value: 2 }, { title: 'Divorced', value: 3 }, { title: 'Widowed', value: 4 }, { title: 'Not Stated', value: 5 }]
+const occupationOptions = ['Student', 'Farmer', 'Trader/Business Owner', 'Civil Servant', 'Private Sector Employee', 'Teacher/Lecturer', 'Health Worker', 'Artisan', 'Driver/Transport Worker', 'Security Personnel', 'Religious Leader', 'Homemaker', 'Retired', 'Unemployed', 'Self-Employed', 'Other', 'Not Stated']
+const disabilityOptions = ['None', 'Visual Impairment', 'Hearing Impairment', 'Speech Impairment', 'Physical/Mobility Disability', 'Intellectual Disability', 'Learning Disability', 'Mental/Psychosocial Disability', 'Albinism', 'Multiple Disabilities', 'Others']
 const relationshipOptions = [{ title: 'Principal', value: 1 }, { title: 'Spouse', value: 2 }, { title: 'Child', value: 3 }, { title: 'Other', value: 4 }]
 
 const selectedProgramme = computed(() => metadata.value.programmes.find((item) => item.id === form.value.insurance_programme_id))
@@ -308,7 +310,8 @@ const fillSampleData = () => {
     email: `demo${Date.now()}@nicare.test`,
     address: 'Demo address',
     village: 'Demo village',
-    occupation: 'Trader',
+    occupation: 'Trader/Business Owner',
+    disability: 'None',
   }
 }
 const validatePin = async () => {

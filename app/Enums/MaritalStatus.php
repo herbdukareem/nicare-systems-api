@@ -13,6 +13,7 @@ enum MaritalStatus: int
     case MARRIED = 2;
     case DIVORCED = 3;
     case WIDOWED = 4;
+    case NOT_STATED = 5;
 
     /**
      * Get the human‑readable label for the enum value.
@@ -23,7 +24,8 @@ enum MaritalStatus: int
             self::SINGLE => 'Single',
             self::MARRIED => 'Married',
             self::DIVORCED => 'Divorced',
-            self::WIDOWED => 'Widowed'
+            self::WIDOWED => 'Widowed',
+            self::NOT_STATED => 'Not Stated',
         };
     }
 
@@ -37,6 +39,7 @@ enum MaritalStatus: int
             self::MARRIED->value => self::MARRIED->label(),
             self::DIVORCED->value => self::DIVORCED->label(),
             self::WIDOWED->value => self::WIDOWED->label(),
+            self::NOT_STATED->value => self::NOT_STATED->label(),
         ];
     }
 }

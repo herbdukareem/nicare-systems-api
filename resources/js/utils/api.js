@@ -355,6 +355,11 @@ export const officerDeviceAPI = {
   setEnrollmentStatus: (userId, enabled) => api.patch(`/users/${userId}/mobile-enrollment-status`, { enabled }),
 };
 
+export const mobileEnrollmentMonitorAPI = {
+  list: (params) => api.get('/mobile-enrollment-monitor', { params }),
+  get: (id) => api.get(`/mobile-enrollment-monitor/${id}`),
+};
+
 export const securityAPI = {
   getDashboard: () => api.get('/pas/security/dashboard'),
   getLogs: (params) => api.get('/pas/security/logs', { params }),

@@ -26,6 +26,7 @@ class EnrollmentFormSchemaController extends BaseController
             'schemas' => $schemas,
             'default_fields' => $this->service->defaultFields(),
             'default_nin_verification_policy' => $this->service->defaultNinVerificationPolicy(false),
+            'default_location_capture_policy' => $this->service->defaultLocationCapturePolicy(),
         ], 'Enrollment form schemas retrieved.');
     }
 
@@ -91,6 +92,13 @@ class EnrollmentFormSchemaController extends BaseController
             'nin_verification_policy.autofill.editable_fields' => ['nullable', 'array'],
             'nin_verification_policy.autofill.editable_fields.*' => ['string', 'max:120'],
             'nin_verification_policy.autofill.fields' => ['nullable', 'array'],
+            'location_capture_policy' => ['nullable', 'array'],
+            'location_capture_policy.enabled' => ['nullable', 'boolean'],
+            'location_capture_policy.mode' => ['nullable', Rule::in(['disabled', 'preferred', 'required', 'required_on_submit'])],
+            'location_capture_policy.capture_points' => ['nullable', 'array'],
+            'location_capture_policy.capture_points.*' => ['string', Rule::in(['start', 'submit'])],
+            'location_capture_policy.minimum_accuracy_meters' => ['nullable', 'integer', 'min:0'],
+            'location_capture_policy.allow_submission_without_location' => ['nullable', 'boolean'],
             'allow_offline_capture' => ['nullable', 'boolean'],
             'fields' => [$required, 'array'],
             'rules' => ['nullable', 'array'],

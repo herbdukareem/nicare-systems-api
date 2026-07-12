@@ -47,6 +47,8 @@ class MobileEnrollmentRecord extends Model
         'nin_autofill_changes' => 'array',
         'nin_conflicts' => 'array',
         'verified_field_edit_reasons' => 'array',
+        'location_capture_policy' => 'array',
+        'location_payload' => 'array',
         'captured_at' => 'datetime',
         'received_at' => 'datetime',
         'nin_verified_at' => 'datetime',

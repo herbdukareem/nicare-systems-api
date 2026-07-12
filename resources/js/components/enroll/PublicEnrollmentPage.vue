@@ -412,6 +412,7 @@ const maritalStatusOptions = [
   { label: 'Married', value: 2 },
   { label: 'Divorced', value: 3 },
   { label: 'Widowed', value: 4 },
+  { label: 'Not Stated', value: 5 },
 ]
 
 const plans = computed(() => metadata.value.premium_plans || [])

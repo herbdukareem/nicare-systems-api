@@ -89,6 +89,9 @@ class MobileEnrollmentService
                 (array) ($schema->nin_verification_policy ?? []),
                 (bool) $schema->requires_nin_verification
             );
+            $locationPolicy = $this->schemaService->normalizeLocationCapturePolicy(
+                (array) ($schema->location_capture_policy ?? [])
+            );
 
             if (($recordPayload['captured_offline'] ?? false) && !$this->policyAllowsOfflineCapture($schema, $ninPolicy)) {
                 return $this->failSync($record, 'This enrollment configuration does not allow offline capture when live NIN verification is required.');
@@ -109,6 +112,8 @@ class MobileEnrollmentService
             $extraFields = (array) ($recordPayload['extra_fields'] ?? []);
             $validated = $this->validationService->validate($schema, $data, $extraFields);
             $this->validateVerifiedFieldEdits($recordPayload, $ninPolicy, $validated['core']);
+            $locationPayload = $this->normalizeLocationPayload((array) ($recordPayload['location'] ?? []), $locationPolicy);
+            $this->validateLocationRequirement($locationPayload, $locationPolicy, $recordPayload);
 
             $record->forceFill([
                 'enrollment_form_schema_id' => $schema->exists ? $schema->id : null,
@@ -118,6 +123,8 @@ class MobileEnrollmentService
                 'migration_hints' => $schema->migration_hints ?? null,
                 'nin_verification_policy' => $ninPolicy,
                 'verified_field_edit_reasons' => $recordPayload['verified_field_edit_reasons'] ?? null,
+                'location_capture_policy' => $locationPolicy,
+                'location_payload' => $locationPayload,
             ])->save();
 
             if (!empty($recordPayload['verified_field_edit_reasons'])) {
@@ -134,7 +141,7 @@ class MobileEnrollmentService
                 $pin = $this->validatePinForEnrollment((string) $validated['core']['premium_pin'], (int) $validated['core']['premium_plan_id']);
             }
 
-            $enrollee = $this->createPendingEnrollee($record, $officer, $validated['core'], $validated['extra'], $schema);
+            $enrollee = $this->createPendingEnrollee($record, $officer, $validated['core'], $validated['extra'], $schema, $locationPayload);
 
             if ($pin) {
                 $enrollee = $this->premiumCoverageService->usePinForPendingEnrollment(
@@ -378,9 +385,9 @@ class MobileEnrollmentService
         return $pin;
     }
 
-    private function createPendingEnrollee(MobileEnrollmentRecord $record, User $officer, array $data, array $extra, $schema): Enrollee
+    private function createPendingEnrollee(MobileEnrollmentRecord $record, User $officer, array $data, array $extra, $schema, array $locationPayload = []): Enrollee
     {
-        return DB::transaction(function () use ($record, $officer, $data, $extra, $schema): Enrollee {
+        return DB::transaction(function () use ($record, $officer, $data, $extra, $schema, $locationPayload): Enrollee {
             return Enrollee::create([
                 'enrollee_id' => $this->uniqueEnrolleeId(),
                 'nin' => $data['nin'] ?? null,
@@ -392,6 +399,8 @@ class MobileEnrollmentService
                 'date_of_birth' => $data['date_of_birth'],
                 'sex' => (int) $data['sex'],
                 'marital_status' => $data['marital_status'] ?? null,
+                'occupation' => $data['occupation'] ?? null,
+                'disability' => $data['disability'] ?? null,
                 'address' => $data['address'] ?? null,
                 'facility_id' => $data['facility_id'],
                 'lga_id' => $data['lga_id'],
@@ -408,6 +417,7 @@ class MobileEnrollmentService
                 'enrollment_date' => now(),
                 'enrollment_source' => 'mobile_officer',
                 'enrollment_extra_fields' => $extra,
+                'enrollment_location_audit' => $locationPayload !== [] ? $this->enrolleeLocationAudit($locationPayload) : null,
                 'enrollment_form_schema_id' => $schema->exists ? $schema->id : null,
                 'enrollment_schema_version' => $schema->version ?? 1,
                 'mobile_enrollment_record_id' => $record->id,
@@ -892,6 +902,117 @@ class MobileEnrollmentService
             'nin_verified_data' => $record->nin_verified_data,
             'nin_autofill_changes' => $record->nin_autofill_changes,
             'nin_conflicts' => $record->nin_conflicts,
+            'location_payload' => $record->location_payload,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $location
+     * @param  array<string, mixed>  $policy
+     * @return array<string, mixed>
+     */
+    private function normalizeLocationPayload(array $location, array $policy): array
+    {
+        $normalized = [
+            'permission_status' => (string) ($location['permission_status'] ?? 'unknown'),
+            'mocked' => (bool) ($location['mocked'] ?? false),
+            'error' => $location['error'] ?? null,
+        ];
+
+        foreach (['capture_location', 'submit_location'] as $key) {
+            $point = is_array($location[$key] ?? null) ? $location[$key] : null;
+            if (!$point) {
+                continue;
+            }
+
+            $latitude = isset($point['latitude']) && is_numeric($point['latitude']) ? round((float) $point['latitude'], 7) : null;
+            $longitude = isset($point['longitude']) && is_numeric($point['longitude']) ? round((float) $point['longitude'], 7) : null;
+            if ($latitude === null || $longitude === null) {
+                continue;
+            }
+
+            $normalized[$key] = [
+                'latitude' => $latitude,
+                'longitude' => $longitude,
+                'accuracy_meters' => isset($point['accuracy_meters']) && is_numeric($point['accuracy_meters']) ? round((float) $point['accuracy_meters'], 2) : null,
+                'captured_at' => $point['captured_at'] ?? now()->toIso8601String(),
+                'source' => $point['source'] ?? 'device_gps',
+                'mocked' => (bool) ($point['mocked'] ?? $location['mocked'] ?? false),
+            ];
+        }
+
+        $normalized['policy_mode'] = $policy['mode'] ?? 'disabled';
+        $normalized['capture_points'] = $policy['capture_points'] ?? ['start', 'submit'];
+
+        return $normalized;
+    }
+
+    /**
+     * @param  array<string, mixed>  $locationPayload
+     * @param  array<string, mixed>  $policy
+     * @param  array<string, mixed>  $recordPayload
+     */
+    private function validateLocationRequirement(array $locationPayload, array $policy, array $recordPayload): void
+    {
+        if (!($policy['enabled'] ?? false)) {
+            return;
+        }
+
+        $mode = (string) ($policy['mode'] ?? 'disabled');
+        if ($mode === 'disabled') {
+            return;
+        }
+
+        $requiredPoint = $mode === 'required_on_submit' ? 'submit_location' : 'capture_location';
+        $hasLocation = !empty($locationPayload[$requiredPoint]) || !empty($locationPayload['submit_location']) || !empty($locationPayload['capture_location']);
+
+        if (!$hasLocation && !($policy['allow_submission_without_location'] ?? true)) {
+            throw new RuntimeException('Location capture is required before this enrollment can be submitted.');
+        }
+
+        $minimumAccuracy = (float) ($policy['minimum_accuracy_meters'] ?? 0);
+        if ($minimumAccuracy <= 0) {
+            return;
+        }
+
+        $point = $locationPayload[$requiredPoint] ?? $locationPayload['submit_location'] ?? $locationPayload['capture_location'] ?? null;
+        $accuracy = is_array($point) ? (float) ($point['accuracy_meters'] ?? 0) : 0;
+
+        if ($hasLocation && $accuracy > 0 && $accuracy > $minimumAccuracy && !($policy['allow_submission_without_location'] ?? true)) {
+            throw new RuntimeException("Captured location accuracy ({$accuracy}m) is weaker than the required {$minimumAccuracy}m threshold.");
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $locationPayload
+     * @return array<string, mixed>
+     */
+    private function enrolleeLocationAudit(array $locationPayload): array
+    {
+        $mapPoint = function (?array $point): ?array {
+            if (!$point || !isset($point['latitude'], $point['longitude'])) {
+                return null;
+            }
+
+            return [
+                'latitude' => $point['latitude'],
+                'longitude' => $point['longitude'],
+                'accuracy_meters' => $point['accuracy_meters'] ?? null,
+                'recorded_at' => $point['captured_at'] ?? null,
+                'source' => $point['source'] ?? 'device_gps',
+                'mocked' => (bool) ($point['mocked'] ?? false),
+                'google_maps_url' => sprintf('https://maps.google.com/?q=%s,%s', $point['latitude'], $point['longitude']),
+            ];
+        };
+
+        return [
+            'permission_status' => $locationPayload['permission_status'] ?? 'unknown',
+            'mocked' => (bool) ($locationPayload['mocked'] ?? false),
+            'error' => $locationPayload['error'] ?? null,
+            'capture_location' => $mapPoint(is_array($locationPayload['capture_location'] ?? null) ? $locationPayload['capture_location'] : null),
+            'submit_location' => $mapPoint(is_array($locationPayload['submit_location'] ?? null) ? $locationPayload['submit_location'] : null),
+            'captured_via' => 'mobile_officer_device',
+            'captured_offline' => (bool) ($locationPayload['captured_offline'] ?? false),
         ];
     }
 

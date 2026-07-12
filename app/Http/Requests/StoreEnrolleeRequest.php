@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Enrollee;
 use App\Models\PremiumPlan;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
 
 /**
@@ -54,7 +55,7 @@ class StoreEnrolleeRequest extends FormRequest
             'phone' => 'nullable|string|max:255',
             'date_of_birth' => 'required|date',
             'sex' => 'required|integer|in:1,2',
-            'marital_status' => 'nullable|integer|in:1,2,3,4',
+            'marital_status' => ['nullable', 'integer', Rule::in(array_keys(Enrollee::MARITAL_STATUS_OPTIONS))],
             'address' => 'nullable|string',
             'insurance_programme_id' => 'nullable|exists:insurance_programmes,id',
             'enrollee_category_id' => 'nullable|exists:enrollee_categories,id',
@@ -63,8 +64,8 @@ class StoreEnrolleeRequest extends FormRequest
             'ward_id' => 'required|exists:wards,id',
             'village' => 'nullable|string|max:255',
             'pregnant' => 'nullable|boolean',
-            'disability' => 'nullable|string|max:255',
-            'occupation' => 'nullable|string|max:255',
+            'disability' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::DISABILITY_OPTIONS)],
+            'occupation' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::OCCUPATION_OPTIONS)],
             'premium_plan_id' => 'nullable|exists:premium_plans,id',
             'premium_pin_id' => 'nullable|exists:premium_pins,id',
             'principal_enrollee_id' => 'nullable|exists:enrollees,id',

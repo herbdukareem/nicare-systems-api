@@ -93,6 +93,7 @@ class EnrolleeResource extends JsonResource
             'status' => $this->status,
             'status_label' => $this->getStatusLabel(),
             'enrollment_source' => $this->enrollment_source ?? 'staff',
+            'enrollment_location' => $this->enrollmentLocation(),
             'creator' => new UserResource($this->whenLoaded('createdBy')),
             'approver' => new UserResource($this->whenLoaded('approvedBy')),
             'duplicate_reviewed_by' => new UserResource($this->whenLoaded('duplicateReviewedBy')),
@@ -164,5 +165,38 @@ class EnrolleeResource extends JsonResource
             \App\Models\Enrollee::NIN_VERIFICATION_NOT_PROVIDED => 'NIN Not Provided',
             default => 'Not Verified',
         };
+    }
+
+    private function enrollmentLocation(): ?array
+    {
+        $location = is_array($this->enrollment_location_audit) ? $this->enrollment_location_audit : null;
+        if (!$location) {
+            return null;
+        }
+
+        $formatPoint = function (?array $point): ?array {
+            if (!$point || !isset($point['latitude'], $point['longitude'])) {
+                return null;
+            }
+
+            return [
+                'latitude' => $point['latitude'],
+                'longitude' => $point['longitude'],
+                'accuracy_meters' => $point['accuracy_meters'] ?? null,
+                'recorded_at' => $point['recorded_at'] ?? null,
+                'source' => $point['source'] ?? 'device_gps',
+                'mocked' => (bool) ($point['mocked'] ?? false),
+                'google_maps_url' => $point['google_maps_url'] ?? sprintf('https://maps.google.com/?q=%s,%s', $point['latitude'], $point['longitude']),
+            ];
+        };
+
+        return [
+            'permission_status' => $location['permission_status'] ?? 'unknown',
+            'mocked' => (bool) ($location['mocked'] ?? false),
+            'error' => $location['error'] ?? null,
+            'captured_via' => $location['captured_via'] ?? 'mobile_officer_device',
+            'capture_location' => $formatPoint(is_array($location['capture_location'] ?? null) ? $location['capture_location'] : null),
+            'submit_location' => $formatPoint(is_array($location['submit_location'] ?? null) ? $location['submit_location'] : null),
+        ];
     }
 }

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\EnrollmentFormSchema;
+use App\Models\Enrollee;
 use App\Models\InsuranceProgramme;
 use App\Models\PremiumPlan;
 use Illuminate\Database\Eloquent\Builder;
@@ -16,6 +17,8 @@ class EnrollmentFormSchemaService
     public const NIN_OFFLINE_BEHAVIORS = ['allow_capture', 'defer_until_sync', 'block_capture'];
     public const NIN_OVERWRITE_STRATEGIES = ['empty_only', 'always', 'never'];
     public const NIN_CONFLICT_STATUSES = ['requires_review', 'nin_failed'];
+    public const LOCATION_CAPTURE_MODES = ['disabled', 'preferred', 'required', 'required_on_submit'];
+    public const LOCATION_CAPTURE_POINTS = ['start', 'submit'];
 
     /**
      * @return array<int, array<string, mixed>>
@@ -34,7 +37,9 @@ class EnrollmentFormSchemaService
                 ['label' => 'Male', 'value' => 1],
                 ['label' => 'Female', 'value' => 2],
             ]],
-            ['key' => 'marital_status', 'label' => 'Marital status', 'type' => 'select', 'required' => false, 'rules' => ['integer', 'in:1,2,3,4']],
+            ['key' => 'marital_status', 'label' => 'Marital status', 'type' => 'select', 'required' => false, 'rules' => ['integer', 'in:1,2,3,4,5'], 'options' => $this->numericSelectOptions(Enrollee::MARITAL_STATUS_OPTIONS)],
+            ['key' => 'occupation', 'label' => 'Occupation', 'type' => 'select', 'required' => false, 'rules' => ['string', 'max:255'], 'options' => $this->stringSelectOptions(Enrollee::OCCUPATION_OPTIONS)],
+            ['key' => 'disability', 'label' => 'Disability', 'type' => 'select', 'required' => false, 'rules' => ['string', 'max:255'], 'options' => $this->stringSelectOptions(Enrollee::DISABILITY_OPTIONS)],
             ['key' => 'address', 'label' => 'Address', 'type' => 'textarea', 'required' => false, 'rules' => ['string']],
             ['key' => 'lga_id', 'label' => 'LGA', 'type' => 'select', 'required' => true, 'source' => 'lgas', 'rules' => ['integer', 'exists:lgas,id']],
             ['key' => 'ward_id', 'label' => 'Ward', 'type' => 'select', 'required' => true, 'source' => 'wards', 'rules' => ['integer', 'exists:wards,id']],
@@ -126,6 +131,7 @@ class EnrollmentFormSchemaService
             'status' => EnrollmentFormSchema::STATUS_PUBLISHED,
             'requires_nin_verification' => false,
             'nin_verification_policy' => $this->defaultNinVerificationPolicy(false),
+            'location_capture_policy' => $this->defaultLocationCapturePolicy(),
             'allow_offline_capture' => true,
             'fields' => $this->defaultFields(),
             'rules' => [],
@@ -202,6 +208,9 @@ class EnrollmentFormSchemaService
                 (array) ($attributes['nin_verification_policy'] ?? []),
                 (bool) ($attributes['requires_nin_verification'] ?? false)
             ),
+            'location_capture_policy' => $this->normalizeLocationCapturePolicy(
+                (array) ($attributes['location_capture_policy'] ?? [])
+            ),
             'allow_offline_capture' => (bool) ($attributes['allow_offline_capture'] ?? true),
             'fields' => $attributes['fields'] ?? $this->defaultFields(),
             'rules' => $attributes['rules'] ?? [],
@@ -235,6 +244,20 @@ class EnrollmentFormSchemaService
                     'address' => 'address',
                 ],
             ],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function defaultLocationCapturePolicy(): array
+    {
+        return [
+            'enabled' => false,
+            'mode' => 'disabled',
+            'capture_points' => ['start', 'submit'],
+            'minimum_accuracy_meters' => 100,
+            'allow_submission_without_location' => true,
         ];
     }
 
@@ -274,5 +297,66 @@ class EnrollmentFormSchemaService
                     ->all(),
             ],
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $policy
+     * @return array<string, mixed>
+     */
+    public function normalizeLocationCapturePolicy(array $policy): array
+    {
+        $default = $this->defaultLocationCapturePolicy();
+        $enabled = (bool) ($policy['enabled'] ?? ($policy !== []));
+        $mode = (string) ($policy['mode'] ?? ($enabled ? 'preferred' : $default['mode']));
+        $capturePoints = collect((array) ($policy['capture_points'] ?? $default['capture_points']))
+            ->filter(fn ($point) => in_array((string) $point, self::LOCATION_CAPTURE_POINTS, true))
+            ->map(fn ($point) => (string) $point)
+            ->unique()
+            ->values()
+            ->all();
+
+        if ($capturePoints === []) {
+            $capturePoints = $default['capture_points'];
+        }
+
+        $minimumAccuracy = $policy['minimum_accuracy_meters'] ?? $default['minimum_accuracy_meters'];
+        $minimumAccuracy = is_numeric($minimumAccuracy) ? max(0, (int) $minimumAccuracy) : $default['minimum_accuracy_meters'];
+
+        $normalizedMode = in_array($mode, self::LOCATION_CAPTURE_MODES, true) ? $mode : ($enabled ? 'preferred' : $default['mode']);
+        if (!$enabled) {
+            $normalizedMode = 'disabled';
+        }
+
+        return [
+            'enabled' => $enabled,
+            'mode' => $normalizedMode,
+            'capture_points' => $capturePoints,
+            'minimum_accuracy_meters' => $minimumAccuracy,
+            'allow_submission_without_location' => (bool) ($policy['allow_submission_without_location'] ?? $default['allow_submission_without_location']),
+        ];
+    }
+
+    /**
+     * @param  array<int, string>  $options
+     * @return array<int, array{label: string, value: string}>
+     */
+    private function stringSelectOptions(array $options): array
+    {
+        return array_map(
+            fn (string $label): array => ['label' => $label, 'value' => $label],
+            array_values($options)
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $options
+     * @return array<int, array{label: string, value: int}>
+     */
+    private function numericSelectOptions(array $options): array
+    {
+        return collect($options)
+            ->map(fn (string $label, int $value): array => ['label' => $label, 'value' => $value])
+            ->values()
+            ->all();
     }
 }

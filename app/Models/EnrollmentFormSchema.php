@@ -20,6 +20,7 @@ class EnrollmentFormSchema extends Model
     protected $casts = [
         'benefactor_ids' => 'array',
         'nin_verification_policy' => 'array',
+        'location_capture_policy' => 'array',
         'fields' => 'array',
         'rules' => 'array',
         'ui_schema' => 'array',

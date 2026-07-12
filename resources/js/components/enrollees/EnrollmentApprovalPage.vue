@@ -424,6 +424,71 @@
                 description="Approval can continue without NIN verification, but the enrollee will be marked as not provided in the verification status."
               />
             </AppCard>
+
+            <AppCard title="Enrollment Location" icon="mdi-map-marker-radius-outline" tone="primary">
+              <div v-if="selectedRow.enrollment_location?.capture_location || selectedRow.enrollment_location?.submit_location" class="tw-grid tw-gap-3 md:tw-grid-cols-2">
+                <div class="tw-space-y-2 tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
+                  <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Start Capture</p>
+                  <p class="tw-text-sm tw-font-medium tw-text-slate-900">{{ formatLocationPoint(selectedRow.enrollment_location?.capture_location) }}</p>
+                  <p class="tw-text-xs tw-text-slate-500">
+                    Estimated GPS accuracy: {{ formatAccuracy(selectedRow.enrollment_location?.capture_location?.accuracy_meters) }}
+                  </p>
+                  <p class="tw-text-xs tw-text-slate-400">
+                    {{ formatAccuracyHint(selectedRow.enrollment_location?.capture_location?.accuracy_meters) }}
+                  </p>
+                  <p class="tw-text-xs tw-text-slate-500">
+                    Time:
+                    <DateDisplay v-if="selectedRow.enrollment_location?.capture_location?.recorded_at" :value="selectedRow.enrollment_location.capture_location.recorded_at" format="medium" />
+                    <span v-else>N/A</span>
+                  </p>
+                  <v-btn
+                    v-if="selectedRow.enrollment_location?.capture_location?.google_maps_url"
+                    variant="text"
+                    color="primary"
+                    size="small"
+                    prepend-icon="mdi-map-search-outline"
+                    class="tw-self-start"
+                    @click="openLocationMap(selectedRow.enrollment_location?.capture_location, 'Start Capture Map')"
+                  >
+                    Open in map
+                  </v-btn>
+                </div>
+
+                <div class="tw-space-y-2 tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
+                  <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Submit Capture</p>
+                  <p class="tw-text-sm tw-font-medium tw-text-slate-900">{{ formatLocationPoint(selectedRow.enrollment_location?.submit_location) }}</p>
+                  <p class="tw-text-xs tw-text-slate-500">
+                    Estimated GPS accuracy: {{ formatAccuracy(selectedRow.enrollment_location?.submit_location?.accuracy_meters) }}
+                  </p>
+                  <p class="tw-text-xs tw-text-slate-400">
+                    {{ formatAccuracyHint(selectedRow.enrollment_location?.submit_location?.accuracy_meters) }}
+                  </p>
+                  <p class="tw-text-xs tw-text-slate-500">
+                    Time:
+                    <DateDisplay v-if="selectedRow.enrollment_location?.submit_location?.recorded_at" :value="selectedRow.enrollment_location.submit_location.recorded_at" format="medium" />
+                    <span v-else>N/A</span>
+                  </p>
+                  <v-btn
+                    v-if="selectedRow.enrollment_location?.submit_location?.google_maps_url"
+                    variant="text"
+                    color="primary"
+                    size="small"
+                    prepend-icon="mdi-map-search-outline"
+                    class="tw-self-start"
+                    @click="openLocationMap(selectedRow.enrollment_location?.submit_location, 'Submit Capture Map')"
+                  >
+                    Open in map
+                  </v-btn>
+                </div>
+              </div>
+
+              <AppEmptyState
+                v-else
+                icon="mdi-map-marker-off-outline"
+                title="No enrollment location captured"
+                :description="selectedRow.enrollment_location?.error || 'This mobile enrollment record did not include device location data.'"
+              />
+            </AppCard>
           </div>
         </template>
 
@@ -442,6 +507,39 @@
         @cancel="closeApproveDialog"
         @confirm="confirmApprove"
       />
+
+      <AppModal
+        :model-value="locationMapOpen"
+        :title="locationMapTitle"
+        subtitle="Review the captured coordinates without leaving the approval workflow."
+        icon="mdi-map-marker-radius-outline"
+        size="xl"
+        color="primary"
+        @update:modelValue="locationMapOpen = $event"
+      >
+        <div class="tw-space-y-4">
+          <div class="tw-grid tw-gap-2 md:tw-grid-cols-3">
+            <Info label="Coordinates" :value="formatLocationPoint(locationMapPoint)" />
+            <Info label="Estimated accuracy" :value="formatAccuracy(locationMapPoint?.accuracy_meters)" />
+            <Info label="Meaning" :value="formatAccuracyHint(locationMapPoint?.accuracy_meters)" />
+          </div>
+
+          <div class="tw-overflow-hidden tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-slate-50">
+            <iframe
+              v-if="locationMapEmbedUrl"
+              :src="locationMapEmbedUrl"
+              title="Enrollment location map"
+              class="tw-h-[420px] tw-w-full tw-border-0"
+              loading="lazy"
+              referrerpolicy="no-referrer-when-downgrade"
+            />
+          </div>
+        </div>
+
+        <template #actions>
+          <v-btn variant="text" @click="locationMapOpen = false">Close</v-btn>
+        </template>
+      </AppModal>
     </div>
   </AdminLayout>
 </template>
@@ -489,6 +587,9 @@ const detailModalOpen = ref(false)
 const selectedRowId = ref(null)
 const approvalDialogOpen = ref(false)
 const approvalTarget = ref(null)
+const locationMapOpen = ref(false)
+const locationMapTitle = ref('Enrollment Location Map')
+const locationMapPoint = ref(null)
 
 const headers = [
   { title: 'Enrollee', key: 'enrollee', sortable: false, minWidth: 220 },
@@ -595,6 +696,35 @@ const defaultFieldSelection = (comparison = []) => {
     carry[field.field] = field.recommended_source || 'provided'
     return carry
   }, {})
+}
+
+const formatLocationPoint = (point) => {
+  if (!point?.latitude || !point?.longitude) return 'Not captured'
+  return `${Number(point.latitude).toFixed(6)}, ${Number(point.longitude).toFixed(6)}`
+}
+
+const formatAccuracy = (accuracy) => {
+  if (!accuracy && accuracy !== 0) return 'N/A'
+  return `${Math.round(Number(accuracy))}m`
+}
+
+const formatAccuracyHint = (accuracy) => {
+  if (!accuracy && accuracy !== 0) return 'No GPS accuracy estimate was recorded.'
+  return `This point is estimated to be within about ${Math.round(Number(accuracy))} meters of the enrollee's actual capture position.`
+}
+
+const buildMapEmbedUrl = (point) => {
+  if (!point?.latitude || !point?.longitude) return ''
+  return `https://maps.google.com/maps?q=${encodeURIComponent(`${point.latitude},${point.longitude}`)}&z=15&output=embed`
+}
+
+const locationMapEmbedUrl = computed(() => buildMapEmbedUrl(locationMapPoint.value))
+
+const openLocationMap = (point, title = 'Enrollment Location Map') => {
+  if (!point?.latitude || !point?.longitude) return
+  locationMapPoint.value = point
+  locationMapTitle.value = title
+  locationMapOpen.value = true
 }
 
 const normalizeRow = (row) => {

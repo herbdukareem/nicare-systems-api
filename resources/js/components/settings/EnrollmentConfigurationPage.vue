@@ -33,11 +33,17 @@
           <AppBadge :label="item.requires_nin_verification ? 'Live NIN required' : 'No live NIN'" :tone="item.requires_nin_verification ? 'warning' : 'neutral'" size="sm" />
           <AppBadge :label="item.allow_offline_capture ? 'Offline' : 'Online only'" :tone="item.allow_offline_capture ? 'success' : 'neutral'" size="sm" />
           <AppBadge v-if="item.benefactor_ids?.length" :label="`${item.benefactor_ids.length} benefactors`" tone="info" size="sm" />
+          <AppBadge
+            :label="item.location_capture_policy?.enabled ? `Location ${String(item.location_capture_policy.mode || 'preferred').replace(/_/g, ' ')}` : 'No location capture'"
+            :tone="item.location_capture_policy?.enabled ? 'info' : 'neutral'"
+            size="sm"
+          />
         </div>
       </template>
       <template #item.actions="{ item }">
         <div class="tw-flex tw-gap-1">
           <v-btn icon="mdi-pencil" size="small" variant="text" title="Edit" @click="openEdit(item)" />
+          <v-btn icon="mdi-content-copy" size="small" variant="text" title="Create copy" @click="openDuplicate(item)" />
           <v-btn v-if="item.status !== 'published'" icon="mdi-cloud-upload-outline" size="small" variant="text" title="Publish" @click="publishSchema(item)" />
           <v-btn v-if="item.status !== 'revoked'" icon="mdi-cancel" size="small" variant="text" title="Revoke" @click="revokeSchema(item)" />
         </div>
@@ -46,7 +52,7 @@
 
     <v-dialog v-model="dialog" max-width="980" scrollable>
       <div class="schema-dialog-shell tw-bg-white tw-shadow-xl">
-        <AppCard :title="editingId ? 'Edit schema' : 'New schema'" icon="mdi-form-textbox" :padded="true">
+        <AppCard :title="dialogTitle" icon="mdi-form-textbox" :padded="true">
           <div class="tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-2">
             <v-text-field v-model="form.name" label="Name" variant="outlined" density="compact" />
             <v-select v-model="form.status" :items="statusOptions" label="Status" variant="outlined" density="compact" />
@@ -95,6 +101,39 @@
               persistent-hint
               class="md:tw-col-span-2"
             />
+          </div>
+
+          <div class="tw-mt-4 tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-2">
+            <v-switch v-model="form.location_capture_policy.enabled" label="Capture enrollment location" color="primary" hide-details />
+            <v-switch v-model="form.location_capture_policy.allow_submission_without_location" label="Allow submission without location" color="primary" hide-details />
+            <v-select
+              v-model="form.location_capture_policy.mode"
+              :items="locationModeOptions"
+              label="Location capture mode"
+              variant="outlined"
+              density="compact"
+            />
+            <v-combobox
+              v-model="form.location_capture_policy.capture_points"
+              :items="locationCapturePointOptions"
+              label="Capture points"
+              variant="outlined"
+              density="compact"
+              multiple
+              chips
+              closable-chips
+            />
+            <v-text-field
+              v-model.number="form.location_capture_policy.minimum_accuracy_meters"
+              label="Minimum accuracy (meters)"
+              type="number"
+              variant="outlined"
+              density="compact"
+            />
+          </div>
+
+          <div class="tw-mt-3 tw-rounded-md tw-border tw-border-slate-200 tw-bg-slate-50 tw-px-3 tw-py-2 tw-text-sm tw-text-slate-600">
+            {{ derivedLocationPolicyHelp }}
           </div>
 
           <div class="tw-mt-4 tw-grid tw-grid-cols-1 tw-gap-3 lg:tw-grid-cols-2">
@@ -150,6 +189,8 @@ const headers = [
 const statusOptions = ['draft', 'published', 'archived', 'revoked']
 const conflictStatusOptions = ['requires_review', 'nin_failed']
 const overwriteStrategyOptions = ['empty_only', 'always', 'never']
+const locationModeOptions = ['disabled', 'preferred', 'required', 'required_on_submit']
+const locationCapturePointOptions = ['start', 'submit']
 const schemas = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -158,11 +199,13 @@ const loading = ref(false)
 const saving = ref(false)
 const dialog = ref(false)
 const editingId = ref(null)
+const duplicateSourceId = ref(null)
 const formError = ref('')
 const fieldsJson = ref('[]')
 const uiJson = ref('{}')
 const ninAutofillFieldsJson = ref('{}')
 const defaultNinPolicy = ref(null)
+const defaultLocationPolicy = ref(null)
 
 const metadata = reactive({
   insurance_programmes: [],
@@ -200,9 +243,21 @@ const form = reactive({
       },
     },
   },
+  location_capture_policy: {
+    enabled: false,
+    mode: 'disabled',
+    capture_points: ['start', 'submit'],
+    minimum_accuracy_meters: 100,
+    allow_submission_without_location: true,
+  },
 })
 
 const filteredPlans = computed(() => metadata.premium_plans.filter((plan) => !form.insurance_programme_id || Number(plan.insurance_programme_id) === Number(form.insurance_programme_id)))
+const dialogTitle = computed(() => {
+  if (editingId.value) return 'Edit schema'
+  if (duplicateSourceId.value) return 'Copy schema'
+  return 'New schema'
+})
 const ninEditableFieldOptions = computed(() => {
   try {
     const parsed = JSON.parse(ninAutofillFieldsJson.value || '{}')
@@ -256,6 +311,22 @@ const derivedNinPolicyHelp = computed(() => {
   return 'Live NIN is required before the officer can continue. Offline capture is blocked for this enrollment form.'
 })
 
+const derivedLocationPolicyHelp = computed(() => {
+  if (!form.location_capture_policy.enabled || form.location_capture_policy.mode === 'disabled') {
+    return 'Device GPS capture is disabled for this enrollment form.'
+  }
+
+  if (form.location_capture_policy.mode === 'required_on_submit') {
+    return 'Location is captured on device and must be available when the officer queues or submits the enrollment.'
+  }
+
+  if (form.location_capture_policy.mode === 'required') {
+    return 'Location is expected during capture and submit. If GPS is unavailable and submission without location is disabled, queueing will be blocked.'
+  }
+
+  return 'Location will be captured on the device when available and stored for approval-time audit review.'
+})
+
 const setPolicy = (policy = null, requiresNin = false) => {
   const next = clonePolicy(policy)
   const defaultFields = defaultNinPolicy.value?.autofill?.fields || form.nin_verification_policy.autofill?.fields || {}
@@ -272,6 +343,14 @@ const setPolicy = (policy = null, requiresNin = false) => {
   ninAutofillFieldsJson.value = JSON.stringify(next.autofill?.fields || {}, null, 2)
 }
 
+const setLocationPolicy = (policy = null) => {
+  const next = JSON.parse(JSON.stringify(policy || defaultLocationPolicy.value || form.location_capture_policy))
+  next.capture_points = Array.isArray(next.capture_points) && next.capture_points.length ? next.capture_points : ['start', 'submit']
+  next.minimum_accuracy_meters = Number.isFinite(Number(next.minimum_accuracy_meters)) ? Number(next.minimum_accuracy_meters) : 100
+  next.allow_submission_without_location = next.allow_submission_without_location !== false
+  form.location_capture_policy = next
+}
+
 const loadSchemas = async () => {
   loading.value = true
   try {
@@ -283,6 +362,7 @@ const loadSchemas = async () => {
       fieldsJson.value = JSON.stringify(response.data?.data?.default_fields || [], null, 2)
     }
     defaultNinPolicy.value = response.data?.data?.default_nin_verification_policy || defaultNinPolicy.value
+    defaultLocationPolicy.value = response.data?.data?.default_location_capture_policy || defaultLocationPolicy.value
   } finally {
     loading.value = false
   }
@@ -298,6 +378,7 @@ const loadMetadata = async () => {
 
 const openCreate = () => {
   editingId.value = null
+  duplicateSourceId.value = null
   form.name = 'Mobile enrollment form'
   form.status = 'draft'
   form.insurance_programme_id = null
@@ -307,6 +388,7 @@ const openCreate = () => {
   form.requires_nin_verification = false
   form.allow_offline_capture = true
   setPolicy(null, false)
+  setLocationPolicy(null)
   fieldsJson.value = fieldsJson.value || '[]'
   uiJson.value = '{}'
   formError.value = ''
@@ -315,6 +397,7 @@ const openCreate = () => {
 
 const openEdit = (item) => {
   editingId.value = item.id
+  duplicateSourceId.value = null
   form.name = item.name
   form.status = item.status
   form.insurance_programme_id = item.insurance_programme_id
@@ -324,6 +407,26 @@ const openEdit = (item) => {
   form.requires_nin_verification = Boolean(item.requires_nin_verification)
   form.allow_offline_capture = Boolean(item.allow_offline_capture)
   setPolicy(item.nin_verification_policy, Boolean(item.requires_nin_verification))
+  setLocationPolicy(item.location_capture_policy)
+  fieldsJson.value = JSON.stringify(item.fields || [], null, 2)
+  uiJson.value = JSON.stringify({ ui_schema: item.ui_schema || {}, migration_hints: item.migration_hints || null }, null, 2)
+  formError.value = ''
+  dialog.value = true
+}
+
+const openDuplicate = (item) => {
+  editingId.value = null
+  duplicateSourceId.value = item.id
+  form.name = `${item.name} Copy`
+  form.status = 'draft'
+  form.insurance_programme_id = item.insurance_programme_id
+  form.premium_plan_id = item.premium_plan_id
+  form.benefactor_ids = item.benefactor_ids || []
+  form.version = Number(item.version || 1) + 1
+  form.requires_nin_verification = Boolean(item.requires_nin_verification)
+  form.allow_offline_capture = Boolean(item.allow_offline_capture)
+  setPolicy(item.nin_verification_policy, Boolean(item.requires_nin_verification))
+  setLocationPolicy(item.location_capture_policy)
   fieldsJson.value = JSON.stringify(item.fields || [], null, 2)
   uiJson.value = JSON.stringify({ ui_schema: item.ui_schema || {}, migration_hints: item.migration_hints || null }, null, 2)
   formError.value = ''
@@ -341,6 +444,7 @@ const payload = () => {
     ...form,
     requires_nin_verification: form.requires_nin_verification,
     nin_verification_policy: policy,
+    location_capture_policy: form.location_capture_policy,
     fields: JSON.parse(fieldsJson.value || '[]'),
     ui_schema: ui.ui_schema || ui,
     migration_hints: ui.migration_hints || null,
