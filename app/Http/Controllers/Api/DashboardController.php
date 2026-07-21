@@ -325,12 +325,13 @@ class DashboardController extends Controller
     {
         try {
             $year = $request->integer('year', 0);
+            $dateExpression = $this->enrollmentTrendDateExpression();
 
             if ($year > 0) {
                 $rows = Enrollee::query()
-                    ->selectRaw('MONTH(created_at) as m, COUNT(*) as total')
-                    ->whereNotNull('created_at')
-                    ->whereYear('created_at', $year)
+                    ->selectRaw("MONTH({$dateExpression}) as m, COUNT(*) as total")
+                    ->whereRaw("{$dateExpression} IS NOT NULL")
+                    ->whereYear(DB::raw($dateExpression), $year)
                     ->groupBy('m')
                     ->orderBy('m')
                     ->get()
@@ -348,8 +349,8 @@ class DashboardController extends Controller
                 })->values()->all();
             } else {
                 $rows = Enrollee::query()
-                    ->selectRaw('YEAR(created_at) as y, COUNT(*) as total')
-                    ->whereNotNull('created_at')
+                    ->selectRaw("YEAR({$dateExpression}) as y, COUNT(*) as total")
+                    ->whereRaw("{$dateExpression} IS NOT NULL")
                     ->groupBy('y')
                     ->orderBy('y')
                     ->get();
@@ -365,6 +366,13 @@ class DashboardController extends Controller
         } catch (\Throwable $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 500);
         }
+    }
+
+    private function enrollmentTrendDateExpression(): string
+    {
+        // Legacy rows preserve the true business enrollment date in enrollment_date,
+        // while created_at reflects when the record was inserted during migration.
+        return 'COALESCE(enrollment_date, created_at)';
     }
 
     /**
