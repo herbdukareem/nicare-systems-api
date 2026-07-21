@@ -297,7 +297,7 @@ class RolesAndPermissionsSeeder extends Seeder
                     'group-enrollment.', 'payroll-upload.', 'subsidy-batch.', 'eligibility.', 'referrals.',
                     'pa_codes.', 'admissions.', 'utn.', 'claims.', 'payment_batches.', 'capitation.', 'payments.',
                     'reports.', 'analytics.', 'feedback.', 'users.view', 'roles.view', 'permissions.view',
-                ]), ['settings.nin.manage', 'settings.payment-gateway.manage', 'settings.enrollment-schema.manage', 'settings.mobile-device.manage'])),
+                ]), ['settings.nin.manage', 'settings.payment-gateway.manage', 'settings.enrollment-schema.manage', 'settings.mobile-device.manage']))),
             ],
             'enrollment-officer' => [
                 'label' => 'Enrollment Officer',

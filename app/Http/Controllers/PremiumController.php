@@ -203,7 +203,6 @@ class PremiumController extends Controller
             
             // Create enrollee
             $enrolleeData = $request->enrollee_data;
-            $enrolleeData['enrollee_id'] = $this->generateEnrolleeId();
             $enrolleeData['lga_id'] = $facility->lga_id;
             $enrolleeData['ward_id'] = $facility->ward_id;
             $enrolleeData['premium_id'] = $premium->id;
@@ -291,15 +290,6 @@ class PremiumController extends Controller
             'total_value' => Premium::sum('amount'),
             'used_value' => Premium::used()->sum('amount'),
         ];
-    }
-
-    private function generateEnrolleeId(): string
-    {
-        do {
-            $id = 'NC' . date('Y') . str_pad(random_int(1, 999999), 6, '0', STR_PAD_LEFT);
-        } while (Enrollee::where('enrollee_id', $id)->exists());
-
-        return $id;
     }
 
     public function bulkUpload(Request $request): JsonResponse

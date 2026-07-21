@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Services\EnrolleeIdGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Laravel\Sanctum\HasApiTokens;
@@ -83,6 +84,15 @@ class Enrollee extends Authenticatable
      * @var array<int, string>
      */
 protected $guarded = ['id'];
+
+    protected static function booted(): void
+    {
+        static::creating(function (self $enrollee): void {
+            if (blank($enrollee->enrollee_id)) {
+                $enrollee->enrollee_id = app(EnrolleeIdGenerator::class)->generate();
+            }
+        });
+    }
 
     /**
      * Date casting for attributes.

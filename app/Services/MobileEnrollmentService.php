@@ -389,7 +389,6 @@ class MobileEnrollmentService
     {
         return DB::transaction(function () use ($record, $officer, $data, $extra, $schema, $locationPayload): Enrollee {
             return Enrollee::create([
-                'enrollee_id' => $this->uniqueEnrolleeId(),
                 'nin' => $data['nin'] ?? null,
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
@@ -1030,15 +1029,6 @@ class MobileEnrollmentService
                 'device_id' => $record->officer_device_id,
             ],
         ]);
-    }
-
-    private function uniqueEnrolleeId(): string
-    {
-        do {
-            $value = 'MOB' . now()->format('ymdHis') . str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        } while (Enrollee::where('enrollee_id', $value)->exists());
-
-        return $value;
     }
 
     private function uniquePurchaseReference(): string

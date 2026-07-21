@@ -204,7 +204,6 @@ class EnrolleeController extends Controller
         DB::beginTransaction();
         try {
             $enrolleeData = $validator->validated();
-            $enrolleeData['enrollee_id'] = $this->generateEnrolleeId();
             $enrolleeData['created_by'] = auth()->id();
             $enrolleeData['status'] = Enrollee::STATUS_PENDING;
 
@@ -627,23 +626,6 @@ class EnrolleeController extends Controller
             'message' => 'Duplicate flag resolved successfully.',
             'data'    => $flag->fresh(),
         ]);
-    }
-
-    private function generateEnrolleeId(): string
-    {
-        $prefix = 'NGSCHA';
-        $lastEnrollee = Enrollee::where('enrollee_id', 'like', $prefix . '%')
-            ->orderBy('enrollee_id', 'desc')
-            ->first();
-
-        if ($lastEnrollee) {
-            $lastNumber = (int) substr($lastEnrollee->enrollee_id, strlen($prefix));
-            $newNumber = $lastNumber + 1;
-        } else {
-            $newNumber = 1;
-        }
-
-        return $prefix . str_pad($newNumber, 9, '0', STR_PAD_LEFT);
     }
 
     private function normalizeIncomingEnrolleeData(array $data): array

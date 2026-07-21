@@ -162,7 +162,11 @@ class LegacyEnrolleeMigrationService
             ->whereNotNull('new_enrollee_id')
             ->first();
 
-        return $log?->enrollee;
+        if ($log?->enrollee) {
+            return $log->enrollee;
+        }
+
+        return Enrollee::where('legacy_id', (int) $mapped['legacy_id'])->first();
     }
 
     private function ensureUniqueEnrolleeId(array &$mapped): void

@@ -284,7 +284,6 @@ class PremiumCoverageService
                 $enrollee = $row->enrollee_id ? Enrollee::find($row->enrollee_id) : null;
                 if (!$enrollee) {
                     $enrollee = Enrollee::create([
-                        'enrollee_id' => 'NIC' . now()->format('ymdHis') . random_int(100, 999),
                         'nin' => $row->nin,
                         'first_name' => $row->first_name,
                         'last_name' => $row->last_name,

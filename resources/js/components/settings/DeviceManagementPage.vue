@@ -6,7 +6,7 @@
         subtitle="Assign enrollment officers to LGAs and enrollment configurations, monitor devices, and revoke lost phones."
         icon="mdi-tablet-dashboard"
       >
-        <v-btn color="primary" prepend-icon="mdi-account-plus" @click="activeTab = 'assignments'">Assign officer</v-btn>
+        <v-btn color="primary" prepend-icon="mdi-account-plus" @click="openAssignmentForm">Assign officer</v-btn>
       </AppPageHeader>
 
       <AppTabs v-model="activeTab" :tabs="tabs">
@@ -52,13 +52,15 @@
         </template>
 
         <template v-else>
-          <AppCard
-            title="Officer Assignment"
-            subtitle="Choose the officer, allowed local governments, and the enrollment form schemas they can use in EES."
-            icon="mdi-account-check-outline"
-          >
+          <div ref="assignmentFormSection">
+            <AppCard
+              title="Officer Assignment"
+              subtitle="Choose the officer, allowed local governments, and the enrollment form schemas they can use in EES."
+              icon="mdi-account-check-outline"
+            >
             <div class="tw-grid tw-grid-cols-1 tw-gap-3 lg:tw-grid-cols-4">
               <v-autocomplete
+                ref="assignmentOfficerField"
                 v-model="assignmentForm.user_id"
                 :items="officers"
                 :item-title="officerLabel"
@@ -116,7 +118,8 @@
                 {{ selectedOfficer.mobile_enrollment_enabled ? 'Disable officer' : 'Enable officer' }}
               </v-btn>
             </div>
-          </AppCard>
+            </AppCard>
+          </div>
 
           <AppDataTable
             v-model:page="assignmentPage"
@@ -179,7 +182,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, reactive, ref } from 'vue'
 import AppBadge from '../common/AppBadge.vue'
 import AppCard from '../common/AppCard.vue'
 import AppDataTable from '../common/AppDataTable.vue'
@@ -224,6 +227,8 @@ const savingOfficerStatus = ref(false)
 const officers = ref([])
 const lgas = ref([])
 const schemas = ref([])
+const assignmentFormSection = ref(null)
+const assignmentOfficerField = ref(null)
 
 const assignmentForm = reactive({
   user_id: null,
@@ -239,6 +244,7 @@ const tabs = computed(() => [
 
 const selectedOfficer = computed(() => officers.value.find((officer) => Number(officer.id) === Number(assignmentForm.user_id)) || null)
 const publishedSchemas = computed(() => schemas.value.filter((schema) => schema.status === 'published'))
+const assignableOfficerRoles = new Set(['enrollment-officer', 'mobile-enrollment-officer'])
 
 const pageItems = (response, nestedKey = null) => {
   const payload = response.data?.data
@@ -254,6 +260,27 @@ const collectionItems = (response) => {
   return payload?.data || payload || []
 }
 
+const normalizeRoleToken = (value) => String(value || '')
+  .trim()
+  .toLowerCase()
+  .replace(/\s+/g, '-')
+
+const isAssignableOfficer = (user) => {
+  const roles = Array.isArray(user?.roles) ? user.roles : []
+  return roles.some((role) => assignableOfficerRoles.has(normalizeRoleToken(role?.name) || normalizeRoleToken(role?.label)))
+}
+
+const mergeUsersById = (...collections) => {
+  const merged = new Map()
+
+  collections.flat().forEach((user) => {
+    if (!user?.id) return
+    merged.set(Number(user.id), user)
+  })
+
+  return Array.from(merged.values()).sort((left, right) => officerLabel(left).localeCompare(officerLabel(right)))
+}
+
 const officerLabel = (officer) => {
   if (!officer) return 'Unknown officer'
   return officer.name || officer.username || officer.email || `Officer #${officer.id}`
@@ -263,6 +290,18 @@ const schemaLabel = (schema) => {
   if (!schema) return 'All published mobile schemas'
   const scope = schema.plan?.name || schema.programme?.name || 'Mobile enrollment'
   return `${schema.name || scope} · v${schema.version || 1}`
+}
+
+const focusAssignmentOfficerField = () => {
+  assignmentOfficerField.value?.focus?.()
+  assignmentOfficerField.value?.$el?.querySelector?.('input')?.focus?.()
+}
+
+const openAssignmentForm = async () => {
+  activeTab.value = 'assignments'
+  await nextTick()
+  assignmentFormSection.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
+  focusAssignmentOfficerField()
 }
 
 const loadDevices = async () => {
@@ -290,15 +329,19 @@ const loadAssignments = async () => {
 }
 
 const loadMetadata = async () => {
-  const [officerResponse, allUsersResponse, lgaResponse, schemaResponse] = await Promise.all([
-    userAPI.getWithRoles({ role: 'mobile-enrollment-officer', per_page: 100 }),
-    userAPI.getWithRoles({ per_page: 100 }),
+  const [mobileOfficerResponse, enrollmentOfficerResponse, allUsersResponse, lgaResponse, schemaResponse] = await Promise.all([
+    userAPI.getWithRoles({ role: 'mobile-enrollment-officer', per_page: 500 }),
+    userAPI.getWithRoles({ role: 'enrollment-officer', per_page: 500 }),
+    userAPI.getWithRoles({ per_page: 500 }),
     lgaAPI.getAll({ per_page: 500 }),
     enrollmentSchemaAPI.list({ channel: 'mobile', per_page: 500 }),
   ])
 
-  const officerItems = collectionItems(officerResponse)
-  officers.value = officerItems.length ? officerItems : collectionItems(allUsersResponse)
+  const mobileOfficerItems = collectionItems(mobileOfficerResponse)
+  const enrollmentOfficerItems = collectionItems(enrollmentOfficerResponse)
+  const fallbackOfficerItems = collectionItems(allUsersResponse).filter(isAssignableOfficer)
+
+  officers.value = mergeUsersById(mobileOfficerItems, enrollmentOfficerItems, fallbackOfficerItems)
   lgas.value = collectionItems(lgaResponse)
   schemas.value = pageItems(schemaResponse, 'schemas').items
 }

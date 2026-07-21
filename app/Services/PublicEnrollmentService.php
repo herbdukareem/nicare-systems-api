@@ -111,7 +111,6 @@ class PublicEnrollmentService
             }
 
             $enrollee = Enrollee::create([
-                'enrollee_id' => $this->generatedEnrolleeId(),
                 'nin' => $data['nin'] ?? null,
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
@@ -184,15 +183,6 @@ class PublicEnrollmentService
         $path = Storage::disk($disk)->putFile('enrollees/passports', $passport, 'public');
 
         return Storage::disk($disk)->url($path);
-    }
-
-    private function generatedEnrolleeId(): string
-    {
-        do {
-            $value = 'NG' . now()->format('ymdHis') . str_pad((string) random_int(0, 9999), 4, '0', STR_PAD_LEFT);
-        } while (Enrollee::where('enrollee_id', $value)->exists());
-
-        return $value;
     }
 
     private function generatedPaymentReference(): string

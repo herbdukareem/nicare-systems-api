@@ -36,8 +36,9 @@ class StoreEnrolleeRequest extends FormRequest
             $data['principal_enrollee_id'] = null;
         }
 
+        unset($data['enrollee_id']);
+
         $this->merge($data + [
-            'enrollee_id' => 'NGSCHA' . now()->format('ymdHis') . random_int(100, 999),
             'created_by' => auth()->id(),
             'status' => 0,
         ]);
@@ -46,7 +47,6 @@ class StoreEnrolleeRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'enrollee_id' => 'required|string|max:255|unique:enrollees,enrollee_id',
             'nin' => 'nullable|string|max:255|unique:enrollees,nin',
             'first_name' => 'required|string|max:255',
             'last_name' => 'required|string|max:255',
