@@ -349,6 +349,7 @@ import AppModal from '../common/AppModal.vue'
 import FacilityBadge from '../common/FacilityBadge.vue'
 import MoneyDisplay from '../common/MoneyDisplay.vue'
 import { useOrganizationSettings } from '../../composables/useOrganizationSettings'
+import { openHostedCheckout } from '../../utils/hostedCheckout'
 
 const { error } = useToast()
 const { settings: org, fetchSettings } = useOrganizationSettings()
@@ -520,16 +521,6 @@ const scrollToError = async () => {
   errorArea.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-const openCheckoutWindow = (authorizationUrl) => {
-  if (!authorizationUrl) return
-
-  const popup = window.open(authorizationUrl, 'premium-checkout', 'width=520,height=760,noopener,noreferrer')
-
-  if (!popup) {
-    window.location.href = authorizationUrl
-  }
-}
-
 const verifyReturnedPayment = async (reference) => {
   if (!reference) return
 
@@ -594,8 +585,8 @@ const submitApplication = async () => {
     clearApplicationFields()
     scrollToSuccess()
 
-    if (responseData?.requires_payment && checkout?.authorization_url) {
-      openCheckoutWindow(checkout.authorization_url)
+    if (responseData?.requires_payment && (checkout?.authorization_url || checkout?.checkout_form)) {
+      openHostedCheckout(checkout, 'premium-checkout')
     }
   } catch (err) {
     const message = err?.response?.data?.message || 'Unable to submit your application right now.'

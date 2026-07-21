@@ -18,7 +18,7 @@ class PaystackBillingGateway implements BillingPaymentGatewayInterface
         $response = Http::baseUrl($configuration['base_url'])
             ->withToken($configuration['secret_key'])
             ->acceptJson()
-            ->post($configuration['initialize_endpoint'], [
+            ->post($configuration['initialize_endpoint'], array_filter([
                 'email' => $payload['email'],
                 'amount' => (int) round(((float) $payload['amount']) * (int) ($configuration['request_amount_multiplier'] ?? 100)),
                 'currency' => $configuration['currency'] ?? 'NGN',
@@ -26,7 +26,8 @@ class PaystackBillingGateway implements BillingPaymentGatewayInterface
                 'callback_url' => $payload['callback_url'],
                 'channels' => $payload['channels'] ?? null,
                 'metadata' => $payload['metadata'] ?? [],
-            ]);
+                'split' => Arr::get($payload, 'split_config.split'),
+            ], static fn ($value) => $value !== null));
 
         $data = $response->json();
 
@@ -44,7 +45,7 @@ class PaystackBillingGateway implements BillingPaymentGatewayInterface
         ];
     }
 
-    public function verifyPayment(string $reference, array $configuration): array
+    public function verifyPayment(string $reference, array $configuration, array $context = []): array
     {
         $endpoint = str_replace('{reference}', urlencode($reference), $configuration['verify_endpoint']);
 

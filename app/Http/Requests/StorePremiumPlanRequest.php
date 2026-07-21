@@ -6,6 +6,7 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
+use App\Services\Billing\PaymentGatewayConfigurationService;
 
 class StorePremiumPlanRequest extends FormRequest
 {
@@ -27,6 +28,7 @@ class StorePremiumPlanRequest extends FormRequest
             'payment_required' => ['nullable', 'boolean'],
             'self_enrollment_enabled' => ['nullable', 'boolean'],
             'payment_gateway' => ['nullable', 'string', 'max:80', Rule::in($this->supportedPaymentGateways())],
+            'payment_split_profile_code' => ['nullable', 'string', 'max:80'],
             'duration_days' => ['nullable', 'integer', 'min:1'],
             'has_no_expiry' => ['nullable', 'boolean'],
             'waiting_period_days' => ['nullable', 'integer', 'min:0'],
@@ -69,6 +71,21 @@ class StorePremiumPlanRequest extends FormRequest
                 $validator->errors()->add('payment_gateway', 'Payment gateway is required when payment is required.');
             }
 
+            if ($paymentRequired && $this->filled('payment_split_profile_code')) {
+                $service = app(PaymentGatewayConfigurationService::class);
+                $profileCode = (string) $this->input('payment_split_profile_code');
+                $gatewayCode = (string) $this->input('payment_gateway');
+                $profile = collect($service->getSplitProfiles())->firstWhere('code', $profileCode);
+
+                if (!$service->supportsSplitProfiles($gatewayCode)) {
+                    $validator->errors()->add('payment_split_profile_code', 'The selected payment gateway does not support split settlement profiles yet.');
+                } elseif (!$profile) {
+                    $validator->errors()->add('payment_split_profile_code', 'Selected split profile does not exist.');
+                } elseif (($profile['gateway_code'] ?? null) !== $gatewayCode) {
+                    $validator->errors()->add('payment_split_profile_code', 'Selected split profile does not match the chosen payment gateway.');
+                }
+            }
+
         });
     }
 
@@ -93,6 +110,7 @@ class StorePremiumPlanRequest extends FormRequest
 
         if (!$data['payment_required']) {
             $data['payment_gateway'] = null;
+            $data['payment_split_profile_code'] = null;
             if (Schema::hasColumn('premium_plans', 'merchant_id')) {
                 $data['merchant_id'] = null;
             }
@@ -117,7 +135,7 @@ class StorePremiumPlanRequest extends FormRequest
 
     private function supportedPaymentGateways(): array
     {
-        return ['remita', 'paystack', 'flutterwave', 'xpresspay', 'bank_transfer', 'pos', 'cash'];
+        return ['paystack', 'monnify', 'remita', 'quickteller'];
     }
 
 }

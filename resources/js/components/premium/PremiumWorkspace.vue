@@ -57,6 +57,17 @@
           <v-switch v-if="mode === 'plans'" v-model="planForm.payment_required" label="Requires payment before PIN generation" color="primary" hide-details />
           <v-switch v-if="mode === 'plans'" v-model="planForm.self_enrollment_enabled" label="Allow public self-enrollment" color="primary" hide-details />
           <v-select v-if="mode === 'plans' && planForm.payment_required" v-model="planForm.payment_gateway" :items="metadata.payment_gateways" item-title="name" item-value="code" label="Payment gateway" density="comfortable" variant="outlined" />
+          <v-select
+            v-if="mode === 'plans' && planForm.payment_required && planForm.payment_gateway && selectedGatewaySupportsSplitProfiles"
+            v-model="planForm.payment_split_profile_code"
+            :items="filteredSplitProfiles"
+            item-title="name"
+            item-value="code"
+            label="Split settlement profile"
+            density="comfortable"
+            variant="outlined"
+            clearable
+          />
           <v-select v-if="mode === 'plans' && planForm.payment_required && metadata.merchants?.length" v-model="planForm.merchant_id" :items="metadata.merchants" item-title="name" item-value="id" label="Merchant" density="comfortable" variant="outlined" />
           <v-select v-if="mode === 'plans' && planForm.payment_required && metadata.merchant_service_types?.length" v-model="planForm.merchant_service_type_id" :items="filteredMerchantServiceTypes" item-title="type_name" item-value="id" label="Merchant service type" density="comfortable" variant="outlined" />
           <v-alert v-if="mode === 'plans' && !planForm.payment_required" type="info" variant="tonal" density="compact" class="lg:tw-col-span-2">
@@ -179,6 +190,7 @@ import { benefactorAPI, premiumAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
 import AppModal from '../common/AppModal.vue'
 import AppDataTable from '../common/AppDataTable.vue'
+import { openHostedCheckout } from '../../utils/hostedCheckout'
 
 const props = defineProps({ mode: { type: String, default: 'dashboard' } })
 const { success, error } = useToast()
@@ -189,7 +201,7 @@ const dashboard = ref({})
 const rows = ref([])
 const plans = ref([])
 const benefactors = ref([])
-const metadata = ref({ programmes: [], benefit_packages: [], funding_types: [], payment_gateways: [], merchants: [], merchant_service_types: [] })
+const metadata = ref({ programmes: [], benefit_packages: [], funding_types: [], payment_gateways: [], payment_split_profiles: [], merchants: [], merchant_service_types: [] })
 const eligibilityResult = ref(null)
 const generatedPins = ref([])
 const selectedPins = ref([])
@@ -213,6 +225,7 @@ const blankPlanForm = () => ({
   payment_required: false,
   self_enrollment_enabled: false,
   payment_gateway: null,
+  payment_split_profile_code: null,
   merchant_id: null,
   merchant_service_type_id: null,
   has_no_expiry: false,
@@ -259,6 +272,14 @@ const paymentAmount = computed(() => {
 const filteredMerchantServiceTypes = computed(() => {
   if (!planForm.value.merchant_id) return metadata.value.merchant_service_types || []
   return (metadata.value.merchant_service_types || []).filter((item) => item.merchant_id === planForm.value.merchant_id)
+})
+const selectedGatewaySupportsSplitProfiles = computed(() => {
+  if (!planForm.value.payment_gateway) return false
+  return Boolean((metadata.value.payment_gateways || []).find((item) => item.code === planForm.value.payment_gateway)?.supports_split_profiles)
+})
+const filteredSplitProfiles = computed(() => {
+  if (!planForm.value.payment_gateway || !selectedGatewaySupportsSplitProfiles.value) return []
+  return (metadata.value.payment_split_profiles || []).filter((item) => item.gateway_code === planForm.value.payment_gateway && item.active !== false)
 })
 const actionLabel = computed(() => ({
   plans: editingPlanId.value ? 'Update Plan' : 'Save Plan',
@@ -394,8 +415,8 @@ const primaryAction = async () => {
       })
       const checkout = response.data?.checkout
 
-      if (checkout?.authorization_url) {
-        openCheckoutWindow(checkout.authorization_url)
+      if (checkout?.authorization_url || checkout?.checkout_form) {
+        openHostedCheckout(checkout, 'premium-purchase-checkout')
         success('Purchase created. Continuing to secure payment checkout.')
       }
     }
@@ -408,15 +429,6 @@ const primaryAction = async () => {
     error(err?.response?.data?.message || 'Action failed')
   } finally {
     saving.value = false
-  }
-}
-
-const openCheckoutWindow = (authorizationUrl) => {
-  if (!authorizationUrl) return
-
-  const popup = window.open(authorizationUrl, 'premium-purchase-checkout', 'width=520,height=760,noopener,noreferrer')
-  if (!popup) {
-    window.location.href = authorizationUrl
   }
 }
 
@@ -460,6 +472,7 @@ const editPlan = (plan) => {
     payment_required: Boolean(plan.payment_required),
     self_enrollment_enabled: Boolean(plan.self_enrollment_enabled),
     payment_gateway: plan.payment_gateway || null,
+    payment_split_profile_code: plan.payment_split_profile_code || null,
     merchant_id: plan.merchant_id || null,
     merchant_service_type_id: plan.merchant_service_type_id || null,
     has_no_expiry: Boolean(plan.has_no_expiry),
@@ -545,6 +558,7 @@ const planPayload = () => ({
   duration_days: planForm.value.has_no_expiry ? null : planForm.value.duration_days,
   maximum_dependants: planForm.value.is_family_plan ? planForm.value.maximum_dependants : 0,
   payment_gateway: planForm.value.payment_required ? planForm.value.payment_gateway : null,
+  payment_split_profile_code: planForm.value.payment_required ? planForm.value.payment_split_profile_code : null,
   merchant_id: planForm.value.payment_required ? planForm.value.merchant_id : null,
   merchant_service_type_id: planForm.value.payment_required ? planForm.value.merchant_service_type_id : null,
 })
@@ -602,9 +616,13 @@ watch(() => planForm.value.is_family_plan, (value) => {
 watch(() => planForm.value.payment_required, (value) => {
   if (!value) {
     planForm.value.payment_gateway = null
+    planForm.value.payment_split_profile_code = null
     planForm.value.merchant_id = null
     planForm.value.merchant_service_type_id = null
   }
+})
+watch(() => planForm.value.payment_gateway, () => {
+  planForm.value.payment_split_profile_code = null
 })
 watch(() => planForm.value.merchant_id, () => {
   planForm.value.merchant_service_type_id = null

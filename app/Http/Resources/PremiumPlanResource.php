@@ -29,6 +29,7 @@ class PremiumPlanResource extends JsonResource
             'payment_required' => (bool) $this->payment_required,
             'self_enrollment_enabled' => (bool) $this->self_enrollment_enabled,
             'payment_gateway' => $this->payment_gateway,
+            'payment_split_profile_code' => $this->payment_split_profile_code,
             'merchant_id' => $this->merchant_id,
             'merchant_service_type_id' => $this->merchant_service_type_id,
             'status' => $this->status,

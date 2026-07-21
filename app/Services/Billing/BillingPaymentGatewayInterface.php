@@ -8,5 +8,5 @@ interface BillingPaymentGatewayInterface
 
     public function initializeCheckout(array $payload, array $configuration): array;
 
-    public function verifyPayment(string $reference, array $configuration): array;
+    public function verifyPayment(string $reference, array $configuration, array $context = []): array;
 }

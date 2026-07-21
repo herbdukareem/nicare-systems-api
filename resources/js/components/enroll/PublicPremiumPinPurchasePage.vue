@@ -68,6 +68,7 @@ import { useOrganizationSettings } from '../../composables/useOrganizationSettin
 import AppAlert from '../common/AppAlert.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
 import MoneyDisplay from '../common/MoneyDisplay.vue'
+import { openHostedCheckout } from '../../utils/hostedCheckout'
 
 const route = useRoute()
 const { error } = useToast()
@@ -88,11 +89,6 @@ const selectedPlan = computed(() => plans.value.find((plan) => plan.id === form.
 const totalAmount = computed(() => Number(selectedPlan.value?.amount || 0) * Math.max(1, Number(form.quantity || 1)))
 
 const clearErrors = () => Object.keys(errors).forEach((key) => delete errors[key])
-const openCheckout = (url) => {
-  const popup = window.open(url, 'premium-pin-checkout', 'width=520,height=760,noopener,noreferrer')
-  if (!popup) window.location.href = url
-}
-
 const purchasePins = async () => {
   clearErrors()
   submitting.value = true
@@ -102,7 +98,7 @@ const purchasePins = async () => {
     purchaseReference.value = payload.purchase?.payment_reference || ''
     docketToken.value = payload.docket_token || ''
     statusMessage.value = `Purchase ${purchaseReference.value} was created. Complete payment, then verify it to receive your PIN docket.`
-    openCheckout(payload.checkout?.authorization_url)
+    openHostedCheckout(payload.checkout, 'premium-pin-checkout')
   } catch (err) {
     if (err.response?.status === 422) Object.assign(errors, err.response?.data?.errors || {})
     error(err?.response?.data?.message || 'Unable to initialize Premium PIN purchase.')

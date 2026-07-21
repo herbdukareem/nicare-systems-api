@@ -11,7 +11,8 @@ class BillingCheckoutService
 {
     public function __construct(
         private BillingGatewayManager $gatewayManager,
-        private PaymentGatewayConfigurationService $configurationService
+        private PaymentGatewayConfigurationService $configurationService,
+        private BillingSplitConfigurationService $splitConfigurationService
     ) {
     }
 
@@ -20,7 +21,7 @@ class BillingCheckoutService
         $gatewayCode = $plan->payment_gateway ?: $this->configurationService->getActiveGatewayCode();
         $configuration = $this->configurationService->getConfig($gatewayCode);
 
-        if (!in_array($gatewayCode, ['paystack'], true)) {
+        if (!in_array($gatewayCode, ['paystack', 'monnify', 'remita', 'quickteller'], true)) {
             throw new RuntimeException('The selected plan is not linked to a supported online checkout gateway yet.');
         }
 
@@ -38,7 +39,17 @@ class BillingCheckoutService
             'amount' => $plan->amount,
             'reference' => $reference,
             'callback_url' => $callbackUrl,
+            'description' => $plan->name,
+            'name' => $this->payerName(
+                $payer['name'] ?? null,
+                $payer['first_name'] ?? null,
+                $payer['last_name'] ?? null
+            ),
+            'first_name' => $payer['first_name'] ?? null,
+            'last_name' => $payer['last_name'] ?? null,
+            'phone' => $payer['phone'] ?? null,
             'metadata' => Arr::get($payer, 'metadata', []),
+            'split_config' => $this->splitConfigurationService->resolveForPlan($plan, $gatewayCode),
         ], $configuration);
     }
 
@@ -52,7 +63,7 @@ class BillingCheckoutService
         $gatewayCode = $purchase->gateway_code ?: $plan->payment_gateway ?: $this->configurationService->getActiveGatewayCode();
         $configuration = $this->configurationService->getConfig($gatewayCode);
 
-        if (!in_array($gatewayCode, ['paystack'], true)) {
+        if (!in_array($gatewayCode, ['paystack', 'monnify', 'remita', 'quickteller'], true)) {
             throw new RuntimeException('This purchase is not linked to a supported online checkout gateway yet.');
         }
 
@@ -69,11 +80,30 @@ class BillingCheckoutService
             'amount' => $purchase->amount,
             'reference' => $purchase->payment_reference,
             'callback_url' => $callbackUrl,
+            'description' => $plan->name,
+            'payer_name' => $purchase->payer_name,
+            'phone' => $purchase->payer_phone,
             'metadata' => [
                 'purchase_id' => $purchase->id,
                 'premium_plan_id' => $plan->id,
                 'channel' => data_get($purchase->payer_details, 'channel', 'premium_purchase'),
             ],
+            'split_config' => $this->splitConfigurationService->resolveForPlan($plan, $gatewayCode),
         ], $configuration);
+    }
+
+    private function payerName(?string $name, ?string $firstName, ?string $lastName): string
+    {
+        $name = trim((string) $name);
+        if ($name !== '') {
+            return $name;
+        }
+
+        $parts = array_filter([
+            trim((string) $firstName),
+            trim((string) $lastName),
+        ]);
+
+        return $parts !== [] ? implode(' ', $parts) : 'Customer';
     }
 }

@@ -20,6 +20,7 @@ class PremiumPlan extends Model
         'payment_required',
         'self_enrollment_enabled',
         'payment_gateway',
+        'payment_split_profile_code',
         'merchant_id',
         'merchant_service_type_id',
         'duration_days',

@@ -24,7 +24,14 @@ class BillingPaymentVerificationService
         }
 
         $configuration = $this->configurationService->getConfig($gatewayCode);
-        $result = $this->gatewayManager->gateway($gatewayCode)->verifyPayment($purchase->payment_reference, $configuration);
+        $result = $this->gatewayManager->gateway($gatewayCode)->verifyPayment(
+            $purchase->payment_reference,
+            $configuration,
+            [
+                'amount' => (float) $purchase->amount,
+                'purchase_id' => $purchase->id,
+            ]
+        );
 
         $purchase->forceFill([
             'gateway_code' => $gatewayCode,

@@ -70,6 +70,7 @@ class PremiumMetadataController extends Controller
                     ->get(),
                 'payment_gateways' => $this->paymentGatewayConfigurationService->availableGatewayOptions(),
                 'active_payment_gateway' => $this->paymentGatewayConfigurationService->getActiveGatewayCode(),
+                'payment_split_profiles' => $this->paymentGatewayConfigurationService->getSplitProfiles(),
                 'merchants' => Schema::hasTable('merchants') ? DB::table('merchants')->orderBy('name')->get() : [],
                 'merchant_service_types' => Schema::hasTable('merchant_service_types')
                     ? DB::table('merchant_service_types')->orderBy('type_name')->get()

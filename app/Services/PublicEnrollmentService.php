@@ -69,6 +69,9 @@ class PublicEnrollmentService
                 $plan,
                 [
                     'email' => $data['email'],
+                    'first_name' => $data['first_name'] ?? null,
+                    'last_name' => $data['last_name'] ?? null,
+                    'phone' => $data['phone'] ?? null,
                     'metadata' => [
                         'channel' => 'self_service_enrollment',
                         'lga_id' => $data['lga_id'],
