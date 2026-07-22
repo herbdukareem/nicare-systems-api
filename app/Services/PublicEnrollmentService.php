@@ -41,6 +41,10 @@ class PublicEnrollmentService
             }
         }
 
+        if ($enrollmentMethod === 'bank_transfer' && !$plan->supportsBankTransfer()) {
+            throw new RuntimeException('The selected premium plan does not currently support direct bank transfer.');
+        }
+
         $facility = Facility::findOrFail($data['facility_id']);
 
         if ((int) $facility->lga_id !== (int) $data['lga_id']) {
@@ -51,18 +55,21 @@ class PublicEnrollmentService
             throw new RuntimeException('The selected facility does not belong to the selected ward.');
         }
 
-        $requiresHostedPayment = $enrollmentMethod !== 'premium_pin' && $plan->requiresPayment();
+        $requiresPayment = $enrollmentMethod !== 'premium_pin' && $plan->requiresPayment();
+        $requiresHostedPayment = $requiresPayment && $enrollmentMethod === 'online_payment';
+        $usesBankTransfer = $requiresPayment && $enrollmentMethod === 'bank_transfer';
 
         if ($requiresHostedPayment && blank($data['email'] ?? null)) {
             throw new RuntimeException('Email address is required for plans that use secure online payment.');
         }
 
-        $paymentReference = $requiresHostedPayment
+        $paymentReference = $requiresPayment
             ? (($data['payment_reference'] ?? null) ?: $this->generatedPaymentReference())
             : null;
         $passportPath = $this->storePassport($data['passport'] ?? null);
 
         $paymentCheckout = null;
+        $paymentCollection = null;
 
         if ($requiresHostedPayment) {
             $paymentCheckout = $this->billingCheckoutService->initializePremiumEnrollmentPlanCheckout(
@@ -83,10 +90,14 @@ class PublicEnrollmentService
             );
         }
 
-        $result = DB::transaction(function () use ($data, $plan, $pin, $enrollmentMethod, $requiresHostedPayment, $paymentReference, $paymentCheckout, $passportPath) {
+        if ($usesBankTransfer) {
+            $paymentCollection = $plan->bankTransferDetails($paymentReference);
+        }
+
+        $result = DB::transaction(function () use ($data, $plan, $pin, $enrollmentMethod, $requiresPayment, $requiresHostedPayment, $paymentReference, $paymentCheckout, $paymentCollection, $passportPath) {
             $purchase = null;
 
-            if ($requiresHostedPayment) {
+            if ($requiresPayment) {
                 $purchase = $this->premiumCoverageService->createPurchase([
                     'premium_plan_id' => $plan->id,
                     'payer_type' => 'individual',
@@ -98,8 +109,9 @@ class PublicEnrollmentService
                         'facility_id' => $data['facility_id'],
                         'lga_id' => $data['lga_id'],
                         'ward_id' => $data['ward_id'],
+                        'bank_transfer_account' => $paymentCollection,
                     ],
-                    'payment_method' => 'online_payment',
+                    'payment_method' => $enrollmentMethod,
                     'payment_status' => 'pending',
                     'payment_reference' => $paymentReference,
                     'gateway_code' => $paymentCheckout['provider'] ?? $plan->payment_gateway,
@@ -150,26 +162,33 @@ class PublicEnrollmentService
             return [
                 'enrollee' => $enrollee->load(['premiumPlan', 'premiumPin', 'premiumPurchase', 'benefitPackage', 'facility', 'lga', 'ward', 'insuranceProgramme']),
                 'purchase' => $purchase?->load(['plan']),
-                'requires_payment' => $requiresHostedPayment,
+                'requires_payment' => $requiresPayment,
                 'enrollment_method' => $enrollmentMethod,
                 'payment_checkout' => $paymentCheckout,
+                'payment_collection' => $paymentCollection,
                 'next_steps' => $requiresHostedPayment
                     ? [
                         'Complete the secure online payment using the launched checkout page.',
                         'Your application will remain pending until payment is confirmed and an approval officer verifies your NIN.',
                         'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
                     ]
+                    : ($enrollmentMethod === 'bank_transfer'
+                        ? [
+                            "Transfer the exact premium amount into the dedicated {$paymentCollection['bank_name']} account shown for this plan.",
+                            "Use {$paymentReference} as your transfer narration or depositor reference so reconciliation can match your payment quickly.",
+                            'Your application will remain pending until payment is confirmed by the finance or enrollment team and your NIN is verified.',
+                        ]
                     : ($enrollmentMethod === 'premium_pin'
                         ? [
                             'Your Premium PIN has been accepted and cannot be used again.',
                             'Your application will remain pending until an approval officer verifies your NIN.',
                             'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
                         ]
-                    : [
-                        'Your application has been submitted for approval.',
-                        'An approval officer will verify your NIN before activating your coverage.',
-                        'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
-                    ]),
+                        : [
+                            'Your application has been submitted for approval.',
+                            'An approval officer will verify your NIN before activating your coverage.',
+                            'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
+                        ])),
             ];
         });
 

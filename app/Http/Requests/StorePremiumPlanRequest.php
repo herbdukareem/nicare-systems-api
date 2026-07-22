@@ -28,6 +28,11 @@ class StorePremiumPlanRequest extends FormRequest
             'payment_required' => ['nullable', 'boolean'],
             'self_enrollment_enabled' => ['nullable', 'boolean'],
             'payment_gateway' => ['nullable', 'string', 'max:80', Rule::in($this->supportedPaymentGateways())],
+            'bank_transfer_enabled' => ['nullable', 'boolean'],
+            'bank_transfer_bank_name' => ['nullable', 'string', 'max:255'],
+            'bank_transfer_account_name' => ['nullable', 'string', 'max:255'],
+            'bank_transfer_account_number' => ['nullable', 'string', 'max:50'],
+            'bank_transfer_instructions' => ['nullable', 'string'],
             'payment_split_profile_code' => ['nullable', 'string', 'max:80'],
             'duration_days' => ['nullable', 'integer', 'min:1'],
             'has_no_expiry' => ['nullable', 'boolean'],
@@ -54,6 +59,7 @@ class StorePremiumPlanRequest extends FormRequest
             $isFamilyPlan = $this->boolean('is_family_plan');
             $hasNoExpiry = $this->boolean('has_no_expiry');
             $paymentRequired = $this->boolean('payment_required');
+            $bankTransferEnabled = $this->boolean('bank_transfer_enabled');
 
             if (!$isFamilyPlan && (int) $this->input('maximum_dependants', 0) > 0) {
                 $validator->errors()->add('maximum_dependants', 'Maximum dependants must be 0 when the plan is not a family plan.');
@@ -69,6 +75,22 @@ class StorePremiumPlanRequest extends FormRequest
 
             if ($paymentRequired && !$this->filled('payment_gateway')) {
                 $validator->errors()->add('payment_gateway', 'Payment gateway is required when payment is required.');
+            }
+
+            if ($bankTransferEnabled && !$paymentRequired) {
+                $validator->errors()->add('bank_transfer_enabled', 'Dedicated bank transfer can only be enabled for plans that require payment.');
+            }
+
+            if ($bankTransferEnabled) {
+                foreach ([
+                    'bank_transfer_bank_name' => 'Bank name is required when dedicated bank transfer is enabled.',
+                    'bank_transfer_account_name' => 'Account name is required when dedicated bank transfer is enabled.',
+                    'bank_transfer_account_number' => 'Account number is required when dedicated bank transfer is enabled.',
+                ] as $field => $message) {
+                    if (!filled(trim((string) $this->input($field, '')))) {
+                        $validator->errors()->add($field, $message);
+                    }
+                }
             }
 
             if ($paymentRequired && $this->filled('payment_split_profile_code')) {
@@ -96,9 +118,22 @@ class StorePremiumPlanRequest extends FormRequest
         $data['has_no_expiry'] = (bool) ($data['has_no_expiry'] ?? false);
         $data['payment_required'] = (bool) ($data['payment_required'] ?? false);
         $data['self_enrollment_enabled'] = (bool) ($data['self_enrollment_enabled'] ?? false);
+        $data['bank_transfer_enabled'] = (bool) ($data['bank_transfer_enabled'] ?? false);
         $data['waiting_period_days'] = (int) ($data['waiting_period_days'] ?? 0);
         $data['consultant_fee'] = $data['consultant_fee'] ?? 0;
         $data['status'] = $data['status'] ?? 'active';
+        $data['bank_transfer_bank_name'] = $this->filled('bank_transfer_bank_name')
+            ? trim((string) $data['bank_transfer_bank_name'])
+            : null;
+        $data['bank_transfer_account_name'] = $this->filled('bank_transfer_account_name')
+            ? trim((string) $data['bank_transfer_account_name'])
+            : null;
+        $data['bank_transfer_account_number'] = $this->filled('bank_transfer_account_number')
+            ? trim((string) $data['bank_transfer_account_number'])
+            : null;
+        $data['bank_transfer_instructions'] = $this->filled('bank_transfer_instructions')
+            ? trim((string) $data['bank_transfer_instructions'])
+            : null;
 
         if (!$data['is_family_plan']) {
             $data['maximum_dependants'] = 0;
@@ -110,6 +145,11 @@ class StorePremiumPlanRequest extends FormRequest
 
         if (!$data['payment_required']) {
             $data['payment_gateway'] = null;
+            $data['bank_transfer_enabled'] = false;
+            $data['bank_transfer_bank_name'] = null;
+            $data['bank_transfer_account_name'] = null;
+            $data['bank_transfer_account_number'] = null;
+            $data['bank_transfer_instructions'] = null;
             $data['payment_split_profile_code'] = null;
             if (Schema::hasColumn('premium_plans', 'merchant_id')) {
                 $data['merchant_id'] = null;
@@ -117,6 +157,13 @@ class StorePremiumPlanRequest extends FormRequest
             if (Schema::hasColumn('premium_plans', 'merchant_service_type_id')) {
                 $data['merchant_service_type_id'] = null;
             }
+        }
+
+        if (!$data['bank_transfer_enabled']) {
+            $data['bank_transfer_bank_name'] = null;
+            $data['bank_transfer_account_name'] = null;
+            $data['bank_transfer_account_number'] = null;
+            $data['bank_transfer_instructions'] = null;
         }
 
         if (!Schema::hasColumn('premium_plans', 'merchant_id')) {

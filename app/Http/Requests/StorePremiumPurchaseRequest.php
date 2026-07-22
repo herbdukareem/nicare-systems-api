@@ -2,7 +2,9 @@
 
 namespace App\Http\Requests;
 
+use App\Models\PremiumPlan;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Validator;
 
 class StorePremiumPurchaseRequest extends FormRequest
 {
@@ -31,5 +33,21 @@ class StorePremiumPurchaseRequest extends FormRequest
             'amount' => ['nullable', 'numeric', 'min:0'],
             'paid_at' => ['nullable', 'date'],
         ];
+    }
+
+    public function withValidator(Validator $validator): void
+    {
+        $validator->after(function (Validator $validator) {
+            if ($this->input('payment_method') !== 'bank_transfer') {
+                return;
+            }
+
+            $planId = $this->input('premium_plan_id');
+            $plan = $planId ? PremiumPlan::find($planId) : null;
+
+            if (!$plan || !$plan->supportsBankTransfer()) {
+                $validator->errors()->add('payment_method', 'The selected premium plan does not have a dedicated bank transfer account configured.');
+            }
+        });
     }
 }

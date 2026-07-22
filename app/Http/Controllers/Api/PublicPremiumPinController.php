@@ -18,6 +18,7 @@ class PublicPremiumPinController extends BaseController
             'payer_name' => ['required', 'string', 'max:255'],
             'payer_phone' => ['required', 'string', 'max:40'],
             'payer_email' => ['required', 'email', 'max:255'],
+            'payment_method' => ['nullable', 'in:online_payment,bank_transfer'],
             'quantity' => ['required', 'integer', 'min:1', 'max:500'],
         ]);
 

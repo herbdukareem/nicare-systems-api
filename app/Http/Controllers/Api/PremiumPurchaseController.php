@@ -29,7 +29,11 @@ class PremiumPurchaseController extends Controller
     ): JsonResponse
     {
         $purchase = $service->createPurchase($request->validated());
+        $plan = $purchase->plan()->firstOrFail();
         $checkout = null;
+        $paymentCollection = $purchase->payment_method === 'bank_transfer'
+            ? $plan->bankTransferDetails($purchase->payment_reference)
+            : null;
 
         if ($request->boolean('initialize_checkout') && $purchase->payment_method === 'online_payment') {
             $checkout = $checkoutService->initializePurchaseCheckout($purchase);
@@ -47,6 +51,7 @@ class PremiumPurchaseController extends Controller
             'success' => true,
             'data' => $purchase->load(['plan', 'benefactor', 'fundingType', 'group']),
             'checkout' => $checkout,
+            'payment_collection' => $paymentCollection,
         ], 201);
     }
 

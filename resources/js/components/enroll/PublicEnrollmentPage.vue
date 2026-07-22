@@ -205,6 +205,7 @@
                 <h3 class="tw-text-sm tw-font-semibold tw-text-slate-900">How would you like to enroll?</h3>
                 <v-radio-group v-model="form.enrollment_method" inline hide-details class="tw-mt-2">
                   <v-radio label="Enroll and pay online" value="online_payment" />
+                  <v-radio v-if="selectedPlanSupportsBankTransfer" label="Direct bank transfer" value="bank_transfer" />
                   <v-radio label="Use a Premium PIN" value="premium_pin" />
                 </v-radio-group>
                 <v-text-field
@@ -218,6 +219,14 @@
                   hint="The PIN must be paid, unused, and issued for the selected plan."
                   persistent-hint
                 />
+                <div v-if="form.enrollment_method === 'bank_transfer' && selectedTransferAccount" class="enroll__transfer-card">
+                  <div class="enroll__transfer-title">Dedicated account for this plan</div>
+                  <div><strong>Bank:</strong> {{ selectedTransferAccount.bank_name }}</div>
+                  <div><strong>Account name:</strong> {{ selectedTransferAccount.account_name }}</div>
+                  <div><strong>Account number:</strong> {{ selectedTransferAccount.account_number }}</div>
+                  <div v-if="selectedTransferAccount.instructions" class="enroll__transfer-note">{{ selectedTransferAccount.instructions }}</div>
+                  <div class="enroll__transfer-note">After you submit, we will generate a payment reference for your transfer narration.</div>
+                </div>
               </div>
 
               <AppAlert
@@ -319,6 +328,16 @@
 
         <p class="tw-text-sm tw-leading-6 tw-text-slate-600">{{ successSummary }}</p>
 
+        <div v-if="paymentCollection" class="enroll__transfer-card enroll__transfer-card--active">
+          <div class="enroll__transfer-title">Transfer instructions</div>
+          <div><strong>Reference:</strong> {{ submittedPaymentReference }}</div>
+          <div><strong>Bank:</strong> {{ paymentCollection.bank_name }}</div>
+          <div><strong>Account name:</strong> {{ paymentCollection.account_name }}</div>
+          <div><strong>Account number:</strong> {{ paymentCollection.account_number }}</div>
+          <div v-if="paymentCollection.instructions" class="enroll__transfer-note">{{ paymentCollection.instructions }}</div>
+          <div v-if="paymentCollection.narration_hint" class="enroll__transfer-note">{{ paymentCollection.narration_hint }}</div>
+        </div>
+
         <div v-if="successNextSteps.length">
           <h3 class="tw-text-sm tw-font-semibold tw-text-slate-900">What happens next</h3>
           <ol class="tw-mt-2 tw-space-y-2">
@@ -375,11 +394,13 @@ const errors = reactive({})
 const successSummary = ref('')
 const successDialog = ref(false)
 const submittedEnrolleeId = ref('')
+const submittedPaymentReference = ref('')
 const successNextSteps = ref([])
 const successArea = ref(null)
 const errorArea = ref(null)
 const submissionError = ref('')
 const paymentSummary = ref('')
+const paymentCollection = ref(null)
 
 const form = reactive({
   premium_plan_id: null,
@@ -418,6 +439,8 @@ const maritalStatusOptions = [
 
 const plans = computed(() => metadata.value.premium_plans || [])
 const selectedPlan = computed(() => plans.value.find((plan) => plan.id === form.premium_plan_id) || null)
+const selectedPlanSupportsBankTransfer = computed(() => Boolean(selectedPlan.value?.bank_transfer_available))
+const selectedTransferAccount = computed(() => selectedPlan.value?.bank_transfer_account || null)
 const selectedFacility = computed(() => (metadata.value.facilities || []).find((facility) => facility.id === form.facility_id) || null)
 const selectedLgaName = computed(() => (metadata.value.lgas || []).find((item) => item.id === form.lga_id)?.name || 'Not selected')
 const selectedWardName = computed(() => (metadata.value.wards || []).find((item) => item.id === form.ward_id)?.name || 'Not selected')
@@ -425,7 +448,13 @@ const activePaymentGatewayLabel = computed(() => {
   const code = selectedPlan.value?.payment_gateway || metadata.value.active_payment_gateway
   return (metadata.value.payment_gateways || []).find((gateway) => gateway.code === code)?.name || code || 'configured online gateway'
 })
-const paymentInstruction = computed(() => `After you submit this form, we will open ${activePaymentGatewayLabel.value} so you can pay securely online.`)
+const paymentInstruction = computed(() => {
+  if (form.enrollment_method === 'bank_transfer' && selectedTransferAccount.value) {
+    return `After you submit this form, we will show the dedicated ${selectedTransferAccount.value.bank_name} account for ${selectedPlan.value?.name} and generate a transfer reference for reconciliation.`
+  }
+
+  return `After you submit this form, we will open ${activePaymentGatewayLabel.value} so you can pay securely online.`
+})
 
 const setPassportPreview = (value) => {
   if (passportPreview.value && passportPreview.value.startsWith('blob:')) {
@@ -466,6 +495,8 @@ const selectPlan = (plan) => {
   form.premium_plan_id = plan.id
   if (!plan.payment_required) {
     form.enrollment_method = 'online_payment'
+  } else if (form.enrollment_method === 'bank_transfer' && !plan.bank_transfer_available) {
+    form.enrollment_method = 'online_payment'
   }
   successSummary.value = ''
   submissionError.value = ''
@@ -476,8 +507,10 @@ const resetForm = () => {
   successSummary.value = ''
   submissionError.value = ''
   submittedEnrolleeId.value = ''
+  submittedPaymentReference.value = ''
   successNextSteps.value = []
   paymentSummary.value = ''
+  paymentCollection.value = null
   clearApplicationFields()
 }
 
@@ -572,14 +605,18 @@ const submitApplication = async () => {
     const enrolleeId = responseData?.enrollee?.enrollee_id
     const paymentRef = responseData?.purchase?.payment_reference
     const checkout = responseData?.payment_checkout
+    paymentCollection.value = responseData?.payment_collection || null
 
-    successSummary.value = responseData?.requires_payment
+    successSummary.value = responseData?.requires_payment && responseData?.enrollment_method === 'online_payment'
       ? `Application ${enrolleeId} submitted. We are opening ${activePaymentGatewayLabel.value} for payment reference ${paymentRef}. Approval continues after payment confirmation and NIN verification.`
+      : responseData?.requires_payment && responseData?.enrollment_method === 'bank_transfer'
+        ? `Application ${enrolleeId} submitted. Transfer the exact premium amount using reference ${paymentRef}. Approval continues after payment confirmation and NIN verification.`
       : responseData?.enrollment_method === 'premium_pin'
         ? `Application ${enrolleeId} submitted. Your Premium PIN has been accepted, and the application is awaiting approval and NIN verification.`
       : `Application ${enrolleeId} submitted and is awaiting approval and NIN verification.`
 
     submittedEnrolleeId.value = enrolleeId || ''
+    submittedPaymentReference.value = paymentRef || ''
     successNextSteps.value = responseData?.next_steps || []
     successDialog.value = true
     clearApplicationFields()
@@ -643,6 +680,12 @@ watch(() => form.lga_id, async () => {
 watch(() => form.ward_id, async () => {
   form.facility_id = null
   await fetchMetadata()
+})
+
+watch(() => form.premium_plan_id, () => {
+  if (form.enrollment_method === 'bank_transfer' && !selectedPlanSupportsBankTransfer.value) {
+    form.enrollment_method = 'online_payment'
+  }
 })
 
 onMounted(() => {
@@ -921,5 +964,32 @@ onMounted(() => {
   font-weight: 800;
   color: var(--qds-color-primary);
   border: 1px solid var(--qds-color-primary);
+}
+
+.enroll__transfer-card {
+  margin-top: 12px;
+  border: 1px solid #bfdbfe;
+  background: #eff6ff;
+  padding: 12px;
+  font-size: 13px;
+  color: #0f172a;
+}
+
+.enroll__transfer-card--active {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.enroll__transfer-title {
+  font-size: 13px;
+  font-weight: 800;
+  margin-bottom: 8px;
+}
+
+.enroll__transfer-note {
+  margin-top: 6px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #334155;
 }
 </style>

@@ -17,6 +17,26 @@ class BillingPaymentVerificationService
 
     public function verifyPurchase(PremiumPurchase $purchase): array
     {
+        if ($purchase->payment_method !== 'online_payment') {
+            $isConfirmed = $purchase->payment_status === 'confirmed';
+            $status = $purchase->payment_status === 'cancelled'
+                ? 'cancelled'
+                : ($isConfirmed ? 'confirmed' : 'pending_manual_confirmation');
+
+            return [
+                'purchase' => $purchase->fresh(['plan', 'benefactor', 'fundingType', 'group']),
+                'verification' => [
+                    'provider' => 'manual_confirmation',
+                    'reference' => $purchase->payment_reference,
+                    'status' => $status,
+                    'paid' => $isConfirmed,
+                    'message' => $isConfirmed
+                        ? 'Payment has already been confirmed manually.'
+                        : 'This payment is awaiting manual confirmation.',
+                ],
+            ];
+        }
+
         $gatewayCode = $purchase->gateway_code ?: $purchase->plan?->payment_gateway ?: $this->configurationService->getActiveGatewayCode();
 
         if (!$gatewayCode) {

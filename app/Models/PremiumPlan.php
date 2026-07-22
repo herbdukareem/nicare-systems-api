@@ -20,6 +20,11 @@ class PremiumPlan extends Model
         'payment_required',
         'self_enrollment_enabled',
         'payment_gateway',
+        'bank_transfer_enabled',
+        'bank_transfer_bank_name',
+        'bank_transfer_account_name',
+        'bank_transfer_account_number',
+        'bank_transfer_instructions',
         'payment_split_profile_code',
         'merchant_id',
         'merchant_service_type_id',
@@ -38,6 +43,7 @@ class PremiumPlan extends Model
         'consultant_fee' => 'decimal:2',
         'payment_required' => 'boolean',
         'self_enrollment_enabled' => 'boolean',
+        'bank_transfer_enabled' => 'boolean',
         'has_no_expiry' => 'boolean',
         'duration_days' => 'integer',
         'waiting_period_days' => 'integer',
@@ -83,6 +89,56 @@ class PremiumPlan extends Model
     public function isSelfEnrollmentEnabled(): bool
     {
         return (bool) $this->self_enrollment_enabled && $this->status === 'active';
+    }
+
+    public function isBankTransferEnabled(): bool
+    {
+        return (bool) $this->bank_transfer_enabled;
+    }
+
+    public function supportsBankTransfer(): bool
+    {
+        return $this->requiresPayment()
+            && $this->isBankTransferEnabled()
+            && filled(trim((string) $this->bank_transfer_bank_name))
+            && filled(trim((string) $this->bank_transfer_account_name))
+            && filled(trim((string) $this->bank_transfer_account_number));
+    }
+
+    public function bankTransferDetails(?string $reference = null): ?array
+    {
+        if (!$this->supportsBankTransfer()) {
+            return null;
+        }
+
+        $instructions = trim((string) $this->bank_transfer_instructions);
+
+        return [
+            'enabled' => true,
+            'bank_name' => trim((string) $this->bank_transfer_bank_name),
+            'account_name' => trim((string) $this->bank_transfer_account_name),
+            'account_number' => trim((string) $this->bank_transfer_account_number),
+            'instructions' => $instructions !== '' ? $instructions : null,
+            'payment_reference' => $reference,
+            'narration_hint' => $reference
+                ? "Use {$reference} as the transfer narration or depositor reference."
+                : null,
+        ];
+    }
+
+    public function availablePaymentMethods(): array
+    {
+        if (!$this->requiresPayment()) {
+            return [];
+        }
+
+        $methods = ['online_payment'];
+
+        if ($this->supportsBankTransfer()) {
+            $methods[] = 'bank_transfer';
+        }
+
+        return $methods;
     }
 
     public function isFamilyPlan(): bool
