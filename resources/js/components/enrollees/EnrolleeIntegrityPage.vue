@@ -153,7 +153,7 @@
 
       <AppAlert v-if="loadError" tone="danger" :message="loadError" />
 
-      <AppBulkActions :count="selectedEnrolleeIds.length" title="Bulk enrollee status change">
+      <AppBulkActions v-if="canChangeStatuses" :count="selectedEnrolleeIds.length" title="Bulk enrollee status change">
         <v-select
           v-model="bulkForm.status"
           :items="statusOptions"
@@ -409,8 +409,8 @@ const bulkForm = reactive({
 })
 
 const canVerifyNin = computed(() => auth.hasPermission('enrollee.nin.verify') || auth.hasPermission('enrollee.approve'))
-const canManageStatuses = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve'))
-const canResolveDuplicates = computed(() => canManageStatuses.value || canVerifyNin.value)
+const canChangeStatuses = computed(() => auth.hasPermission('enrollee.status.change') || auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve'))
+const canResolveDuplicates = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve') || canVerifyNin.value)
 
 const statusOptions = [
   { title: 'Pending Approval', value: 0 },
@@ -649,7 +649,7 @@ const resetFilters = () => {
 }
 
 const applyBulkStatus = async () => {
-  if (!canManageStatuses.value) {
+  if (!canChangeStatuses.value) {
     error('You do not have permission to update enrollee statuses.')
     return
   }

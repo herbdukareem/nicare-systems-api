@@ -52,6 +52,59 @@ class Enrollee extends Authenticatable
         'Not Stated',
     ];
 
+    public static function normalizeOccupation(?string $occupation): ?string
+    {
+        if ($occupation === null) {
+            return null;
+        }
+
+        $value = trim($occupation);
+        if ($value === '') {
+            return null;
+        }
+
+        foreach (self::OCCUPATION_OPTIONS as $option) {
+            if (strcasecmp($option, $value) === 0) {
+                return $option;
+            }
+        }
+
+        $normalized = strtolower((string) preg_replace('/[^a-z0-9]+/i', ' ', $value));
+        $normalized = trim((string) preg_replace('/\s+/', ' ', $normalized));
+
+        return self::occupationAliases()[$normalized] ?? $value;
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private static function occupationAliases(): array
+    {
+        return [
+            'petty trader' => 'Trader/Business Owner',
+            'trader' => 'Trader/Business Owner',
+            'business owner' => 'Trader/Business Owner',
+            'businesswoman' => 'Trader/Business Owner',
+            'businessman' => 'Trader/Business Owner',
+            'civil servant worker' => 'Civil Servant',
+            'private employee' => 'Private Sector Employee',
+            'private sector worker' => 'Private Sector Employee',
+            'teacher' => 'Teacher/Lecturer',
+            'lecturer' => 'Teacher/Lecturer',
+            'healthcare worker' => 'Health Worker',
+            'driver' => 'Driver/Transport Worker',
+            'transport worker' => 'Driver/Transport Worker',
+            'security officer' => 'Security Personnel',
+            'religious leader clergy' => 'Religious Leader',
+            'house wife' => 'Homemaker',
+            'housewife' => 'Homemaker',
+            'self employed' => 'Self-Employed',
+            'none' => 'Not Stated',
+            'n a' => 'Not Stated',
+            'na' => 'Not Stated',
+        ];
+    }
+
     public const DISABILITY_OPTIONS = [
         'None',
         'Visual Impairment',

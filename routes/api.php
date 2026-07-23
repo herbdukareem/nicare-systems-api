@@ -191,19 +191,19 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('enrollees/{enrollee}/id-card', [EnrolleeController::class, 'idCard'])
         ->middleware('permission:any,enrollees.view,enrollee.print-id-card');
     Route::get('enrollees', [EnrolleeController::class, 'index'])
-        ->middleware('permission:enrollees.view');
+        ->middleware('permission:any,enrollees.view,enrollee.status.change');
     Route::get('enrollees/integrity/summary', [EnrolleeController::class, 'integritySummary'])
-        ->middleware('permission:any,enrollees.view,enrollees.update,enrollee.approve,enrollee.nin.verify');
+        ->middleware('permission:any,enrollees.view,enrollees.update,enrollee.approve,enrollee.nin.verify,enrollee.status.change');
     Route::get('enrollees/duplicates', [EnrolleeController::class, 'listDuplicates'])
-        ->middleware('permission:any,enrollees.view,enrollees.update,enrollee.approve,enrollee.nin.verify');
+        ->middleware('permission:any,enrollees.view,enrollees.update,enrollee.approve,enrollee.nin.verify,enrollee.status.change');
     Route::post('enrollees/duplicates/{flag}/resolve', [EnrolleeController::class, 'resolveDuplicate'])
         ->middleware('permission:any,enrollees.update,enrollees.edit,enrollee.approve,enrollee.nin.verify');
     Route::post('enrollees/bulk-update-status', [EnrolleeController::class, 'bulkUpdateStatus'])
-        ->middleware('permission:any,enrollees.update,enrollees.edit,enrollee.approve');
+        ->middleware('permission:any,enrollees.update,enrollees.edit,enrollee.approve,enrollee.status.change');
     Route::post('enrollees', [EnrolleeController::class, 'store'])
         ->middleware('permission:enrollees.create');
     Route::get('enrollees/{enrollee}', [EnrolleeController::class, 'show'])
-        ->middleware('permission:enrollees.view');
+        ->middleware('permission:any,enrollees.view,enrollee.status.change');
     Route::match(['put', 'patch'], 'enrollees/{enrollee}', [EnrolleeController::class, 'update'])
         ->middleware('permission:any,enrollees.update,enrollees.edit');
     Route::delete('enrollees/{enrollee}', [EnrolleeController::class, 'destroy'])
@@ -211,7 +211,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('enrollees/{enrollee}/upload-passport', [EnrolleeController::class, 'uploadPassport'])
         ->middleware('permission:any,enrollees.update,enrollees.edit');
     Route::put('enrollees/{enrollee}/status', [EnrolleeController::class, 'updateStatus'])
-        ->middleware('permission:any,enrollees.update,enrollees.edit');
+        ->middleware('permission:any,enrollees.update,enrollees.edit,enrollee.status.change');
     Route::get('enrollees/{enrollee}/statistics', [EnrolleeController::class, 'getStatistics'])
         ->middleware('permission:enrollees.view');
     Route::middleware('permission:enrollees.export')->get('enrollees-export', function (Request $request) {

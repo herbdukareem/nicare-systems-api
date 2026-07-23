@@ -105,6 +105,15 @@
 
           <!-- Actions -->
           <div class="tw-flex tw-flex-col sm:tw-flex-row tw-gap-2 sm:tw-items-start">
+            <v-btn
+              v-if="canChangeStatus"
+              color="warning"
+              variant="outlined"
+              prepend-icon="mdi-swap-horizontal"
+              @click="openStatusDialog"
+            >
+              Change Status
+            </v-btn>
             <v-btn color="primary" variant="outlined" prepend-icon="mdi-pencil" @click="editEnrollee">Edit Profile</v-btn>
             <v-btn color="primary" prepend-icon="mdi-download" @click="downloadProfile">Download PDF</v-btn>
           </div>
@@ -226,6 +235,53 @@
         </template>
       </v-alert>
     </div>
+
+    <AppModal
+      v-model="statusDialog"
+      title="Change Enrollee Status"
+      :subtitle="enrollee?.name || enrollee?.enrollee_id || ''"
+      icon="mdi-swap-horizontal"
+      size="md"
+      :loading="statusSaving"
+    >
+      <template #actions>
+        <v-btn variant="outlined" :disabled="statusSaving" @click="closeStatusDialog">Cancel</v-btn>
+        <v-btn color="warning" variant="flat" :loading="statusSaving" prepend-icon="mdi-content-save" @click="saveStatusChange">
+          Update Status
+        </v-btn>
+      </template>
+
+      <div class="tw-space-y-4">
+        <div v-if="enrollee" class="tw-rounded-xl tw-border tw-border-gray-200 tw-bg-gray-50 tw-p-4">
+          <p class="tw-text-xs tw-uppercase tw-tracking-[0.24em] tw-text-gray-500">Current status</p>
+          <div class="tw-mt-2 tw-flex tw-items-center tw-gap-3">
+            <v-chip :color="getStatusColor(enrollee.status)" size="small" variant="flat" class="tw-capitalize">
+              <v-icon start size="16">mdi-check-circle</v-icon>{{ statusLabel(enrollee) }}
+            </v-chip>
+            <span class="tw-text-sm tw-text-gray-500">{{ enrollee.enrollee_id }}</span>
+          </div>
+        </div>
+
+        <v-select
+          v-model="statusForm.status"
+          :items="manageableStatusOptions"
+          item-title="title"
+          item-value="value"
+          label="New status"
+          density="compact"
+          variant="outlined"
+        />
+        <v-textarea
+          v-model="statusForm.comment"
+          label="Comment"
+          placeholder="Why is this status changing?"
+          density="compact"
+          variant="outlined"
+          rows="3"
+          counter="500"
+        />
+      </div>
+    </AppModal>
   </AdminLayout>
 </template>
 
@@ -233,22 +289,39 @@
 import { ref, onMounted, defineComponent, h, resolveComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
+import AppModal from '../common/AppModal.vue'
 import { useToast } from '../../composables/useToast'
 import { enrolleeAPI } from '../../utils/api'
+import { useAuthStore } from '../../stores/auth'
 
 /* Toast + route */
 const route = useRoute()
 const router = useRouter()
 const { success, error } = useToast()
+const auth = useAuthStore()
 
 /* State */
 const enrollee = ref(null)
 const loading = ref(false)
 const loadError = ref('')
 const fileInput = ref(null)
+const statusDialog = ref(false)
+const statusSaving = ref(false)
+const statusForm = ref({
+  status: null,
+  comment: '',
+})
 
 const statistics = ref({ totalClaims: 0, totalBenefits: 0, facilitiesVisited: 0, lastVisit: null })
 const activeCoverage = ref(null)
+const canChangeStatus = auth.hasPermission('enrollee.status.change') || auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve')
+const manageableStatusOptions = [
+  { title: 'Pending Approval', value: 0 },
+  { title: 'Approved', value: 1 },
+  { title: 'Rejected', value: 2 },
+  { title: 'Suspended', value: 3 },
+  { title: 'Inactive', value: 4 },
+]
 
 /* -------- Small presentational components (render functions to keep SFC lean) -------- */
 const InfoItem = defineComponent({
@@ -361,6 +434,52 @@ const downloadProfile = async () => {
     success('Profile downloaded successfully')
   } catch {
     error('Failed to download profile')
+  }
+}
+
+const openStatusDialog = () => {
+  if (!canChangeStatus || !enrollee.value) {
+    error('You do not have permission to change enrollee statuses.')
+    return
+  }
+
+  statusForm.value = {
+    status: Number(enrollee.value.status),
+    comment: '',
+  }
+  statusDialog.value = true
+}
+
+const closeStatusDialog = () => {
+  statusDialog.value = false
+  statusForm.value = {
+    status: enrollee.value ? Number(enrollee.value.status) : null,
+    comment: '',
+  }
+}
+
+const saveStatusChange = async () => {
+  if (!enrollee.value) return
+  if (statusForm.value.status === null || statusForm.value.status === undefined || statusForm.value.status === '') {
+    error('Select a new status before saving.')
+    return
+  }
+
+  statusSaving.value = true
+  try {
+    const response = await enrolleeAPI.updateStatus(enrollee.value.id, {
+      status: Number(statusForm.value.status),
+      comment: statusForm.value.comment || null,
+    })
+
+    enrollee.value = response.data.data?.data || response.data.data
+    activeCoverage.value = buildActiveCoverage(enrollee.value)
+    success('Enrollee status updated')
+    closeStatusDialog()
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to update enrollee status')
+  } finally {
+    statusSaving.value = false
   }
 }
 

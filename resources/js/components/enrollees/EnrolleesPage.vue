@@ -280,11 +280,17 @@
                   title="View"
                   @click="openDetails(item)"
                 />
-                <v-list-item
+              <v-list-item
                   v-if="canEdit"
                   prepend-icon="mdi-pencil-outline"
                   title="Edit"
                   @click="openEdit(item)"
+                />
+                <v-list-item
+                  v-if="canChangeStatus"
+                  prepend-icon="mdi-swap-horizontal"
+                  title="Change status"
+                  @click="openStatusDialog(item)"
                 />
                 <v-list-item
                   prepend-icon="mdi-card-account-details-outline"
@@ -358,6 +364,9 @@
               <v-icon start size="16">mdi-pencil</v-icon>
               Edit
             </v-btn>
+            <v-btn v-if="canChangeStatus" size="small" color="warning" variant="outlined" prepend-icon="mdi-swap-horizontal" @click="openStatusDialog(selected)">
+              Change Status
+            </v-btn>
             <v-btn size="small" color="primary" variant="flat" prepend-icon="mdi-card-account-details-outline" @click="printIdCard(selected)">
               Print ID Card
             </v-btn>
@@ -404,7 +413,14 @@
           <v-text-field v-model="editForm.date_of_birth" type="date" label="Date of birth" density="compact" variant="outlined" />
           <v-text-field v-model="editForm.phone" label="Phone" density="compact" variant="outlined" />
           <v-text-field v-model="editForm.email" label="Email" density="compact" variant="outlined" />
-          <v-text-field v-model="editForm.occupation" label="Occupation" density="compact" variant="outlined" />
+          <v-autocomplete
+            v-model="editForm.occupation"
+            :items="occupationOptions"
+            label="Occupation"
+            density="compact"
+            variant="outlined"
+            clearable
+          />
           <v-select v-model="editForm.lga_id" :items="metadata.lgas" item-title="name" item-value="id" label="LGA" density="compact" variant="outlined" />
           <v-select v-model="editForm.ward_id" :items="metadata.wards" item-title="name" item-value="id" label="Ward" density="compact" variant="outlined" />
           <v-select v-model="editForm.facility_id" :items="metadata.facilities" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" />
@@ -412,6 +428,55 @@
           <v-select v-model="editForm.benefactor_id" :items="metadata.benefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
           <v-select v-model="editForm.enrollment_phase_id" :items="metadata.enrollment_phases" item-title="name" item-value="id" label="Enrollment phase" density="compact" variant="outlined" clearable />
           <v-textarea v-model="editForm.address" label="Address" density="compact" variant="outlined" rows="2" class="md:tw-col-span-3" />
+        </div>
+      </AppModal>
+
+      <AppModal
+        v-model="statusDialog"
+        title="Change Enrollee Status"
+        :subtitle="statusTarget ? (statusTarget.full_name || statusTarget.name || statusTarget.enrollee_id) : ''"
+        icon="mdi-swap-horizontal"
+        size="md"
+        :loading="statusSaving"
+      >
+        <template #actions>
+          <v-btn variant="outlined" :disabled="statusSaving" @click="closeStatusDialog">Cancel</v-btn>
+          <v-btn color="warning" variant="flat" :loading="statusSaving" prepend-icon="mdi-content-save" @click="saveStatusChange">
+            Update Status
+          </v-btn>
+        </template>
+
+        <div class="tw-space-y-4">
+          <div v-if="statusTarget" class="tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
+            <p class="tw-text-xs tw-uppercase tw-tracking-[0.24em] tw-text-slate-500">Current status</p>
+            <div class="tw-mt-2 tw-flex tw-items-center tw-gap-3">
+              <EnrolleeStatusBadge
+                :status="statusTarget.status_label || statusLabel(statusTarget.status)"
+                :label="statusTarget.status_label || statusLabel(statusTarget.status)"
+                show-icon
+              />
+              <span class="tw-text-sm tw-text-slate-500">{{ statusTarget.enrollee_id }}</span>
+            </div>
+          </div>
+
+          <v-select
+            v-model="statusForm.status"
+            :items="manageableStatusOptions"
+            item-title="title"
+            item-value="value"
+            label="New status"
+            density="compact"
+            variant="outlined"
+          />
+          <v-textarea
+            v-model="statusForm.comment"
+            label="Comment"
+            placeholder="Why is this status changing?"
+            density="compact"
+            variant="outlined"
+            rows="3"
+            counter="500"
+          />
         </div>
       </AppModal>
 
@@ -461,6 +526,7 @@ const auth = useAuthStore()
 
 const canView = computed(() => auth.hasPermission('enrollees.view'))
 const canEdit = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollee.update'))
+const canChangeStatus = computed(() => auth.hasPermission('enrollee.status.change') || auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve'))
 const canDelete = computed(() => auth.hasPermission('enrollees.delete'))
 const canExport = computed(() => auth.hasPermission('enrollees.export'))
 
@@ -496,13 +562,20 @@ const filters = reactive({
 const enrollees = ref([])
 const selected = ref(null)
 const deleteTarget = ref(null)
+const statusTarget = ref(null)
 const detailDrawer = ref(false)
 const editDialog = ref(false)
+const statusDialog = ref(false)
 const deleteDialog = ref(false)
 const editForm = reactive({})
+const statusForm = reactive({
+  status: null,
+  comment: '',
+})
 const loading = ref(false)
 const exporting = ref(false)
 const saving = ref(false)
+const statusSaving = ref(false)
 const deleting = ref(false)
 const hasLoaded = ref(false)
 const loadError = ref('')
@@ -530,6 +603,14 @@ const coverageOptions = [
   { title: 'Future Coverage', value: 'future' },
 ]
 
+const manageableStatusOptions = [
+  { title: 'Pending Approval', value: 0 },
+  { title: 'Approved', value: 1 },
+  { title: 'Rejected', value: 2 },
+  { title: 'Suspended', value: 3 },
+  { title: 'Inactive', value: 4 },
+]
+
 const dateFieldOptions = [
   { title: 'Created Date', value: 'created_at' },
   { title: 'Enrollment Date', value: 'enrollment_date' },
@@ -540,6 +621,48 @@ const sexOptions = [
   { title: 'Female', value: 2 },
   { title: 'Other', value: 3 },
 ]
+
+const occupationOptions = [
+  'Student',
+  'Farmer',
+  'Trader/Business Owner',
+  'Civil Servant',
+  'Private Sector Employee',
+  'Teacher/Lecturer',
+  'Health Worker',
+  'Artisan',
+  'Driver/Transport Worker',
+  'Security Personnel',
+  'Religious Leader',
+  'Homemaker',
+  'Retired',
+  'Unemployed',
+  'Self-Employed',
+  'Other',
+  'Not Stated',
+]
+
+const occupationAliasMap = {
+  'petty trader': 'Trader/Business Owner',
+  trader: 'Trader/Business Owner',
+  'business owner': 'Trader/Business Owner',
+  businessman: 'Trader/Business Owner',
+  businesswoman: 'Trader/Business Owner',
+  'private employee': 'Private Sector Employee',
+  'private sector worker': 'Private Sector Employee',
+  teacher: 'Teacher/Lecturer',
+  lecturer: 'Teacher/Lecturer',
+  'healthcare worker': 'Health Worker',
+  driver: 'Driver/Transport Worker',
+  'transport worker': 'Driver/Transport Worker',
+  'security officer': 'Security Personnel',
+  'house wife': 'Homemaker',
+  housewife: 'Homemaker',
+  'self employed': 'Self-Employed',
+  none: 'Not Stated',
+  'n a': 'Not Stated',
+  na: 'Not Stated',
+}
 
 const headers = [
   { title: 'S/N', key: 'sn', sortable: false, width: 72 },
@@ -595,6 +718,18 @@ const statusLabel = (status) => ({
   3: 'Suspended',
   4: 'Inactive',
 }[Number(status)] || 'Unknown')
+
+const normalizeOccupationValue = (value) => {
+  if (!value) return null
+  const trimmed = String(value).trim()
+  if (!trimmed) return null
+
+  const exact = occupationOptions.find((option) => option.toLowerCase() === trimmed.toLowerCase())
+  if (exact) return exact
+
+  const normalized = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  return occupationAliasMap[normalized] || trimmed
+}
 
 const serialNumber = (index) => ((page.value - 1) * perPage.value) + index + 1
 
@@ -842,7 +977,7 @@ const openEdit = (item) => {
     date_of_birth: item.date_of_birth?.slice?.(0, 10),
     phone: item.phone,
     email: item.email,
-    occupation: item.occupation,
+    occupation: normalizeOccupationValue(item.occupation),
     address: item.address,
     lga_id: item.lga?.id,
     ward_id: item.ward?.id,
@@ -852,6 +987,26 @@ const openEdit = (item) => {
     enrollment_phase_id: item.enrollment_phase?.id,
   })
   editDialog.value = true
+}
+
+const openStatusDialog = (item) => {
+  if (!canChangeStatus.value) {
+    error('You do not have permission to change enrollee statuses.')
+    return
+  }
+
+  statusTarget.value = item
+  selected.value = item
+  statusForm.status = Number(item.status)
+  statusForm.comment = ''
+  statusDialog.value = true
+}
+
+const closeStatusDialog = () => {
+  statusDialog.value = false
+  statusTarget.value = null
+  statusForm.status = null
+  statusForm.comment = ''
 }
 
 const saveEdit = async () => {
@@ -866,6 +1021,38 @@ const saveEdit = async () => {
     error(err.response?.data?.message || 'Could not update enrollee')
   } finally {
     saving.value = false
+  }
+}
+
+const saveStatusChange = async () => {
+  if (!statusTarget.value) return
+  if (statusForm.status === null || statusForm.status === undefined || statusForm.status === '') {
+    error('Select a new status before saving.')
+    return
+  }
+
+  statusSaving.value = true
+  try {
+    const response = await enrolleeAPI.updateStatus(statusTarget.value.id, {
+      status: Number(statusForm.status),
+      comment: statusForm.comment || null,
+    })
+
+    const updated = response.data.data?.data || response.data.data
+    if (updated) {
+      statusTarget.value = updated
+      if (selected.value && Number(selected.value.id) === Number(updated.id)) {
+        selected.value = updated
+      }
+    }
+
+    success('Enrollee status updated')
+    closeStatusDialog()
+    await loadPage()
+  } catch (err) {
+    error(err.response?.data?.message || 'Could not update enrollee status')
+  } finally {
+    statusSaving.value = false
   }
 }
 

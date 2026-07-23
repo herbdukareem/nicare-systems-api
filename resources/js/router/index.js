@@ -81,7 +81,7 @@ const routes = [
     component: EnrolleesPage,
     meta: {
       requiresAuth: true,
-      permissions: ['enrollees.view'],
+      permissions: ['enrollees.view', 'enrollee.status.change'],
       title: 'Enrollees',
       breadcrumb: 'Enrollees',
     },
@@ -114,7 +114,7 @@ const routes = [
     component: EnrolleeIntegrityPage,
     meta: {
       requiresAuth: true,
-      permissions: ['enrollees.view', 'enrollees.update', 'enrollee.approve', 'enrollee.nin.verify'],
+      permissions: ['enrollees.view', 'enrollees.update', 'enrollee.approve', 'enrollee.nin.verify', 'enrollee.status.change'],
       title: 'NIN & Duplicates',
       breadcrumb: 'NIN & Duplicates',
     },
@@ -158,7 +158,7 @@ const routes = [
     component: EnrolleeProfilePage,
     meta: {
       requiresAuth: true,
-      permissions: ['enrollees.view'],
+      permissions: ['enrollees.view', 'enrollee.status.change'],
       title: 'Enrollee Profile',
       breadcrumb: 'Enrollee Profile',
     },

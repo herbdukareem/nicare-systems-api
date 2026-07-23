@@ -597,16 +597,18 @@ class EnrolleeController extends BaseController
                 'updated_at' => now(),
             ]);
 
-            \App\Models\AuditTrail::create([
-                'enrollee_id' => $enrollee->id,
+            AuditTrail::create([
+                'auditable_type' => Enrollee::class,
+                'auditable_id' => $enrollee->id,
                 'action' => 'status_changed',
                 'description' => 'Status changed from ' . $this->statusLabel((int) $oldStatus) . ' to ' . $this->statusLabel($newStatus),
                 'user_id' => auth()->id(),
-                'old_values' => json_encode(['status' => $oldStatus]),
-                'new_values' => json_encode([
+                'ip_address' => $request->ip(),
+                'old_values' => ['status' => $oldStatus],
+                'new_values' => [
                     'status' => $newStatus,
-                    'comment' => $request->comment
-                ]),
+                    'comment' => $request->comment,
+                ],
             ]);
 
             return $this->sendResponse(

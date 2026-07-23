@@ -15,9 +15,9 @@ export const navigationItems = [
     name: 'Enrollment',
     icon: 'mdi-account-multiple-plus-outline',
     children: [
-      { name: 'All Enrollees', path: '/enrollees', icon: 'mdi-account-group-outline', permissions: ['enrollees.view'] },
+      { name: 'All Enrollees', path: '/enrollees', icon: 'mdi-account-group-outline', permissions: ['enrollees.view', 'enrollee.status.change'] },
       { name: 'Pending Approval', path: '/enrollees/approval', icon: 'mdi-account-check-outline', permissions: ['enrollees.update', 'enrollee.approve'] },
-      { name: 'NIN & Duplicates', path: '/enrollees/integrity', icon: 'mdi-shield-account-outline', permissions: ['enrollees.view', 'enrollees.update', 'enrollee.approve', 'enrollee.nin.verify'] },
+      { name: 'NIN & Duplicates', path: '/enrollees/integrity', icon: 'mdi-shield-account-outline', permissions: ['enrollees.view', 'enrollees.update', 'enrollee.approve', 'enrollee.nin.verify', 'enrollee.status.change'] },
       { name: 'Demo Enrollment', path: '/enrollees/demo-enrollment', icon: 'mdi-account-plus-outline', permissions: ['enrollees.create'] },
       { name: 'Bulk Enrollment Slip', path: '/enrollees/bulk-enrollment-slip', icon: 'mdi-file-document-multiple-outline', permissions: ['enrollees.view', 'enrollee.print-bulk-slip'] },
       { name: 'Bulk ID Cards', path: '/enrollees/bulk-id-card', icon: 'mdi-card-account-details-star-outline', permissions: ['enrollees.view'] },
