@@ -25,7 +25,7 @@
         <AppStatCard compact label="Active Coverage" icon="mdi-shield-check-outline" color="secondary" :value="summary.active_coverage" :loading="loading" />
       </div>
 
-      <AppFilterBar :active-count="activeFilterCount" :cols="5" :advanced-cols="4" @clear="resetFilters">
+      <AppFilterBar :active-count="activeFilterCount" :cols="6" :advanced-cols="4" @clear="resetFilters">
         <template #actions>
           <v-btn size="small" color="primary" variant="flat" :loading="loading" @click="applyFilters">
             Load
@@ -35,10 +35,32 @@
         <v-text-field
           v-model="filters.search"
           label="Search"
-          placeholder="ID, name, NIN, phone"
+          placeholder="Name, phone, email"
           density="compact"
           variant="outlined"
           prepend-inner-icon="mdi-magnify"
+          clearable
+          hide-details
+          @keyup.enter="applyFilters"
+        />
+        <v-text-field
+          v-model="filters.enrollee_id"
+          label="Enrollment No"
+          placeholder="NGSCHA052361"
+          density="compact"
+          variant="outlined"
+          prepend-inner-icon="mdi-card-account-details-outline"
+          clearable
+          hide-details
+          @keyup.enter="applyFilters"
+        />
+        <v-text-field
+          v-model="filters.nin"
+          label="NIN"
+          placeholder="38817514594"
+          density="compact"
+          variant="outlined"
+          prepend-inner-icon="mdi-card-bulleted-outline"
           clearable
           hide-details
           @keyup.enter="applyFilters"
@@ -163,6 +185,9 @@
         </template>
 
         <template #tags>
+          <AppBadge v-if="filters.search" :label="`Search: ${filters.search}`" tone="primary" size="sm" />
+          <AppBadge v-if="filters.enrollee_id" :label="`Enrollment No: ${filters.enrollee_id}`" tone="primary" size="sm" />
+          <AppBadge v-if="filters.nin" :label="`NIN: ${filters.nin}`" tone="primary" size="sm" />
           <AppBadge v-if="filters.lga_id" :label="`LGA: ${selectedLgaName}`" tone="secondary" size="sm" />
           <AppBadge v-if="filters.ward_id" :label="`Ward: ${selectedWardName}`" tone="secondary" size="sm" />
           <AppBadge v-if="filters.facility_id" :label="`Facility: ${selectedFacilityName}`" tone="secondary" size="sm" />
@@ -453,6 +478,8 @@ const metadata = reactive({
 
 const filters = reactive({
   search: '',
+  enrollee_id: '',
+  nin: '',
   lga_id: null,
   ward_id: null,
   facility_id: null,
@@ -742,6 +769,8 @@ const loadPage = async () => {
 const resetFilters = () => {
   Object.assign(filters, {
     search: '',
+    enrollee_id: '',
+    nin: '',
     lga_id: null,
     ward_id: null,
     facility_id: null,

@@ -79,6 +79,19 @@ class EnrolleeController extends Controller
             }
         }
 
+        if ($request->filled('enrollee_id')) {
+            $enrolleeId = (string) $request->enrollee_id;
+            $query->where(function ($q) use ($enrolleeId) {
+                $q->where('enrollee_id', 'like', "%{$enrolleeId}%")
+                    ->orWhere('legacy_id', 'like', "%{$enrolleeId}%")
+                    ->orWhere('legacy_enrollee_id', 'like', "%{$enrolleeId}%");
+            });
+        }
+
+        if ($request->filled('nin')) {
+            $query->where('nin', 'like', '%' . $request->nin . '%');
+        }
+
         if ($request->has('gender')) {
             $genders = $request->gender;
             if (is_array($genders)) {
