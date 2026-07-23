@@ -7,6 +7,7 @@ use App\Models\PayrollBatch;
 use App\Models\PremiumPin;
 use App\Models\PremiumPlan;
 use App\Models\PremiumPurchase;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
@@ -148,6 +149,77 @@ class PremiumCoverageService
                 'used_by_enrollee_id' => $enrollee->id,
             ]);
             $this->audit->record($pin, 'premium_pin_used', "Premium PIN {$pin->serial_number} used by enrollee {$enrollee->enrollee_id}.", $old, $pin->fresh()->toArray());
+
+            return $enrollee->fresh(['insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage', 'facility', 'fundingType', 'benefactor']);
+        });
+    }
+
+    public function usePinForRenewal(PremiumPin $pin, Enrollee $enrollee, ?int $facilityId = null, ?PremiumPurchase $purchase = null): Enrollee
+    {
+        $pin = $this->validatePin($pin->pin);
+
+        if ($pin->used_at || $pin->used_by_enrollee_id) {
+            throw new InvalidArgumentException('BR-13 violation: Premium PIN can only be used once.');
+        }
+
+        return DB::transaction(function () use ($pin, $enrollee, $facilityId, $purchase) {
+            $plan = $pin->plan;
+            [$start, $end] = $this->determineRenewalCoverageWindow($enrollee, $plan);
+
+            $enrollee->update([
+                'insurance_programme_id' => $plan->insurance_programme_id,
+                'premium_plan_id' => $plan->id,
+                'premium_pin_id' => $pin->id,
+                'premium_purchase_id' => $pin->premium_purchase_id ?? $purchase?->id ?? $enrollee->premium_purchase_id,
+                'benefit_package_id' => $plan->benefit_package_id,
+                'funding_type_id' => $plan->funding_type_id,
+                'facility_id' => $facilityId ?? $enrollee->facility_id,
+                'coverage_start_date' => $start->toDateString(),
+                'coverage_end_date' => $end?->toDateString(),
+                'status' => Enrollee::STATUS_ACTIVE,
+                'approval_date' => $enrollee->approval_date ?? now(),
+                'approved_by' => $enrollee->approved_by ?? auth()->id(),
+            ]);
+
+            $old = $pin->toArray();
+            $pin->update([
+                'status' => PremiumPin::STATUS_USED,
+                'used_at' => now(),
+                'expires_at' => $end,
+                'used_by_enrollee_id' => $enrollee->id,
+            ]);
+
+            $this->audit->record(
+                $pin,
+                'premium_pin_used_for_renewal',
+                "Premium PIN {$pin->serial_number} used to renew enrollee {$enrollee->enrollee_id}.",
+                $old,
+                $pin->fresh()->toArray()
+            );
+
+            return $enrollee->fresh(['insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage', 'facility', 'fundingType', 'benefactor']);
+        });
+    }
+
+    public function renewEnrolleeCoverage(Enrollee $enrollee, PremiumPlan $plan, ?PremiumPurchase $purchase = null, ?int $facilityId = null): Enrollee
+    {
+        return DB::transaction(function () use ($enrollee, $plan, $purchase, $facilityId) {
+            [$start, $end] = $this->determineRenewalCoverageWindow($enrollee, $plan);
+
+            $enrollee->update([
+                'insurance_programme_id' => $plan->insurance_programme_id,
+                'premium_plan_id' => $plan->id,
+                'premium_pin_id' => null,
+                'premium_purchase_id' => $purchase?->id ?? $enrollee->premium_purchase_id,
+                'benefit_package_id' => $plan->benefit_package_id,
+                'funding_type_id' => $plan->funding_type_id,
+                'facility_id' => $facilityId ?? $enrollee->facility_id,
+                'coverage_start_date' => $start->toDateString(),
+                'coverage_end_date' => $end?->toDateString(),
+                'status' => Enrollee::STATUS_ACTIVE,
+                'approval_date' => $enrollee->approval_date ?? now(),
+                'approved_by' => $enrollee->approved_by ?? auth()->id(),
+            ]);
 
             return $enrollee->fresh(['insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage', 'facility', 'fundingType', 'benefactor']);
         });
@@ -345,5 +417,28 @@ class PremiumCoverageService
         if ($pin->isExpired() || $pin->status !== PremiumPin::STATUS_GENERATED) {
             throw new InvalidArgumentException('Premium PIN cannot be sold because it is expired, cancelled, sold, or used.');
         }
+    }
+
+    /**
+     * @return array{0: Carbon, 1: ?Carbon}
+     */
+    private function determineRenewalCoverageWindow(Enrollee $enrollee, PremiumPlan $plan): array
+    {
+        $today = now()->startOfDay();
+        $currentEnd = $enrollee->coverage_end_date?->copy()->startOfDay();
+
+        if ($currentEnd && $currentEnd->gte($today)) {
+            $start = $currentEnd->copy()->addDay();
+        } elseif ($enrollee->coverage_start_date && !$enrollee->coverage_end_date && (int) $enrollee->status === Enrollee::STATUS_ACTIVE) {
+            $start = $today;
+        } else {
+            $start = $today;
+        }
+
+        $end = $plan->hasNoExpiry()
+            ? null
+            : $start->copy()->addDays(max(1, (int) $plan->duration_days) - 1)->endOfDay();
+
+        return [$start, $end];
     }
 }

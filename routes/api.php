@@ -120,6 +120,8 @@ Route::middleware(['auth:sanctum', 'enrollee'])->prefix('enroll')->group(functio
     Route::post('logout',           [EnrolleeAuthController::class, 'logout']);
     Route::get('me',                [EnrolleeAuthController::class, 'me']);
     Route::post('change-password',  [EnrolleeAuthController::class, 'changePassword']);
+    Route::post('renewals',         [EnrolleeAuthController::class, 'renew']);
+    Route::get('renewals/{reference}/verify', [EnrolleeAuthController::class, 'verifyRenewal']);
 });
 
 // Auth routes (without middleware to avoid CSRF issues)
@@ -206,6 +208,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,enrollees.view,enrollee.status.change');
     Route::match(['put', 'patch'], 'enrollees/{enrollee}', [EnrolleeController::class, 'update'])
         ->middleware('permission:any,enrollees.update,enrollees.edit');
+    Route::patch('enrollees/{enrollee}/password', [EnrolleeApiController::class, 'resetPassword'])
+        ->middleware('permission:enrollee.password.reset');
     Route::delete('enrollees/{enrollee}', [EnrolleeController::class, 'destroy'])
         ->middleware('permission:any,enrollees.delete,enrollee.delete');
     Route::post('enrollees/{enrollee}/upload-passport', [EnrolleeController::class, 'uploadPassport'])

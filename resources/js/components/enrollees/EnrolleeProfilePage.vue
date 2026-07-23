@@ -114,6 +114,15 @@
             >
               Change Status
             </v-btn>
+            <v-btn
+              v-if="canResetPassword"
+              color="secondary"
+              variant="outlined"
+              prepend-icon="mdi-lock-reset"
+              @click="openPasswordDialog"
+            >
+              Reset Password
+            </v-btn>
             <v-btn color="primary" variant="outlined" prepend-icon="mdi-pencil" @click="editEnrollee">Edit Profile</v-btn>
             <v-btn color="primary" prepend-icon="mdi-download" @click="downloadProfile">Download PDF</v-btn>
           </div>
@@ -282,6 +291,50 @@
         />
       </div>
     </AppModal>
+
+    <AppModal
+      v-model="passwordDialog"
+      title="Reset Portal Password"
+      :subtitle="enrollee?.name || enrollee?.enrollee_id || ''"
+      icon="mdi-lock-reset"
+      size="md"
+      :loading="passwordSaving"
+    >
+      <template #actions>
+        <v-btn variant="outlined" :disabled="passwordSaving" @click="closePasswordDialog">Cancel</v-btn>
+        <v-btn color="secondary" variant="flat" :loading="passwordSaving" prepend-icon="mdi-content-save" @click="savePasswordReset">
+          Reset Password
+        </v-btn>
+      </template>
+
+      <div class="tw-space-y-4">
+        <div v-if="enrollee" class="tw-rounded-xl tw-border tw-border-gray-200 tw-bg-gray-50 tw-p-4">
+          <p class="tw-text-xs tw-uppercase tw-tracking-[0.24em] tw-text-gray-500">Portal account</p>
+          <div class="tw-mt-2">
+            <p class="tw-font-semibold tw-text-gray-900">{{ enrollee.name }}</p>
+            <p class="tw-text-sm tw-text-gray-500">{{ enrollee.enrollee_id }}</p>
+          </div>
+        </div>
+
+        <v-text-field
+          v-model="passwordForm.password"
+          label="Temporary password"
+          type="password"
+          density="compact"
+          variant="outlined"
+        />
+        <v-text-field
+          v-model="passwordForm.password_confirmation"
+          label="Confirm temporary password"
+          type="password"
+          density="compact"
+          variant="outlined"
+        />
+        <p class="tw-text-sm tw-text-gray-500">
+          Existing enrollee portal sessions will be signed out once the password is reset.
+        </p>
+      </div>
+    </AppModal>
   </AdminLayout>
 </template>
 
@@ -306,15 +359,22 @@ const loading = ref(false)
 const loadError = ref('')
 const fileInput = ref(null)
 const statusDialog = ref(false)
+const passwordDialog = ref(false)
 const statusSaving = ref(false)
+const passwordSaving = ref(false)
 const statusForm = ref({
   status: null,
   comment: '',
+})
+const passwordForm = ref({
+  password: '',
+  password_confirmation: '',
 })
 
 const statistics = ref({ totalClaims: 0, totalBenefits: 0, facilitiesVisited: 0, lastVisit: null })
 const activeCoverage = ref(null)
 const canChangeStatus = auth.hasPermission('enrollee.status.change') || auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve')
+const canResetPassword = auth.hasPermission('enrollee.password.reset')
 const manageableStatusOptions = [
   { title: 'Pending Approval', value: 0 },
   { title: 'Approved', value: 1 },
@@ -458,6 +518,27 @@ const closeStatusDialog = () => {
   }
 }
 
+const openPasswordDialog = () => {
+  if (!canResetPassword || !enrollee.value) {
+    error('You do not have permission to reset enrollee portal passwords.')
+    return
+  }
+
+  passwordForm.value = {
+    password: '',
+    password_confirmation: '',
+  }
+  passwordDialog.value = true
+}
+
+const closePasswordDialog = () => {
+  passwordDialog.value = false
+  passwordForm.value = {
+    password: '',
+    password_confirmation: '',
+  }
+}
+
 const saveStatusChange = async () => {
   if (!enrollee.value) return
   if (statusForm.value.status === null || statusForm.value.status === undefined || statusForm.value.status === '') {
@@ -480,6 +561,36 @@ const saveStatusChange = async () => {
     error(err.response?.data?.message || 'Failed to update enrollee status')
   } finally {
     statusSaving.value = false
+  }
+}
+
+const savePasswordReset = async () => {
+  if (!enrollee.value) return
+  if (!passwordForm.value.password) {
+    error('Enter a temporary password before saving.')
+    return
+  }
+  if (passwordForm.value.password.length < 8) {
+    error('Password must be at least 8 characters.')
+    return
+  }
+  if (passwordForm.value.password !== passwordForm.value.password_confirmation) {
+    error('Password confirmation does not match.')
+    return
+  }
+
+  passwordSaving.value = true
+  try {
+    await enrolleeAPI.resetPassword(enrollee.value.id, {
+      password: passwordForm.value.password,
+      password_confirmation: passwordForm.value.password_confirmation,
+    })
+    success('Enrollee portal password reset successfully.')
+    closePasswordDialog()
+  } catch (err) {
+    error(err.response?.data?.message || 'Failed to reset enrollee password')
+  } finally {
+    passwordSaving.value = false
   }
 }
 

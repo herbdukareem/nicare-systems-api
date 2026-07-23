@@ -5,10 +5,14 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Enrollee;
 use App\Models\PremiumPlan;
+use App\Services\EnrolleePortalRenewalService;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Schema;
+use RuntimeException;
 
 class EnrolleeAuthController extends Controller
 {
@@ -134,9 +138,59 @@ class EnrolleeAuthController extends Controller
 
     public function plans(): JsonResponse
     {
-        $plans = PremiumPlan::orderBy('amount')->get();
+        $plans = PremiumPlan::with(['programme', 'benefitPackage', 'fundingType'])
+            ->where('status', 'active');
+
+        if (Schema::hasColumn('premium_plans', 'self_enrollment_enabled')) {
+            $plans->where(function (Builder $query) {
+                $query->where('self_enrollment_enabled', true)
+                    ->orWhereNull('self_enrollment_enabled');
+            });
+        }
+
+        $plans = $plans->orderBy('amount')
+            ->orderBy('name')
+            ->get();
 
         return response()->json(['success' => true, 'data' => $plans]);
+    }
+
+    public function renew(Request $request, EnrolleePortalRenewalService $service): JsonResponse
+    {
+        $validated = $request->validate([
+            'premium_plan_id' => ['required', 'integer', 'exists:premium_plans,id'],
+        ]);
+
+        try {
+            $result = $service->create($request->user(), (int) $validated['premium_plan_id']);
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+        ], 201);
+    }
+
+    public function verifyRenewal(Request $request, string $reference, EnrolleePortalRenewalService $service): JsonResponse
+    {
+        try {
+            $result = $service->verify($request->user(), $reference);
+        } catch (RuntimeException $exception) {
+            return response()->json([
+                'success' => false,
+                'message' => $exception->getMessage(),
+            ], 422);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => $result,
+        ]);
     }
 
     private function throttleKey(Request $request): string

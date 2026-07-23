@@ -125,6 +125,7 @@ export const enrolleeAPI = {
   approve: (id, data = {}) => api.post(`/enrollees/${id}/approve`, data),
   pendingApproval: (params) => api.get('/enrollees/pending-approval', { params }),
   update: (id, data) => api.put(`/enrollees/${id}`, data),
+  resetPassword: (id, data) => api.patch(`/enrollees/${id}/password`, data),
   updateStatus: (id, data) => api.put(`/enrollees/${id}/status`, data),
   uploadPassport: (id, data) => api.post(`/enrollees/${id}/upload-passport`, data, {
     headers: { 'Content-Type': 'multipart/form-data' },

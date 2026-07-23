@@ -28,6 +28,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'enrollee.create',
                 'enrollee.update',
                 'enrollee.status.change',
+                'enrollee.password.reset',
                 'enrollee.delete',
                 'enrollee.approve',
                 'enrollee.nin.verify',
@@ -305,7 +306,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'description' => 'Registers and maintains enrollees.',
                 'permissions' => [
                     'dashboard.view', 'enrollees.view', 'enrollees.create', 'enrollees.update',
-                    'enrollee.view', 'enrollee.create', 'enrollee.update', 'enrollee.status.change', 'enrollee.nin.verify', 'enrollee.print-id-card', 'enrollee.print-bulk-slip',
+                    'enrollee.view', 'enrollee.create', 'enrollee.update', 'enrollee.status.change', 'enrollee.password.reset', 'enrollee.nin.verify', 'enrollee.print-id-card', 'enrollee.print-bulk-slip',
                     'enrollees.import', 'enrollees.export', 'facilities.view', 'coverage.view',
                     'eligibility.lookup', 'reports.view',
                 ],

@@ -293,6 +293,12 @@
                   @click="openStatusDialog(item)"
                 />
                 <v-list-item
+                  v-if="canResetPassword"
+                  prepend-icon="mdi-lock-reset"
+                  title="Reset portal password"
+                  @click="openPasswordDialog(item)"
+                />
+                <v-list-item
                   prepend-icon="mdi-card-account-details-outline"
                   title="Print ID card"
                   @click="printIdCard(item)"
@@ -367,6 +373,9 @@
             <v-btn v-if="canChangeStatus" size="small" color="warning" variant="outlined" prepend-icon="mdi-swap-horizontal" @click="openStatusDialog(selected)">
               Change Status
             </v-btn>
+            <v-btn v-if="canResetPassword" size="small" color="secondary" variant="outlined" prepend-icon="mdi-lock-reset" @click="openPasswordDialog(selected)">
+              Reset Password
+            </v-btn>
             <v-btn size="small" color="primary" variant="flat" prepend-icon="mdi-card-account-details-outline" @click="printIdCard(selected)">
               Print ID Card
             </v-btn>
@@ -428,6 +437,50 @@
           <v-select v-model="editForm.benefactor_id" :items="metadata.benefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
           <v-select v-model="editForm.enrollment_phase_id" :items="metadata.enrollment_phases" item-title="name" item-value="id" label="Enrollment phase" density="compact" variant="outlined" clearable />
           <v-textarea v-model="editForm.address" label="Address" density="compact" variant="outlined" rows="2" class="md:tw-col-span-3" />
+        </div>
+      </AppModal>
+
+      <AppModal
+        v-model="passwordDialog"
+        title="Reset Portal Password"
+        :subtitle="passwordTarget ? (passwordTarget.full_name || passwordTarget.name || passwordTarget.enrollee_id) : ''"
+        icon="mdi-lock-reset"
+        size="md"
+        :loading="passwordSaving"
+      >
+        <template #actions>
+          <v-btn variant="outlined" :disabled="passwordSaving" @click="closePasswordDialog">Cancel</v-btn>
+          <v-btn color="secondary" variant="flat" :loading="passwordSaving" prepend-icon="mdi-content-save" @click="savePasswordReset">
+            Reset Password
+          </v-btn>
+        </template>
+
+        <div class="tw-space-y-4">
+          <div v-if="passwordTarget" class="tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
+            <p class="tw-text-xs tw-uppercase tw-tracking-[0.24em] tw-text-slate-500">Portal account</p>
+            <div class="tw-mt-2">
+              <p class="tw-font-semibold tw-text-slate-900">{{ passwordTarget.full_name || passwordTarget.name }}</p>
+              <p class="tw-text-sm tw-text-slate-500">{{ passwordTarget.enrollee_id }}</p>
+            </div>
+          </div>
+
+          <v-text-field
+            v-model="passwordForm.password"
+            label="Temporary password"
+            type="password"
+            density="compact"
+            variant="outlined"
+          />
+          <v-text-field
+            v-model="passwordForm.password_confirmation"
+            label="Confirm temporary password"
+            type="password"
+            density="compact"
+            variant="outlined"
+          />
+          <p class="tw-text-sm tw-text-slate-500">
+            The enrollee will need to sign in with this password. Existing enrollee portal sessions will be signed out.
+          </p>
         </div>
       </AppModal>
 
@@ -527,6 +580,7 @@ const auth = useAuthStore()
 const canView = computed(() => auth.hasPermission('enrollees.view'))
 const canEdit = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollee.update'))
 const canChangeStatus = computed(() => auth.hasPermission('enrollee.status.change') || auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve'))
+const canResetPassword = computed(() => auth.hasPermission('enrollee.password.reset'))
 const canDelete = computed(() => auth.hasPermission('enrollees.delete'))
 const canExport = computed(() => auth.hasPermission('enrollees.export'))
 
@@ -563,19 +617,26 @@ const enrollees = ref([])
 const selected = ref(null)
 const deleteTarget = ref(null)
 const statusTarget = ref(null)
+const passwordTarget = ref(null)
 const detailDrawer = ref(false)
 const editDialog = ref(false)
 const statusDialog = ref(false)
+const passwordDialog = ref(false)
 const deleteDialog = ref(false)
 const editForm = reactive({})
 const statusForm = reactive({
   status: null,
   comment: '',
 })
+const passwordForm = reactive({
+  password: '',
+  password_confirmation: '',
+})
 const loading = ref(false)
 const exporting = ref(false)
 const saving = ref(false)
 const statusSaving = ref(false)
+const passwordSaving = ref(false)
 const deleting = ref(false)
 const hasLoaded = ref(false)
 const loadError = ref('')
@@ -1002,11 +1063,31 @@ const openStatusDialog = (item) => {
   statusDialog.value = true
 }
 
+const openPasswordDialog = (item) => {
+  if (!canResetPassword.value) {
+    error('You do not have permission to reset enrollee portal passwords.')
+    return
+  }
+
+  passwordTarget.value = item
+  selected.value = item
+  passwordForm.password = ''
+  passwordForm.password_confirmation = ''
+  passwordDialog.value = true
+}
+
 const closeStatusDialog = () => {
   statusDialog.value = false
   statusTarget.value = null
   statusForm.status = null
   statusForm.comment = ''
+}
+
+const closePasswordDialog = () => {
+  passwordDialog.value = false
+  passwordTarget.value = null
+  passwordForm.password = ''
+  passwordForm.password_confirmation = ''
 }
 
 const saveEdit = async () => {
@@ -1053,6 +1134,36 @@ const saveStatusChange = async () => {
     error(err.response?.data?.message || 'Could not update enrollee status')
   } finally {
     statusSaving.value = false
+  }
+}
+
+const savePasswordReset = async () => {
+  if (!passwordTarget.value) return
+  if (!passwordForm.password) {
+    error('Enter a temporary password before saving.')
+    return
+  }
+  if (passwordForm.password.length < 8) {
+    error('Password must be at least 8 characters.')
+    return
+  }
+  if (passwordForm.password !== passwordForm.password_confirmation) {
+    error('Password confirmation does not match.')
+    return
+  }
+
+  passwordSaving.value = true
+  try {
+    await enrolleeAPI.resetPassword(passwordTarget.value.id, {
+      password: passwordForm.password,
+      password_confirmation: passwordForm.password_confirmation,
+    })
+    success('Enrollee portal password reset successfully.')
+    closePasswordDialog()
+  } catch (err) {
+    error(err.response?.data?.message || 'Could not reset enrollee password')
+  } finally {
+    passwordSaving.value = false
   }
 }
 

@@ -18,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Request as FacadeRequest;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
@@ -325,6 +326,36 @@ class EnrolleeController extends Controller
             'success' => true,
             'message' => 'Enrollee updated successfully',
             'data' => $enrollee->fresh()->load(['insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage', 'facility', 'lga', 'ward']),
+        ]);
+    }
+
+    public function resetPassword(Request $request, Enrollee $enrollee): JsonResponse
+    {
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $enrollee->forceFill([
+            'password' => Hash::make($validated['password']),
+        ])->save();
+
+        $enrollee->tokens()->delete();
+
+        AuditTrail::create([
+            'auditable_type' => Enrollee::class,
+            'auditable_id' => $enrollee->id,
+            'enrollee_id' => $enrollee->id,
+            'action' => 'password_reset',
+            'description' => 'Enrollee portal password reset by authorized staff',
+            'user_id' => auth()->id(),
+            'old_values' => json_encode(['password' => 'hidden']),
+            'new_values' => json_encode(['password' => 'hidden']),
+            'ip_address' => FacadeRequest::ip(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Enrollee portal password reset successfully.',
         ]);
     }
 
