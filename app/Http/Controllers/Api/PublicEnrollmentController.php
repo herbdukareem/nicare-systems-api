@@ -30,7 +30,7 @@ class PublicEnrollmentController extends BaseController
         $lgaId = $request->integer('lga_id') ?: null;
         $wardId = $request->integer('ward_id') ?: null;
 
-        $plansQuery = PremiumPlan::with(['programme', 'benefitPackage'])
+        $plansQuery = PremiumPlan::with(['programme', 'benefitPackage', 'fundingType'])
             ->where('status', 'active');
 
         if (Schema::hasColumn('premium_plans', 'self_enrollment_enabled')) {

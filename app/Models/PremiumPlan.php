@@ -13,6 +13,7 @@ class PremiumPlan extends Model
     protected $fillable = [
         'insurance_programme_id',
         'benefit_package_id',
+        'funding_type_id',
         'name',
         'code',
         'amount',
@@ -52,6 +53,11 @@ class PremiumPlan extends Model
     public function benefitPackage()
     {
         return $this->belongsTo(BenefitPackage::class);
+    }
+
+    public function fundingType()
+    {
+        return $this->belongsTo(FundingType::class);
     }
 
     public function premiumPins()

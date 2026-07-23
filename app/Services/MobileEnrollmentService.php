@@ -388,6 +388,10 @@ class MobileEnrollmentService
     private function createPendingEnrollee(MobileEnrollmentRecord $record, User $officer, array $data, array $extra, $schema, array $locationPayload = []): Enrollee
     {
         return DB::transaction(function () use ($record, $officer, $data, $extra, $schema, $locationPayload): Enrollee {
+            $plan = !empty($data['premium_plan_id'])
+                ? PremiumPlan::find($data['premium_plan_id'])
+                : null;
+
             return Enrollee::create([
                 'nin' => $data['nin'] ?? null,
                 'first_name' => $data['first_name'],
@@ -404,9 +408,11 @@ class MobileEnrollmentService
                 'facility_id' => $data['facility_id'],
                 'lga_id' => $data['lga_id'],
                 'ward_id' => $data['ward_id'],
-                'insurance_programme_id' => $data['insurance_programme_id'],
+                'insurance_programme_id' => $plan?->insurance_programme_id ?? $data['insurance_programme_id'],
                 'enrollee_category_id' => $data['enrollee_category_id'] ?? null,
-                'premium_plan_id' => $data['premium_plan_id'],
+                'premium_plan_id' => $plan?->id ?? ($data['premium_plan_id'] ?? null),
+                'benefit_package_id' => $plan?->benefit_package_id ?? ($data['benefit_package_id'] ?? null),
+                'funding_type_id' => $plan?->funding_type_id ?? ($data['funding_type_id'] ?? null),
                 'benefactor_id' => $data['benefactor_id'] ?? null,
                 'relationship_to_principal' => $data['relationship_to_principal'] ?? 1,
                 'principal_enrollee_id' => $data['principal_enrollee_id'] ?? null,

@@ -20,6 +20,7 @@ class StorePremiumPlanRequest extends FormRequest
         $rules = [
             'insurance_programme_id' => ['required', 'exists:insurance_programmes,id'],
             'benefit_package_id' => ['nullable', 'exists:benefit_packages,id'],
+            'funding_type_id' => ['nullable', 'exists:funding_types,id'],
             'name' => ['required', 'string', 'max:255'],
             'code' => ['required', 'string', 'max:80', Rule::unique('premium_plans', 'code')->ignore($planId)],
             'amount' => ['required', 'numeric', 'min:0'],

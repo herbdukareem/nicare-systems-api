@@ -131,6 +131,7 @@ class PremiumCoverageService
                 'premium_plan_id' => $plan->id,
                 'premium_pin_id' => $pin->id,
                 'benefit_package_id' => $plan->benefit_package_id,
+                'funding_type_id' => $plan->funding_type_id,
                 'facility_id' => $facilityId ?? $enrollee->facility_id,
                 'coverage_start_date' => $start->toDateString(),
                 'coverage_end_date' => $end?->toDateString(),
@@ -177,8 +178,12 @@ class PremiumCoverageService
             }
 
             $enrollee->update([
+                'insurance_programme_id' => $plan->insurance_programme_id,
+                'premium_plan_id' => $plan->id,
                 'premium_pin_id' => $lockedPin->id,
                 'premium_purchase_id' => $lockedPin->premium_purchase_id,
+                'benefit_package_id' => $plan->benefit_package_id,
+                'funding_type_id' => $plan->funding_type_id,
             ]);
 
             $old = $lockedPin->toArray();
@@ -307,7 +312,7 @@ class PremiumCoverageService
                     'benefit_package_id' => $plan->benefit_package_id,
                     'facility_id' => $row->facility_id ?? $enrollee->facility_id,
                     'benefactor_id' => $batch->benefactor_id,
-                    'funding_type_id' => $batch->funding_type_id,
+                    'funding_type_id' => $batch->funding_type_id ?? $plan->funding_type_id,
                     'coverage_start_date' => $coverageStart->toDateString(),
                     'coverage_end_date' => $coverageEnd?->toDateString(),
                     'status' => 1,

@@ -46,7 +46,7 @@ class PremiumMetadataController extends Controller
                 'categories' => $categories,
                 'enrollee_categories' => $categories,
                 'benefit_packages' => BenefitPackage::orderBy('name')->get(),
-                'premium_plans' => PremiumPlan::with(['programme', 'benefitPackage'])
+                'premium_plans' => PremiumPlan::with(['programme', 'benefitPackage', 'fundingType'])
                     ->when($programmeId, fn ($query) => $query->where('insurance_programme_id', $programmeId))
                     ->where('status', 'active')
                     ->orderBy('name')

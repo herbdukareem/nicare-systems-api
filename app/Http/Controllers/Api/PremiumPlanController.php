@@ -14,7 +14,7 @@ class PremiumPlanController extends Controller
 {
     public function index(Request $request)
     {
-        $plans = PremiumPlan::with(['programme', 'benefitPackage'])
+        $plans = PremiumPlan::with(['programme', 'benefitPackage', 'fundingType'])
             ->when($request->status, fn ($q) => $q->where('status', $request->status))
             ->when($request->search, fn ($q) => $q->where('name', 'like', "%{$request->search}%")->orWhere('code', 'like', "%{$request->search}%"))
             ->latest()
@@ -28,12 +28,12 @@ class PremiumPlanController extends Controller
         $plan = PremiumPlan::create($request->normalized() + ['created_by' => auth()->id()]);
         $audit->record($plan, 'premium_plan_created', "Premium plan {$plan->name} created.", [], $plan->toArray());
 
-        return response()->json(['success' => true, 'data' => new PremiumPlanResource($plan->load(['programme', 'benefitPackage']))], 201);
+        return response()->json(['success' => true, 'data' => new PremiumPlanResource($plan->load(['programme', 'benefitPackage', 'fundingType']))], 201);
     }
 
     public function show(PremiumPlan $premiumPlan): PremiumPlanResource
     {
-        return new PremiumPlanResource($premiumPlan->load(['programme', 'benefitPackage']));
+        return new PremiumPlanResource($premiumPlan->load(['programme', 'benefitPackage', 'fundingType']));
     }
 
     public function update(StorePremiumPlanRequest $request, PremiumPlan $premiumPlan, PremiumAuditService $audit): JsonResponse
@@ -42,7 +42,7 @@ class PremiumPlanController extends Controller
         $premiumPlan->update($request->normalized() + ['updated_by' => auth()->id()]);
         $audit->record($premiumPlan, 'premium_plan_updated', "Premium plan {$premiumPlan->name} updated.", $old, $premiumPlan->fresh()->toArray());
 
-        return response()->json(['success' => true, 'data' => new PremiumPlanResource($premiumPlan->fresh(['programme', 'benefitPackage']))]);
+        return response()->json(['success' => true, 'data' => new PremiumPlanResource($premiumPlan->fresh(['programme', 'benefitPackage', 'fundingType']))]);
     }
 
     public function destroy(PremiumPlan $premiumPlan, PremiumAuditService $audit): JsonResponse
@@ -59,7 +59,7 @@ class PremiumPlanController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Premium plan has existing usage, so it was archived instead of permanently deleted.',
-                'data' => new PremiumPlanResource($premiumPlan->fresh(['programme', 'benefitPackage'])),
+                'data' => new PremiumPlanResource($premiumPlan->fresh(['programme', 'benefitPackage', 'fundingType'])),
             ]);
         }
 

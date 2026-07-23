@@ -41,6 +41,7 @@
           <v-text-field v-if="mode === 'plans'" v-model="planForm.code" label="Code" density="comfortable" variant="outlined" />
           <v-select v-if="mode === 'plans'" v-model="planForm.insurance_programme_id" :items="metadata.programmes" item-title="name" item-value="id" label="Programme" density="comfortable" variant="outlined" />
           <v-select v-if="mode === 'plans'" v-model="planForm.benefit_package_id" :items="metadata.benefit_packages" item-title="name" item-value="id" label="Benefit package" density="comfortable" variant="outlined" clearable />
+          <v-select v-if="mode === 'plans'" v-model="planForm.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding type" density="comfortable" variant="outlined" clearable />
           <v-text-field v-if="mode === 'plans'" v-model.number="planForm.amount" label="Amount" type="number" density="comfortable" variant="outlined" />
           <v-text-field v-if="mode === 'plans'" v-model.number="planForm.consultant_fee" label="Consultant fee" type="number" density="comfortable" variant="outlined" />
           <v-switch v-if="mode === 'plans'" v-model="planForm.has_no_expiry" label="No expiry" color="primary" hide-details />
@@ -208,6 +209,7 @@ const blankPlanForm = () => ({
   code: '',
   insurance_programme_id: null,
   benefit_package_id: null,
+  funding_type_id: null,
   amount: 0,
   consultant_fee: 0,
   payment_required: false,
@@ -453,6 +455,7 @@ const editPlan = (plan) => {
     ...blankPlanForm(),
     insurance_programme_id: plan.insurance_programme_id ?? null,
     benefit_package_id: plan.benefit_package_id ?? null,
+    funding_type_id: plan.funding_type_id ?? null,
     name: plan.name || '',
     code: plan.code || '',
     amount: Number(plan.amount || 0),

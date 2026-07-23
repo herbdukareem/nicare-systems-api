@@ -15,6 +15,7 @@ class PremiumPlanResource extends JsonResource
             'id' => $this->id,
             'insurance_programme_id' => $this->insurance_programme_id,
             'benefit_package_id' => $this->benefit_package_id,
+            'funding_type_id' => $this->funding_type_id,
             'name' => $this->name,
             'code' => $this->code,
             'amount' => $this->amount,
@@ -36,6 +37,7 @@ class PremiumPlanResource extends JsonResource
             'updated_at' => $this->updated_at,
             'programme' => $this->whenLoaded('programme'),
             'benefit_package' => $this->whenLoaded('benefitPackage'),
+            'funding_type' => $this->whenLoaded('fundingType'),
             'merchant' => $this->merchantDetails(),
             'merchant_service_type' => $this->merchantServiceTypeDetails(),
         ];

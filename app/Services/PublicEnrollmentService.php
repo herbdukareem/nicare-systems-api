@@ -25,7 +25,7 @@ class PublicEnrollmentService
 
     public function submitApplication(array $data): array
     {
-        $plan = PremiumPlan::with(['programme', 'benefitPackage'])->findOrFail($data['premium_plan_id']);
+        $plan = PremiumPlan::with(['programme', 'benefitPackage', 'fundingType'])->findOrFail($data['premium_plan_id']);
         $enrollmentMethod = $data['enrollment_method'] ?? 'online_payment';
         $pin = null;
 
@@ -129,6 +129,7 @@ class PublicEnrollmentService
                 'premium_plan_id' => $plan->id,
                 'premium_purchase_id' => $purchase?->id,
                 'benefit_package_id' => $plan->benefit_package_id,
+                'funding_type_id' => $plan->funding_type_id,
                 'status' => Enrollee::STATUS_PENDING,
                 'relationship_to_principal' => 1,
                 'created_by' => $this->systemActorId(),
@@ -145,7 +146,7 @@ class PublicEnrollmentService
             }
 
             return [
-                'enrollee' => $enrollee->load(['premiumPlan', 'premiumPin', 'premiumPurchase', 'benefitPackage', 'facility', 'lga', 'ward', 'insuranceProgramme']),
+                'enrollee' => $enrollee->load(['premiumPlan', 'premiumPin', 'premiumPurchase', 'benefitPackage', 'fundingType', 'facility', 'lga', 'ward', 'insuranceProgramme']),
                 'purchase' => $purchase?->load(['plan']),
                 'requires_payment' => $requiresHostedPayment,
                 'enrollment_method' => $enrollmentMethod,

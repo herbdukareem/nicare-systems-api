@@ -203,7 +203,7 @@ class EnrolleeController extends Controller
 
         DB::beginTransaction();
         try {
-            $enrolleeData = $validator->validated();
+            $enrolleeData = $this->applyPremiumPlanAssignments($validator->validated());
             $enrolleeData['created_by'] = auth()->id();
             $enrolleeData['status'] = Enrollee::STATUS_PENDING;
 
@@ -296,7 +296,7 @@ class EnrolleeController extends Controller
         }
 
         $oldValues = $enrollee->toArray();
-        $enrollee->update($validator->validated());
+        $enrollee->update($this->applyPremiumPlanAssignments($validator->validated()));
 
         // Create audit trail
         AuditTrail::create([
@@ -680,6 +680,25 @@ class EnrolleeController extends Controller
         if ($dependantCount >= $plan->getEffectiveMaximumDependants()) {
             $validator->errors()->add('principal_enrollee_id', 'The selected principal has reached the dependant limit for this plan.');
         }
+    }
+
+    private function applyPremiumPlanAssignments(array $data): array
+    {
+        $planId = $data['premium_plan_id'] ?? null;
+        if (!$planId) {
+            return $data;
+        }
+
+        $plan = PremiumPlan::find($planId);
+        if (!$plan) {
+            return $data;
+        }
+
+        $data['insurance_programme_id'] = $plan->insurance_programme_id;
+        $data['benefit_package_id'] = $plan->benefit_package_id;
+        $data['funding_type_id'] = $plan->funding_type_id;
+
+        return $data;
     }
 
     private function hasSatisfiedRequiredPayment(Enrollee $enrollee): bool
