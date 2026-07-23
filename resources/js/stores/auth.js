@@ -1,6 +1,71 @@
 import { defineStore } from 'pinia';
 import { authAPI, userAPI } from '../utils/api';
 
+const permissionAliases = {
+  'enrollee.view': ['enrollees.view'],
+  'enrollee.create': ['enrollees.create'],
+  'enrollee.update': ['enrollees.update', 'enrollees.edit'],
+  'enrollee.delete': ['enrollees.delete'],
+  'enrollees.view': ['enrollee.view'],
+  'enrollees.create': ['enrollee.create'],
+  'enrollees.update': ['enrollee.update', 'enrollees.edit'],
+  'enrollees.edit': ['enrollee.update', 'enrollees.update'],
+  'enrollees.delete': ['enrollee.delete'],
+  'facilities.view': ['setup.facility.view'],
+  'setup.facility.view': ['facilities.view'],
+  'benefactor.view': ['setup.benefactor.view', 'benefactors.view'],
+  'setup.benefactor.view': ['benefactor.view', 'benefactors.view'],
+  'benefactors.view': ['benefactor.view', 'setup.benefactor.view'],
+};
+
+const normalizePermissionName = (permission) => {
+  if (typeof permission === 'string') {
+    return permission;
+  }
+
+  return permission?.name || null;
+};
+
+const dedupePermissions = (permissions = []) => {
+  const seen = new Set();
+
+  return permissions.filter((permission) => {
+    const name = normalizePermissionName(permission);
+    if (!name || seen.has(name)) {
+      return false;
+    }
+
+    seen.add(name);
+    return true;
+  });
+};
+
+const collectPermissions = (state) => {
+  const scopedRolePermissions = state.currentRole
+    ? (state.currentRole.permissions || [])
+    : (state.user?.roles?.flatMap((role) => role.permissions || []) || []);
+
+  return dedupePermissions([
+    ...(state.user?.permissions || []),
+    ...(state.user?.direct_permissions || []),
+    ...scopedRolePermissions,
+  ]);
+};
+
+const matchesPermission = (loadedPermissions, requestedPermission) => {
+  const loadedNames = new Set(
+    loadedPermissions
+      .map(normalizePermissionName)
+      .filter(Boolean)
+  );
+
+  if (loadedNames.has(requestedPermission)) {
+    return true;
+  }
+
+  return (permissionAliases[requestedPermission] || []).some((alias) => loadedNames.has(alias));
+};
+
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     user: null,
@@ -20,10 +85,10 @@ export const useAuthStore = defineStore('auth', {
     getUserCurrentRole: (state) => state.currentRole,
 
     availableModules: (state) => {
-      const roles = state.currentRole ? [state.currentRole] : (state.user?.roles || []);
+      const permissions = collectPermissions(state);
+
       return [...new Set(
-        roles
-          .flatMap((role) => role.permissions || [])
+        permissions
           .map((permission) => permission.category)
           .filter(Boolean)
       )];
@@ -31,17 +96,10 @@ export const useAuthStore = defineStore('auth', {
 
     currentRolePermissions: (state) => {
       if (!state.currentRole) return [];
-      return state.currentRole.permissions || [];
+      return dedupePermissions(state.currentRole.permissions || []);
     },
     userPermissions: (state) => {
-      // If a specific role is active, return only that role's permissions
-      if (state.currentRole) {
-        return state.currentRole.permissions || [];
-      }
-      // Otherwise, return all permissions from all roles
-      const directPermissions = state.user?.permissions || [];
-      const rolePermissions = state.user?.roles?.flatMap(role => role.permissions || []) || [];
-      return [...directPermissions, ...rolePermissions];
+      return collectPermissions(state);
     },
     canSwitchRoles: (state) => state.availableRoles.length > 1,
   },
@@ -324,7 +382,7 @@ export const useAuthStore = defineStore('auth', {
       if (this.isSuperAdmin()) return true;
 
       const permissions = this.userPermissions;
-      const hasIt = permissions.some(p => p.name === permission || p === permission);
+      const hasIt = matchesPermission(permissions, permission);
 
       if (!hasIt && permissions.length === 0) {
         console.warn(`[Auth] No permissions loaded yet. Checking for: ${permission}`);
