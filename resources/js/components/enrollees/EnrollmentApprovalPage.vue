@@ -317,12 +317,12 @@
                 />
               </template>
 
-              <div v-if="selectedRow.image_url || selectedRow.providerPhoto" class="tw-mb-4 tw-grid tw-gap-3 md:tw-grid-cols-2">
+              <div v-if="selectedRow.provided_image_url || selectedRow.image_url || selectedRow.providerPhoto" class="tw-mb-4 tw-grid tw-gap-3 md:tw-grid-cols-2">
                 <div class="tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
                   <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Provided enrollment photo</p>
                   <div class="tw-mt-3 tw-flex tw-justify-center">
                     <div class="tw-flex tw-h-44 tw-w-44 tw-items-center tw-justify-center tw-overflow-hidden tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-white">
-                      <img v-if="selectedRow.image_url" :src="selectedRow.image_url" alt="Enrollment passport photo" class="tw-h-full tw-w-full tw-object-cover" />
+                      <img v-if="selectedRow.provided_image_url || selectedRow.image_url" :src="selectedRow.provided_image_url || selectedRow.image_url" alt="Enrollment passport photo" class="tw-h-full tw-w-full tw-object-cover" />
                       <div v-else class="tw-flex tw-flex-col tw-items-center tw-gap-2 tw-text-slate-400">
                         <v-icon size="34">mdi-account-box-outline</v-icon>
                         <span class="tw-text-xs tw-font-medium">No uploaded photo</span>
@@ -740,6 +740,7 @@ const normalizeRow = (row) => {
     fieldSelection: { ...defaultFieldSelection(comparison), ...storedSelection },
     comparison,
     providerData,
+    provided_image_url: row.provided_image_url || row.image_url || '',
     providerPhoto: normalizeProviderPhoto(providerData.photo),
   }
 }

@@ -214,6 +214,39 @@ protected $guarded = ['id'];
         return $this->belongsTo(MobileEnrollmentRecord::class, 'mobile_enrollment_record_id');
     }
 
+    public function providedEnrollmentPhotoUrl(): ?string
+    {
+        $mobilePassport = $this->latestMobilePassportAttachment();
+
+        return $mobilePassport?->file_path ?: $this->image_url;
+    }
+
+    public function latestMobilePassportAttachment(): ?MobileEnrollmentAttachment
+    {
+        if (($this->enrollment_source ?? null) !== 'mobile_officer' || !$this->mobile_enrollment_record_id) {
+            return null;
+        }
+
+        $record = $this->relationLoaded('mobileEnrollmentRecord')
+            ? $this->mobileEnrollmentRecord
+            : $this->mobileEnrollmentRecord()->with('attachments')->first();
+
+        if (!$record) {
+            return null;
+        }
+
+        $attachments = $record->relationLoaded('attachments')
+            ? $record->attachments
+            : $record->attachments()->get();
+
+        return $attachments
+            ->filter(fn ($attachment) => $attachment instanceof MobileEnrollmentAttachment
+                && $attachment->kind === 'passport'
+                && filled($attachment->file_path))
+            ->sortByDesc(fn (MobileEnrollmentAttachment $attachment) => $attachment->created_at?->timestamp ?? $attachment->id)
+            ->first();
+    }
+
     /**
      * Enrollee has a benefactor.
      */

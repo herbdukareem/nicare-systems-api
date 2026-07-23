@@ -50,6 +50,7 @@ class EnrolleeResource extends JsonResource
             'disability' => $this->disability,
             'occupation' => $this->occupation,
             'image_url' => $this->image_url,
+            'provided_image_url' => $this->providedEnrollmentPhotoUrl(),
             'enrollee_type' => new EnrolleeTypeResource($this->whenLoaded('enrolleeType')),
             'type' => $this->whenLoaded('enrolleeType', function() {
                 return $this->enrolleeType->name ?? null;

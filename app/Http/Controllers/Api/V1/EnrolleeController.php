@@ -313,6 +313,7 @@ class EnrolleeController extends BaseController
                 'benefactor', 'enrollmentPhase', 'facility', 'lga', 'ward', 'principal', 'premiumPurchase',
                 'duplicateFlags',
                 'ninVerifiedBy',
+                'mobileEnrollmentRecord.attachments',
             ])
             ->where('status', Enrollee::STATUS_PENDING);
 

@@ -496,6 +496,9 @@ class MobileEnrollmentService
         $verifiedAt = optional($cache->verified_at)->toIso8601String()
             ?: data_get($record->payload, 'nin_verified_at')
             ?: now()->toIso8601String();
+        $comparison = $enrollee
+            ? $this->ninVerificationService->comparisonFor($enrollee, $providerData)
+            : [];
 
         if ($enrollee) {
             $enrollee->forceFill([
@@ -505,6 +508,7 @@ class MobileEnrollmentService
                 'nin_verification_provider' => $providerName,
                 'nin_verification_data' => [
                     'provider_data' => $providerData,
+                    'comparison' => $comparison,
                     'verified_nin' => $providerData['nin'] ?? $enrollee->nin,
                     'source' => 'server_cache_after_mobile_live_verification',
                     'cache_id' => $cache->id,
