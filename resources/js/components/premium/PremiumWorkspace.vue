@@ -143,6 +143,8 @@
           <div><strong>Batch:</strong> {{ pinDetails.batch_code }}</div>
           <div><strong>Plan:</strong> {{ pinDetails.plan?.name }}</div>
           <div><strong>Amount:</strong> {{ pinDetails.amount }}</div>
+          <div><strong>Generated:</strong> {{ formatDateTime(pinDetails.created_at) }}</div>
+          <div><strong>Used:</strong> {{ formatDateTime(pinDetails.used_at) }}</div>
           <div><strong>Expires:</strong> {{ pinDetails.expires_at || 'Calculated after usage' }}</div>
           <div><strong>Used by:</strong> {{ pinDetails.used_by_enrollee?.full_name || pinDetails.used_by_enrollee?.enrollee_id || 'Not used' }}</div>
           <div><strong>Payment:</strong> {{ pinDetails.purchase?.payment_reference || 'N/A' }}</div>
@@ -302,7 +304,7 @@ const headers = computed(() => {
       { title: '', key: 'actions', sortable: false },
     ]
   }
-  if (['inventory', 'generate-pins', 'sell-pin', 'validate-pin'].includes(props.mode)) return [{ title: 'Serial', key: 'serial_number' }, { title: 'Batch', key: 'batch_code' }, { title: 'PIN', key: 'pin' }, { title: 'Amount', key: 'amount' }, { title: 'Status', key: 'status' }, { title: '', key: 'actions', sortable: false }]
+  if (['inventory', 'generate-pins', 'sell-pin', 'validate-pin'].includes(props.mode)) return [{ title: 'Serial', key: 'serial_number' }, { title: 'Batch', key: 'batch_code' }, { title: 'PIN', key: 'pin' }, { title: 'Amount', key: 'amount' }, { title: 'Generated', key: 'created_at_display' }, { title: 'Used', key: 'used_at_display' }, { title: 'Status', key: 'status' }, { title: '', key: 'actions', sortable: false }]
   if (props.mode === 'purchases') return [{ title: 'Payer', key: 'payer_name' }, { title: 'Type', key: 'payer_type' }, { title: 'Amount', key: 'amount' }, { title: 'Status', key: 'payment_status' }, { title: '', key: 'actions', sortable: false }]
   if (props.mode === 'benefactors') return [{ title: 'Name', key: 'name' }, { title: 'Type', key: 'type' }, { title: 'Phone', key: 'phone' }, { title: 'Status', key: 'status' }]
   return [{ title: 'Enrollee', key: 'enrollee.enrollee_id' }, { title: 'Programme', key: 'programme.name' }, { title: 'Facility', key: 'facility.name' }, { title: 'Status', key: 'status' }, { title: '', key: 'actions', sortable: false }]
@@ -315,6 +317,27 @@ const normalizeCollection = (payload) => {
   if (Array.isArray(payload?.data?.data?.data)) return payload.data.data.data
   return []
 }
+
+const formatDateTime = (value) => {
+  if (!value) return 'Not yet'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return value
+
+  return new Intl.DateTimeFormat('en-NG', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+const formatPinRow = (pin) => ({
+  ...pin,
+  created_at_display: formatDateTime(pin.created_at),
+  used_at_display: formatDateTime(pin.used_at),
+})
 
 const fetchOptionalCollection = async (requestFactory, fallback = []) => {
   try {
@@ -344,11 +367,11 @@ const loadAll = async () => {
 
     if (props.mode === 'dashboard') {
       dashboard.value = (await premiumAPI.dashboard()).data.data
-      rows.value = []
+      rows.value = dashboard.value.recent_coverages || []
     } else if (props.mode === 'plans') {
       rows.value = plans.value.map(formatPlanRow)
     } else if (['inventory', 'generate-pins', 'sell-pin', 'validate-pin'].includes(props.mode)) {
-      rows.value = normalizeCollection((await premiumAPI.pins()).data)
+      rows.value = normalizeCollection((await premiumAPI.pins()).data).map(formatPinRow)
     } else if (props.mode === 'purchases') {
       rows.value = normalizeCollection((await premiumAPI.purchases()).data)
     } else if (props.mode === 'benefactors') {
@@ -424,7 +447,7 @@ const openCheckoutWindow = (authorizationUrl) => {
 
 const generatePins = async () => {
   const response = await premiumAPI.generatePins(pinForm.value)
-  generatedPins.value = response.data.data.pins || []
+  generatedPins.value = (response.data.data.pins || []).map(formatPinRow)
   rows.value = generatedPins.value
   selectedPins.value = generatedPins.value.map((pin) => pin.id)
   success(`${generatedPins.value.length} PINs generated`)
