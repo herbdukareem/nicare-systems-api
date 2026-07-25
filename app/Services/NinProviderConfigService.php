@@ -33,6 +33,10 @@ class NinProviderConfigService
             'data_path' => trim((string) Configuration::getValue(self::KEY_PREFIX . 'DATA_PATH', 'data')),
             'field_map' => is_array($fieldMap) ? $this->normalizeFieldMap($fieldMap) : $this->defaultFieldMap(),
             'timeout_seconds' => max(5, (int) Configuration::getNumericValue(self::KEY_PREFIX . 'TIMEOUT_SECONDS', 15)),
+            'public_self_enrollment_enabled' => $this->toBoolean(Configuration::getValue(self::KEY_PREFIX . 'PUBLIC_SELF_ENROLLMENT_ENABLED', 'false')),
+            'public_verification_fee_amount' => round((float) Configuration::getNumericValue(self::KEY_PREFIX . 'PUBLIC_VERIFICATION_FEE_AMOUNT', 0), 2),
+            'public_pin_fee_required' => $this->toBoolean(Configuration::getValue(self::KEY_PREFIX . 'PUBLIC_PIN_FEE_REQUIRED', 'true')),
+            'public_pin_reservation_minutes' => max(5, (int) Configuration::getNumericValue(self::KEY_PREFIX . 'PUBLIC_PIN_RESERVATION_MINUTES', 60)),
         ];
     }
 
@@ -58,8 +62,32 @@ class NinProviderConfigService
         Configuration::setValue(self::KEY_PREFIX . 'DATA_PATH', trim((string) $payload['data_path']), 'Dot path to the provider enrollee payload in the response body.');
         Configuration::setValue(self::KEY_PREFIX . 'FIELD_MAP', json_encode($this->normalizeFieldMap((array) $payload['field_map']), JSON_UNESCAPED_SLASHES), 'Field mapping from provider payload keys to the internal enrollee comparison structure.');
         Configuration::setValue(self::KEY_PREFIX . 'TIMEOUT_SECONDS', (string) max(5, (int) $payload['timeout_seconds']), 'Maximum seconds allowed for NIN verification requests.');
+        Configuration::setValue(self::KEY_PREFIX . 'PUBLIC_SELF_ENROLLMENT_ENABLED', $payload['public_self_enrollment_enabled'] ? 'true' : 'false', 'Whether live NIN verification is enabled for public self-enrollment.');
+        Configuration::setValue(self::KEY_PREFIX . 'PUBLIC_VERIFICATION_FEE_AMOUNT', number_format(max(0, (float) $payload['public_verification_fee_amount']), 2, '.', ''), 'Amount charged for each public self-enrollment NIN verification.');
+        Configuration::setValue(self::KEY_PREFIX . 'PUBLIC_PIN_FEE_REQUIRED', $payload['public_pin_fee_required'] ? 'true' : 'false', 'Whether Premium PIN enrollments must still pay the public NIN verification fee.');
+        Configuration::setValue(self::KEY_PREFIX . 'PUBLIC_PIN_RESERVATION_MINUTES', (string) max(5, (int) $payload['public_pin_reservation_minutes']), 'How long a Premium PIN stays reserved while public NIN-fee payment is pending.');
 
         return $this->getConfig();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function publicEnrollmentConfig(): array
+    {
+        $config = $this->getConfig();
+        $providerConfigured = filled($config['base_url'] ?? null)
+            && filled($config['verify_endpoint'] ?? null)
+            && filled($config['api_key'] ?? null)
+            && (bool) ($config['enabled'] ?? false);
+
+        return [
+            'enabled' => (bool) ($config['public_self_enrollment_enabled'] ?? false) && $providerConfigured,
+            'configured' => $providerConfigured,
+            'fee_amount' => round((float) ($config['public_verification_fee_amount'] ?? 0), 2),
+            'charge_for_premium_pin' => (bool) ($config['public_pin_fee_required'] ?? true),
+            'pin_reservation_minutes' => max(5, (int) ($config['public_pin_reservation_minutes'] ?? 60)),
+        ];
     }
 
     /**

@@ -81,6 +81,8 @@ export const enrolleePortalAPI = {
   me:             () => enrolleeHttp.get('/enroll/me'),
   changePassword: (data) => enrolleeHttp.post('/enroll/change-password', data),
   plans:          () => enrolleeHttp.get('/enroll/plans'),
+  renewPlan:      (data) => enrolleeHttp.post('/enroll/renewals', data),
+  verifyRenewal:  (reference) => enrolleeHttp.get(`/enroll/renewals/${encodeURIComponent(reference)}/verify`),
 };
 
 export const publicEnrollmentAPI = {

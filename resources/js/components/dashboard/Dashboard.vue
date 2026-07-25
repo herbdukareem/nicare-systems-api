@@ -580,9 +580,9 @@
               >
                 <div
                   class="tw-flex tw-h-9 tw-w-9 tw-flex-shrink-0 tw-items-center tw-justify-center tw-rounded-lg tw-mt-0.5"
-                  :class="capStatusClass(period.status_key).bg"
+                  :class="capStatusClass(period.status_key || period.status).bg"
                 >
-                  <v-icon size="17" :color="capStatusClass(period.status_key).icon">{{ capStatusClass(period.status_key).mdi }}</v-icon>
+                  <v-icon size="17" :color="capStatusClass(period.status_key || period.status).icon">{{ capStatusClass(period.status_key || period.status).mdi }}</v-icon>
                 </div>
                 <div class="tw-flex-1 tw-min-w-0">
                   <p class="tw-text-sm tw-font-semibold tw-text-gray-900 tw-truncate">{{ period.name }}</p>
@@ -599,8 +599,8 @@
                 </div>
                 <span
                   class="tw-inline-block tw-rounded-full tw-px-2.5 tw-py-0.5 tw-text-[11px] tw-font-semibold tw-flex-shrink-0 tw-mt-0.5"
-                  :class="capStatusClass(period.status_key).badge"
-                >{{ capStatusLabel(period.status_key) }}</span>
+                  :class="capStatusClass(period.status_key || period.status).badge"
+                >{{ capStatusLabel(period.status_key || period.status) }}</span>
               </div>
             </div>
             <div v-else class="tw-py-10 tw-text-center tw-text-gray-400 tw-text-sm">
@@ -778,12 +778,13 @@ const fmtAmount = (val) => val != null ? Number(val).toLocaleString('en-NG', { m
 const formatCapDate = (value) => value ? new Date(value).toLocaleDateString(undefined, { month: 'short', year: 'numeric' }) : '—'
 
 const CAP_STATUS = {
+  paid:        { bg: 'tw-bg-emerald-100', icon: 'emerald-darken-1', mdi: 'mdi-cash-check', badge: 'tw-bg-emerald-50 tw-text-emerald-700' },
   finalised:   { bg: 'tw-bg-green-100', icon: 'green-darken-1',  mdi: 'mdi-check-decagram',  badge: 'tw-bg-green-50 tw-text-green-700' },
   in_progress: { bg: 'tw-bg-amber-100', icon: 'amber-darken-2',  mdi: 'mdi-progress-clock',  badge: 'tw-bg-amber-50 tw-text-amber-700' },
   generated:   { bg: 'tw-bg-blue-100',  icon: 'blue-darken-1',   mdi: 'mdi-progress-check',  badge: 'tw-bg-blue-50 tw-text-blue-700' },
   draft:       { bg: 'tw-bg-gray-100',  icon: 'grey-darken-1',   mdi: 'mdi-clock-outline',   badge: 'tw-bg-gray-100 tw-text-gray-500' },
 }
-const STATUS_LABELS = { finalised: 'Finalised', in_progress: 'In Progress', generated: 'Generated', draft: 'Draft' }
+const STATUS_LABELS = { paid: 'Paid', finalised: 'Finalised', in_progress: 'In Progress', generated: 'Generated', draft: 'Draft' }
 const capStatusClass = (key) => CAP_STATUS[key] || CAP_STATUS.draft
 const capStatusLabel = (key) => STATUS_LABELS[key] || 'Draft'
 

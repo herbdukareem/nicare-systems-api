@@ -104,6 +104,46 @@
         </AppCard>
       </div>
 
+      <AppCard title="Public Self-Enrollment Charges" icon="mdi-cash-sync" tone="success">
+        <div class="tw-grid tw-gap-4 md:tw-grid-cols-2">
+          <v-switch
+            v-model="form.public_self_enrollment_enabled"
+            color="primary"
+            label="Enable live NIN verification for public self-enrollment"
+            inset
+            hide-details
+            class="md:tw-col-span-2"
+          />
+          <v-text-field
+            v-model.number="form.public_verification_fee_amount"
+            label="Public NIN verification fee"
+            type="number"
+            min="0"
+            step="0.01"
+            prefix="NGN"
+            variant="outlined"
+            density="comfortable"
+          />
+          <v-text-field
+            v-model.number="form.public_pin_reservation_minutes"
+            label="Premium PIN reservation timeout (minutes)"
+            type="number"
+            min="5"
+            max="1440"
+            variant="outlined"
+            density="comfortable"
+          />
+          <v-switch
+            v-model="form.public_pin_fee_required"
+            color="primary"
+            label="Require NIN fee when a Premium PIN is used"
+            inset
+            hide-details
+            class="md:tw-col-span-2"
+          />
+        </div>
+      </AppCard>
+
       <AppCard title="Current Approval Behaviour" icon="mdi-shield-check-outline" tone="warning">
         <div class="tw-grid tw-gap-4 md:tw-grid-cols-3">
           <div class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
@@ -173,6 +213,10 @@ const form = reactive({
   success_path: 'success',
   data_path: 'data',
   timeout_seconds: 15,
+  public_self_enrollment_enabled: false,
+  public_verification_fee_amount: 0,
+  public_pin_fee_required: true,
+  public_pin_reservation_minutes: 60,
   field_map: defaultFieldMap(),
 })
 
@@ -191,6 +235,10 @@ const applyConfig = (config = {}) => {
     success_path: config.success_path ?? 'success',
     data_path: config.data_path ?? 'data',
     timeout_seconds: Number(config.timeout_seconds ?? 15),
+    public_self_enrollment_enabled: !!config.public_self_enrollment_enabled,
+    public_verification_fee_amount: Number(config.public_verification_fee_amount ?? 0),
+    public_pin_fee_required: config.public_pin_fee_required ?? true,
+    public_pin_reservation_minutes: Number(config.public_pin_reservation_minutes ?? 60),
     field_map: { ...defaultFieldMap(), ...(config.field_map || {}) },
   })
 }

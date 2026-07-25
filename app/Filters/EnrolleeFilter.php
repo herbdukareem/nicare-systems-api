@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\DB;
  */
 class EnrolleeFilter
 {
+    private const TABLE = 'enrollees';
+
     /**
      * Apply the given filters to the query.
      *
@@ -29,15 +31,15 @@ class EnrolleeFilter
             switch ($key) {
                 case 'search':
                     $query->where(function($q) use ($value) {
-                        $q->where('first_name', 'like', "%{$value}%")
-                          ->orWhere('last_name', 'like', "%{$value}%")
-                          ->orWhere('middle_name', 'like', "%{$value}%")
-                          ->orWhere('enrollee_id', 'like', "%{$value}%")
-                          ->orWhere('legacy_id', 'like', "%{$value}%")
-                          ->orWhere('legacy_enrollee_id', 'like', "%{$value}%")
-                          ->orWhere('nin', 'like', "%{$value}%")
-                          ->orWhere('phone', 'like', "%{$value}%")
-                          ->orWhere('email', 'like', "%{$value}%");
+                        $q->where(self::TABLE . '.first_name', 'like', "%{$value}%")
+                          ->orWhere(self::TABLE . '.last_name', 'like', "%{$value}%")
+                          ->orWhere(self::TABLE . '.middle_name', 'like', "%{$value}%")
+                          ->orWhere(self::TABLE . '.enrollee_id', 'like', "%{$value}%")
+                          ->orWhere(self::TABLE . '.legacy_id', 'like', "%{$value}%")
+                          ->orWhere(self::TABLE . '.legacy_enrollee_id', 'like', "%{$value}%")
+                          ->orWhere(self::TABLE . '.nin', 'like', "%{$value}%")
+                          ->orWhere(self::TABLE . '.phone', 'like', "%{$value}%")
+                          ->orWhere(self::TABLE . '.email', 'like', "%{$value}%");
                     });
                     break;
                 case 'first_name':
@@ -95,20 +97,20 @@ class EnrolleeFilter
                     }
                     break;
                 case 'nin':
-                    $query->where('nin', 'like', "%{$value}%");
+                    $query->where(self::TABLE . '.nin', 'like', "%{$value}%");
                     break;
                 case 'enrollee_id':
-                    $query->where('enrollee_id', 'like', "%{$value}%");
+                    $query->where(self::TABLE . '.enrollee_id', 'like', "%{$value}%");
                     break;
                 case 'legacy_id':
                     $query->where('legacy_id', $value);
                     break;
                 case 'nin_state':
                     if ($value === 'with_nin') {
-                        $query->whereNotNull('nin')->where('nin', '!=', '');
+                        $query->whereNotNull(self::TABLE . '.nin')->where(self::TABLE . '.nin', '!=', '');
                     } elseif ($value === 'without_nin') {
                         $query->where(function (Builder $ninQuery): void {
-                            $ninQuery->whereNull('nin')->orWhere('nin', '');
+                            $ninQuery->whereNull(self::TABLE . '.nin')->orWhere(self::TABLE . '.nin', '');
                         });
                     }
                     break;
@@ -130,7 +132,7 @@ class EnrolleeFilter
                         if (empty($duplicateNins)) {
                             $query->whereRaw('1 = 0');
                         } else {
-                            $query->whereIn('nin', $duplicateNins);
+                            $query->whereIn(self::TABLE . '.nin', $duplicateNins);
                         }
                     }
                     break;

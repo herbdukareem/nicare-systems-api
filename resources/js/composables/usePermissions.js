@@ -87,9 +87,9 @@ export function usePermissions() {
   const canViewReports = computed(() => hasPermission('reports.view'));
   const canExportReports = computed(() => hasPermission('reports.export'));
 
-  const canManageUsers = computed(() => hasPermission('users.manage'));
-  const canManageRoles = computed(() => hasPermission('roles.manage'));
-  const canManagePermissions = computed(() => hasPermission('permissions.manage'));
+  const canManageUsers = computed(() => hasAnyPermission(['users.view', 'users.create', 'users.edit', 'users.delete']));
+  const canManageRoles = computed(() => hasAnyPermission(['roles.view', 'roles.create', 'roles.edit', 'roles.delete']));
+  const canManagePermissions = computed(() => hasAnyPermission(['permissions.view', 'permissions.create', 'permissions.edit', 'permissions.delete']));
 
   // Role-based computed properties (for backward compatibility)
   const isFacilityRole = computed(() => {

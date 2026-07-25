@@ -740,6 +740,15 @@ class NinVerificationService
         return $comparison;
     }
 
+    /**
+     * @param  array<string, mixed>  $providerData
+     * @return array<int, array<string, mixed>>
+     */
+    public function comparisonFor(Enrollee $enrollee, array $providerData): array
+    {
+        return $this->buildComparison($enrollee, $providerData);
+    }
+
     private function valuesMatch(mixed $provided, mixed $verified): bool
     {
         if ($provided === null && $verified === null) {
@@ -754,6 +763,7 @@ class NinVerificationService
         return match ($field) {
             'gender' => $this->genderLabel($enrollee->sex),
             'date_of_birth' => optional($enrollee->date_of_birth)->toDateString(),
+            'photo' => $enrollee->providedEnrollmentPhotoUrl(),
             default => $enrollee->{$field},
         };
     }

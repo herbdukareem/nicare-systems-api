@@ -18,6 +18,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Request as FacadeRequest;
 use Illuminate\Validation\Rule;
 use Maatwebsite\Excel\Facades\Excel;
@@ -77,6 +78,19 @@ class EnrolleeController extends Controller
             } else {
                 $query->where('enrollee_type_id', $enrolleeTypeIds);
             }
+        }
+
+        if ($request->filled('enrollee_id')) {
+            $enrolleeId = (string) $request->enrollee_id;
+            $query->where(function ($q) use ($enrolleeId) {
+                $q->where('enrollee_id', 'like', "%{$enrolleeId}%")
+                    ->orWhere('legacy_id', 'like', "%{$enrolleeId}%")
+                    ->orWhere('legacy_enrollee_id', 'like', "%{$enrolleeId}%");
+            });
+        }
+
+        if ($request->filled('nin')) {
+            $query->where('nin', 'like', '%' . $request->nin . '%');
         }
 
         if ($request->has('gender')) {
@@ -203,7 +217,7 @@ class EnrolleeController extends Controller
 
         DB::beginTransaction();
         try {
-            $enrolleeData = $validator->validated();
+            $enrolleeData = $this->applyPremiumPlanAssignments($validator->validated());
             $enrolleeData['created_by'] = auth()->id();
             $enrolleeData['status'] = Enrollee::STATUS_PENDING;
 
@@ -296,7 +310,7 @@ class EnrolleeController extends Controller
         }
 
         $oldValues = $enrollee->toArray();
-        $enrollee->update($validator->validated());
+        $enrollee->update($this->applyPremiumPlanAssignments($validator->validated()));
 
         // Create audit trail
         AuditTrail::create([
@@ -312,6 +326,36 @@ class EnrolleeController extends Controller
             'success' => true,
             'message' => 'Enrollee updated successfully',
             'data' => $enrollee->fresh()->load(['insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage', 'facility', 'lga', 'ward']),
+        ]);
+    }
+
+    public function resetPassword(Request $request, Enrollee $enrollee): JsonResponse
+    {
+        $validated = $request->validate([
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $enrollee->forceFill([
+            'password' => Hash::make($validated['password']),
+        ])->save();
+
+        $enrollee->tokens()->delete();
+
+        AuditTrail::create([
+            'auditable_type' => Enrollee::class,
+            'auditable_id' => $enrollee->id,
+            'enrollee_id' => $enrollee->id,
+            'action' => 'password_reset',
+            'description' => 'Enrollee portal password reset by authorized staff',
+            'user_id' => auth()->id(),
+            'old_values' => json_encode(['password' => 'hidden']),
+            'new_values' => json_encode(['password' => 'hidden']),
+            'ip_address' => FacadeRequest::ip(),
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Enrollee portal password reset successfully.',
         ]);
     }
 
@@ -680,6 +724,25 @@ class EnrolleeController extends Controller
         if ($dependantCount >= $plan->getEffectiveMaximumDependants()) {
             $validator->errors()->add('principal_enrollee_id', 'The selected principal has reached the dependant limit for this plan.');
         }
+    }
+
+    private function applyPremiumPlanAssignments(array $data): array
+    {
+        $planId = $data['premium_plan_id'] ?? null;
+        if (!$planId) {
+            return $data;
+        }
+
+        $plan = PremiumPlan::find($planId);
+        if (!$plan) {
+            return $data;
+        }
+
+        $data['insurance_programme_id'] = $plan->insurance_programme_id;
+        $data['benefit_package_id'] = $plan->benefit_package_id;
+        $data['funding_type_id'] = $plan->funding_type_id;
+
+        return $data;
     }
 
     private function hasSatisfiedRequiredPayment(Enrollee $enrollee): bool

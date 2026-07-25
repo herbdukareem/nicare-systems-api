@@ -32,6 +32,10 @@ class UpdateEnrolleeRequest extends FormRequest
             };
         }
 
+        if (array_key_exists('occupation', $data)) {
+            $data['occupation'] = Enrollee::normalizeOccupation($data['occupation']);
+        }
+
         if (($data['relationship_to_principal'] ?? null) == 1) {
             $data['principal_enrollee_id'] = null;
         }

@@ -758,60 +758,57 @@ class DashboardController extends Controller
         $lastM  = $now->copy()->subMonth()->month;
         $lastY  = $now->copy()->subMonth()->year;
 
-        // Total paid across all capitation payments (status = 1 means paid)
-        $totalPaid = (float) DB::table('capitation_payments')
-            ->where('status', 1)
-            ->sum('amount');
-
-        // Last month: sum of generated capitation detail amounts
-        $lastMonthGenerated = (float) DB::table('capitation_details')
-            ->join('capitations', 'capitation_details.capitation_id', '=', 'capitations.id')
-            ->where('capitations.capitation_month', $lastM)
-            ->where('capitations.year', $lastY)
-            ->whereNull('capitations.deleted_at')
-            ->sum('capitation_details.total_amount');
-
-        // Last month: sum of paid amounts
-        $lastMonthPaid = (float) DB::table('capitation_payments')
-            ->join('capitations', 'capitation_payments.capitation_id', '=', 'capitations.id')
-            ->where('capitations.capitation_month', $lastM)
-            ->where('capitations.year', $lastY)
-            ->where('capitation_payments.status', 1)
-            ->whereNull('capitations.deleted_at')
-            ->sum('capitation_payments.amount');
-
-        // This month: generated
-        $thisMonthGenerated = (float) DB::table('capitation_details')
-            ->join('capitations', 'capitation_details.capitation_id', '=', 'capitations.id')
-            ->where('capitations.capitation_month', $thisM)
-            ->where('capitations.year', $thisY)
-            ->whereNull('capitations.deleted_at')
-            ->sum('capitation_details.total_amount');
-
-        // Latest 5 capitation periods with financial aggregates
-        $latestPeriods = Capitation::query()
+        $periods = Capitation::query()
             ->select([
                 'capitations.*',
                 DB::raw('(SELECT COUNT(DISTINCT facility_id) FROM capitation_details WHERE capitation_id = capitations.id) AS facilities_count'),
                 DB::raw('(SELECT COALESCE(SUM(total_amount), 0) FROM capitation_details WHERE capitation_id = capitations.id) AS amount_generated'),
-                DB::raw('(SELECT COALESCE(SUM(amount), 0) FROM capitation_payments WHERE capitation_id = capitations.id AND status = 1) AS amount_paid'),
+                DB::raw(
+                    '(CASE
+                        WHEN EXISTS(SELECT 1 FROM capitation_payments WHERE capitation_id = capitations.id AND status = 1)
+                            THEN (SELECT COALESCE(SUM(amount), 0) FROM capitation_payments WHERE capitation_id = capitations.id AND status = 1)
+                        ELSE (SELECT COALESCE(SUM(total_amount), 0) FROM capitation_details WHERE capitation_id = capitations.id AND (capitation_payment_id IS NOT NULL OR paid_at IS NOT NULL OR status = 4))
+                    END) AS amount_paid'
+                ),
             ])
+            ->whereNull('capitations.deleted_at')
+            ->orderByDesc('capitations.year')
+            ->orderByDesc('capitations.capitation_month')
             ->orderBy('id', 'desc')
-            ->limit(5)
             ->get()
-            ->map(function (Capitation $p) {
-                $paid      = (float) $p->amount_paid;
-                $generated = (float) $p->amount_generated;
+            ->map(function (Capitation $period): Capitation {
+                $period->facilities_count = (int) ($period->facilities_count ?? 0);
+                $period->amount_generated = (float) ($period->amount_generated ?? 0);
+                $period->amount_paid = (float) ($period->amount_paid ?? 0);
 
-                if ($p->status) {
-                    $status = 'finalised';
-                } elseif ($paid > 0) {
-                    $status = 'in_progress';
-                } elseif ($p->computed_at) {
-                    $status = 'generated';
-                } else {
-                    $status = 'draft';
-                }
+                return $period;
+            });
+
+        $totalPaid = (float) $periods->sum('amount_paid');
+
+        $lastMonthPeriods = $periods->filter(
+            fn (Capitation $period): bool => (int) $period->capitation_month === $lastM && (int) $period->year === $lastY
+        );
+        $thisMonthPeriods = $periods->filter(
+            fn (Capitation $period): bool => (int) $period->capitation_month === $thisM && (int) $period->year === $thisY
+        );
+
+        $lastMonthGenerated = (float) $lastMonthPeriods->sum('amount_generated');
+        $lastMonthPaid = (float) $lastMonthPeriods->sum('amount_paid');
+        $thisMonthGenerated = (float) $thisMonthPeriods->sum('amount_generated');
+
+        $latestPeriods = $periods
+            ->filter(fn (Capitation $period): bool => $period->amount_generated > 0 || $period->amount_paid > 0 || $period->facilities_count > 0)
+            ->take(5);
+
+        if ($latestPeriods->isEmpty()) {
+            $latestPeriods = $periods->take(5);
+        }
+
+        $latestPeriods = $latestPeriods->values()->map(function (Capitation $p): array {
+                $paid = (float) $p->amount_paid;
+                $generated = (float) $p->amount_generated;
+                $statusKey = $this->capitationDashboardStatusKey($p, $paid, $generated);
 
                 return [
                     'id'                => $p->id,
@@ -823,7 +820,8 @@ class DashboardController extends Controller
                     'facilities_count'  => (int) $p->facilities_count,
                     'amount_generated'  => $generated,
                     'amount_paid'       => $paid,
-                    'status'            => $status,
+                    'status'            => $statusKey,
+                    'status_key'        => $statusKey,
                     'computed_at'       => $p->computed_at,
                     'finalised_at'      => $p->finalised_at,
                 ];
@@ -848,6 +846,27 @@ class DashboardController extends Controller
                 'latest_periods' => $latestPeriods,
             ],
         ]);
+    }
+
+    private function capitationDashboardStatusKey(Capitation $period, float $paid, float $generated): string
+    {
+        if ($paid > 0 && $generated > 0 && $paid >= $generated) {
+            return 'paid';
+        }
+
+        if ($paid > 0) {
+            return 'in_progress';
+        }
+
+        if ($period->status) {
+            return 'finalised';
+        }
+
+        if ($generated > 0 || $period->computed_at) {
+            return 'generated';
+        }
+
+        return 'draft';
     }
 
     private function invoiceSummary(): array
