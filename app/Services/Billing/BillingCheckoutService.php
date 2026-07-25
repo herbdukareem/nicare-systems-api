@@ -42,6 +42,33 @@ class BillingCheckoutService
         ], $configuration);
     }
 
+    public function initializePublicEnrollmentCheckout(PremiumPlan $plan, array $payer, string $reference): array
+    {
+        $gatewayCode = $plan->payment_gateway ?: $this->configurationService->getActiveGatewayCode();
+        $configuration = $this->configurationService->getConfig($gatewayCode);
+
+        if (!in_array($gatewayCode, ['paystack'], true)) {
+            throw new RuntimeException('The selected plan is not linked to a supported online checkout gateway yet.');
+        }
+
+        if (!$this->configurationService->isGatewayEnabled($gatewayCode)) {
+            throw new RuntimeException("The configured {$gatewayCode} gateway is not enabled for online checkout.");
+        }
+
+        $callbackBase = rtrim(config('app.url'), '/');
+        $callbackPath = (string) ($configuration['callback_path'] ?? '/enroll/start?checkout_return=1');
+        $separator = str_contains($callbackPath, '?') ? '&' : '?';
+        $callbackUrl = "{$callbackBase}{$callbackPath}{$separator}payment_reference={$reference}";
+
+        return $this->gatewayManager->gateway($gatewayCode)->initializeCheckout([
+            'email' => $payer['email'],
+            'amount' => (float) ($payer['amount'] ?? $plan->amount),
+            'reference' => $reference,
+            'callback_url' => $callbackUrl,
+            'metadata' => Arr::get($payer, 'metadata', []),
+        ], $configuration);
+    }
+
     public function initializePurchaseCheckout(PremiumPurchase $purchase, ?string $callbackPath = null): array
     {
         $plan = $purchase->plan()->firstOrFail();

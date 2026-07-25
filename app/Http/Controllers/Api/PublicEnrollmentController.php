@@ -11,6 +11,7 @@ use App\Models\InsuranceProgramme;
 use App\Models\Lga;
 use App\Models\PremiumPlan;
 use App\Models\Ward;
+use App\Services\NinProviderConfigService;
 use App\Services\Billing\PaymentGatewayConfigurationService;
 use App\Services\PublicEnrollmentService;
 use Illuminate\Http\Request;
@@ -20,7 +21,10 @@ use RuntimeException;
 
 class PublicEnrollmentController extends BaseController
 {
-    public function __construct(private PaymentGatewayConfigurationService $paymentGatewayConfigurationService)
+    public function __construct(
+        private PaymentGatewayConfigurationService $paymentGatewayConfigurationService,
+        private NinProviderConfigService $ninProviderConfigService
+    )
     {
     }
 
@@ -53,6 +57,7 @@ class PublicEnrollmentController extends BaseController
             'premium_plans' => PremiumPlanResource::collection($plans),
             'payment_gateways' => $this->paymentGatewayConfigurationService->availableGatewayOptions(),
             'active_payment_gateway' => $this->paymentGatewayConfigurationService->getActiveGatewayCode(),
+            'nin_verification' => $this->ninProviderConfigService->publicEnrollmentConfig(),
             'lgas' => Lga::orderBy('name')->get(),
             'wards' => Ward::query()
                 ->when($lgaId, fn ($query) => $query->where('lga_id', $lgaId))
@@ -103,6 +108,8 @@ class PublicEnrollmentController extends BaseController
             'requires_payment' => $result['requires_payment'],
             'enrollment_method' => $result['enrollment_method'],
             'payment_checkout' => $result['payment_checkout'] ?? null,
+            'payment_breakdown' => $result['payment_breakdown'] ?? null,
+            'nin_verification' => $result['nin_verification'] ?? null,
             'next_steps' => $result['next_steps'],
         ], 'Self-enrollment application submitted successfully.', 201);
     }

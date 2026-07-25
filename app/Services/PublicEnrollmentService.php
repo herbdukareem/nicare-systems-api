@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\Enrollee;
 use App\Models\Facility;
+use App\Models\PremiumPin;
 use App\Models\PremiumPlan;
 use App\Models\PremiumPurchase;
+use App\Models\User;
 use App\Services\Billing\BillingCheckoutService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
@@ -19,13 +21,20 @@ class PublicEnrollmentService
     public function __construct(
         private PremiumCoverageService $premiumCoverageService,
         private BillingCheckoutService $billingCheckoutService,
-        private SystemAuditUserResolver $systemAuditUserResolver
+        private SystemAuditUserResolver $systemAuditUserResolver,
+        private NinProviderConfigService $ninProviderConfigService,
+        private NinVerificationService $ninVerificationService
     ) {
     }
 
+    /**
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     public function submitApplication(array $data): array
     {
         $plan = PremiumPlan::with(['programme', 'benefitPackage', 'fundingType'])->findOrFail($data['premium_plan_id']);
+        $ninPolicy = $this->ninProviderConfigService->publicEnrollmentConfig();
         $enrollmentMethod = $data['enrollment_method'] ?? 'online_payment';
         $pin = null;
 
@@ -51,26 +60,43 @@ class PublicEnrollmentService
             throw new RuntimeException('The selected facility does not belong to the selected ward.');
         }
 
-        $requiresHostedPayment = $enrollmentMethod !== 'premium_pin' && $plan->requiresPayment();
+        $requiresPublicNinVerification = $ninPolicy['enabled'] && filled($data['nin'] ?? null);
+        $planAmountDue = $enrollmentMethod === 'premium_pin'
+            ? 0.0
+            : ($plan->requiresPayment() ? (float) $plan->amount : 0.0);
+        $ninVerificationFee = $requiresPublicNinVerification
+            && ($enrollmentMethod !== 'premium_pin' || (bool) $ninPolicy['charge_for_premium_pin'])
+            ? round((float) $ninPolicy['fee_amount'], 2)
+            : 0.0;
+        $totalDue = round($planAmountDue + $ninVerificationFee, 2);
+        $requiresHostedPayment = $totalDue > 0;
 
         if ($requiresHostedPayment && blank($data['email'] ?? null)) {
-            throw new RuntimeException('Email address is required for plans that use secure online payment.');
+            throw new RuntimeException('Email address is required before checkout can continue for this enrollment.');
         }
 
         $paymentReference = $requiresHostedPayment
             ? (($data['payment_reference'] ?? null) ?: $this->generatedPaymentReference())
             : null;
         $passportPath = $this->storePassport($data['passport'] ?? null);
+        $paymentBreakdown = [
+            'plan_amount' => round($planAmountDue, 2),
+            'nin_verification_fee' => round($ninVerificationFee, 2),
+            'total_amount' => round($totalDue, 2),
+        ];
 
         $paymentCheckout = null;
 
         if ($requiresHostedPayment) {
-            $paymentCheckout = $this->billingCheckoutService->initializePremiumEnrollmentPlanCheckout(
+            $paymentCheckout = $this->billingCheckoutService->initializePublicEnrollmentCheckout(
                 $plan,
                 [
                     'email' => $data['email'],
+                    'amount' => $totalDue,
                     'metadata' => [
                         'channel' => 'self_service_enrollment',
+                        'payment_breakdown' => $paymentBreakdown,
+                        'enrollment_method' => $enrollmentMethod,
                         'lga_id' => $data['lga_id'],
                         'ward_id' => $data['ward_id'],
                         'facility_id' => $data['facility_id'],
@@ -80,8 +106,30 @@ class PublicEnrollmentService
             );
         }
 
-        $result = DB::transaction(function () use ($data, $plan, $pin, $enrollmentMethod, $requiresHostedPayment, $paymentReference, $paymentCheckout, $passportPath) {
+        $result = DB::transaction(function () use (
+            $data,
+            $plan,
+            $pin,
+            $ninPolicy,
+            $enrollmentMethod,
+            $requiresHostedPayment,
+            $requiresPublicNinVerification,
+            $paymentReference,
+            $paymentCheckout,
+            $passportPath,
+            $paymentBreakdown
+        ) {
             $purchase = null;
+            $purchaseDetails = [
+                'channel' => 'self_service_enrollment',
+                'enrollment_method' => $enrollmentMethod,
+                'payment_purpose' => $this->paymentPurpose($enrollmentMethod, $paymentBreakdown),
+                'requires_public_nin_verification' => $requiresPublicNinVerification,
+                'payment_breakdown' => $paymentBreakdown,
+                'facility_id' => $data['facility_id'],
+                'lga_id' => $data['lga_id'],
+                'ward_id' => $data['ward_id'],
+            ];
 
             if ($requiresHostedPayment) {
                 $purchase = $this->premiumCoverageService->createPurchase([
@@ -90,12 +138,7 @@ class PublicEnrollmentService
                     'payer_name' => trim($data['first_name'] . ' ' . $data['last_name']),
                     'payer_phone' => $data['phone'] ?? null,
                     'payer_email' => $data['email'] ?? null,
-                    'payer_details' => [
-                        'channel' => 'self_service_enrollment',
-                        'facility_id' => $data['facility_id'],
-                        'lga_id' => $data['lga_id'],
-                        'ward_id' => $data['ward_id'],
-                    ],
+                    'payer_details' => $purchaseDetails,
                     'payment_method' => 'online_payment',
                     'payment_status' => 'pending',
                     'payment_reference' => $paymentReference,
@@ -105,7 +148,7 @@ class PublicEnrollmentService
                     'gateway_access_code' => $paymentCheckout['access_code'] ?? null,
                     'gateway_response' => $paymentCheckout['raw_response'] ?? null,
                     'quantity' => 1,
-                    'amount' => $plan->amount,
+                    'amount' => $paymentBreakdown['total_amount'],
                     'sold_by' => null,
                 ]);
             }
@@ -141,37 +184,122 @@ class PublicEnrollmentService
                     : Enrollee::NIN_VERIFICATION_NOT_STARTED,
             ]);
 
-            if ($pin) {
+            if ($purchase) {
+                $purchaseDetails['enrollee_id'] = $enrollee->id;
+                $purchaseDetails['enrollee_identifier'] = $enrollee->enrollee_id;
+            }
+
+            if ($pin && $requiresHostedPayment && $paymentBreakdown['nin_verification_fee'] > 0) {
+                $reservedPin = $this->premiumCoverageService->reservePinForPendingEnrollment(
+                    $pin,
+                    $enrollee,
+                    $plan,
+                    (int) $ninPolicy['pin_reservation_minutes']
+                );
+
+                $purchaseDetails['reserved_premium_pin_id'] = $reservedPin->id;
+                $purchaseDetails['reserved_premium_pin_serial'] = $reservedPin->serial_number;
+            } elseif ($pin) {
                 $enrollee = $this->premiumCoverageService->usePinForPendingEnrollment($pin, $enrollee, $plan);
             }
 
+            if ($purchase) {
+                $purchase->update(['payer_details' => $purchaseDetails]);
+                $purchase = $purchase->fresh(['plan']);
+            }
+
+            $ninVerification = null;
+
+            if (!$requiresHostedPayment && $requiresPublicNinVerification) {
+                $ninVerification = $this->attemptPublicNinVerification($enrollee);
+            }
+
+            $enrollee = $enrollee->fresh(['premiumPlan', 'premiumPin', 'premiumPurchase', 'benefitPackage', 'fundingType', 'facility', 'lga', 'ward', 'insuranceProgramme']);
+
             return [
-                'enrollee' => $enrollee->load(['premiumPlan', 'premiumPin', 'premiumPurchase', 'benefitPackage', 'fundingType', 'facility', 'lga', 'ward', 'insuranceProgramme']),
-                'purchase' => $purchase?->load(['plan']),
+                'enrollee' => $enrollee,
+                'purchase' => $purchase,
                 'requires_payment' => $requiresHostedPayment,
                 'enrollment_method' => $enrollmentMethod,
                 'payment_checkout' => $paymentCheckout,
-                'next_steps' => $requiresHostedPayment
-                    ? [
-                        'Complete the secure online payment using the launched checkout page.',
-                        'Your application will remain pending until payment is confirmed and an approval officer verifies your NIN.',
-                        'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
-                    ]
-                    : ($enrollmentMethod === 'premium_pin'
-                        ? [
-                            'Your Premium PIN has been accepted and cannot be used again.',
-                            'Your application will remain pending until an approval officer verifies your NIN.',
-                            'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
-                        ]
-                    : [
-                        'Your application has been submitted for approval.',
-                        'An approval officer will verify your NIN before activating your coverage.',
-                        'Use your enrollee ID after approval to access the enrollee portal with the password you created.',
-                    ]),
+                'payment_breakdown' => $paymentBreakdown,
+                'nin_verification' => $ninVerification,
+                'next_steps' => $this->buildNextSteps(
+                    $requiresHostedPayment,
+                    $enrollmentMethod,
+                    $paymentBreakdown,
+                    $requiresPublicNinVerification,
+                    $ninVerification
+                ),
             ];
         });
 
         return $result;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function finalizePaymentVerification(PremiumPurchase $purchase): array
+    {
+        if (data_get($purchase->payer_details, 'channel') !== 'self_service_enrollment') {
+            return [];
+        }
+
+        $enrollee = Enrollee::with(['premiumPlan', 'premiumPin', 'premiumPurchase', 'benefitPackage', 'fundingType', 'facility', 'lga', 'ward', 'insuranceProgramme'])
+            ->where('premium_purchase_id', $purchase->id)
+            ->first();
+
+        if (!$enrollee && data_get($purchase->payer_details, 'enrollee_id')) {
+            $enrollee = Enrollee::with(['premiumPlan', 'premiumPin', 'premiumPurchase', 'benefitPackage', 'fundingType', 'facility', 'lga', 'ward', 'insuranceProgramme'])
+                ->find(data_get($purchase->payer_details, 'enrollee_id'));
+        }
+
+        if (!$enrollee) {
+            return [];
+        }
+
+        $warnings = [];
+        $ninVerification = null;
+        $pinApplied = blank(data_get($purchase->payer_details, 'reserved_premium_pin_id'));
+
+        if ($purchase->payment_status === 'confirmed') {
+            $reservedPinId = data_get($purchase->payer_details, 'reserved_premium_pin_id');
+
+            if ($reservedPinId && !$enrollee->premium_pin_id) {
+                try {
+                    $pin = PremiumPin::query()->findOrFail($reservedPinId);
+                    $plan = $purchase->plan()->firstOrFail();
+                    $enrollee = $this->premiumCoverageService->useReservedPinForPendingEnrollment($pin, $enrollee, $plan);
+                    $pinApplied = true;
+                } catch (\Throwable $exception) {
+                    $warnings[] = $exception->getMessage();
+                }
+            }
+
+            if ($this->ninProviderConfigService->publicEnrollmentConfig()['enabled'] && filled($enrollee->nin)) {
+                $ninVerification = $this->attemptPublicNinVerification($enrollee);
+
+                if (($ninVerification['message'] ?? null) && !($ninVerification['verified'] ?? false)) {
+                    $warnings[] = (string) $ninVerification['message'];
+                }
+            }
+        }
+
+        $enrollee = $enrollee->fresh(['premiumPlan', 'premiumPin', 'premiumPurchase', 'benefitPackage', 'fundingType', 'facility', 'lga', 'ward', 'insuranceProgramme']);
+
+        return [
+            'enrollee' => $enrollee,
+            'nin_verification' => $ninVerification,
+            'pin_applied' => $pinApplied,
+            'payment_breakdown' => data_get($purchase->payer_details, 'payment_breakdown', [
+                'plan_amount' => round((float) $purchase->amount, 2),
+                'nin_verification_fee' => 0.0,
+                'total_amount' => round((float) $purchase->amount, 2),
+            ]),
+            'warnings' => $warnings,
+            'next_steps' => $this->buildVerificationNextSteps($purchase, $enrollee, $ninVerification, $warnings),
+        ];
     }
 
     private function storePassport(mixed $passport): ?string
@@ -202,5 +330,146 @@ class PublicEnrollmentService
         }
 
         return $this->systemAuditUserResolver->resolveId();
+    }
+
+    private function systemAuditUser(): User
+    {
+        return User::query()->findOrFail($this->systemAuditUserResolver->resolveId());
+    }
+
+    /**
+     * @param  array<string, mixed>  $paymentBreakdown
+     */
+    private function paymentPurpose(string $enrollmentMethod, array $paymentBreakdown): string
+    {
+        $planAmount = (float) ($paymentBreakdown['plan_amount'] ?? 0);
+        $ninFee = (float) ($paymentBreakdown['nin_verification_fee'] ?? 0);
+
+        if ($enrollmentMethod === 'premium_pin') {
+            return 'nin_verification_fee';
+        }
+
+        if ($planAmount > 0 && $ninFee > 0) {
+            return 'plan_and_nin_verification';
+        }
+
+        if ($ninFee > 0) {
+            return 'nin_verification_fee';
+        }
+
+        return 'plan_only';
+    }
+
+    private function attemptPublicNinVerification(Enrollee $enrollee): ?array
+    {
+        if (blank($enrollee->nin)) {
+            return null;
+        }
+
+        try {
+            $result = $this->ninVerificationService->verify($enrollee->fresh(), $this->systemAuditUser());
+
+            return [
+                'status' => $result['status'] ?? Enrollee::NIN_VERIFICATION_VERIFIED,
+                'verified' => ($result['status'] ?? null) === Enrollee::NIN_VERIFICATION_VERIFIED,
+                'provider_name' => $result['provider_name'] ?? null,
+                'verified_at' => $result['verified_at'] ?? null,
+                'cached' => (bool) ($result['cached'] ?? false),
+                'comparison' => $result['comparison'] ?? null,
+            ];
+        } catch (RuntimeException $exception) {
+            $fresh = $enrollee->fresh();
+
+            return [
+                'status' => $fresh->nin_verification_status ?: Enrollee::NIN_VERIFICATION_FAILED,
+                'verified' => false,
+                'provider_name' => $fresh->nin_verification_provider,
+                'verified_at' => $fresh->nin_verified_at,
+                'message' => $exception->getMessage(),
+            ];
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $paymentBreakdown
+     * @param  array<string, mixed>|null  $ninVerification
+     * @return array<int, string>
+     */
+    private function buildNextSteps(
+        bool $requiresHostedPayment,
+        string $enrollmentMethod,
+        array $paymentBreakdown,
+        bool $requiresPublicNinVerification,
+        ?array $ninVerification
+    ): array {
+        if ($requiresHostedPayment) {
+            $steps = [
+                'Complete the secure online payment using the launched checkout page.',
+            ];
+
+            if (($paymentBreakdown['nin_verification_fee'] ?? 0) > 0) {
+                $steps[] = 'Once payment is confirmed, the system will run your live NIN verification automatically and attach the result to this enrollment.';
+            }
+
+            $steps[] = 'Your application will remain pending until payment is confirmed and enrollment review is completed.';
+            $steps[] = 'Use your enrollee ID after approval to access the enrollee portal with the password you created.';
+
+            return $steps;
+        }
+
+        $steps = [];
+
+        if ($enrollmentMethod === 'premium_pin') {
+            $steps[] = 'Your Premium PIN has been accepted and cannot be used again.';
+        }
+
+        if ($requiresPublicNinVerification && ($ninVerification['verified'] ?? false)) {
+            $steps[] = 'Your NIN was verified successfully during submission.';
+        } elseif ($requiresPublicNinVerification) {
+            $steps[] = $ninVerification['message'] ?? 'Your NIN verification could not be completed automatically. An enrollment officer can review and retry it.';
+        } else {
+            $steps[] = 'Your application has been submitted for approval.';
+        }
+
+        $steps[] = 'Use your enrollee ID after approval to access the enrollee portal with the password you created.';
+
+        return $steps;
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $ninVerification
+     * @param  array<int, string>  $warnings
+     * @return array<int, string>
+     */
+    private function buildVerificationNextSteps(
+        PremiumPurchase $purchase,
+        Enrollee $enrollee,
+        ?array $ninVerification,
+        array $warnings
+    ): array {
+        if ($purchase->payment_status !== 'confirmed') {
+            return [
+                'Complete the pending payment, then return here to verify the transaction.',
+                'Your enrollment application will remain pending until payment is confirmed.',
+            ];
+        }
+
+        $steps = [
+            'Payment has been confirmed for this enrollment.',
+        ];
+
+        if (($ninVerification['verified'] ?? false) === true) {
+            $steps[] = 'Live NIN verification has been completed and attached to the enrollment review record.';
+        } elseif (filled($enrollee->nin)) {
+            $steps[] = $ninVerification['message'] ?? 'Live NIN verification still needs review or retry.';
+        }
+
+        if ($warnings !== []) {
+            $steps[] = 'One or more follow-up checks still need staff attention before approval.';
+        }
+
+        $steps[] = 'An enrollment officer will complete approval before coverage becomes active.';
+
+        return $steps;
     }
 }

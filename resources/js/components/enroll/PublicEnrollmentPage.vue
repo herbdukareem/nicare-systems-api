@@ -114,7 +114,9 @@
           <section class="enroll__panel">
             <header class="enroll__panel-head">
               <h2 class="enroll__panel-title">2. Your Details</h2>
-              <span class="enroll__panel-note">Matched against your NIN during approval</span>
+              <span class="enroll__panel-note">
+                {{ publicNinVerificationEnabled ? 'Live NIN verification runs automatically after payment confirmation.' : 'Matched against your NIN during approval' }}
+              </span>
             </header>
 
             <v-form @submit.prevent="submitApplication">
@@ -201,11 +203,11 @@
                 />
               </div>
 
-              <div v-if="selectedPlan?.payment_required" class="tw-mt-4 tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
+              <div v-if="showEnrollmentMethodSelector" class="tw-mt-4 tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
                 <h3 class="tw-text-sm tw-font-semibold tw-text-slate-900">How would you like to enroll?</h3>
                 <v-radio-group v-model="form.enrollment_method" inline hide-details class="tw-mt-2">
                   <v-radio label="Enroll and pay online" value="online_payment" />
-                  <v-radio label="Use a Premium PIN" value="premium_pin" />
+                  <v-radio v-if="selectedPlan?.payment_required" label="Use a Premium PIN" value="premium_pin" />
                 </v-radio-group>
                 <v-text-field
                   v-if="form.enrollment_method === 'premium_pin'"
@@ -221,11 +223,19 @@
               </div>
 
               <AppAlert
-                v-if="selectedPlan?.payment_required && form.enrollment_method !== 'premium_pin'"
+                v-if="requiresCheckoutFlow && form.enrollment_method !== 'premium_pin'"
                 class="tw-mt-3"
                 tone="info"
                 title="Secure online payment"
                 :message="paymentInstruction"
+              />
+
+              <AppAlert
+                v-if="publicNinVerificationEnabled && ninVerificationFeeAmount > 0"
+                class="tw-mt-3"
+                tone="warning"
+                title="NIN verification fee applies"
+                :message="ninFeeNotice"
               />
 
               <div class="tw-mt-4 tw-flex tw-flex-wrap tw-gap-2">
@@ -256,6 +266,8 @@
               <div><dt>Plan</dt><dd>{{ selectedPlan.name }}</dd></div>
               <div><dt>Programme</dt><dd>{{ selectedPlan.programme?.name || 'N/A' }}</dd></div>
               <div><dt>Premium</dt><dd><MoneyDisplay :value="selectedPlan.amount" currency="NGN" size="sm" /></dd></div>
+              <div v-if="appliesNinFee"><dt>NIN verification fee</dt><dd><MoneyDisplay :value="ninVerificationFeeAmount" currency="NGN" size="sm" /></dd></div>
+              <div v-if="selectedPlan.payment_required || appliesNinFee"><dt>Total payable</dt><dd><MoneyDisplay :value="totalPayableAmount" currency="NGN" size="sm" /></dd></div>
               <div><dt>Coverage</dt><dd>{{ selectedPlan.has_no_expiry ? 'No expiry' : `${selectedPlan.duration_days || 0} days` }}</dd></div>
               <div><dt>Waiting period</dt><dd>{{ selectedPlan.waiting_period_days || 0 }} days</dd></div>
               <div><dt>Enrollment type</dt><dd>{{ selectedPlan.is_family_plan ? 'Family plan' : 'Principal only' }}</dd></div>
@@ -366,6 +378,13 @@ const metadata = ref({
   premium_plans: [],
   payment_gateways: [],
   active_payment_gateway: null,
+  nin_verification: {
+    enabled: false,
+    configured: false,
+    fee_amount: 0,
+    charge_for_premium_pin: true,
+    pin_reservation_minutes: 60,
+  },
   lgas: [],
   wards: [],
   facilities: [],
@@ -420,11 +439,58 @@ const selectedPlan = computed(() => plans.value.find((plan) => plan.id === form.
 const selectedFacility = computed(() => (metadata.value.facilities || []).find((facility) => facility.id === form.facility_id) || null)
 const selectedLgaName = computed(() => (metadata.value.lgas || []).find((item) => item.id === form.lga_id)?.name || 'Not selected')
 const selectedWardName = computed(() => (metadata.value.wards || []).find((item) => item.id === form.ward_id)?.name || 'Not selected')
+const ninVerificationPolicy = computed(() => metadata.value.nin_verification || {})
+const publicNinVerificationEnabled = computed(() => !!ninVerificationPolicy.value.enabled)
+const showEnrollmentMethodSelector = computed(() => !!selectedPlan.value && selectedPlan.value.payment_required)
+const appliesNinFee = computed(() => {
+  if (!selectedPlan.value || !publicNinVerificationEnabled.value || !form.nin) {
+    return false
+  }
+
+  if (form.enrollment_method === 'premium_pin') {
+    return !!ninVerificationPolicy.value.charge_for_premium_pin
+  }
+
+  return true
+})
+const ninVerificationFeeAmount = computed(() => appliesNinFee.value ? Number(ninVerificationPolicy.value.fee_amount || 0) : 0)
+const planPayableAmount = computed(() => {
+  if (!selectedPlan.value) {
+    return 0
+  }
+
+  return form.enrollment_method === 'premium_pin'
+    ? 0
+    : (selectedPlan.value.payment_required ? Number(selectedPlan.value.amount || 0) : 0)
+})
+const totalPayableAmount = computed(() => Number(planPayableAmount.value) + Number(ninVerificationFeeAmount.value))
+const requiresCheckoutFlow = computed(() => totalPayableAmount.value > 0)
 const activePaymentGatewayLabel = computed(() => {
   const code = selectedPlan.value?.payment_gateway || metadata.value.active_payment_gateway
   return (metadata.value.payment_gateways || []).find((gateway) => gateway.code === code)?.name || code || 'configured online gateway'
 })
-const paymentInstruction = computed(() => `After you submit this form, we will open ${activePaymentGatewayLabel.value} so you can pay securely online.`)
+const paymentInstruction = computed(() => {
+  if (form.enrollment_method === 'premium_pin' && ninVerificationFeeAmount.value > 0) {
+    return `After you submit this form, we will open ${activePaymentGatewayLabel.value} so you can pay the NIN verification fee securely online. Your Premium PIN will be held temporarily and only consumed after payment is confirmed.`
+  }
+
+  if (ninVerificationFeeAmount.value > 0) {
+    return `After you submit this form, we will open ${activePaymentGatewayLabel.value} so you can pay the plan amount and NIN verification fee securely online.`
+  }
+
+  return `After you submit this form, we will open ${activePaymentGatewayLabel.value} so you can pay securely online.`
+})
+const ninFeeNotice = computed(() => {
+  if (!publicNinVerificationEnabled.value || ninVerificationFeeAmount.value <= 0) {
+    return ''
+  }
+
+  if (form.enrollment_method === 'premium_pin') {
+    return `This enrollment still requires a NIN verification fee of NGN ${ninVerificationFeeAmount.value.toLocaleString()} before your Premium PIN can be fully applied.`
+  }
+
+  return `A NIN verification fee of NGN ${ninVerificationFeeAmount.value.toLocaleString()} will be added to your enrollment checkout total.`
+})
 
 const setPassportPreview = (value) => {
   if (passportPreview.value && passportPreview.value.startsWith('blob:')) {
@@ -541,9 +607,15 @@ const verifyReturnedPayment = async (reference) => {
     const payload = response.data?.data || {}
     const purchase = payload.purchase
     const verification = payload.verification || {}
+    const ninVerification = payload.nin_verification || null
+    const warnings = payload.warnings || []
 
     if (verification.paid) {
-      paymentSummary.value = `Payment ${purchase?.payment_reference || reference} was verified successfully through ${verification.provider || activePaymentGatewayLabel.value}. Your enrollment application remains pending approval and NIN verification.`
+      const ninNote = ninVerification?.verified
+        ? ' Live NIN verification has also been completed.'
+        : (ninVerification?.message ? ` ${ninVerification.message}` : '')
+      const warningNote = warnings.length ? ` Follow-up: ${warnings.join(' ')}` : ''
+      paymentSummary.value = `Payment ${purchase?.payment_reference || reference} was verified successfully through ${verification.provider || activePaymentGatewayLabel.value}.${ninNote}${warningNote} Your enrollment application remains pending approval.`
     } else {
       paymentSummary.value = `Payment ${purchase?.payment_reference || reference} is still ${verification.status || 'pending'}. Complete the checkout and return to this page if you have not finished payment.`
     }
@@ -581,12 +653,14 @@ const submitApplication = async () => {
     const enrolleeId = responseData?.enrollee?.enrollee_id
     const paymentRef = responseData?.purchase?.payment_reference
     const checkout = responseData?.payment_checkout
+    const ninVerification = responseData?.nin_verification
+    const totalAmount = responseData?.payment_breakdown?.total_amount
 
     successSummary.value = responseData?.requires_payment
-      ? `Application ${enrolleeId} submitted. We are opening ${activePaymentGatewayLabel.value} for payment reference ${paymentRef}. Approval continues after payment confirmation and NIN verification.`
+      ? `Application ${enrolleeId} submitted. We are opening ${activePaymentGatewayLabel.value} for payment reference ${paymentRef}${totalAmount ? ` and total NGN ${Number(totalAmount).toLocaleString()}` : ''}. Approval continues after payment confirmation${publicNinVerificationEnabled.value ? ' and live NIN verification' : ''}.`
       : responseData?.enrollment_method === 'premium_pin'
-        ? `Application ${enrolleeId} submitted. Your Premium PIN has been accepted, and the application is awaiting approval and NIN verification.`
-      : `Application ${enrolleeId} submitted and is awaiting approval and NIN verification.`
+        ? `Application ${enrolleeId} submitted. Your Premium PIN has been accepted, and the application is awaiting approval${ninVerification?.verified ? ' after successful live NIN verification' : publicNinVerificationEnabled.value ? ' and NIN verification review' : ''}.`
+      : `Application ${enrolleeId} submitted and is awaiting approval${ninVerification?.verified ? ' after successful live NIN verification' : publicNinVerificationEnabled.value ? ' and NIN verification review' : ''}.`
 
     submittedEnrolleeId.value = enrolleeId || ''
     successNextSteps.value = responseData?.next_steps || []

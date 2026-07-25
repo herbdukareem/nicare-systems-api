@@ -30,7 +30,7 @@ jobs:
         shell: bash
 
     env:
-      CPANEL_DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
+      CPANEL_DEPLOY_PATH_STAGING: ${{ secrets.CPANEL_DEPLOY_PATH_STAGING }}
       CPANEL_SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
       CPANEL_SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
       CPANEL_SSH_USERNAME: ${{ secrets.CPANEL_SSH_USERNAME }}
@@ -64,7 +64,7 @@ jobs:
       - name: Ensure remote deploy path exists
         run: |
           ssh -p "$CPANEL_SSH_PORT" "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST" \
-            "mkdir -p \"$CPANEL_DEPLOY_PATH\""
+            "mkdir -p \"$CPANEL_DEPLOY_PATH_STAGING\""
 
       - name: Sync application files
         run: |
@@ -82,7 +82,7 @@ jobs:
             --exclude "storage/logs/" \
             --exclude "storage/framework/" \
             --exclude "public/storage/" \
-            ./ "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST:$CPANEL_DEPLOY_PATH/"
+            ./ "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST:$CPANEL_DEPLOY_PATH_STAGING/"
 
       - name: Run remote post-deploy tasks
         env:
@@ -90,7 +90,7 @@ jobs:
         run: |
           ssh -p "$CPANEL_SSH_PORT" "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST" /bin/bash <<EOF
           set -e
-          cd "$CPANEL_DEPLOY_PATH"
+          cd "$CPANEL_DEPLOY_PATH_STAGING"
 
           mkdir -p bootstrap/cache
           mkdir -p storage/framework/cache/data
