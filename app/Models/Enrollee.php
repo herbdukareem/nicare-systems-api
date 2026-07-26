@@ -164,6 +164,7 @@ protected $guarded = ['id'];
         'nin_verification_meta' => 'array',
         'enrollment_extra_fields' => 'array',
         'enrollment_location_audit' => 'array',
+        'has_duplicate_nin' => 'boolean',
         'duplicate_reviewed' => 'boolean',
         'duplicate_reviewed_at' => 'datetime',
         'status' => 'integer',

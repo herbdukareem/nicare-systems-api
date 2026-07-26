@@ -18,13 +18,13 @@
       <div v-if="mode === 'generate'" class="qds-card qds-card-padding tw-space-y-4">
         <div>
           <h2 class="tw-text-sm tw-font-semibold tw-text-gray-900">Capitation Period</h2>
-          <p class="tw-text-xs tw-text-gray-500">Create the monthly capitation period first. Facility generation is done separately by period and funding type.</p>
+          <p class="tw-text-xs tw-text-gray-500">Create the monthly capitation period first. Eligibility is always cut off on the 20th of the selected month and year, while facility generation is done separately by period and funding type.</p>
         </div>
         <div class="tw-grid tw-grid-cols-1 tw-gap-4 md:tw-grid-cols-4">
           <v-text-field v-model="form.name" label="Period name" density="comfortable" variant="outlined" />
           <v-select v-model="form.capitation_month" :items="months" item-title="name" item-value="value" label="Capitation month" density="comfortable" variant="outlined" />
           <v-text-field v-model.number="form.year" label="Capitation year" type="number" density="comfortable" variant="outlined" />
-          <v-text-field v-model.number="form.start_day" label="Eligibility start day" type="number" density="comfortable" variant="outlined" />
+          <v-select v-model="form.duplicate_nin_policy" :items="duplicateNinPolicyOptions" item-title="label" item-value="value" label="Duplicate NIN policy" density="comfortable" variant="outlined" />
         </div>
         <div class="tw-flex tw-flex-wrap tw-gap-2">
           <v-btn color="primary" :loading="saving" prepend-icon="mdi-content-save" @click="createPeriod">Create Period</v-btn>
@@ -63,10 +63,14 @@
             </div>
           </div>
 
-          <div class="tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-5">
+          <div class="tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-6">
             <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Funding Type</p>
               <p class="tw-font-bold">{{ selectedGenerationFundingType?.name || 'N/A' }}</p>
+            </div>
+            <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
+              <p class="tw-text-xs tw-text-gray-500">Duplicate NIN Policy</p>
+              <p class="tw-font-bold">{{ duplicateNinPolicyLabel(generationPeriod?.duplicate_nin_policy) }}</p>
             </div>
             <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Facilities Loaded</p>
@@ -161,7 +165,7 @@
             density="compact"
           >
             <template #item.facility="{ item }">{{ item.facility?.name || 'N/A' }}</template>
-            <template #item.funding_type="{ item }">{{ item.funding_type?.name || 'N/A' }}</template>
+            <template #item.funding_type="{ item }">{{ periodFundingTypeName(item) }}</template>
             <template #item.total_amount="{ item }">NGN {{ Number(item.total_amount || item.amount || 0).toLocaleString() }}</template>
             <template #item.stage="{ item }">
               <v-chip size="small" :color="detailStatusColor(item)" variant="flat">{{ detailStatusLabel(item) }}</v-chip>
@@ -181,12 +185,9 @@
         density="comfortable"
       >
         <template #item.status="{ item }">
-          <v-chip size="small" :color="item.status ? 'success' : item.computed_at ? 'info' : 'warning'" variant="flat">
-            {{ item.status ? 'Finalised' : item.computed_at ? 'Computed' : 'Draft' }}
+          <v-chip size="small" :color="periodStatusColor(item)" variant="flat">
+            {{ periodStatusLabel(item) }}
           </v-chip>
-        </template>
-        <template #item.period="{ item }">
-          {{ formatDate(item.period_start) }} - {{ formatDate(item.period_end) }}
         </template>
         <template #item.actions="{ item }">
           <div class="tw-flex tw-gap-1">
@@ -269,7 +270,7 @@
                   class="tw-transition-colors hover:tw-bg-slate-50"
                 >
                   <td class="tw-px-4 tw-py-3 tw-font-medium tw-text-slate-800">{{ item.facility?.name || 'N/A' }}</td>
-                  <td class="tw-px-4 tw-py-3 tw-text-slate-600">{{ item.funding_type?.name || 'N/A' }}</td>
+                  <td class="tw-px-4 tw-py-3 tw-text-slate-600">{{ periodFundingTypeName(item) }}</td>
                   <td class="tw-px-4 tw-py-3">{{ Number(item.total_enrollees || item.total_enrolled || 0).toLocaleString() }}</td>
                   <td class="tw-px-4 tw-py-3">{{ Number(item.capitation_rate || item.rate || 0).toLocaleString() }}</td>
                   <td class="tw-px-4 tw-py-3 tw-font-semibold tw-text-slate-900">NGN {{ Number(item.total_amount || item.amount || 0).toLocaleString() }}</td>
@@ -309,7 +310,7 @@
           <div class="tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-4">
             <div class="tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Funding Type</p>
-              <p class="tw-font-bold">{{ selectedPeriod?.funding_type?.name || selectedPeriod?.funding_type?.label || 'N/A' }}</p>
+              <p class="tw-font-bold">{{ periodFundingTypeName(selectedPeriod) }}</p>
             </div>
             <div class="tw-border tw-border-gray-100 tw-bg-slate-50 tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Capitation Rate</p>
@@ -376,8 +377,12 @@
               <span class="tw-font-semibold tw-text-slate-800">{{ selectedPeriod?.name }}</span>
             </div>
             <div class="tw-flex tw-gap-2">
-              <span class="tw-text-slate-500 tw-w-28 tw-flex-shrink-0">Date range:</span>
-              <span class="tw-font-semibold tw-text-slate-800">{{ formatDate(selectedPeriod?.period_start) }} – {{ formatDate(selectedPeriod?.period_end) }}</span>
+              <span class="tw-text-slate-500 tw-w-28 tw-flex-shrink-0">Cutoff date:</span>
+              <span class="tw-font-semibold tw-text-slate-800">{{ formatDate(selectedPeriod?.period_start) }}</span>
+            </div>
+            <div class="tw-flex tw-gap-2">
+              <span class="tw-text-slate-500 tw-w-28 tw-flex-shrink-0">Duplicate NIN:</span>
+              <span class="tw-font-semibold tw-text-slate-800">{{ duplicateNinPolicyLabel(selectedPeriod?.duplicate_nin_policy) }}</span>
             </div>
           </div>
           <v-text-field v-model="paymentForm.payment_reference" label="Payment reference" density="comfortable" variant="outlined" />
@@ -426,7 +431,7 @@ const form = ref({
   name: '',
   capitation_month: new Date().getMonth() + 1,
   year: new Date().getFullYear(),
-  start_day: 1,
+  duplicate_nin_policy: 'exclude',
 })
 const generationForm = ref({ period_id: null, funding_type_id: null })
 const workflowForm = ref({ period_id: null, funding_type_id: null })
@@ -436,6 +441,10 @@ const months = [
   { name: 'April', value: 4 }, { name: 'May', value: 5 }, { name: 'June', value: 6 },
   { name: 'July', value: 7 }, { name: 'August', value: 8 }, { name: 'September', value: 9 },
   { name: 'October', value: 10 }, { name: 'November', value: 11 }, { name: 'December', value: 12 },
+]
+const duplicateNinPolicyOptions = [
+  { label: 'Exclude duplicate NINs', value: 'exclude' },
+  { label: 'Allow duplicate NINs', value: 'include' },
 ]
 const paymentForm = ref({
   payment_reference: '',
@@ -472,9 +481,25 @@ const workflowActionLabel = computed(() => ({ review: 'Review Selected', approva
 const breakdownStage = computed(() => ({ review: 'reviewed', approval: 'approved', payments: 'paid' })[props.mode] || 'generated')
 const breakdownStageLabel = computed(() => ({ generated: 'Generated', reviewed: 'Reviewed', approved: 'Approved', paid: 'Paid' })[breakdownStage.value] || 'Generated')
 
+const duplicateNinPolicyLabel = (value) => {
+  const normalized = String(value || 'exclude')
+  return duplicateNinPolicyOptions.find((item) => item.value === normalized)?.label || 'Exclude duplicate NINs'
+}
+
+const periodFundingTypeName = (period) => {
+  if (!period) return 'N/A'
+  if (period.funding_type?.name) return period.funding_type.name
+  if (period.funding_type?.label) return period.funding_type.label
+  if (period.funding_type_summary) return period.funding_type_summary
+  if (Array.isArray(period.funding_types) && period.funding_types.length) {
+    return period.funding_types.map((item) => item?.name).filter(Boolean).join(', ')
+  }
+  return 'N/A'
+}
+
 const periodOptions = computed(() => periods.value.map((p) => ({
   ...p,
-  label: `#${p.id} - ${p.name} (${formatDate(p.period_start)} - ${formatDate(p.period_end)}) - ${p.capitation_details_count || 0} generated`,
+  label: `#${p.id} - ${p.name} (Cutoff: ${formatDate(p.period_start)}; ${duplicateNinPolicyLabel(p.duplicate_nin_policy)}) - ${p.capitation_details_count || 0} generated`,
 })))
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -488,13 +513,9 @@ const STATUS_COL_HEADERS = {
 
 const periodHeaders = [
   { title: 'Name', key: 'name' },
-  { title: 'Funding Type', key: 'funding_type.name' },
-  { title: 'Period', key: 'period' },
-  { title: 'Rate', key: 'capitation_rate' },
+  { title: 'Capitation Year', key: 'year' },
   { title: 'Generated Facilities', key: 'capitation_details_count' },
   { title: 'Status', key: 'status' },
-  { title: 'Computed', key: 'computed_at' },
-  { title: 'Finalised', key: 'finalised_at' },
   { title: '', key: 'actions', sortable: false, align: 'end' },
 ]
 const providerHeaders = [
@@ -558,6 +579,54 @@ const workflowTotals = computed(() => ({
   enrollees: workflowDetails.value.reduce((sum, row) => sum + Number(row.total_enrollees || row.total_enrolled || 0), 0),
   amount: workflowDetails.value.reduce((sum, row) => sum + Number(row.total_amount || row.amount || 0), 0),
 }))
+
+const periodStatusLabel = (item) => {
+  const detailCount = Number(item.capitation_details_count || 0)
+  const pendingReviewCount = Number(item.pending_review_count || 0)
+  const reviewedCount = Number(item.reviewed_count || 0)
+  const pendingApprovalCount = Number(item.pending_approval_count || 0)
+  const approvedCount = Number(item.approved_count || 0)
+  const pendingPaymentCount = Number(item.pending_payment_count || 0)
+  const paidCount = Number(item.paid_count || 0)
+
+  if (props.mode === 'review') {
+    if (detailCount === 0) return 'Not Generated'
+    if (pendingReviewCount > 0) return 'Pending Review'
+    if (reviewedCount > 0) return 'Reviewed'
+    return 'Generated'
+  }
+
+  if (props.mode === 'approval') {
+    if (detailCount === 0) return 'Not Generated'
+    if (pendingApprovalCount > 0) return 'Pending Approval'
+    if (approvedCount > 0) return 'Approved'
+    if (reviewedCount > 0) return 'Awaiting Approval'
+    return 'Awaiting Review'
+  }
+
+  if (props.mode === 'payments') {
+    if (detailCount === 0) return 'Not Generated'
+    if (pendingPaymentCount > 0) return 'Pending Payment'
+    if (paidCount > 0) return 'Paid'
+    if (approvedCount > 0) return 'Awaiting Payment'
+    if (reviewedCount > 0) return 'Awaiting Approval'
+    return 'Awaiting Review'
+  }
+
+  if (item.status) return 'Finalised'
+  if (detailCount > 0) return 'Generated'
+  if (item.computed_at) return 'Computed'
+  return 'Draft'
+}
+
+const periodStatusColor = (item) => {
+  const label = periodStatusLabel(item)
+
+  if (['Finalised', 'Approved', 'Paid', 'Reviewed'].includes(label)) return 'success'
+  if (['Generated', 'Computed', 'Awaiting Approval', 'Awaiting Payment'].includes(label)) return 'info'
+  if (['Pending Review', 'Pending Approval', 'Pending Payment'].includes(label)) return 'warning'
+  return 'default'
+}
 
 const loadFundingTypes = async () => {
   try {

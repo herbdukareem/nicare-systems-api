@@ -24,6 +24,7 @@ class Ward extends Model
      * @var array<int, string>
      */
     protected $fillable = [
+        'legacy_id',
         'name',
         'lga_id',
         'enrollment_cap',

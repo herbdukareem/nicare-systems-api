@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\EnrolleeDuplicateNinService;
 use App\Services\Legacy\LegacyEnrolleeMigrationService;
 use Illuminate\Bus\Batchable;
 use Illuminate\Bus\Queueable;
@@ -16,8 +17,8 @@ class ProcessLegacyEnrolleesJob implements ShouldQueue
 {
     use Batchable, Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $tries   = 3;
-    public int $timeout = 1800; // 30 minutes per chunk
+    public int $tries = 3;
+    public int $timeout = 1800;
 
     public function __construct(
         private readonly string $sourceTable,
@@ -26,8 +27,10 @@ class ProcessLegacyEnrolleesJob implements ShouldQueue
     ) {
     }
 
-    public function handle(LegacyEnrolleeMigrationService $service): void
-    {
+    public function handle(
+        LegacyEnrolleeMigrationService $service,
+        EnrolleeDuplicateNinService $duplicateNinService
+    ): void {
         if ($this->batch()?->cancelled()) {
             return;
         }
@@ -39,21 +42,30 @@ class ProcessLegacyEnrolleesJob implements ShouldQueue
             ->get();
 
         $migrated = 0;
-        $failed   = 0;
+        $failed = 0;
+        $touchedNins = [];
 
         foreach ($rows as $row) {
             try {
-                $service->migrate($row, $this->sourceTable, $this->dryRun);
+                $result = $service->migrate($row, $this->sourceTable, $this->dryRun);
+                $nin = $result['mapped']['enrollee']['nin'] ?? null;
+                if (filled($nin)) {
+                    $touchedNins[] = $nin;
+                }
                 $migrated++;
             } catch (\Throwable $e) {
                 $failed++;
                 if (!$this->dryRun) {
                     $service->logFailure($row, $this->sourceTable, $e);
                 }
-                Log::error("[ProcessLegacyEnrolleesJob] {$this->sourceTable}:{$row->id} — {$e->getMessage()}");
+                Log::error("[ProcessLegacyEnrolleesJob] {$this->sourceTable}:{$row->id} - {$e->getMessage()}");
             }
         }
 
-        Log::info("[ProcessLegacyEnrolleesJob] {$this->sourceTable} chunk done — migrated:{$migrated} failed:{$failed}");
+        if (!$this->dryRun && $touchedNins !== []) {
+            $duplicateNinService->refreshForNins($touchedNins);
+        }
+
+        Log::info("[ProcessLegacyEnrolleesJob] {$this->sourceTable} chunk done - migrated:{$migrated} failed:{$failed}");
     }
 }

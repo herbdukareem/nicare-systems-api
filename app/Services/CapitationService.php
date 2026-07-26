@@ -16,10 +16,14 @@ use Illuminate\Support\Facades\Log;
 
 class CapitationService
 {
+    public function __construct(
+        private readonly EnrolleeDuplicateNinService $duplicateNinService
+    ) {
+    }
+
     public function getAll(array $filters = []): LengthAwarePaginator
     {
-        $query = Capitation::with(['user', 'fundingType'])
-            ->withCount('capitationDetails');
+        $query = $this->capitationPeriodQuery();
 
         if (!empty($filters['search'])) {
             $search = $filters['search'];
@@ -54,24 +58,35 @@ class CapitationService
         $sortDirection = $filters['sort_direction'] ?? 'desc';
         $query->orderBy($sortBy, $sortDirection);
 
-        return $query->paginate((int) ($filters['per_page'] ?? 15), ['*'], 'page', (int) ($filters['page'] ?? 1));
+        $paginator = $query->paginate((int) ($filters['per_page'] ?? 15), ['*'], 'page', (int) ($filters['page'] ?? 1));
+        $this->decorateCapitationPeriods($paginator->getCollection());
+
+        return $paginator;
     }
 
     public function getAllWithoutPagination(): Collection
     {
-        return Capitation::with(['user', 'fundingType'])
-            ->withCount('capitationDetails')
+        $periods = $this->capitationPeriodQuery()
             ->where('status', 1)
             ->orderBy('year', 'desc')
             ->orderBy('capitation_month', 'desc')
             ->get();
+
+        $this->decorateCapitationPeriods($periods);
+
+        return $periods;
     }
 
     public function findById(int $id): ?Capitation
     {
-        return Capitation::with(['user', 'fundingType'])
-            ->withCount('capitationDetails')
+        $period = $this->capitationPeriodQuery()
             ->find($id);
+
+        if ($period) {
+            $this->decorateCapitationPeriod($period);
+        }
+
+        return $period;
     }
 
     public function create(array $data): Capitation
@@ -95,27 +110,39 @@ class CapitationService
 
     public function getByYear(int $year): Collection
     {
-        return Capitation::with(['user', 'fundingType'])
+        $periods = $this->capitationPeriodQuery()
             ->where('year', $year)
             ->orderBy('capitation_month')
             ->get();
+
+        $this->decorateCapitationPeriods($periods);
+
+        return $periods;
     }
 
     public function getByUser(int $userId): Collection
     {
-        return Capitation::with(['user', 'fundingType'])
+        $periods = $this->capitationPeriodQuery()
             ->where('user_id', $userId)
             ->orderBy('year', 'desc')
             ->orderBy('capitation_month', 'desc')
             ->get();
+
+        $this->decorateCapitationPeriods($periods);
+
+        return $periods;
     }
 
     public function getByMonthYear(int $month, int $year): Collection
     {
-        return Capitation::with(['user', 'fundingType'])
+        $periods = $this->capitationPeriodQuery()
             ->where('capitation_month', $month)
             ->where('year', $year)
             ->get();
+
+        $this->decorateCapitationPeriods($periods);
+
+        return $periods;
     }
 
     public function toggleStatus(int $id): bool
@@ -171,8 +198,7 @@ class CapitationService
             throw new \InvalidArgumentException('A capitation period already exists for the selected month and year.');
         }
 
-        $periodStart = \Carbon\Carbon::create((int) $data['year'], (int) $data['capitation_month'], 1)
-            ->setDay(min((int) $data['start_day'], \Carbon\Carbon::create((int) $data['year'], (int) $data['capitation_month'], 1)->daysInMonth));
+        $periodStart = \Carbon\Carbon::create((int) $data['year'], (int) $data['capitation_month'], 20);
         $fundingType = !empty($data['funding_type_id'])
             ? FundingType::findOrFail((int) $data['funding_type_id'])
             : null;
@@ -180,11 +206,12 @@ class CapitationService
         return Capitation::create([
             'name' => $data['name'] ?? $periodStart->format('F Y') . ' Capitation',
             'period_start' => $periodStart->toDateString(),
-            'period_end' => $periodStart->copy()->endOfMonth()->toDateString(),
+            'period_end' => null,
             'capitated_month' => (int) $data['capitation_month'],
             'capitation_rate' => (float) ($fundingType?->capitation_rate ?? 0),
             'status' => false,
             'funding_type_id' => $fundingType?->id,
+            'duplicate_nin_policy' => $data['duplicate_nin_policy'] ?? Capitation::DUPLICATE_NIN_POLICY_EXCLUDE,
             'created_by' => auth()->id(),
             'user_id' => auth()->id(),
             'capitation_month' => (int) $data['capitation_month'],
@@ -555,8 +582,9 @@ class CapitationService
     private function eligibleProviderRows(Capitation $capitation, FundingType $fundingType)
     {
         $cutoffDate = $capitation->period_start;
+        $duplicateNinPolicy = $capitation->duplicate_nin_policy ?: Capitation::DUPLICATE_NIN_POLICY_EXCLUDE;
 
-        return Enrollee::query()
+        $query = Enrollee::query()
             ->join('facilities', 'facilities.id', '=', 'enrollees.facility_id')
             ->leftJoin('lgas', 'lgas.id', '=', 'facilities.lga_id')
             ->select(
@@ -575,8 +603,96 @@ class CapitationService
                 $query->whereNull('enrollees.coverage_end_date')
                     ->orWhereDate('enrollees.coverage_end_date', '>=', $cutoffDate);
             })
+            ->when(
+                $duplicateNinPolicy === Capitation::DUPLICATE_NIN_POLICY_EXCLUDE,
+                fn ($builder) => $this->duplicateNinService->applyUniqueNinOnly($builder, 'enrollees')
+            )
             ->groupBy('facilities.id', 'facilities.name', 'facilities.hcp_code', 'lgas.name')
             ->orderBy('facilities.name')
             ->get();
+
+        return $query;
+    }
+
+    private function capitationPeriodQuery()
+    {
+        return Capitation::with(['user:id,name', 'fundingType:id,name'])
+            ->withCount([
+                'capitationDetails',
+                'capitationDetails as pending_review_count' => fn ($query) => $query->whereNull('reviewed_at'),
+                'capitationDetails as reviewed_count' => fn ($query) => $query->whereNotNull('reviewed_at'),
+                'capitationDetails as pending_approval_count' => fn ($query) => $query->whereNotNull('reviewed_at')->whereNull('approved_at'),
+                'capitationDetails as approved_count' => fn ($query) => $query->whereNotNull('approved_at'),
+                'capitationDetails as pending_payment_count' => fn ($query) => $query->whereNotNull('approved_at')->whereNull('paid_at'),
+                'capitationDetails as paid_count' => fn ($query) => $query->whereNotNull('paid_at'),
+            ]);
+    }
+
+    private function decorateCapitationPeriods(iterable $periods): void
+    {
+        $capitationPeriods = collect($periods)->filter(fn ($period) => $period instanceof Capitation)->values();
+
+        if ($capitationPeriods->isEmpty()) {
+            return;
+        }
+
+        $fundingTypesByPeriod = DB::table('capitation_details')
+            ->join('funding_types', 'funding_types.id', '=', 'capitation_details.funding_type_id')
+            ->select(
+                'capitation_details.capitation_id',
+                'funding_types.id as funding_type_id',
+                'funding_types.name as funding_type_name'
+            )
+            ->whereIn('capitation_details.capitation_id', $capitationPeriods->pluck('id')->all())
+            ->whereNotNull('capitation_details.funding_type_id')
+            ->distinct()
+            ->orderBy('funding_types.name')
+            ->get()
+            ->groupBy('capitation_id');
+
+        foreach ($capitationPeriods as $period) {
+            if ($period instanceof Capitation) {
+                $this->decorateCapitationPeriod($period, collect($fundingTypesByPeriod->get($period->id, [])));
+            }
+        }
+    }
+
+    private function decorateCapitationPeriod(Capitation $period, $detailFundingTypes = null): void
+    {
+        $detailFundingTypes = collect($detailFundingTypes)
+            ->map(fn ($type) => [
+                'id' => (int) data_get($type, 'funding_type_id'),
+                'name' => data_get($type, 'funding_type_name'),
+            ])
+            ->filter(fn (array $type) => $type['id'] > 0 && filled($type['name']))
+            ->unique('id')
+            ->values();
+
+        $period->setAttribute(
+            'funding_types',
+            $detailFundingTypes->all()
+        );
+
+        if ($period->fundingType) {
+            $period->setAttribute('funding_type_summary', $period->fundingType->name);
+            return;
+        }
+
+        if ($detailFundingTypes->count() === 1) {
+            $derivedType = $detailFundingTypes->first();
+            $period->setAttribute('funding_type_id', $derivedType['id']);
+            $period->setAttribute('funding_type_summary', $derivedType['name']);
+            return;
+        }
+
+        if ($detailFundingTypes->count() > 1) {
+            $period->setAttribute(
+                'funding_type_summary',
+                'Multiple: ' . $detailFundingTypes->pluck('name')->implode(', ')
+            );
+            return;
+        }
+
+        $period->setAttribute('funding_type_summary', null);
     }
 }

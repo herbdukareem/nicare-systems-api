@@ -587,7 +587,7 @@
                 <div class="tw-flex-1 tw-min-w-0">
                   <p class="tw-text-sm tw-font-semibold tw-text-gray-900 tw-truncate">{{ period.name }}</p>
                   <p class="tw-text-xs tw-text-gray-400 tw-mt-0.5">
-                    Eligible: {{ formatCapDate(period.period_end) }}
+                    Cutoff: {{ formatCapDate(period.period_start) }}
                     <span class="tw-mx-1 tw-text-gray-300">·</span>
                     {{ period.facilities_count }} {{ period.facilities_count === 1 ? 'facility' : 'facilities' }}
                   </p>

@@ -16,6 +16,10 @@ use Illuminate\Database\Eloquent\Builder;
  */
 class EnrolleeService
 {
+    public function __construct(private EnrollmentLocationResolver $locationResolver)
+    {
+    }
+
     /**
      * @var array<int, string>
      */
@@ -162,6 +166,8 @@ class EnrolleeService
      */
     public function create(array $data): Enrollee
     {
+        $data = $this->locationResolver->resolve($data);
+
         return Enrollee::create($data);
     }
 
@@ -174,6 +180,8 @@ class EnrolleeService
      */
     public function update(Enrollee $enrollee, array $data): Enrollee
     {
+        $data = $this->locationResolver->resolve($data);
+
         $enrollee->update($data);
         return $enrollee;
     }

@@ -13,11 +13,17 @@ use Illuminate\Validation\ValidationException;
 
 class EnrollmentValidationService
 {
+    public function __construct(private EnrollmentLocationResolver $locationResolver)
+    {
+    }
+
     /**
      * @return array{core: array<string, mixed>, extra: array<string, mixed>}
      */
     public function validate(EnrollmentFormSchema $schema, array $data, array $extraFields = []): array
     {
+        $data = $this->locationResolver->resolve($data);
+
         $coreRules = [
             'nin' => ['nullable', 'string', 'max:255'],
             'first_name' => ['required', 'string', 'max:255'],
@@ -33,7 +39,7 @@ class EnrollmentValidationService
             'address' => ['nullable', 'string'],
             'facility_id' => ['required', 'integer', 'exists:facilities,id'],
             'lga_id' => ['required', 'integer', 'exists:lgas,id'],
-            'ward_id' => ['required', 'integer', 'exists:wards,id'],
+            'ward_id' => ['nullable', 'integer', 'exists:wards,id'],
             'insurance_programme_id' => ['required', 'integer', 'exists:insurance_programmes,id'],
             'enrollee_category_id' => ['nullable', 'integer', 'exists:enrollee_categories,id'],
             'premium_plan_id' => ['required', 'integer', 'exists:premium_plans,id'],

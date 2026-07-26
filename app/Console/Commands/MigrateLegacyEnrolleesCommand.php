@@ -2,6 +2,7 @@
 
 namespace App\Console\Commands;
 
+use App\Services\EnrolleeDuplicateNinService;
 use App\Services\Legacy\LegacyEnrolleeMigrationService;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
@@ -18,7 +19,10 @@ class MigrateLegacyEnrolleesCommand extends Command
 
     protected $description = 'Safely migrate legacy informal/formal enrollees into enrollees, purchases, and coverage periods';
 
-    public function handle(LegacyEnrolleeMigrationService $service): int
+    public function handle(
+        LegacyEnrolleeMigrationService $service,
+        EnrolleeDuplicateNinService $duplicateNinService
+    ): int
     {
         $source = strtolower((string) $this->option('source'));
         if (!in_array($source, ['all', 'informal', 'formal'], true)) {
@@ -71,6 +75,8 @@ class MigrateLegacyEnrolleesCommand extends Command
                     break;
                 }
 
+                $touchedNins = [];
+
                 foreach ($rows as $row) {
                     $lastId = (int) $row->id;
                     $stats['processed']++;
@@ -79,6 +85,10 @@ class MigrateLegacyEnrolleesCommand extends Command
                         $result = $service->migrate($row, $table, $dryRun);
                         $mapped = $result['mapped'] ?? [];
                         $flags = $mapped['flags'] ?? [];
+                        $nin = $mapped['enrollee']['nin'] ?? null;
+                        if (filled($nin)) {
+                            $touchedNins[] = $nin;
+                        }
 
                         $stats[$dryRun ? 'skipped' : 'migrated']++;
                         if ($result['duplicate_matched'] ?? false) {
@@ -107,6 +117,10 @@ class MigrateLegacyEnrolleesCommand extends Command
                         }
                         $this->error("[{$table}:{$row->id}] failed: {$e->getMessage()}");
                     }
+                }
+
+                if (!$dryRun && $touchedNins !== []) {
+                    $duplicateNinService->refreshForNins($touchedNins);
                 }
 
                 if ($remaining !== null) {

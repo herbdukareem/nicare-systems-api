@@ -88,7 +88,7 @@ class PublicEnrollmentController extends BaseController
             'address' => ['nullable', 'string'],
             'facility_id' => ['required', 'exists:facilities,id'],
             'lga_id' => ['required', 'exists:lgas,id'],
-            'ward_id' => ['required', 'exists:wards,id'],
+            'ward_id' => ['nullable', 'exists:wards,id'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],
             'enrollment_method' => ['nullable', Rule::in(['online_payment', 'bank_transfer', 'premium_pin'])],
             'premium_pin' => ['nullable', 'required_if:enrollment_method,premium_pin', 'string', 'max:255'],

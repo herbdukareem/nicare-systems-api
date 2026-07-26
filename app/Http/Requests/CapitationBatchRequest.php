@@ -20,7 +20,7 @@ class CapitationBatchRequest extends FormRequest
             'funding_type_id' => ['nullable', 'exists:funding_types,id'],
             'capitation_month' => ['required', 'integer', 'between:1,12'],
             'year' => ['required', 'integer', 'min:2000', 'max:2100'],
-            'start_day' => ['required', 'integer', 'between:1,31'],
+            'duplicate_nin_policy' => ['nullable', 'in:exclude,include'],
         ];
     }
 

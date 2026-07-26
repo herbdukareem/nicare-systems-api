@@ -12,8 +12,6 @@
         </v-btn>
       </AppPageHeader>
 
-      
-
       <AppAlert
         v-if="errorMessage"
         tone="danger"
@@ -37,10 +35,10 @@
             <div class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
               <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Current mode</p>
               <p class="tw-mt-2 tw-text-lg tw-font-semibold tw-text-slate-900">
-                {{ activeGatewayConfig.enabled ? 'Hosted checkout enabled' : 'Hosted checkout disabled' }}
+                {{ activeGatewayModeLabel }}
               </p>
               <p class="tw-mt-2 tw-text-sm tw-text-slate-600">
-                {{ activeGatewayName }} is the active secure checkout gateway for self-enrollment and premium online purchases.
+                {{ activeGatewayModeDescription }}
               </p>
             </div>
           </div>
@@ -57,20 +55,54 @@
               class="md:tw-col-span-2"
             />
             <v-text-field v-model="activeGatewayConfig.provider_name" label="Provider name" variant="outlined" density="comfortable" />
-            <v-text-field v-model="activeGatewayConfig.currency" label="Currency" variant="outlined" density="comfortable" />
-            <v-text-field v-model="activeGatewayConfig.base_url" label="Base URL" variant="outlined" density="comfortable" class="md:tw-col-span-2" />
+            <v-select
+              v-model="activeGatewayConfig.mode"
+              :items="gatewayModeOptions"
+              label="Active mode"
+              variant="outlined"
+              density="comfortable"
+            />
+
+            <div class="md:tw-col-span-2 tw-rounded-lg tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-3">
+              <div class="tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-3">
+                <div>
+                  <p class="tw-text-sm tw-font-semibold tw-text-slate-900">Credential sets</p>
+                  <p class="tw-text-xs tw-text-slate-500">Save separate test and live credentials, endpoints, and response mapping.</p>
+                </div>
+                <v-btn-toggle
+                  v-model="environmentEditorMode"
+                  mandatory
+                  color="primary"
+                  density="comfortable"
+                  variant="outlined"
+                >
+                  <v-btn value="test">Test setup</v-btn>
+                  <v-btn value="live">Live setup</v-btn>
+                </v-btn-toggle>
+              </div>
+            </div>
+
+            <v-text-field v-model="selectedGatewayEnvironmentConfig.currency" label="Currency" variant="outlined" density="comfortable" />
+            <v-text-field
+              :model-value="environmentEditorMode === 'live' ? 'Live configuration' : 'Test configuration'"
+              label="Editing"
+              variant="outlined"
+              density="comfortable"
+              readonly
+            />
+            <v-text-field v-model="selectedGatewayEnvironmentConfig.base_url" label="Base URL" variant="outlined" density="comfortable" class="md:tw-col-span-2" />
             <v-text-field
               v-if="form.active_gateway === 'monnify'"
-              v-model="activeGatewayConfig.login_endpoint"
+              v-model="selectedGatewayEnvironmentConfig.login_endpoint"
               label="Login endpoint"
               variant="outlined"
               density="comfortable"
             />
-            <v-text-field v-model="activeGatewayConfig.initialize_endpoint" label="Initialize endpoint" variant="outlined" density="comfortable" />
-            <v-text-field v-model="activeGatewayConfig.verify_endpoint" label="Verify endpoint" variant="outlined" density="comfortable" />
+            <v-text-field v-model="selectedGatewayEnvironmentConfig.initialize_endpoint" label="Initialize endpoint" variant="outlined" density="comfortable" />
+            <v-text-field v-model="selectedGatewayEnvironmentConfig.verify_endpoint" label="Verify endpoint" variant="outlined" density="comfortable" />
             <v-text-field
               v-if="form.active_gateway === 'paystack'"
-              v-model="activeGatewayConfig.public_key"
+              v-model="selectedGatewayEnvironmentConfig.public_key"
               label="Public key"
               variant="outlined"
               density="comfortable"
@@ -78,43 +110,35 @@
             />
             <v-text-field
               v-if="form.active_gateway === 'monnify'"
-              v-model="activeGatewayConfig.api_key"
+              v-model="selectedGatewayEnvironmentConfig.api_key"
               label="API key"
               variant="outlined"
               density="comfortable"
             />
             <v-text-field
               v-if="form.active_gateway === 'monnify'"
-              v-model="activeGatewayConfig.contract_code"
+              v-model="selectedGatewayEnvironmentConfig.contract_code"
               label="Contract code"
               variant="outlined"
               density="comfortable"
             />
             <v-text-field
               v-if="form.active_gateway === 'quickteller'"
-              v-model="activeGatewayConfig.merchant_code"
+              v-model="selectedGatewayEnvironmentConfig.merchant_code"
               label="Merchant code"
               variant="outlined"
               density="comfortable"
             />
             <v-text-field
               v-if="form.active_gateway === 'quickteller'"
-              v-model="activeGatewayConfig.pay_item_id"
+              v-model="selectedGatewayEnvironmentConfig.pay_item_id"
               label="Pay item ID"
-              variant="outlined"
-              density="comfortable"
-            />
-            <v-select
-              v-if="form.active_gateway === 'quickteller'"
-              v-model="activeGatewayConfig.mode"
-              :items="quicktellerModeOptions"
-              label="Quickteller mode"
               variant="outlined"
               density="comfortable"
             />
             <v-text-field
               v-if="form.active_gateway !== 'quickteller'"
-              v-model="activeGatewayConfig.secret_key"
+              v-model="selectedGatewayEnvironmentConfig.secret_key"
               :label="form.active_gateway === 'paystack' ? 'Secret key' : form.active_gateway === 'remita' ? 'Secret key header value' : 'Secret key'"
               variant="outlined"
               density="comfortable"
@@ -127,11 +151,11 @@
                 </v-btn>
               </template>
             </v-text-field>
-            <v-text-field v-model="activeGatewayConfig.callback_path" label="Frontend return path" variant="outlined" density="comfortable" class="md:tw-col-span-2" />
-            <v-text-field v-model.number="activeGatewayConfig.request_amount_multiplier" label="Amount multiplier" type="number" variant="outlined" density="comfortable" />
+            <v-text-field v-model="selectedGatewayEnvironmentConfig.callback_path" label="Frontend return path" variant="outlined" density="comfortable" class="md:tw-col-span-2" />
+            <v-text-field v-model.number="selectedGatewayEnvironmentConfig.request_amount_multiplier" label="Amount multiplier" type="number" variant="outlined" density="comfortable" />
             <v-combobox
               v-if="form.active_gateway === 'monnify'"
-              v-model="activeGatewayConfig.payment_methods"
+              v-model="selectedGatewayEnvironmentConfig.payment_methods"
               :items="monnifyPaymentMethodOptions"
               label="Allowed Monnify payment methods"
               chips
@@ -146,14 +170,14 @@
 
       <AppCard title="Response Mapping" icon="mdi-source-commit" tone="warning">
         <div class="tw-grid tw-gap-4 md:tw-grid-cols-2">
-          <v-text-field v-model="activeGatewayConfig.response_paths.success" label="Response path: success flag" variant="outlined" density="comfortable" />
-          <v-text-field v-model="activeGatewayConfig.response_paths.message" label="Response path: message" variant="outlined" density="comfortable" />
-          <v-text-field v-model="activeGatewayConfig.response_paths.authorization_url" label="Response path: authorization URL" variant="outlined" density="comfortable" />
-          <v-text-field v-model="activeGatewayConfig.response_paths.access_code" label="Response path: access code" variant="outlined" density="comfortable" />
-          <v-text-field v-model="activeGatewayConfig.response_paths.reference" label="Response path: reference" variant="outlined" density="comfortable" />
-          <v-text-field v-model="activeGatewayConfig.response_paths.paid_status" label="Response path: paid status" variant="outlined" density="comfortable" />
+          <v-text-field v-model="selectedGatewayEnvironmentConfig.response_paths.success" label="Response path: success flag" variant="outlined" density="comfortable" />
+          <v-text-field v-model="selectedGatewayEnvironmentConfig.response_paths.message" label="Response path: message" variant="outlined" density="comfortable" />
+          <v-text-field v-model="selectedGatewayEnvironmentConfig.response_paths.authorization_url" label="Response path: authorization URL" variant="outlined" density="comfortable" />
+          <v-text-field v-model="selectedGatewayEnvironmentConfig.response_paths.access_code" label="Response path: access code" variant="outlined" density="comfortable" />
+          <v-text-field v-model="selectedGatewayEnvironmentConfig.response_paths.reference" label="Response path: reference" variant="outlined" density="comfortable" />
+          <v-text-field v-model="selectedGatewayEnvironmentConfig.response_paths.paid_status" label="Response path: paid status" variant="outlined" density="comfortable" />
           <v-combobox
-            v-model="activeGatewayConfig.successful_payment_values"
+            v-model="selectedGatewayEnvironmentConfig.successful_payment_values"
             label="Successful verification values"
             chips
             multiple
@@ -167,7 +191,7 @@
       <AppCard title="Gateway Subaccounts" icon="mdi-bank-outline" tone="primary">
         <div class="tw-space-y-4">
           <p class="tw-text-sm tw-text-slate-600">
-            Register reusable gateway subaccounts here. Enter the external provider code returned by Paystack or Monnify, then use those records inside split profiles.
+            Register only reusable settlement targets for gateways that support split settlement. Each subaccount stores the provider-issued external code used during hosted checkout.
           </p>
 
           <div
@@ -184,14 +208,14 @@
 
             <div class="tw-grid tw-gap-4 md:tw-grid-cols-2">
               <v-text-field v-model="subaccount.code" label="Internal code" variant="outlined" density="comfortable" />
-              <v-select v-model="subaccount.gateway_code" :items="gatewayOptions" item-title="name" item-value="code" label="Gateway" variant="outlined" density="comfortable" />
+              <v-select v-model="subaccount.gateway_code" :items="splitGatewayOptions" item-title="name" item-value="code" label="Gateway" variant="outlined" density="comfortable" />
               <v-text-field v-model="subaccount.name" label="Display name" variant="outlined" density="comfortable" />
               <v-text-field v-model="subaccount.external_code" :label="subaccountExternalLabel(subaccount.gateway_code)" variant="outlined" density="comfortable" />
-              <v-text-field v-model="subaccount.currency" label="Currency" variant="outlined" density="comfortable" />
-              <v-text-field v-model="subaccount.account_name" label="Account name" variant="outlined" density="comfortable" />
-              <v-text-field v-model="subaccount.bank_code" label="Bank code" variant="outlined" density="comfortable" />
-              <v-text-field v-model="subaccount.account_number" label="Account number" variant="outlined" density="comfortable" />
-              <v-text-field v-model="subaccount.email" label="Contact email" variant="outlined" density="comfortable" />
+              <v-text-field v-if="showSubaccountCurrency(subaccount.gateway_code)" v-model="subaccount.currency" label="Currency" variant="outlined" density="comfortable" />
+              <v-text-field v-if="showSubaccountAccountName(subaccount.gateway_code)" v-model="subaccount.account_name" label="Account name" variant="outlined" density="comfortable" />
+              <v-text-field v-if="showSubaccountBankCode(subaccount.gateway_code)" v-model="subaccount.bank_code" label="Bank code" variant="outlined" density="comfortable" />
+              <v-text-field v-if="showSubaccountAccountNumber(subaccount.gateway_code)" v-model="subaccount.account_number" label="Account number" variant="outlined" density="comfortable" />
+              <v-text-field v-if="showSubaccountEmail(subaccount.gateway_code)" v-model="subaccount.email" label="Contact email" variant="outlined" density="comfortable" />
               <v-switch v-model="subaccount.active" color="primary" label="Active" hide-details inset />
             </div>
           </div>
@@ -205,7 +229,7 @@
       <AppCard title="Split Profiles" icon="mdi-source-branch" tone="secondary">
         <div class="tw-space-y-4">
           <p class="tw-text-sm tw-text-slate-600">
-            Split profiles are reusable settlement instructions attached to premium plans. A plan chooses one profile, and the selected gateway adapter translates it into Paystack or Monnify split payloads during checkout.
+            Split profiles are reusable settlement instructions attached to premium plans. A plan chooses one profile, and the selected gateway adapter translates it into the provider-specific split payload during checkout.
           </p>
 
           <div
@@ -223,7 +247,16 @@
             <div class="tw-grid tw-gap-4 md:tw-grid-cols-2">
               <v-text-field v-model="profile.code" label="Profile code" variant="outlined" density="comfortable" />
               <v-text-field v-model="profile.name" label="Profile name" variant="outlined" density="comfortable" />
-              <v-select v-model="profile.gateway_code" :items="gatewayOptions" item-title="name" item-value="code" label="Gateway" variant="outlined" density="comfortable" />
+              <v-select
+                v-model="profile.gateway_code"
+                :items="splitGatewayOptions"
+                item-title="name"
+                item-value="code"
+                label="Gateway"
+                variant="outlined"
+                density="comfortable"
+                @update:model-value="normalizeSplitProfileGateway(profile)"
+              />
               <v-switch v-model="profile.active" color="primary" label="Active" hide-details inset />
               <v-select
                 v-if="profile.gateway_code === 'paystack'"
@@ -269,10 +302,11 @@
                 />
                 <v-select
                   v-model="entry.share_type"
-                  :items="shareTypeOptions"
+                  :items="shareTypeOptionsForGateway(profile.gateway_code)"
                   label="Share type"
                   variant="outlined"
                   density="comfortable"
+                  :disabled="profile.gateway_code === 'remita'"
                 />
                 <v-text-field
                   v-model.number="entry.share_value"
@@ -282,9 +316,10 @@
                   density="comfortable"
                 />
                 <v-switch
+                  v-if="showSplitEntryFeeBearer(profile.gateway_code)"
                   v-model="entry.fee_bearer"
                   color="primary"
-                  :label="profile.gateway_code === 'monnify' ? 'Subaccount bears Monnify fee' : 'Used for gateway-specific fee handling'"
+                  :label="profile.gateway_code === 'monnify' ? 'Subaccount bears Monnify fee' : 'Fee bearer'"
                   hide-details
                   inset
                 />
@@ -330,9 +365,10 @@ const loading = ref(false)
 const showSecret = ref(false)
 const errorMessage = ref('')
 const gatewayOptions = ref([])
+const environmentEditorMode = ref('test')
 
 const monnifyPaymentMethodOptions = ['CARD', 'ACCOUNT_TRANSFER', 'USSD', 'PHONE_NUMBER']
-const quicktellerModeOptions = ['TEST', 'LIVE']
+const gatewayModeOptions = ['TEST', 'LIVE']
 const paystackBearerTypes = [
   { title: 'Account', value: 'account' },
   { title: 'Subaccount', value: 'subaccount' },
@@ -344,9 +380,7 @@ const shareTypeOptions = [
   { title: 'Flat Amount', value: 'flat' },
 ]
 
-const defaultPaystackConfig = () => ({
-  enabled: false,
-  provider_name: 'Paystack',
+const defaultPaystackEnvironment = () => ({
   base_url: 'https://api.paystack.co',
   initialize_endpoint: '/transaction/initialize',
   verify_endpoint: '/transaction/verify/{reference}',
@@ -366,10 +400,8 @@ const defaultPaystackConfig = () => ({
   successful_payment_values: ['success'],
 })
 
-const defaultMonnifyConfig = () => ({
-  enabled: false,
-  provider_name: 'Monnify',
-  base_url: 'https://sandbox.monnify.com',
+const defaultMonnifyEnvironment = (environment = 'test') => ({
+  base_url: environment === 'live' ? 'https://api.monnify.com' : 'https://sandbox.monnify.com',
   login_endpoint: '/api/v1/auth/login',
   initialize_endpoint: '/api/v1/merchant/transactions/init-transaction',
   verify_endpoint: '/api/v2/merchant/transactions/query?paymentReference={reference}',
@@ -391,10 +423,8 @@ const defaultMonnifyConfig = () => ({
   successful_payment_values: ['PAID'],
 })
 
-const defaultRemitaConfig = () => ({
-  enabled: false,
-  provider_name: 'Remita',
-  base_url: 'https://api-demo.systemspecsng.com',
+const defaultRemitaEnvironment = (environment = 'test') => ({
+  base_url: environment === 'live' ? 'https://api.remita.net' : 'https://api-demo.systemspecsng.com',
   initialize_endpoint: '/services/connect-gateway/api/v1/payment/charge',
   verify_endpoint: '/services/connect-gateway/api/v1/payment-engine/payment/merchant/verify/{reference}',
   secret_key: '',
@@ -412,16 +442,15 @@ const defaultRemitaConfig = () => ({
   successful_payment_values: ['SUCCESS', 'APPROVED', '00'],
 })
 
-const defaultQuicktellerConfig = () => ({
-  enabled: false,
-  provider_name: 'Quickteller',
-  base_url: 'https://sandbox.interswitchng.com',
-  initialize_endpoint: '/collections/w/pay',
+const defaultQuicktellerEnvironment = (environment = 'test') => ({
+  base_url: environment === 'live' ? 'https://webpay.interswitchng.com' : 'https://sandbox.interswitchng.com',
+  initialize_endpoint: environment === 'live'
+    ? 'https://webpay.interswitchng.com/collections/w/pay'
+    : 'https://newwebpay-sandbox.interswitchng.com/collections/w/pay',
   verify_endpoint: '/collections/api/v1/gettransaction.json?merchantcode={merchant_code}&transactionreference={reference}&amount={amount}',
   merchant_code: '',
   pay_item_id: '',
   currency: '566',
-  mode: 'TEST',
   callback_path: '/enroll/start?checkout_return=1',
   request_amount_multiplier: 100,
   response_paths: {
@@ -433,6 +462,46 @@ const defaultQuicktellerConfig = () => ({
     paid_status: 'ResponseCode',
   },
   successful_payment_values: ['00'],
+})
+
+const defaultPaystackConfig = () => ({
+  enabled: false,
+  provider_name: 'Paystack',
+  mode: 'TEST',
+  environments: {
+    test: defaultPaystackEnvironment(),
+    live: defaultPaystackEnvironment(),
+  },
+})
+
+const defaultMonnifyConfig = () => ({
+  enabled: false,
+  provider_name: 'Monnify',
+  mode: 'TEST',
+  environments: {
+    test: defaultMonnifyEnvironment('test'),
+    live: defaultMonnifyEnvironment('live'),
+  },
+})
+
+const defaultRemitaConfig = () => ({
+  enabled: false,
+  provider_name: 'Remita',
+  mode: 'TEST',
+  environments: {
+    test: defaultRemitaEnvironment('test'),
+    live: defaultRemitaEnvironment('live'),
+  },
+})
+
+const defaultQuicktellerConfig = () => ({
+  enabled: false,
+  provider_name: 'Quickteller',
+  mode: 'TEST',
+  environments: {
+    test: defaultQuicktellerEnvironment('test'),
+    live: defaultQuicktellerEnvironment('live'),
+  },
 })
 
 const blankSubaccount = () => ({
@@ -482,6 +551,13 @@ const form = reactive({
   split_profiles: [],
 })
 
+const defaultGatewayConfig = (code) => {
+  if (code === 'monnify') return defaultMonnifyConfig()
+  if (code === 'remita') return defaultRemitaConfig()
+  if (code === 'quickteller') return defaultQuicktellerConfig()
+  return defaultPaystackConfig()
+}
+
 const activeGatewayConfig = computed(() => {
   const code = form.active_gateway || 'paystack'
 
@@ -492,9 +568,98 @@ const activeGatewayConfig = computed(() => {
   return form.gateway_configurations[code]
 })
 
+const selectedGatewayEnvironmentConfig = computed(() => {
+  const code = form.active_gateway || 'paystack'
+  const activeConfig = activeGatewayConfig.value
+  const environmentKey = environmentEditorMode.value === 'live' ? 'live' : 'test'
+  const defaults = defaultGatewayConfig(code)
+
+  if (!activeConfig.environments) {
+    activeConfig.environments = defaults.environments
+  }
+
+  if (!activeConfig.environments[environmentKey]) {
+    activeConfig.environments[environmentKey] = defaults.environments[environmentKey]
+  }
+
+  if (!activeConfig.environments[environmentKey].response_paths) {
+    activeConfig.environments[environmentKey].response_paths = {
+      ...defaults.environments[environmentKey].response_paths,
+    }
+  }
+
+  if (!Array.isArray(activeConfig.environments[environmentKey].successful_payment_values)) {
+    activeConfig.environments[environmentKey].successful_payment_values = [...(defaults.environments[environmentKey].successful_payment_values || [])]
+  }
+
+  if (activeConfig.environments[environmentKey].payment_methods === undefined && defaults.environments[environmentKey].payment_methods) {
+    activeConfig.environments[environmentKey].payment_methods = [...defaults.environments[environmentKey].payment_methods]
+  }
+
+  return activeConfig.environments[environmentKey]
+})
+
 const activeGatewayName = computed(() => {
   return gatewayOptions.value.find((item) => item.code === form.active_gateway)?.name || 'Configured gateway'
 })
+
+const activeGatewayMode = computed(() => {
+  return (activeGatewayConfig.value.mode || 'TEST').toUpperCase()
+})
+
+const activeGatewayModeLabel = computed(() => {
+  const prefix = activeGatewayMode.value === 'LIVE' ? 'Live mode' : 'Test mode'
+
+  return activeGatewayConfig.value.enabled ? `${prefix} enabled` : `${prefix} selected`
+})
+
+const activeGatewayModeDescription = computed(() => {
+  const modeText = activeGatewayMode.value === 'LIVE' ? 'live transactions' : 'test transactions'
+  const checkoutText = activeGatewayConfig.value.enabled ? 'Hosted checkout is enabled.' : 'Hosted checkout is currently disabled.'
+
+  return `${activeGatewayName.value} is configured for ${modeText}. ${checkoutText}`
+})
+
+const splitGatewayOptions = computed(() => {
+  return (gatewayOptions.value || []).filter((item) => item.supports_split_profiles)
+})
+
+const normalizeEnvironmentConfig = (baseEnvironment, environmentConfig = {}) => ({
+  ...baseEnvironment,
+  ...(environmentConfig || {}),
+  response_paths: {
+    ...(baseEnvironment.response_paths || {}),
+    ...(environmentConfig?.response_paths || {}),
+  },
+  successful_payment_values: Array.isArray(environmentConfig?.successful_payment_values)
+    ? environmentConfig.successful_payment_values
+    : [...(baseEnvironment.successful_payment_values || [])],
+  payment_methods: Array.isArray(environmentConfig?.payment_methods)
+    ? environmentConfig.payment_methods
+    : (baseEnvironment.payment_methods ? [...baseEnvironment.payment_methods] : undefined),
+})
+
+const normalizeGatewayConfig = (code, config) => {
+  const base = defaultGatewayConfig(code)
+  const environments = config?.environments || {}
+  const legacyEnvironment = config?.environments
+    ? {}
+    : Object.fromEntries(
+        Object.keys(base.environments.test || {})
+          .filter((key) => Object.prototype.hasOwnProperty.call(config || {}, key))
+          .map((key) => [key, config[key]])
+      )
+
+  return {
+    ...base,
+    ...(config || {}),
+    mode: (config?.mode || base.mode || 'TEST').toUpperCase(),
+    environments: {
+      test: normalizeEnvironmentConfig(base.environments.test, { ...legacyEnvironment, ...(environments.test || {}) }),
+      live: normalizeEnvironmentConfig(base.environments.live, { ...legacyEnvironment, ...(environments.live || {}) }),
+    },
+  }
+}
 
 const subaccountsForGateway = (gatewayCode) => {
   return (form.subaccounts || []).filter((item) => item.gateway_code === gatewayCode)
@@ -503,49 +668,67 @@ const subaccountsForGateway = (gatewayCode) => {
 const subaccountExternalLabel = (gatewayCode) => {
   if (gatewayCode === 'monnify') return 'Monnify subAccountCode'
   if (gatewayCode === 'remita') return 'Remita subAccountId'
-  if (gatewayCode === 'quickteller') return 'Quickteller split code'
   return 'Paystack subaccount code'
 }
 
-const defaultGatewayConfig = (code) => {
-  if (code === 'monnify') return defaultMonnifyConfig()
-  if (code === 'remita') return defaultRemitaConfig()
-  if (code === 'quickteller') return defaultQuicktellerConfig()
-  return defaultPaystackConfig()
+const showSubaccountCurrency = (gatewayCode) => ['monnify', 'remita'].includes(gatewayCode)
+const showSubaccountAccountName = (gatewayCode) => ['monnify', 'remita'].includes(gatewayCode)
+const showSubaccountBankCode = (gatewayCode) => ['monnify', 'remita'].includes(gatewayCode)
+const showSubaccountAccountNumber = (gatewayCode) => ['monnify', 'remita'].includes(gatewayCode)
+const showSubaccountEmail = (gatewayCode) => gatewayCode === 'monnify'
+
+const shareTypeOptionsForGateway = (gatewayCode) => {
+  if (gatewayCode === 'remita') {
+    return [{ title: 'Flat Amount', value: 'flat' }]
+  }
+
+  return shareTypeOptions
 }
 
-const normalizeGatewayConfig = (code, config) => {
-  const base = defaultGatewayConfig(code)
+const showSplitEntryFeeBearer = (gatewayCode) => ['monnify', 'remita'].includes(gatewayCode)
 
-  return {
-    ...base,
-    ...(config || {}),
-    response_paths: {
-      ...base.response_paths,
-      ...(config?.response_paths || {}),
-    },
-    successful_payment_values: config?.successful_payment_values || base.successful_payment_values,
-    payment_methods: config?.payment_methods || base.payment_methods,
+const normalizeSplitProfileGateway = (profile) => {
+  if (profile.gateway_code === 'remita') {
+    profile.entries = (profile.entries || []).map((entry) => ({
+      ...entry,
+      share_type: 'flat',
+      fee_percentage: 0,
+    }))
+  }
+
+  if (profile.gateway_code === 'paystack') {
+    profile.entries = (profile.entries || []).map((entry) => ({
+      ...entry,
+      fee_bearer: false,
+      fee_percentage: 0,
+    }))
   }
 }
 
-const normalizeSplitProfile = (profile = {}) => ({
-  ...blankSplitProfile(),
-  ...profile,
-  settings: {
-    paystack: {
-      ...blankSplitProfile().settings.paystack,
-      ...(profile.settings?.paystack || {}),
+const normalizeSplitProfile = (profile = {}) => {
+  const normalized = {
+    ...blankSplitProfile(),
+    ...profile,
+    settings: {
+      paystack: {
+        ...blankSplitProfile().settings.paystack,
+        ...(profile.settings?.paystack || {}),
+      },
     },
-  },
-  entries: (profile.entries || []).length
-    ? profile.entries.map((entry) => ({ ...blankSplitEntry(), ...entry }))
-    : [blankSplitEntry()],
-})
+    entries: (profile.entries || []).length
+      ? profile.entries.map((entry) => ({ ...blankSplitEntry(), ...entry }))
+      : [blankSplitEntry()],
+  }
+
+  normalizeSplitProfileGateway(normalized)
+
+  return normalized
+}
 
 const applyConfig = (payload = {}) => {
   gatewayOptions.value = payload.supported_gateways || []
   form.active_gateway = payload.active_gateway || 'paystack'
+  environmentEditorMode.value = 'test'
   form.gateway_configurations = {
     paystack: normalizeGatewayConfig('paystack', payload.gateway_configurations?.paystack),
     monnify: normalizeGatewayConfig('monnify', payload.gateway_configurations?.monnify),
@@ -574,6 +757,7 @@ const removeSplitProfile = (index) => {
 
 const addSplitEntry = (profile) => {
   profile.entries.push(blankSplitEntry())
+  normalizeSplitProfileGateway(profile)
 }
 
 const removeSplitEntry = (profile, index) => {
@@ -581,6 +765,7 @@ const removeSplitEntry = (profile, index) => {
   if (!profile.entries.length) {
     profile.entries.push(blankSplitEntry())
   }
+  normalizeSplitProfileGateway(profile)
 }
 
 const loadConfig = async () => {

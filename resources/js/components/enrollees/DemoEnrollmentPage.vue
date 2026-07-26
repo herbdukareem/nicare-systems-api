@@ -77,7 +77,7 @@
           <v-stepper-window-item :value="4">
             <section class="tw-grid tw-grid-cols-1 md:tw-grid-cols-3 tw-gap-4 tw-p-4">
               <v-select v-model="form.lga_id" :items="metadata.lgas" item-title="name" item-value="id" label="LGA" variant="outlined" density="comfortable" />
-              <v-select v-model="form.ward_id" :items="filteredWards" item-title="name" item-value="id" label="Ward" variant="outlined" density="comfortable" />
+              <v-text-field :model-value="selectedFacilityWardName" label="Ward" variant="outlined" density="comfortable" readonly />
               <v-select v-model="form.facility_id" :items="filteredFacilities" item-title="name" item-value="id" label="Facility" variant="outlined" density="comfortable" />
               <div v-if="selectedFacility" class="tw-rounded tw-border tw-border-gray-100 tw-p-4 tw-text-sm md:tw-col-span-3">
                 <strong>{{ selectedFacility.name }}</strong>
@@ -231,7 +231,6 @@ const form = ref({
   enrollment_phase_id: null,
   vulnerable_group_id: null,
   lga_id: null,
-  ward_id: null,
   facility_id: null,
   relationship_to_principal: 1,
   principal_enrollee_id: null,
@@ -253,7 +252,7 @@ const flowSteps = [
   'Officer captures enrollee biodata.',
   'Officer selects programme, category and premium plan.',
   'Officer selects funding source.',
-  'Officer assigns facility, LGA and ward.',
+  'Officer assigns facility and LGA.',
   'Officer links principal/dependant if applicable.',
   'System validates payment, PIN, sponsorship or payroll.',
   'System checks duplicates.',
@@ -277,12 +276,14 @@ const selectedBenefactor = computed(() => metadata.value.benefactors.find((item)
 const selectedFacility = computed(() => metadata.value.facilities.find((item) => item.id === form.value.facility_id))
 const filteredCategories = computed(() => metadata.value.categories.filter((item) => !form.value.insurance_programme_id || item.insurance_programme_id === form.value.insurance_programme_id))
 const filteredPlans = computed(() => metadata.value.premium_plans.filter((item) => !form.value.insurance_programme_id || item.insurance_programme_id === form.value.insurance_programme_id))
-const filteredWards = computed(() => metadata.value.wards.filter((item) => !form.value.lga_id || item.lga_id === form.value.lga_id))
 const filteredFacilities = computed(() => metadata.value.facilities.filter((item) => {
   if (form.value.lga_id && item.lga_id !== form.value.lga_id) return false
-  if (form.value.ward_id && item.ward_id !== form.value.ward_id) return false
   return true
 }))
+const selectedFacilityWardName = computed(() => {
+  const wardId = selectedFacility.value?.ward?.id || selectedFacility.value?.ward_id
+  return metadata.value.wards.find((item) => item.id === wardId)?.name || selectedFacility.value?.ward?.name || 'Auto from facility'
+})
 const filteredEnrollmentPhases = computed(() => metadata.value.enrollment_phases.filter((item) => !form.value.benefactor_id || item.benefactor_id === form.value.benefactor_id))
 const showSponsorFields = computed(() => {
   const name = (selectedFundingType.value?.name || selectedFundingType.value?.code || '').toLowerCase()
@@ -373,11 +374,13 @@ watch(() => form.value.insurance_programme_id, () => {
   form.value.premium_plan_id = null
 })
 watch(() => form.value.lga_id, () => {
-  form.value.ward_id = null
   form.value.facility_id = null
 })
-watch(() => form.value.ward_id, () => {
-  form.value.facility_id = null
+watch(() => form.value.facility_id, (facilityId) => {
+  const facility = metadata.value.facilities.find((item) => item.id === facilityId)
+  if (facility) {
+    form.value.lga_id = facility.lga_id || form.value.lga_id
+  }
 })
 watch(principalSearch, async (value) => {
   if (!value || value.length < 2) return

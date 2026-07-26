@@ -19,6 +19,7 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
@@ -103,11 +104,13 @@ class EnrolleeController extends BaseController
             'without_nin' => (clone $base)->where(function ($query): void {
                 $query->whereNull('nin')->orWhere('nin', '');
             })->count(),
-            'duplicate_nin_records' => (clone $base)
-                ->joinSub($this->duplicateNinValuesQuery(), 'duplicate_nins', function ($join) {
-                    $join->on('duplicate_nins.nin', '=', 'enrollees.nin');
-                })
-                ->count('enrollees.id'),
+            'duplicate_nin_records' => Schema::hasColumn('enrollees', 'has_duplicate_nin')
+                ? (clone $base)->where('has_duplicate_nin', 1)->count()
+                : (clone $base)
+                    ->joinSub($this->duplicateNinValuesQuery(), 'duplicate_nins', function ($join) {
+                        $join->on('duplicate_nins.nin', '=', 'enrollees.nin');
+                    })
+                    ->count('enrollees.id'),
             'possible_duplicates' => (clone $base)->where('is_possible_duplicate', true)->count(),
             'verified_nin' => (clone $base)
                 ->whereNotNull('nin')
@@ -935,6 +938,7 @@ class EnrolleeController extends BaseController
             'enrollment_date' => $enrollee->enrollment_date,
             'relationship_to_principal' => $enrollee->relationship_to_principal,
             'is_possible_duplicate' => (bool) $enrollee->is_possible_duplicate,
+            'has_duplicate_nin' => (bool) ($enrollee->has_duplicate_nin ?? false),
             'duplicate_reviewed' => (bool) $enrollee->duplicate_reviewed,
             'created_at' => $enrollee->created_at,
             'updated_at' => $enrollee->updated_at,

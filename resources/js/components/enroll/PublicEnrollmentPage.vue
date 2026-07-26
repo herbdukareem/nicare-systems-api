@@ -131,7 +131,6 @@
                 <v-select v-model="form.sex" label="Sex" variant="outlined" density="compact" :items="sexOptions" item-title="label" item-value="value" :error-messages="errors.sex" />
                 <v-select v-model="form.marital_status" label="Marital status" variant="outlined" density="compact" :items="maritalStatusOptions" item-title="label" item-value="value" :error-messages="errors.marital_status" />
                 <v-select v-model="form.lga_id" label="LGA" variant="outlined" density="compact" :items="metadata.lgas" item-title="name" item-value="id" :error-messages="errors.lga_id" />
-                <v-select v-model="form.ward_id" label="Ward" variant="outlined" density="compact" :items="metadata.wards" item-title="name" item-value="id" :error-messages="errors.ward_id" />
                 <v-select v-model="form.facility_id" label="Preferred facility" variant="outlined" density="compact" :items="metadata.facilities" item-title="name" item-value="id" :error-messages="errors.facility_id" />
               </div>
 
@@ -293,7 +292,7 @@
             <AppEmptyState
               v-if="!selectedFacility"
               title="No facility selected"
-              description="Select an LGA, ward, and facility in the form."
+              description="Select an LGA and facility in the form."
               icon="mdi-map-marker-outline"
             />
             <dl v-else class="enroll__summary">
@@ -434,7 +433,6 @@ const form = reactive({
   marital_status: null,
   address: '',
   lga_id: null,
-  ward_id: null,
   facility_id: null,
   password: '',
   password_confirmation: '',
@@ -462,7 +460,10 @@ const selectedPlanSupportsBankTransfer = computed(() => Boolean(selectedPlan.val
 const selectedTransferAccount = computed(() => selectedPlan.value?.bank_transfer_account || null)
 const selectedFacility = computed(() => (metadata.value.facilities || []).find((facility) => facility.id === form.facility_id) || null)
 const selectedLgaName = computed(() => (metadata.value.lgas || []).find((item) => item.id === form.lga_id)?.name || 'Not selected')
-const selectedWardName = computed(() => (metadata.value.wards || []).find((item) => item.id === form.ward_id)?.name || 'Not selected')
+const selectedWardName = computed(() => {
+  const facilityWardId = selectedFacility.value?.ward?.id || selectedFacility.value?.ward_id
+  return (metadata.value.wards || []).find((item) => item.id === facilityWardId)?.name || selectedFacility.value?.ward?.name || 'Not selected'
+})
 const ninVerificationPolicy = computed(() => metadata.value.nin_verification || {})
 const publicNinVerificationEnabled = computed(() => !!ninVerificationPolicy.value.enabled)
 const showEnrollmentMethodSelector = computed(() => !!selectedPlan.value && selectedPlan.value.payment_required)
@@ -541,7 +542,6 @@ const fetchMetadata = async () => {
     const response = await publicEnrollmentAPI.metadata({
       insurance_programme_id: selectedPlan.value?.insurance_programme_id || undefined,
       lga_id: form.lga_id || undefined,
-      ward_id: form.ward_id || undefined,
     })
 
     metadata.value = response.data.data || metadata.value
@@ -594,7 +594,6 @@ const clearApplicationFields = () => {
     marital_status: null,
     address: '',
     lga_id: null,
-    ward_id: null,
     facility_id: null,
     password: '',
     password_confirmation: '',
@@ -745,12 +744,6 @@ const handlePassportSelected = (event) => {
 }
 
 watch(() => form.lga_id, async () => {
-  form.ward_id = null
-  form.facility_id = null
-  await fetchMetadata()
-})
-
-watch(() => form.ward_id, async () => {
   form.facility_id = null
   await fetchMetadata()
 })

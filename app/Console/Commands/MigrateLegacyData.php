@@ -21,6 +21,7 @@ use App\Models\Staff;
 use App\Models\User;
 use App\Models\Ward;
 use App\Services\Legacy\LegacyEnrolleeMigrationService;
+use App\Services\EnrolleeDuplicateNinService;
 use App\Support\LegacyReferenceData;
 use Illuminate\Bus\Batch;
 use Illuminate\Console\Command;
@@ -80,7 +81,10 @@ class MigrateLegacyData extends Command
     /** @var array<int, int> */
     private array $wardIds = [];
 
-    public function handle(LegacyEnrolleeMigrationService $enrolleeService): int
+    public function handle(
+        LegacyEnrolleeMigrationService $enrolleeService,
+        EnrolleeDuplicateNinService $duplicateNinService
+    ): int
     {
         $only = strtolower((string) $this->option('only'));
         if (!in_array($only, ['all', 'reference', 'phases', 'pins', 'invoices', 'enrollees', 'capitations'], true)) {
@@ -143,6 +147,7 @@ class MigrateLegacyData extends Command
             } else {
                 $enrolleeStats = $this->migrateEnrollees(
                     $enrolleeService,
+                    $duplicateNinService,
                     $enrolleeTables,
                     $chunk,
                     $fromId,
@@ -210,25 +215,32 @@ class MigrateLegacyData extends Command
     {
         $count = 0;
         $unknownLga = $this->unknownLga();
+        $hasLegacyId = Schema::hasColumn('wards', 'legacy_id');
 
         DB::connection(self::LEGACY_CONNECTION)
             ->table('ward')
             ->orderBy('id')
             ->get()
-            ->each(function (object $row) use (&$count, $unknownLga): void {
+            ->each(function (object $row) use (&$count, $unknownLga, $hasLegacyId): void {
                 $legacyId = (int) $row->id;
                 $legacyLgaId = (int) ($row->lga_id ?? 0);
                 $lgaId = $this->lgaIds[$legacyLgaId] ?? ($legacyLgaId ?: $unknownLga->id);
 
-                $ward = Ward::updateOrCreate(
-                    ['id' => $legacyId],
-                    [
-                        'name' => $this->string($this->value($row, 'ward', 'name')) ?? 'Legacy Ward ' . $legacyId,
-                        'lga_id' => Lga::whereKey($lgaId)->exists() ? $lgaId : $unknownLga->id,
-                        'settlement_type' => $this->settlementType($row->settlement ?? null),
-                        'status' => 1,
-                    ]
-                );
+                $data = [
+                    'name' => $this->string($this->value($row, 'ward', 'name')) ?? 'Legacy Ward ' . $legacyId,
+                    'lga_id' => Lga::whereKey($lgaId)->exists() ? $lgaId : $unknownLga->id,
+                    'settlement_type' => $this->settlementType($row->settlement ?? null),
+                    'status' => 1,
+                ];
+
+                if ($hasLegacyId) {
+                    $data['legacy_id'] = $legacyId;
+                }
+
+                $ward = ($hasLegacyId ? Ward::where('legacy_id', $legacyId)->first() : null)
+                    ?: Ward::whereKey($legacyId)->first()
+                    ?: new Ward(['id' => $legacyId]);
+                $ward->fill($data)->save();
 
                 $this->wardIds[$legacyId] = $ward->id;
                 $count++;
@@ -364,12 +376,13 @@ class MigrateLegacyData extends Command
         $unknownLga = $this->unknownLga();
         $unknownWard = $this->unknownWard($unknownLga);
         $hasAccreditation = Schema::hasColumn('facilities', 'accreditation_status');
+        $hasLegacyId = Schema::hasColumn('facilities', 'legacy_id');
 
         DB::connection(self::LEGACY_CONNECTION)
             ->table('tbl_providers')
             ->orderBy('id')
             ->get()
-            ->each(function (object $provider) use (&$count, $unknownLga, $unknownWard, $hasAccreditation): void {
+            ->each(function (object $provider) use (&$count, $unknownLga, $unknownWard, $hasAccreditation, $hasLegacyId): void {
                 $legacyId = (int) $provider->id;
                 $hcpCode = $this->string($provider->hcpcode ?? null) ?? 'LEGACY-HCP-' . $legacyId;
                 $legacyLgaId = (int) ($provider->hcplga ?? 0);
@@ -401,8 +414,12 @@ class MigrateLegacyData extends Command
                 if ($hasAccreditation) {
                     $data['accreditation_status'] = 'active';
                 }
+                if ($hasLegacyId) {
+                    $data['legacy_id'] = $legacyId;
+                }
 
-                $facility = Facility::whereKey($legacyId)->first()
+                $facility = ($hasLegacyId ? Facility::where('legacy_id', $legacyId)->first() : null)
+                    ?: Facility::whereKey($legacyId)->first()
                     ?: Facility::where('hcp_code', $hcpCode)->first()
                     ?: new Facility(['id' => $legacyId]);
                 $facility->forceFill($data)->save();
@@ -818,6 +835,8 @@ class MigrateLegacyData extends Command
                     $cutoff = $this->legacyCarbon($row->enroled_on_before_date ?? null);
                     $capitatedMonth = $cutoff?->month ?: (int) ($row->month ?? 1);
                     $periodYear = (int) ($row->cap_year ?? $row->year ?? $cutoff?->year ?? now()->year);
+                    $periodStart = $cutoff?->copy()->setDate($periodYear, $capitatedMonth, 20)
+                        ?? Carbon::create($periodYear, max(1, min(12, $capitatedMonth)), 20);
                     $createdAt = $this->legacyDateTime($row->date_created ?? null) ?? now()->toDateTimeString();
                     $updatedAt = $this->legacyDateTime($row->last_modified ?? null) ?? $createdAt;
                     $finalisedAt = $this->legacyDateTime($row->approval_date_bhcpf ?? null)
@@ -825,13 +844,16 @@ class MigrateLegacyData extends Command
 
                     $payload = [
                         'name' => $this->string($row->name ?? null) ?? 'Legacy Capitation ' . $legacyId,
-                        'period_start' => $cutoff?->copy()->startOfMonth()->toDateString(),
-                        'period_end' => $cutoff?->copy()->endOfMonth()->toDateString(),
+                        'period_start' => $periodStart->toDateString(),
+                        'period_end' => null,
                         'capitation_rate' => $this->numeric($ratesByGroup[$legacyId] ?? null) ?? 0,
                         'capitated_month' => max(1, min(12, $capitatedMonth)),
-                        'capitation_month' => max(1, min(12, (int) ($row->month ?? $capitatedMonth))),
+                        // Legacy capitation_grouping.month points to the following display month.
+                        // Use the actual cutoff month so imported periods line up with legacy totals.
+                        'capitation_month' => max(1, min(12, $capitatedMonth)),
                         'year' => $periodYear,
                         'funding_type_id' => null,
+                        'duplicate_nin_policy' => Capitation::DUPLICATE_NIN_POLICY_INCLUDE,
                         'user_id' => $systemUserId,
                         'created_by' => $this->legacyUserIdOrSystem($row->created_by ?? null, $systemUserId),
                         'status' => (string) ($row->status ?? '1') === '1',
@@ -1167,6 +1189,7 @@ class MigrateLegacyData extends Command
      */
     private function migrateEnrollees(
         LegacyEnrolleeMigrationService $service,
+        EnrolleeDuplicateNinService $duplicateNinService,
         array $tables,
         int $chunk,
         ?int $fromId,
@@ -1210,6 +1233,8 @@ class MigrateLegacyData extends Command
                     break;
                 }
 
+                $touchedNins = [];
+
                 foreach ($rows as $row) {
                     $lastId = (int) $row->id;
                     $stats['processed']++;
@@ -1218,6 +1243,10 @@ class MigrateLegacyData extends Command
                         $result = $service->migrate($row, $table, $dryRun);
                         $mapped = $result['mapped'] ?? [];
                         $flags = $mapped['flags'] ?? [];
+                        $nin = $mapped['enrollee']['nin'] ?? null;
+                        if (filled($nin)) {
+                            $touchedNins[] = $nin;
+                        }
 
                         $stats[$dryRun ? 'skipped' : 'migrated']++;
                         if ($result['duplicate_matched'] ?? false) {
@@ -1243,6 +1272,10 @@ class MigrateLegacyData extends Command
                         }
                         $this->error("[{$table}:{$row->id}] failed: {$e->getMessage()}");
                     }
+                }
+
+                if (!$dryRun && $touchedNins !== []) {
+                    $duplicateNinService->refreshForNins($touchedNins);
                 }
 
                 if ($remaining !== null) {

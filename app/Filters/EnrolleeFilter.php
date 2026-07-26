@@ -5,6 +5,7 @@ namespace App\Filters;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Class EnrolleeFilter
@@ -116,6 +117,11 @@ class EnrolleeFilter
                     break;
                 case 'duplicate_nin_only':
                     if (filter_var($value, FILTER_VALIDATE_BOOLEAN)) {
+                        if (Schema::hasColumn(self::TABLE, 'has_duplicate_nin')) {
+                            $query->where(self::TABLE . '.has_duplicate_nin', 1);
+                            break;
+                        }
+
                         // A `whereIn('nin', $closure)` with GROUP BY/HAVING inside is
                         // optimized by MySQL as a dependent subquery — re-executed for
                         // every outer row (catastrophic at 100k+ rows: hours, not seconds).

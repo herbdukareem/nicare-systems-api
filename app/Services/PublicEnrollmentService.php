@@ -23,7 +23,8 @@ class PublicEnrollmentService
         private BillingCheckoutService $billingCheckoutService,
         private SystemAuditUserResolver $systemAuditUserResolver,
         private NinProviderConfigService $ninProviderConfigService,
-        private NinVerificationService $ninVerificationService
+        private NinVerificationService $ninVerificationService,
+        private EnrollmentLocationResolver $locationResolver
     ) {
     }
 
@@ -55,13 +56,10 @@ class PublicEnrollmentService
         }
 
         $facility = Facility::findOrFail($data['facility_id']);
+        $data = $this->locationResolver->resolve($data);
 
-        if ((int) $facility->lga_id !== (int) $data['lga_id']) {
-            throw new RuntimeException('The selected facility does not belong to the selected LGA.');
-        }
-
-        if ((int) $facility->ward_id !== (int) $data['ward_id']) {
-            throw new RuntimeException('The selected facility does not belong to the selected ward.');
+        if (empty($data['lga_id']) || empty($data['ward_id'])) {
+            throw new RuntimeException('The selected facility is missing a complete ward/LGA assignment.');
         }
 
         $requiresPublicNinVerification = $ninPolicy['enabled'] && filled($data['nin'] ?? null);

@@ -42,7 +42,6 @@ class EnrollmentFormSchemaService
             ['key' => 'disability', 'label' => 'Disability', 'type' => 'select', 'required' => false, 'rules' => ['string', 'max:255'], 'options' => $this->stringSelectOptions(Enrollee::DISABILITY_OPTIONS)],
             ['key' => 'address', 'label' => 'Address', 'type' => 'textarea', 'required' => false, 'rules' => ['string']],
             ['key' => 'lga_id', 'label' => 'LGA', 'type' => 'select', 'required' => true, 'source' => 'lgas', 'rules' => ['integer', 'exists:lgas,id']],
-            ['key' => 'ward_id', 'label' => 'Ward', 'type' => 'select', 'required' => true, 'source' => 'wards', 'rules' => ['integer', 'exists:wards,id']],
             ['key' => 'facility_id', 'label' => 'Facility', 'type' => 'select', 'required' => true, 'source' => 'facilities', 'rules' => ['integer', 'exists:facilities,id']],
             ['key' => 'insurance_programme_id', 'label' => 'Programme', 'type' => 'select', 'required' => true, 'source' => 'insurance_programmes', 'rules' => ['integer', 'exists:insurance_programmes,id']],
             ['key' => 'premium_plan_id', 'label' => 'Premium plan', 'type' => 'select', 'required' => true, 'source' => 'premium_plans', 'rules' => ['integer', 'exists:premium_plans,id']],
@@ -212,11 +211,23 @@ class EnrollmentFormSchemaService
                 (array) ($attributes['location_capture_policy'] ?? [])
             ),
             'allow_offline_capture' => (bool) ($attributes['allow_offline_capture'] ?? true),
-            'fields' => $attributes['fields'] ?? $this->defaultFields(),
+            'fields' => $this->normalizeFields($attributes['fields'] ?? $this->defaultFields()),
             'rules' => $attributes['rules'] ?? [],
             'ui_schema' => $attributes['ui_schema'] ?? [],
             'migration_hints' => $attributes['migration_hints'] ?? null,
         ];
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $fields
+     * @return array<int, array<string, mixed>>
+     */
+    private function normalizeFields(array $fields): array
+    {
+        return collect($fields)
+            ->filter(fn ($field) => (string) ($field['key'] ?? '') !== 'ward_id')
+            ->values()
+            ->all();
     }
 
     /**

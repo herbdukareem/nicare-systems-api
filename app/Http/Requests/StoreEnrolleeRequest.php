@@ -3,7 +3,9 @@
 namespace App\Http\Requests;
 
 use App\Models\Enrollee;
+use App\Models\Facility;
 use App\Models\PremiumPlan;
+use App\Services\EnrollmentLocationResolver;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -40,6 +42,8 @@ class StoreEnrolleeRequest extends FormRequest
             $data['principal_enrollee_id'] = null;
         }
 
+        $data = app(EnrollmentLocationResolver::class)->resolve($data);
+
         unset($data['enrollee_id']);
 
         $this->merge($data + [
@@ -65,7 +69,7 @@ class StoreEnrolleeRequest extends FormRequest
             'enrollee_category_id' => 'nullable|exists:enrollee_categories,id',
             'facility_id' => 'required|exists:facilities,id',
             'lga_id' => 'required|exists:lgas,id',
-            'ward_id' => 'required|exists:wards,id',
+            'ward_id' => 'nullable|exists:wards,id',
             'village' => 'nullable|string|max:255',
             'pregnant' => 'nullable|boolean',
             'disability' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::DISABILITY_OPTIONS)],
@@ -98,6 +102,20 @@ class StoreEnrolleeRequest extends FormRequest
 
                 if (!$wardBelongsToLga) {
                     $validator->errors()->add('ward_id', 'The selected ward does not belong to the selected LGA.');
+                }
+            }
+
+            if ($this->filled('facility_id')) {
+                $facility = Facility::query()
+                    ->select(['id', 'lga_id', 'ward_id'])
+                    ->find($this->input('facility_id'));
+
+                if ($facility && $this->filled('lga_id') && (int) $facility->lga_id !== (int) $this->input('lga_id')) {
+                    $validator->errors()->add('facility_id', 'The selected facility does not belong to the selected LGA.');
+                }
+
+                if ($facility && $this->filled('ward_id') && (int) $facility->ward_id !== (int) $this->input('ward_id')) {
+                    $validator->errors()->add('facility_id', 'The selected facility does not belong to the selected ward.');
                 }
             }
 

@@ -23,30 +23,27 @@ use Illuminate\Support\Str;
 class LegacyEnrolleeMapper
 {
     private const BENEFACTOR_ID_MAP = [
-        1 => 1,
-        2 => 2,
-        3 => 3,
-        4 => 4,
-        5 => 5,
-        6 => 6,
-        7 => 7,
-        8 => 8,
-        9 => 9,
-        10 => 10,
-        11 => 11,
-        12 => 12,
-        13 => 13,
-        14 => 14,
-        100 => 15,
+        '' => 7,
+        '7' => 7,
+        'dr. mm makusidi' => 5,
+        'peculiar cooperative' => 1,
+        '2' => 2,
+        'ngscha' => 3,
+        'nigeria for women' => 6,
+        '10' => 10,
+        '9' => 9,
+        '100' => 15,
+        '4' => 4,
+        '8' => 8,
     ];
 
     private const FUNDING_TYPE_ID_MAP = [
+        '' => 3,
         'bhcpf' => 1,
         'cf' => 2,
-        'premium' => 3,
+        'formal' => 6,
         'gac' => 4,
         'unicef' => 5,
-        'formal' => 6,
     ];
 
     /** @var array<int, int|null> */
@@ -76,6 +73,9 @@ class LegacyEnrolleeMapper
     /** @var array<int, int|null> */
     private array $facilityIds = [];
 
+    /** @var array<string, int|null> */
+    private array $wardLookupIds = [];
+
     /** @var array<int, bool> */
     private array $ensuredFundingTypeIds = [];
 
@@ -90,8 +90,8 @@ class LegacyEnrolleeMapper
 
         $programme = $this->programme($classification['programme_code'], $classification['programme_name']);
         $category = $this->category($programme, $this->categoryName($legacy, $classification, $sourceTable));
-        $fundingTypeId = $this->fundingTypeId($classification['funding_type']);
-        $fundingTypeName = $this->fundingTypeName($classification['funding_type']);
+        $fundingTypeId = $this->fundingTypeId($legacy, $classification);
+        $fundingTypeName = $this->fundingTypeName($fundingTypeId, $classification['funding_type']);
         $vulnerableGroupId = $this->vulnerableGroupId($legacy, $classification, $sourceTable);
         $benefitPackage = $this->benefitPackage($classification['benefit_package']);
         $benefactorId = $this->benefactorId($legacy, $classification);
@@ -132,6 +132,7 @@ class LegacyEnrolleeMapper
             'enrollee' => [
                 'enrollee_id' => $legacyEnrolmentNumber,
                 'legacy_id' => (int) $legacy->id,
+                'legacy_source_table' => $sourceTable,
                 'legacy_enrollee_id' => $legacyEnrolmentNumber,
                 'nin' => $this->string($legacy->nin ?? null) ?: $this->string($legacy->national_identification_number ?? null),
                 'first_name' => $this->string($legacy->first_name ?? null) ?: 'Unknown',
@@ -220,7 +221,7 @@ class LegacyEnrolleeMapper
             'flags' => [
                 'missing_facility' => !$this->directLegacyId($legacy, 'provider_id', 'p_provider_id', 'facility_id'),
                 'missing_lga' => !$this->directLegacyId($legacy, 'lga_id', 'lga'),
-                'missing_ward' => !$this->directLegacyId($legacy, 'ward_id', 'ward'),
+                'missing_ward' => $this->wardName($legacy) === null,
                 'missing_funding_type' => $classification['missing_funding_type'],
             ],
         ];
@@ -392,27 +393,23 @@ class LegacyEnrolleeMapper
         return $classification['category_name'];
     }
 
-    private function fundingTypeId(string $name): int
+    private function fundingTypeId(object $legacy, array $classification): int
     {
-        $fundingType = LegacyReferenceData::fundingTypeByLegacyValue($name);
-        $code = $fundingType['code2'] ?? Str::lower($name);
+        $key = $this->fundingTypeMappingKey($legacy, $classification);
+        $id = self::FUNDING_TYPE_ID_MAP[$key] ?? self::FUNDING_TYPE_ID_MAP[''];
 
-        if (isset(self::FUNDING_TYPE_ID_MAP[$code])) {
-            $id = self::FUNDING_TYPE_ID_MAP[$code];
-            $this->ensureFundingTypeId($id, $fundingType, $name);
+        $this->ensureFundingTypeId(
+            $id,
+            $this->fundingTypeReferenceById($id),
+            $classification['funding_type'] ?? $key ?: 'premium'
+        );
 
-            return $id;
-        }
-
-        return FundingType::firstOrCreate(
-            ['name' => $fundingType['name'] ?? $name],
-            ['description' => "Legacy migration funding classification: {$name}", 'status' => $fundingType['status'] ?? 1]
-        )->id;
+        return $id;
     }
 
-    private function fundingTypeName(string $name): string
+    private function fundingTypeName(int $id, string $fallback): string
     {
-        return LegacyReferenceData::fundingTypeByLegacyValue($name)['name'] ?? $name;
+        return $this->fundingTypeReferenceById($id)['name'] ?? $fallback;
     }
 
     private function vulnerableGroupId(object $legacy, array $classification, string $sourceTable): ?int
@@ -505,31 +502,19 @@ class LegacyEnrolleeMapper
 
     private function benefactorId(object $legacy, array $classification): ?int
     {
-        $benefactorRef = LegacyReferenceData::benefactorByLegacyValue($legacy->benefactor ?? null)
-            ?: LegacyReferenceData::benefactorByFundingValue($legacy->funding ?? null);
+        $key = $this->benefactorMappingKey($legacy, $classification);
+        $id = self::BENEFACTOR_ID_MAP[$key] ?? self::BENEFACTOR_ID_MAP[''];
 
-        $legacyId = $benefactorRef['legacy_id'] ?? $this->positiveInteger($legacy->benefactor ?? null);
-        if ($legacyId && isset(self::BENEFACTOR_ID_MAP[$legacyId])) {
-            $id = self::BENEFACTOR_ID_MAP[$legacyId];
-            $this->ensureBenefactorId($id, $benefactorRef, $this->benefactorName($legacy, $classification));
+        $this->ensureBenefactorId($id, $this->benefactorReferenceById($id), $this->benefactorName($legacy, $classification));
 
-            return $id;
-        }
-
-        if ($classification['activation_source'] === 'payroll') {
-            $id = self::BENEFACTOR_ID_MAP[100];
-            $this->ensureBenefactorId($id, LegacyReferenceData::benefactorByLegacyValue(100), 'Formal Sector');
-
-            return $id;
-        }
-
-        return null;
+        return $id;
     }
 
     private function benefactorName(object $legacy, array $classification): ?string
     {
-        $benefactorRef = LegacyReferenceData::benefactorByLegacyValue($legacy->benefactor ?? null)
-            ?: LegacyReferenceData::benefactorByFundingValue($legacy->funding ?? null);
+        $benefactorId = self::BENEFACTOR_ID_MAP[$this->benefactorMappingKey($legacy, $classification)] ?? self::BENEFACTOR_ID_MAP[''];
+        $benefactorRef = $this->benefactorReferenceById($benefactorId)
+            ?: LegacyReferenceData::benefactorByLegacyValue($legacy->benefactor ?? null);
 
         $name = $benefactorRef['name'] ?? (
             $this->string($legacy->benefactor ?? null)
@@ -575,9 +560,12 @@ class LegacyEnrolleeMapper
 
     private function facilityId(object $legacy, int $lgaId, int $wardId): int
     {
-        $providerId = $this->directLegacyId($legacy, 'provider_id', 'p_provider_id', 'facility_id');
-        if ($providerId && $this->facilityExists($providerId)) {
-            return $providerId;
+        $providerLegacyId = $this->directLegacyId($legacy, 'provider_id', 'p_provider_id', 'facility_id');
+        if ($providerLegacyId) {
+            $facilityId = $this->facilityIdFromLegacyId($providerLegacyId);
+            if ($facilityId !== null) {
+                return $facilityId;
+            }
         }
 
         return $this->fallbackIds['facility'] ??= Facility::firstOrCreate(
@@ -586,15 +574,25 @@ class LegacyEnrolleeMapper
         )->id;
     }
 
-    private function facilityExists(int $providerId): bool
+    private function facilityIdFromLegacyId(int $providerLegacyId): ?int
     {
-        if (array_key_exists($providerId, $this->facilityIds)) {
-            return $this->facilityIds[$providerId] !== null;
+        if (array_key_exists($providerLegacyId, $this->facilityIds)) {
+            return $this->facilityIds[$providerLegacyId];
         }
 
-        $this->facilityIds[$providerId] = Facility::whereKey($providerId)->value('id');
+        $query = Facility::query();
+        if (Schema::hasColumn('facilities', 'legacy_id')) {
+            $query->where('legacy_id', $providerLegacyId);
+        } else {
+            $query->whereKey($providerLegacyId);
+        }
 
-        return $this->facilityIds[$providerId] !== null;
+        $facilityId = $query->value('id');
+        if ($facilityId === null && Schema::hasColumn('facilities', 'legacy_id')) {
+            $facilityId = Facility::whereKey($providerLegacyId)->value('id');
+        }
+
+        return $this->facilityIds[$providerLegacyId] = $facilityId ? (int) $facilityId : null;
     }
 
     private function lgaId(object $legacy): int
@@ -609,12 +607,52 @@ class LegacyEnrolleeMapper
 
     private function wardId(object $legacy, int $lgaId): int
     {
-        $wardId = $this->directLegacyId($legacy, 'ward_id', 'ward');
-        if ($wardId) {
-            return $wardId;
+        $legacyWardId = $this->directLegacyId($legacy, 'ward_id', 'ward');
+        if ($legacyWardId) {
+            $mappedWardId = $this->wardIdFromLegacyId($legacyWardId, $lgaId);
+            if ($mappedWardId !== null) {
+                return $mappedWardId;
+            }
+        }
+
+        $wardName = $this->wardName($legacy);
+        if ($wardName) {
+            $matchedWardId = Ward::query()
+                ->where('lga_id', $lgaId)
+                ->whereRaw('LOWER(TRIM(name)) = ?', [Str::lower(trim($wardName))])
+                ->value('id');
+
+            if ($matchedWardId) {
+                return (int) $matchedWardId;
+            }
         }
 
         return $this->unknownWardId($lgaId);
+    }
+
+    private function wardIdFromLegacyId(int $legacyWardId, int $lgaId): ?int
+    {
+        $cacheKey = $legacyWardId . ':' . $lgaId;
+        if (array_key_exists($cacheKey, $this->wardLookupIds)) {
+            return $this->wardLookupIds[$cacheKey];
+        }
+
+        $query = Ward::query()->where('lga_id', $lgaId);
+        if (Schema::hasColumn('wards', 'legacy_id')) {
+            $query->where('legacy_id', $legacyWardId);
+        } else {
+            $query->whereKey($legacyWardId);
+        }
+
+        $wardId = $query->value('id');
+        if ($wardId === null && Schema::hasColumn('wards', 'legacy_id')) {
+            $wardId = Ward::query()
+                ->where('lga_id', $lgaId)
+                ->whereKey($legacyWardId)
+                ->value('id');
+        }
+
+        return $this->wardLookupIds[$cacheKey] = $wardId ? (int) $wardId : null;
     }
 
     private function premiumPinId(object $legacy): ?int
@@ -711,6 +749,75 @@ class LegacyEnrolleeMapper
             ['name' => 'Unknown Legacy Ward', 'lga_id' => $lgaId],
             ['settlement_type' => 1, 'status' => 1]
         )->id;
+    }
+
+    private function fundingTypeMappingKey(object $legacy, array $classification): string
+    {
+        if (($classification['funding_type'] ?? null) === 'formal' || ($classification['activation_source'] ?? null) === 'payroll') {
+            return 'formal';
+        }
+
+        return $this->normalizedMappingKey($legacy->funding ?? null);
+    }
+
+    private function benefactorMappingKey(object $legacy, array $classification): string
+    {
+        $benefactor = $this->string($legacy->benefactor ?? null);
+        if ($benefactor !== null) {
+            return $this->normalizedMappingKey($benefactor);
+        }
+
+        if (($classification['funding_type'] ?? null) === 'formal' || ($classification['activation_source'] ?? null) === 'payroll') {
+            return '100';
+        }
+
+        return '';
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function fundingTypeReferenceById(int $id): ?array
+    {
+        foreach (LegacyReferenceData::fundingTypes() as $fundingType) {
+            $mappedId = self::FUNDING_TYPE_ID_MAP[$this->normalizedMappingKey($fundingType['code2'] ?? null)] ?? null;
+            if ($mappedId === $id) {
+                return $fundingType;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    private function benefactorReferenceById(int $id): ?array
+    {
+        foreach (LegacyReferenceData::benefactors() as $benefactor) {
+            $mappedId = self::BENEFACTOR_ID_MAP[$this->normalizedMappingKey($benefactor['legacy_id'] ?? null)] ?? null;
+            if ($mappedId === $id) {
+                return $benefactor;
+            }
+        }
+
+        return null;
+    }
+
+    private function wardName(object $legacy): ?string
+    {
+        foreach (['ward_name', 'ward'] as $key) {
+            if (!property_exists($legacy, $key)) {
+                continue;
+            }
+
+            $value = $this->string($legacy->{$key});
+            if ($value !== null && $this->positiveInteger($value) === null) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     private function formalCategory(object $legacy): string
@@ -840,6 +947,15 @@ class LegacyEnrolleeMapper
         }
 
         return null;
+    }
+
+    private function normalizedMappingKey(mixed $value): string
+    {
+        $value = $this->string($value);
+
+        return $value === null
+            ? ''
+            : Str::of($value)->lower()->replace("\xc2\xa0", ' ')->squish()->toString();
     }
 
     private function string(mixed $value): ?string

@@ -12,6 +12,7 @@ class PaymentGatewayConfigurationService
     private const GATEWAY_CONFIG_PREFIX = 'PAYMENT_GATEWAY_CONFIG_';
     private const SUBACCOUNTS_KEY = 'PAYMENT_GATEWAY_SUBACCOUNTS';
     private const SPLIT_PROFILES_KEY = 'PAYMENT_GATEWAY_SPLIT_PROFILES';
+    private const GATEWAY_ENVIRONMENTS = ['test', 'live'];
 
     public function availableGatewayOptions(): array
     {
@@ -33,7 +34,7 @@ class PaymentGatewayConfigurationService
         $code ??= $this->getActiveGatewayCode();
 
         if (!$code) {
-            return $this->defaultConfig('paystack');
+            return $this->resolveRuntimeConfig($this->defaultConfig('paystack'));
         }
 
         $stored = Configuration::getValue($this->configKey($code));
@@ -41,7 +42,7 @@ class PaymentGatewayConfigurationService
             ? json_decode($stored, true) ?? []
             : [];
 
-        return array_replace_recursive($this->defaultConfig($code), $config);
+        return $this->resolveRuntimeConfig($this->normalizeGatewayConfig($code, $config));
     }
 
     public function getAll(): array
@@ -69,9 +70,9 @@ class PaymentGatewayConfigurationService
 
         foreach ($this->availableGatewayOptions() as $gateway) {
             $code = $gateway['code'];
-            $config = array_replace_recursive(
-                $this->defaultConfig($code),
-                Arr::get($payload, "gateway_configurations.$code", [])
+            $config = $this->normalizeGatewayConfig(
+                $code,
+                (array) Arr::get($payload, "gateway_configurations.$code", [])
             );
 
             Configuration::setValue(
@@ -117,102 +118,16 @@ class PaymentGatewayConfigurationService
 
     public function defaultConfig(string $code): array
     {
-        return match ($code) {
-            'paystack' => [
-                'code' => 'paystack',
-                'provider_name' => 'Paystack',
-                'enabled' => false,
-                'base_url' => 'https://api.paystack.co',
-                'initialize_endpoint' => '/transaction/initialize',
-                'verify_endpoint' => '/transaction/verify/{reference}',
-                'public_key' => '',
-                'secret_key' => '',
-                'currency' => 'NGN',
-                'callback_path' => '/enroll/start?checkout_return=1',
-                'request_amount_multiplier' => 100,
-                'response_paths' => [
-                    'success' => 'status',
-                    'authorization_url' => 'data.authorization_url',
-                    'access_code' => 'data.access_code',
-                    'reference' => 'data.reference',
-                    'paid_status' => 'data.status',
-                    'message' => 'message',
-                ],
-                'successful_payment_values' => ['success'],
-            ],
-            'monnify' => [
-                'code' => 'monnify',
-                'provider_name' => 'Monnify',
-                'enabled' => false,
-                'base_url' => 'https://sandbox.monnify.com',
-                'login_endpoint' => '/api/v1/auth/login',
-                'initialize_endpoint' => '/api/v1/merchant/transactions/init-transaction',
-                'verify_endpoint' => '/api/v2/merchant/transactions/query?paymentReference={reference}',
-                'api_key' => '',
-                'secret_key' => '',
-                'contract_code' => '',
-                'currency' => 'NGN',
-                'callback_path' => '/enroll/start?checkout_return=1',
-                'payment_methods' => ['CARD', 'ACCOUNT_TRANSFER', 'USSD'],
-                'request_amount_multiplier' => 1,
-                'response_paths' => [
-                    'success' => 'requestSuccessful',
-                    'authorization_url' => 'responseBody.checkoutUrl',
-                    'access_code' => 'responseBody.transactionReference',
-                    'reference' => 'responseBody.paymentReference',
-                    'paid_status' => 'responseBody.paymentStatus',
-                    'message' => 'responseMessage',
-                ],
-                'successful_payment_values' => ['PAID'],
-            ],
-            'remita' => [
-                'code' => 'remita',
-                'provider_name' => 'Remita',
-                'enabled' => false,
-                'base_url' => 'https://api-demo.systemspecsng.com',
-                'initialize_endpoint' => '/services/connect-gateway/api/v1/payment/charge',
-                'verify_endpoint' => '/services/connect-gateway/api/v1/payment-engine/payment/merchant/verify/{reference}',
-                'secret_key' => '',
-                'currency' => 'NGN',
-                'callback_path' => '/enroll/start?checkout_return=1',
-                'request_amount_multiplier' => 1,
-                'response_paths' => [
-                    'success' => 'status',
-                    'authorization_url' => 'data.paymentLink',
-                    'access_code' => 'data.paymentIdentifier',
-                    'reference' => 'data.paymentIdentifier',
-                    'paid_status' => 'data.status',
-                    'message' => 'message',
-                ],
-                'successful_payment_values' => ['SUCCESS', 'APPROVED', '00'],
-            ],
-            'quickteller' => [
-                'code' => 'quickteller',
-                'provider_name' => 'Quickteller',
-                'enabled' => false,
-                'base_url' => 'https://sandbox.interswitchng.com',
-                'initialize_endpoint' => '/collections/w/pay',
-                'verify_endpoint' => '/collections/api/v1/gettransaction.json?merchantcode={merchant_code}&transactionreference={reference}&amount={amount}',
-                'merchant_code' => '',
-                'pay_item_id' => '',
-                'currency' => '566',
-                'mode' => 'TEST',
-                'callback_path' => '/enroll/start?checkout_return=1',
-                'request_amount_multiplier' => 100,
-                'response_paths' => [
-                    'paid_status' => 'ResponseCode',
-                    'message' => 'ResponseDescription',
-                    'reference' => 'MerchantReference',
-                    'access_code' => 'PaymentReference',
-                ],
-                'successful_payment_values' => ['00'],
-            ],
-            default => [
-                'code' => $code,
-                'provider_name' => str($code)->replace('_', ' ')->title()->toString(),
-                'enabled' => false,
-            ],
-        };
+        return [
+            'code' => $code,
+            'provider_name' => $this->defaultProviderName($code),
+            'enabled' => false,
+            'mode' => 'TEST',
+            'environments' => collect(self::GATEWAY_ENVIRONMENTS)
+                ->mapWithKeys(fn (string $environment) => [
+                    $environment => $this->defaultEnvironmentConfig($code, $environment),
+                ])->all(),
+        ];
     }
 
     public function getSubaccounts(): array
@@ -234,6 +149,162 @@ class PaymentGatewayConfigurationService
     private function configKey(string $code): string
     {
         return self::GATEWAY_CONFIG_PREFIX . strtoupper($code);
+    }
+
+    private function normalizeGatewayConfig(string $code, array $config): array
+    {
+        $default = $this->defaultConfig($code);
+        $mode = strtoupper(trim((string) ($config['mode'] ?? $default['mode'])));
+        if (!in_array($mode, ['TEST', 'LIVE'], true)) {
+            $mode = 'TEST';
+        }
+
+        $providerName = trim((string) ($config['provider_name'] ?? $default['provider_name']));
+        $providerName = $providerName !== '' ? $providerName : $default['provider_name'];
+
+        $environments = [];
+        foreach (self::GATEWAY_ENVIRONMENTS as $environment) {
+            $environments[$environment] = array_replace_recursive(
+                $this->defaultEnvironmentConfig($code, $environment),
+                $this->legacyEnvironmentConfig($code, $config),
+                (array) Arr::get($config, "environments.{$environment}", [])
+            );
+        }
+
+        return [
+            'code' => $code,
+            'provider_name' => $providerName,
+            'enabled' => (bool) ($config['enabled'] ?? $default['enabled']),
+            'mode' => $mode,
+            'environments' => $environments,
+        ];
+    }
+
+    private function resolveRuntimeConfig(array $config): array
+    {
+        $environment = strtolower((string) ($config['mode'] ?? 'TEST'));
+        if (!in_array($environment, self::GATEWAY_ENVIRONMENTS, true)) {
+            $environment = 'test';
+        }
+
+        return array_replace_recursive(
+            $config,
+            (array) Arr::get($config, "environments.{$environment}", [])
+        );
+    }
+
+    private function defaultProviderName(string $code): string
+    {
+        return match ($code) {
+            'paystack' => 'Paystack',
+            'monnify' => 'Monnify',
+            'remita' => 'Remita',
+            'quickteller' => 'Quickteller',
+            default => str($code)->replace('_', ' ')->title()->toString(),
+        };
+    }
+
+    private function defaultEnvironmentConfig(string $code, string $environment): array
+    {
+        return match ($code) {
+            'paystack' => [
+                'base_url' => 'https://api.paystack.co',
+                'initialize_endpoint' => '/transaction/initialize',
+                'verify_endpoint' => '/transaction/verify/{reference}',
+                'public_key' => '',
+                'secret_key' => '',
+                'currency' => 'NGN',
+                'callback_path' => '/enroll/start?checkout_return=1',
+                'request_amount_multiplier' => 100,
+                'response_paths' => [
+                    'success' => 'status',
+                    'authorization_url' => 'data.authorization_url',
+                    'access_code' => 'data.access_code',
+                    'reference' => 'data.reference',
+                    'paid_status' => 'data.status',
+                    'message' => 'message',
+                ],
+                'successful_payment_values' => ['success'],
+            ],
+            'monnify' => [
+                'base_url' => $environment === 'live' ? 'https://api.monnify.com' : 'https://sandbox.monnify.com',
+                'login_endpoint' => '/api/v1/auth/login',
+                'initialize_endpoint' => '/api/v1/merchant/transactions/init-transaction',
+                'verify_endpoint' => '/api/v2/merchant/transactions/query?paymentReference={reference}',
+                'api_key' => '',
+                'secret_key' => '',
+                'contract_code' => '',
+                'currency' => 'NGN',
+                'callback_path' => '/enroll/start?checkout_return=1',
+                'payment_methods' => ['CARD', 'ACCOUNT_TRANSFER', 'USSD'],
+                'request_amount_multiplier' => 1,
+                'response_paths' => [
+                    'success' => 'requestSuccessful',
+                    'authorization_url' => 'responseBody.checkoutUrl',
+                    'access_code' => 'responseBody.transactionReference',
+                    'reference' => 'responseBody.paymentReference',
+                    'paid_status' => 'responseBody.paymentStatus',
+                    'message' => 'responseMessage',
+                ],
+                'successful_payment_values' => ['PAID'],
+            ],
+            'remita' => [
+                'base_url' => $environment === 'live' ? 'https://api.remita.net' : 'https://api-demo.systemspecsng.com',
+                'initialize_endpoint' => '/services/connect-gateway/api/v1/payment/charge',
+                'verify_endpoint' => '/services/connect-gateway/api/v1/payment-engine/payment/merchant/verify/{reference}',
+                'secret_key' => '',
+                'currency' => 'NGN',
+                'callback_path' => '/enroll/start?checkout_return=1',
+                'request_amount_multiplier' => 1,
+                'response_paths' => [
+                    'success' => 'status',
+                    'authorization_url' => 'data.paymentLink',
+                    'access_code' => 'data.paymentIdentifier',
+                    'reference' => 'data.paymentIdentifier',
+                    'paid_status' => 'data.status',
+                    'message' => 'message',
+                ],
+                'successful_payment_values' => ['SUCCESS', 'APPROVED', '00'],
+            ],
+            'quickteller' => [
+                'base_url' => $environment === 'live' ? 'https://webpay.interswitchng.com' : 'https://sandbox.interswitchng.com',
+                'initialize_endpoint' => $environment === 'live'
+                    ? 'https://webpay.interswitchng.com/collections/w/pay'
+                    : 'https://newwebpay-sandbox.interswitchng.com/collections/w/pay',
+                'verify_endpoint' => '/collections/api/v1/gettransaction.json?merchantcode={merchant_code}&transactionreference={reference}&amount={amount}',
+                'merchant_code' => '',
+                'pay_item_id' => '',
+                'currency' => '566',
+                'callback_path' => '/enroll/start?checkout_return=1',
+                'request_amount_multiplier' => 100,
+                'response_paths' => [
+                    'paid_status' => 'ResponseCode',
+                    'message' => 'ResponseDescription',
+                    'reference' => 'MerchantReference',
+                    'access_code' => 'PaymentReference',
+                ],
+                'successful_payment_values' => ['00'],
+            ],
+            default => [],
+        };
+    }
+
+    private function legacyEnvironmentConfig(string $code, array $config): array
+    {
+        if (isset($config['environments']) && is_array($config['environments'])) {
+            return [];
+        }
+
+        $template = $this->defaultEnvironmentConfig($code, 'test');
+        $legacy = [];
+
+        foreach (array_keys($template) as $key) {
+            if (array_key_exists($key, $config)) {
+                $legacy[$key] = $config[$key];
+            }
+        }
+
+        return $legacy;
     }
 
     private function normalizeSubaccounts(array $subaccounts): array

@@ -22,13 +22,13 @@ class LegacyEnrolleeMigrationService
     ) {
     }
 
-    public function migrate(object $legacy, string $sourceTable, bool $dryRun = false): array
+    public function migrate(object $legacy, string $sourceTable, bool $dryRun = false, bool $forceCreate = false): array
     {
         if ($dryRun) {
             DB::beginTransaction();
             try {
                 $mapped = $this->mapper->map($legacy, $sourceTable);
-                $existing = $this->findExistingEnrollee($mapped);
+                $existing = $forceCreate ? null : $this->findExistingEnrollee($mapped);
                 if (!$existing) {
                     $this->ensureUniqueEnrolleeId($mapped);
                 }
@@ -46,9 +46,9 @@ class LegacyEnrolleeMigrationService
             }
         }
 
-        return DB::transaction(function () use ($legacy, $sourceTable) {
+        return DB::transaction(function () use ($legacy, $sourceTable, $forceCreate) {
             $mapped = $this->mapper->map($legacy, $sourceTable);
-            $existing = $this->findExistingEnrollee($mapped);
+            $existing = $forceCreate ? null : $this->findExistingEnrollee($mapped);
             $systemUserId = $this->systemUserId();
 
             if (!$existing) {
@@ -166,7 +166,13 @@ class LegacyEnrolleeMigrationService
             return $log->enrollee;
         }
 
-        return Enrollee::where('legacy_id', (int) $mapped['legacy_id'])->first();
+        if (!Schema::hasColumn('enrollees', 'legacy_source_table')) {
+            return null;
+        }
+
+        return Enrollee::where('legacy_source_table', $mapped['source_table'])
+            ->where('legacy_id', (int) $mapped['legacy_id'])
+            ->first();
     }
 
     private function ensureUniqueEnrolleeId(array &$mapped): void

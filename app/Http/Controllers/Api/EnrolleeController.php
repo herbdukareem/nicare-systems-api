@@ -189,7 +189,7 @@ class EnrolleeController extends Controller
             'occupation' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::OCCUPATION_OPTIONS)],
             'facility_id' => 'required|exists:facilities,id',
             'lga_id' => 'required|exists:lgas,id',
-            'ward_id' => 'required|exists:wards,id',
+            'ward_id' => 'nullable|exists:wards,id',
             'insurance_programme_id' => 'nullable|exists:insurance_programmes,id',
             'enrollee_category_id' => 'nullable|exists:enrollee_categories,id',
             'premium_plan_id' => 'nullable|exists:premium_plans,id',
@@ -283,7 +283,7 @@ class EnrolleeController extends Controller
             'occupation' => ['nullable', 'string', 'max:255', Rule::in(Enrollee::OCCUPATION_OPTIONS)],
             'facility_id' => 'sometimes|exists:facilities,id',
             'lga_id' => 'sometimes|exists:lgas,id',
-            'ward_id' => 'sometimes|exists:wards,id',
+            'ward_id' => 'nullable|exists:wards,id',
             'insurance_programme_id' => 'nullable|exists:insurance_programmes,id',
             'enrollee_category_id' => 'nullable|exists:enrollee_categories,id',
             'premium_plan_id' => 'nullable|exists:premium_plans,id',
@@ -687,7 +687,7 @@ class EnrolleeController extends Controller
             $data['principal_enrollee_id'] = null;
         }
 
-        return $data;
+        return app(\App\Services\EnrollmentLocationResolver::class)->resolve($data);
     }
 
     private function validateDependantPlanRules($validator, array $data, ?int $currentEnrolleeId = null): void

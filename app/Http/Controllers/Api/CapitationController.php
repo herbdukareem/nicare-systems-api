@@ -27,6 +27,9 @@ class CapitationController extends Controller
         try {
             $filters = $request->only(['search', 'status', 'year', 'month', 'funding_type_id', 'user_id', 'sort_by', 'sort_direction', 'per_page', 'page']);
             $periods = $this->service->getAll($filters);
+            $periods->setCollection(
+                $periods->getCollection()->map(fn (Capitation $period) => $this->serializePeriod($period))
+            );
 
             return response()->json([
                 'success' => true,
@@ -76,6 +79,40 @@ class CapitationController extends Controller
         } catch (\Throwable $e) {
             return $this->error($e->getMessage());
         }
+    }
+
+    private function serializePeriod(Capitation $period): array
+    {
+        return [
+            'id' => $period->id,
+            'name' => $period->name,
+            'year' => (int) $period->year,
+            'capitation_month' => $period->capitation_month !== null ? (int) $period->capitation_month : null,
+            'capitated_month' => $period->capitated_month !== null ? (int) $period->capitated_month : null,
+            'period_start' => $period->period_start,
+            'period_end' => $period->period_end,
+            'capitation_rate' => $period->capitation_rate !== null ? (float) $period->capitation_rate : null,
+            'status' => (bool) $period->status,
+            'duplicate_nin_policy' => $period->duplicate_nin_policy,
+            'funding_type_id' => $period->funding_type_id !== null ? (int) $period->funding_type_id : null,
+            'funding_type' => $period->fundingType ? [
+                'id' => $period->fundingType->id,
+                'name' => $period->fundingType->name,
+            ] : null,
+            'funding_types' => $period->getAttribute('funding_types') ?? [],
+            'funding_type_summary' => $period->getAttribute('funding_type_summary'),
+            'capitation_details_count' => (int) ($period->capitation_details_count ?? 0),
+            'pending_review_count' => (int) ($period->pending_review_count ?? 0),
+            'reviewed_count' => (int) ($period->reviewed_count ?? 0),
+            'pending_approval_count' => (int) ($period->pending_approval_count ?? 0),
+            'approved_count' => (int) ($period->approved_count ?? 0),
+            'pending_payment_count' => (int) ($period->pending_payment_count ?? 0),
+            'paid_count' => (int) ($period->paid_count ?? 0),
+            'computed_at' => $period->computed_at,
+            'finalised_at' => $period->finalised_at,
+            'created_at' => $period->created_at,
+            'updated_at' => $period->updated_at,
+        ];
     }
 
     /**

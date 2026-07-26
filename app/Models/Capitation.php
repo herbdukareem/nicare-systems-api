@@ -9,6 +9,9 @@ class Capitation extends Model
 {
     use SoftDeletes;
 
+    public const DUPLICATE_NIN_POLICY_EXCLUDE = 'exclude';
+    public const DUPLICATE_NIN_POLICY_INCLUDE = 'include';
+
     protected $table = 'capitations';
 
     protected $guarded = ['id'];
@@ -19,6 +22,7 @@ class Capitation extends Model
         'year' => 'integer',
         'status' => 'boolean',
         'metadata' => 'array',
+        'duplicate_nin_policy' => 'string',
         'created_at' => 'datetime',
         'updated_at' => 'datetime',
         'deleted_at' => 'datetime'
