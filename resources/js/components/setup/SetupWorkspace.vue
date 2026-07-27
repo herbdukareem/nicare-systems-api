@@ -6,18 +6,23 @@
           <h1 class="tw-text-2xl tw-font-bold tw-text-slate-950">Setup</h1>
           <p class="tw-text-sm tw-text-slate-500">Manage locations, facilities, funding, benefit packages, and sponsors.</p>
         </div>
-        <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">New {{ current.singular }}</v-btn>
+        <v-btn v-if="hasVisibleSections && canCreateCurrent" color="primary" prepend-icon="mdi-plus" @click="openCreate">New {{ current.singular }}</v-btn>
       </div>
 
-      <div class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white">
+      <div v-if="hasVisibleSections" class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white">
         <v-tabs v-model="activeKey" color="primary" density="comfortable">
-          <v-tab v-for="item in sections" :key="item.key" :value="item.key">
+          <v-tab v-for="item in visibleSections" :key="item.key" :value="item.key">
             <v-icon start size="18">{{ item.icon }}</v-icon>{{ item.label }}
           </v-tab>
         </v-tabs>
       </div>
 
-      <div class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-p-4">
+      <v-card v-if="!hasVisibleSections" class="tw-border tw-border-slate-200 tw-p-6 tw-text-center" elevation="0">
+        <p class="tw-text-base tw-font-semibold tw-text-slate-900">No setup sections available</p>
+        <p class="tw-mt-2 tw-text-sm tw-text-slate-500">Your account does not currently have permission to view any setup tab.</p>
+      </v-card>
+
+      <div v-else class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-p-4">
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-4">
           <v-text-field v-model="filters.search" label="Search" prepend-inner-icon="mdi-magnify" density="compact" variant="outlined" clearable @keyup.enter="loadItems" />
           <v-select v-if="activeKey === 'wards'" v-model="filters.lga_id" :items="lookups.lgas" item-title="name" item-value="id" label="LGA" density="compact" variant="outlined" clearable />
@@ -32,9 +37,9 @@
         </div>
       </div>
 
-      <v-card class="tw-border tw-border-slate-200" elevation="0">
+      <v-card v-if="hasVisibleSections" class="tw-border tw-border-slate-200" elevation="0">
         <AppDataTable
-          :headers="current.headers"
+          :headers="currentHeaders"
           :items="items"
           :loading="loading"
           :items-length="meta.total"
@@ -52,14 +57,14 @@
           <template #item.ward="{ item }">{{ item.ward?.name || 'N/A' }}</template>
           <template #item.actions="{ item }">
             <div class="tw-flex tw-justify-end tw-gap-1">
-              <v-btn icon size="small" variant="text" @click="openEdit(item)"><v-icon size="18">mdi-pencil</v-icon></v-btn>
-              <v-btn icon size="small" variant="text" color="error" @click="removeItem(item)"><v-icon size="18">mdi-delete-outline</v-icon></v-btn>
+              <v-btn v-if="canUpdateCurrent" icon size="small" variant="text" @click="openEdit(item)"><v-icon size="18">mdi-pencil</v-icon></v-btn>
+              <v-btn v-if="canDeleteCurrent" icon size="small" variant="text" color="error" @click="removeItem(item)"><v-icon size="18">mdi-delete-outline</v-icon></v-btn>
             </div>
           </template>
         </AppDataTable>
       </v-card>
 
-      <AppModal v-model="dialog" :title="`${editingId ? 'Edit' : 'Create'} ${current.singular}`" size="md" :loading="saving">
+      <AppModal v-if="hasVisibleSections && current" v-model="dialog" :title="`${editingId ? 'Edit' : 'Create'} ${current.singular}`" size="md" :loading="saving">
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-2">
           <component
             v-for="field in current.fields"
@@ -89,6 +94,7 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
+import { useAuthStore } from '../../stores/auth';
 import AdminLayout from '../layout/AdminLayout.vue';
 import AppModal from '../common/AppModal.vue';
 import AppDataTable from '../common/AppDataTable.vue';
@@ -97,6 +103,7 @@ import { benefactorAPI, benefitPackageAPI, facilityAPI, fundingTypeAPI, lgaAPI, 
 
 const route = useRoute();
 const router = useRouter();
+const auth = useAuthStore();
 const { success, error } = useToast();
 
 const statusOptions = [{ title: 'Active', value: 1 }, { title: 'Inactive', value: 0 }];
@@ -128,6 +135,12 @@ const sections = [
     singular: 'LGA',
     icon: 'mdi-map-outline',
     api: lgaAPI,
+    permissions: {
+      view: ['setup.lga.view'],
+      create: ['setup.lga.create'],
+      update: ['setup.lga.update'],
+      delete: ['setup.lga.delete'],
+    },
     headers: [
       { title: 'Name', key: 'name' },
       { title: 'Code', key: 'code' },
@@ -149,6 +162,12 @@ const sections = [
     singular: 'Ward',
     icon: 'mdi-map-marker-outline',
     api: wardAPI,
+    permissions: {
+      view: ['setup.ward.view'],
+      create: ['setup.ward.create'],
+      update: ['setup.ward.update'],
+      delete: ['setup.ward.delete'],
+    },
     headers: [
       { title: 'Name', key: 'name' },
       { title: 'LGA', key: 'lga' },
@@ -170,6 +189,12 @@ const sections = [
     singular: 'Facility',
     icon: 'mdi-hospital-building',
     api: facilityAPI,
+    permissions: {
+      view: ['setup.facility.view'],
+      create: ['setup.facility.create'],
+      update: ['setup.facility.update'],
+      delete: ['setup.facility.delete'],
+    },
     headers: [
       { title: 'HCP Code', key: 'hcp_code' },
       { title: 'Name', key: 'name' },
@@ -202,6 +227,12 @@ const sections = [
     singular: 'Benefit Package',
     icon: 'mdi-package-variant',
     api: benefitPackageAPI,
+    permissions: {
+      view: ['setup.benefit-package.view'],
+      create: ['setup.benefit-package.create'],
+      update: ['setup.benefit-package.update'],
+      delete: ['setup.benefit-package.delete'],
+    },
     headers: [
       { title: 'Name', key: 'name' },
       { title: 'Code', key: 'code' },
@@ -222,6 +253,12 @@ const sections = [
     singular: 'Funding Type',
     icon: 'mdi-cash-multiple',
     api: fundingTypeAPI,
+    permissions: {
+      view: ['setup.funding-type.view'],
+      create: ['setup.funding-type.create'],
+      update: ['setup.funding-type.update'],
+      delete: ['setup.funding-type.delete'],
+    },
     headers: [
       { title: 'Name', key: 'name' },
       { title: 'Description', key: 'description' },
@@ -243,6 +280,12 @@ const sections = [
     singular: 'Benefactor',
     icon: 'mdi-account-heart-outline',
     api: benefactorAPI,
+    permissions: {
+      view: ['setup.benefactor.view'],
+      create: ['setup.benefactor.create'],
+      update: ['setup.benefactor.update'],
+      delete: ['setup.benefactor.delete'],
+    },
     headers: [
       { title: 'Name', key: 'name' },
       { title: 'Type', key: 'type' },
@@ -265,20 +308,93 @@ const sections = [
   },
 ];
 
-const sectionFromRoute = () => (sections.find((item) => item.key === route.params.section)?.key || 'locations');
-const activeKey = ref(sectionFromRoute());
-const current = computed(() => sections.find((item) => item.key === activeKey.value) || sections[0]);
+const hasAnyPermission = (permissions = []) => permissions.some((permission) => auth.hasPermission(permission));
+const visibleSections = computed(() => sections.filter((item) => hasAnyPermission(item.permissions?.view || [])));
+const hasVisibleSections = computed(() => visibleSections.value.length > 0);
+const defaultSectionKey = computed(() => visibleSections.value[0]?.key || null);
+const current = computed(() => visibleSections.value.find((item) => item.key === activeKey.value) || visibleSections.value[0] || null);
+const canCreateCurrent = computed(() => hasAnyPermission(current.value?.permissions?.create || []));
+const canUpdateCurrent = computed(() => hasAnyPermission(current.value?.permissions?.update || []));
+const canDeleteCurrent = computed(() => hasAnyPermission(current.value?.permissions?.delete || []));
+const needsLgaLookups = computed(() => hasAnyPermission([
+  'setup.lga.view',
+  'setup.ward.view',
+  'setup.ward.create',
+  'setup.ward.update',
+  'setup.facility.view',
+  'setup.facility.create',
+  'setup.facility.update',
+]));
+const needsWardLookups = computed(() => hasAnyPermission([
+  'setup.facility.view',
+  'setup.facility.create',
+  'setup.facility.update',
+]));
+const currentHeaders = computed(() => {
+  const headers = current.value?.headers || [];
+  if (canUpdateCurrent.value || canDeleteCurrent.value) {
+    return headers;
+  }
+  return headers.filter((header) => header.key !== 'actions');
+});
+
+const resolveSectionKey = () => {
+  const requested = visibleSections.value.find((item) => item.key === route.params.section)?.key;
+  return requested || defaultSectionKey.value;
+};
+
+const activeKey = ref(resolveSectionKey());
+
+const syncAccessibleSection = () => {
+  if (!hasVisibleSections.value) {
+    activeKey.value = null;
+    return;
+  }
+
+  const nextKey = resolveSectionKey();
+  if (nextKey && nextKey !== activeKey.value) {
+    activeKey.value = nextKey;
+    return;
+  }
+
+  if (route.params.section !== activeKey.value) {
+    router.replace(`/setup/${activeKey.value}`);
+  }
+};
 
 const loadLookups = async () => {
-  const [lgas, wards] = await Promise.all([
-    lgaAPI.getAll({ per_page: 500 }),
-    wardAPI.getAll({ per_page: 1000 }),
-  ]);
-  lookups.lgas = apiData(lgas);
-  lookups.wards = apiData(wards);
+  const tasks = [];
+
+  if (needsLgaLookups.value) {
+    tasks.push(
+      lgaAPI.getAll({ per_page: 500 }).then((response) => {
+        lookups.lgas = apiData(response);
+      })
+    );
+  } else {
+    lookups.lgas = [];
+  }
+
+  if (needsWardLookups.value) {
+    tasks.push(
+      wardAPI.getAll({ per_page: 1000 }).then((response) => {
+        lookups.wards = apiData(response);
+      })
+    );
+  } else {
+    lookups.wards = [];
+  }
+
+  await Promise.all(tasks);
 };
 
 const loadItems = async () => {
+  if (!hasVisibleSections.value || !current.value) {
+    items.value = [];
+    meta.total = 0;
+    return;
+  }
+
   loading.value = true;
   try {
     const params = { ...filters, page: page.value, per_page: perPage.value };
@@ -306,12 +422,20 @@ const resetForm = () => {
 };
 
 const openCreate = () => {
+  if (!canCreateCurrent.value) {
+    error(`You do not have permission to create ${current.value.singular.toLowerCase()} records.`);
+    return;
+  }
   editingId.value = null;
   resetForm();
   dialog.value = true;
 };
 
 const openEdit = (item) => {
+  if (!canUpdateCurrent.value) {
+    error(`You do not have permission to edit ${current.value.singular.toLowerCase()} records.`);
+    return;
+  }
   editingId.value = item.id;
   resetForm();
   current.value.fields.forEach((field) => {
@@ -321,6 +445,11 @@ const openEdit = (item) => {
 };
 
 const saveItem = async () => {
+  if ((editingId.value && !canUpdateCurrent.value) || (!editingId.value && !canCreateCurrent.value)) {
+    error(`You do not have permission to save ${current.value.singular.toLowerCase()} records.`);
+    return;
+  }
+
   saving.value = true;
   try {
     const payload = { ...form };
@@ -343,6 +472,10 @@ const saveItem = async () => {
 };
 
 const removeItem = async (item) => {
+  if (!canDeleteCurrent.value) {
+    error(`You do not have permission to delete ${current.value.singular.toLowerCase()} records.`);
+    return;
+  }
   if (!window.confirm(`Delete ${item.name || item.code}? Records in use will be deactivated instead.`)) return;
   try {
     await current.value.api.delete(item.id);
@@ -354,17 +487,30 @@ const removeItem = async (item) => {
 };
 
 watch(activeKey, async (key) => {
+  if (!key) return;
   if (route.params.section !== key) router.replace(`/setup/${key}`);
   page.value = 1;
   await loadItems();
 });
 watch([page, perPage], loadItems);
 watch(() => route.params.section, (value) => {
-  const key = sections.find((item) => item.key === value)?.key;
-  if (key && key !== activeKey.value) activeKey.value = key;
+  const key = visibleSections.value.find((item) => item.key === value)?.key;
+  if (key && key !== activeKey.value) {
+    activeKey.value = key;
+    return;
+  }
+
+  if (!key) {
+    syncAccessibleSection();
+  }
 });
+watch(visibleSections, syncAccessibleSection, { immediate: true });
 
 onMounted(async () => {
+  syncAccessibleSection();
+  if (!hasVisibleSections.value) {
+    return;
+  }
   await loadLookups();
   await loadItems();
 });

@@ -211,7 +211,6 @@ class CapitationService
             'capitation_rate' => (float) ($fundingType?->capitation_rate ?? 0),
             'status' => false,
             'funding_type_id' => $fundingType?->id,
-            'duplicate_nin_policy' => $data['duplicate_nin_policy'] ?? Capitation::DUPLICATE_NIN_POLICY_EXCLUDE,
             'created_by' => auth()->id(),
             'user_id' => auth()->id(),
             'capitation_month' => (int) $data['capitation_month'],
@@ -219,7 +218,11 @@ class CapitationService
         ]);
     }
 
-    public function eligibleProvidersForPeriod(Capitation $capitation, ?int $fundingTypeId = null): array
+    public function eligibleProvidersForPeriod(
+        Capitation $capitation,
+        ?int $fundingTypeId = null,
+        string $duplicateNinPolicy = Capitation::DUPLICATE_NIN_POLICY_EXCLUDE
+    ): array
     {
         $fundingType = $fundingTypeId
             ? FundingType::find($fundingTypeId)
@@ -229,7 +232,7 @@ class CapitationService
             return [];
         }
 
-        return $this->eligibleProviderRows($capitation, $fundingType)
+        return $this->eligibleProviderRows($capitation, $fundingType, $duplicateNinPolicy)
             ->map(function ($row) use ($capitation, $fundingType): array {
                 $detail = CapitationDetail::where('capitation_id', $capitation->id)
                     ->where('facility_id', $row->facility_id)
@@ -261,7 +264,12 @@ class CapitationService
      *
      * @throws CapitationComputationException
      */
-    public function computeForPeriod(Capitation $capitation, ?int $fundingTypeId = null, array $facilityIds = []): array
+    public function computeForPeriod(
+        Capitation $capitation,
+        ?int $fundingTypeId = null,
+        string $duplicateNinPolicy = Capitation::DUPLICATE_NIN_POLICY_EXCLUDE,
+        array $facilityIds = []
+    ): array
     {
         if ($facilityIds === []) {
             throw new CapitationComputationException('Select at least one facility to generate capitation.');
@@ -280,7 +288,9 @@ class CapitationService
             throw new CapitationComputationException("Funding type {$fundingType->name} does not have a capitation rate.");
         }
 
-        $eligibleProviders = $this->eligibleProviderRows($capitation, $fundingType)
+        $normalizedDuplicateNinPolicy = $this->normalizeDuplicateNinPolicy($duplicateNinPolicy);
+
+        $eligibleProviders = $this->eligibleProviderRows($capitation, $fundingType, $normalizedDuplicateNinPolicy)
             ->whereIn('facility_id', $facilityIds)
             ->values();
 
@@ -324,6 +334,10 @@ class CapitationService
                     'total_amount' => $totalAmount,
                     'amount' => $totalAmount,
                     'status' => 1,
+                    'metadata' => [
+                        'duplicate_nin_policy' => $normalizedDuplicateNinPolicy,
+                        'generated_for_funding_type_id' => $fundingType->id,
+                    ],
                 ]);
 
                 Log::info("Capitation generated for facility {$provider->facility_id}: {$count} enrollees = {$totalAmount}");
@@ -579,10 +593,10 @@ class CapitationService
         return $details->count();
     }
 
-    private function eligibleProviderRows(Capitation $capitation, FundingType $fundingType)
+    private function eligibleProviderRows(Capitation $capitation, FundingType $fundingType, string $duplicateNinPolicy)
     {
         $cutoffDate = $capitation->period_start;
-        $duplicateNinPolicy = $capitation->duplicate_nin_policy ?: Capitation::DUPLICATE_NIN_POLICY_EXCLUDE;
+        $duplicateNinPolicy = $this->normalizeDuplicateNinPolicy($duplicateNinPolicy);
 
         $query = Enrollee::query()
             ->join('facilities', 'facilities.id', '=', 'enrollees.facility_id')
@@ -612,6 +626,13 @@ class CapitationService
             ->get();
 
         return $query;
+    }
+
+    private function normalizeDuplicateNinPolicy(?string $duplicateNinPolicy): string
+    {
+        return $duplicateNinPolicy === Capitation::DUPLICATE_NIN_POLICY_INCLUDE
+            ? Capitation::DUPLICATE_NIN_POLICY_INCLUDE
+            : Capitation::DUPLICATE_NIN_POLICY_EXCLUDE;
     }
 
     private function capitationPeriodQuery()

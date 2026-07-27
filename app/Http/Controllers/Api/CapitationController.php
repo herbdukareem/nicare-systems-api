@@ -93,7 +93,6 @@ class CapitationController extends Controller
             'period_end' => $period->period_end,
             'capitation_rate' => $period->capitation_rate !== null ? (float) $period->capitation_rate : null,
             'status' => (bool) $period->status,
-            'duplicate_nin_policy' => $period->duplicate_nin_policy,
             'funding_type_id' => $period->funding_type_id !== null ? (int) $period->funding_type_id : null,
             'funding_type' => $period->fundingType ? [
                 'id' => $period->fundingType->id,
@@ -123,6 +122,7 @@ class CapitationController extends Controller
     {
         $validated = request()->validate([
             'funding_type_id' => ['required', 'integer', 'exists:funding_types,id'],
+            'duplicate_nin_policy' => ['required', 'in:exclude,include'],
             'facility_ids' => ['required', 'array', 'min:1'],
             'facility_ids.*' => ['integer', 'exists:facilities,id'],
         ]);
@@ -135,6 +135,7 @@ class CapitationController extends Controller
             $results = $this->service->computeForPeriod(
                 $capitation,
                 (int) $validated['funding_type_id'],
+                (string) $validated['duplicate_nin_policy'],
                 $validated['facility_ids'] ?? []
             );
 
@@ -183,12 +184,17 @@ class CapitationController extends Controller
     {
         $validated = request()->validate([
             'funding_type_id' => ['required', 'integer', 'exists:funding_types,id'],
+            'duplicate_nin_policy' => ['required', 'in:exclude,include'],
         ]);
 
         try {
             return response()->json([
                 'success' => true,
-                'data' => $this->service->eligibleProvidersForPeriod($capitation, (int) $validated['funding_type_id']),
+                'data' => $this->service->eligibleProvidersForPeriod(
+                    $capitation,
+                    (int) $validated['funding_type_id'],
+                    (string) $validated['duplicate_nin_policy']
+                ),
             ]);
         } catch (\Throwable $e) {
             return $this->error($e->getMessage());

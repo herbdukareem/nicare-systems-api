@@ -24,7 +24,6 @@
           <v-text-field v-model="form.name" label="Period name" density="comfortable" variant="outlined" />
           <v-select v-model="form.capitation_month" :items="months" item-title="name" item-value="value" label="Capitation month" density="comfortable" variant="outlined" />
           <v-text-field v-model.number="form.year" label="Capitation year" type="number" density="comfortable" variant="outlined" />
-          <v-select v-model="form.duplicate_nin_policy" :items="duplicateNinPolicyOptions" item-title="label" item-value="value" label="Duplicate NIN policy" density="comfortable" variant="outlined" />
         </div>
         <div class="tw-flex tw-flex-wrap tw-gap-2">
           <v-btn color="primary" :loading="saving" prepend-icon="mdi-content-save" @click="createPeriod">Create Period</v-btn>
@@ -38,9 +37,10 @@
           <h2 class="tw-text-sm tw-font-semibold tw-text-gray-900">Generate Facility Capitation</h2>
           <p class="tw-text-xs tw-text-gray-500">Select the period and funding type, load facilities, review enrollee counts and totals, then generate only the selected facilities.</p>
         </div>
-        <div class="tw-grid tw-grid-cols-1 tw-gap-4 md:tw-grid-cols-2">
+        <div class="tw-grid tw-grid-cols-1 tw-gap-4 md:tw-grid-cols-3">
           <v-select v-model="generationForm.period_id" :items="periodOptions" item-title="label" item-value="id" label="Capitation period" density="comfortable" variant="outlined" :disabled="facilitiesLoaded" />
           <v-select v-model="generationForm.funding_type_id" :items="fundingTypes" item-title="name" item-value="id" label="Funding type" density="comfortable" variant="outlined" :disabled="facilitiesLoaded" />
+          <v-select v-model="generationForm.duplicate_nin_policy" :items="duplicateNinPolicyOptions" item-title="label" item-value="value" label="Duplicate NIN policy" density="comfortable" variant="outlined" :disabled="facilitiesLoaded" />
         </div>
         <div class="tw-flex tw-flex-wrap tw-gap-2">
           <v-btn color="primary" :loading="eligibleLoading" prepend-icon="mdi-hospital-building" @click="loadFacilitiesForGeneration">Load Facilities</v-btn>
@@ -70,7 +70,7 @@
             </div>
             <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Duplicate NIN Policy</p>
-              <p class="tw-font-bold">{{ duplicateNinPolicyLabel(generationPeriod?.duplicate_nin_policy) }}</p>
+              <p class="tw-font-bold">{{ duplicateNinPolicyLabel(generationForm.duplicate_nin_policy) }}</p>
             </div>
             <div class="tw-border tw-border-gray-100 tw-bg-white tw-p-3">
               <p class="tw-text-xs tw-text-gray-500">Facilities Loaded</p>
@@ -380,10 +380,6 @@
               <span class="tw-text-slate-500 tw-w-28 tw-flex-shrink-0">Cutoff date:</span>
               <span class="tw-font-semibold tw-text-slate-800">{{ formatDate(selectedPeriod?.period_start) }}</span>
             </div>
-            <div class="tw-flex tw-gap-2">
-              <span class="tw-text-slate-500 tw-w-28 tw-flex-shrink-0">Duplicate NIN:</span>
-              <span class="tw-font-semibold tw-text-slate-800">{{ duplicateNinPolicyLabel(selectedPeriod?.duplicate_nin_policy) }}</span>
-            </div>
           </div>
           <v-text-field v-model="paymentForm.payment_reference" label="Payment reference" density="comfortable" variant="outlined" />
           <v-text-field v-model="paymentForm.payment_date" label="Payment date" type="date" density="comfortable" variant="outlined" />
@@ -431,9 +427,8 @@ const form = ref({
   name: '',
   capitation_month: new Date().getMonth() + 1,
   year: new Date().getFullYear(),
-  duplicate_nin_policy: 'exclude',
 })
-const generationForm = ref({ period_id: null, funding_type_id: null })
+const generationForm = ref({ period_id: null, funding_type_id: null, duplicate_nin_policy: 'exclude' })
 const workflowForm = ref({ period_id: null, funding_type_id: null })
 
 const months = [
@@ -499,7 +494,7 @@ const periodFundingTypeName = (period) => {
 
 const periodOptions = computed(() => periods.value.map((p) => ({
   ...p,
-  label: `#${p.id} - ${p.name} (Cutoff: ${formatDate(p.period_start)}; ${duplicateNinPolicyLabel(p.duplicate_nin_policy)}) - ${p.capitation_details_count || 0} generated`,
+  label: `#${p.id} - ${p.name} (Cutoff: ${formatDate(p.period_start)}) - ${p.capitation_details_count || 0} generated`,
 })))
 
 const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
@@ -667,15 +662,18 @@ const createPeriod = async (showMessage = true) => {
 }
 
 const loadFacilitiesForGeneration = async () => {
-  if (!generationForm.value.period_id || !generationForm.value.funding_type_id) {
-    error('Select a capitation period and funding type before loading facilities')
+  if (!generationForm.value.period_id || !generationForm.value.funding_type_id || !generationForm.value.duplicate_nin_policy) {
+    error('Select a capitation period, funding type, and duplicate NIN policy before loading facilities')
     return
   }
   eligibleLoading.value = true
   try {
     generationPeriod.value = periods.value.find((item) => Number(item.id) === Number(generationForm.value.period_id)) || null
     if (!generationPeriod.value) return
-    const response = await capitationAPI.eligibleProviders(generationPeriod.value.id, { funding_type_id: generationForm.value.funding_type_id })
+    const response = await capitationAPI.eligibleProviders(generationPeriod.value.id, {
+      funding_type_id: generationForm.value.funding_type_id,
+      duplicate_nin_policy: generationForm.value.duplicate_nin_policy,
+    })
     eligibleProviders.value = response.data?.data || []
     selectedProviderIds.value = []
     facilitiesLoaded.value = true
@@ -696,7 +694,7 @@ const resetGenerationFlow = () => {
   selectedPeriod.value = null
   eligibleProviders.value = []
   selectedProviderIds.value = []
-  generationForm.value = { period_id: null, funding_type_id: null }
+  generationForm.value = { period_id: null, funding_type_id: null, duplicate_nin_policy: 'exclude' }
   facilitiesLoaded.value = false
 }
 
@@ -706,7 +704,10 @@ const openProviderSelection = async (period) => {
   eligibleLoading.value = true
   selectedProviderIds.value = []
   try {
-    eligibleProviders.value = (await capitationAPI.eligibleProviders(period.id, { funding_type_id: period.funding_type_id })).data.data || []
+    eligibleProviders.value = (await capitationAPI.eligibleProviders(period.id, {
+      funding_type_id: period.funding_type_id,
+      duplicate_nin_policy: generationForm.value.duplicate_nin_policy || 'exclude',
+    })).data.data || []
     selectedProviderIds.value = []
   } catch (err) {
     error(err?.response?.data?.message || 'Failed to load eligible providers')
@@ -729,6 +730,7 @@ const generateSelectedProviders = async () => {
   try {
     await capitationAPI.compute(selectedPeriod.value.id, {
       funding_type_id: selectedPeriod.value.funding_type_id,
+      duplicate_nin_policy: generationForm.value.duplicate_nin_policy || 'exclude',
       facility_ids: selectedProviderIdValues.value,
     })
     success('Capitation computed')
@@ -748,10 +750,14 @@ const generateLoadedFacilities = async () => {
   try {
     await capitationAPI.compute(generationPeriod.value.id, {
       funding_type_id: generationForm.value.funding_type_id,
+      duplicate_nin_policy: generationForm.value.duplicate_nin_policy,
       facility_ids: selectedProviderIdValues.value,
     })
     success('Capitation generated for selected facilities')
-    const response = await capitationAPI.eligibleProviders(generationPeriod.value.id, { funding_type_id: generationForm.value.funding_type_id })
+    const response = await capitationAPI.eligibleProviders(generationPeriod.value.id, {
+      funding_type_id: generationForm.value.funding_type_id,
+      duplicate_nin_policy: generationForm.value.duplicate_nin_policy,
+    })
     eligibleProviders.value = response.data?.data || []
     selectedProviderIds.value = []
     await loadPeriods()

@@ -297,8 +297,16 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('enrollee-types', EnrolleeTypeController::class);
     Route::apiResource('banks', BankController::class);
-    Route::get('facilities/{facility}/enrollees', [FacilityController::class, 'enrollees']);
-    Route::apiResource('facilities', FacilityController::class);
+    Route::get('facilities/{facility}/enrollees', [FacilityController::class, 'enrollees'])
+        ->middleware('permission:any,setup.facility.view,facilities.view');
+    Route::apiResource('facilities', FacilityController::class)->only(['index', 'show'])
+        ->middleware('permission:any,setup.facility.view,facilities.view');
+    Route::apiResource('facilities', FacilityController::class)->only(['store'])
+        ->middleware('permission:setup.facility.create');
+    Route::apiResource('facilities', FacilityController::class)->only(['update'])
+        ->middleware('permission:setup.facility.update');
+    Route::apiResource('facilities', FacilityController::class)->only(['destroy'])
+        ->middleware('permission:setup.facility.delete');
     Route::get('referrals', [ReferralController::class, 'index'])->middleware('permission:any,referrals.view,referrals.manage,referrals.approve,referrals.reject');
     Route::post('referrals', [ReferralController::class, 'store'])->middleware('permission:any,referrals.create,referrals.submit,referrals.manage');
     Route::get('referrals/{referral}', [ReferralController::class, 'show'])->middleware('permission:any,referrals.view,referrals.manage,referrals.approve,referrals.reject');
@@ -329,9 +337,34 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('eligibility', [EligibilityLookupController::class, 'show']);
     });
 
-    Route::apiResource('funding-types', FundingTypeController::class);
-    Route::apiResource('benefactors', BenefactorController::class);
-    Route::apiResource('benefit-packages', BenefitPackageController::class)->parameters(['benefit-packages' => 'benefitPackage']);
+    Route::apiResource('funding-types', FundingTypeController::class)->only(['index', 'show'])
+        ->middleware('permission:setup.funding-type.view');
+    Route::apiResource('funding-types', FundingTypeController::class)->only(['store'])
+        ->middleware('permission:setup.funding-type.create');
+    Route::apiResource('funding-types', FundingTypeController::class)->only(['update'])
+        ->middleware('permission:setup.funding-type.update');
+    Route::apiResource('funding-types', FundingTypeController::class)->only(['destroy'])
+        ->middleware('permission:setup.funding-type.delete');
+    Route::apiResource('benefactors', BenefactorController::class)->only(['index', 'show'])
+        ->middleware('permission:any,setup.benefactor.view,benefactor.view,benefactors.view');
+    Route::apiResource('benefactors', BenefactorController::class)->only(['store'])
+        ->middleware('permission:setup.benefactor.create');
+    Route::apiResource('benefactors', BenefactorController::class)->only(['update'])
+        ->middleware('permission:setup.benefactor.update');
+    Route::apiResource('benefactors', BenefactorController::class)->only(['destroy'])
+        ->middleware('permission:setup.benefactor.delete');
+    Route::apiResource('benefit-packages', BenefitPackageController::class)->only(['index', 'show'])
+        ->parameters(['benefit-packages' => 'benefitPackage'])
+        ->middleware('permission:setup.benefit-package.view');
+    Route::apiResource('benefit-packages', BenefitPackageController::class)->only(['store'])
+        ->parameters(['benefit-packages' => 'benefitPackage'])
+        ->middleware('permission:setup.benefit-package.create');
+    Route::apiResource('benefit-packages', BenefitPackageController::class)->only(['update'])
+        ->parameters(['benefit-packages' => 'benefitPackage'])
+        ->middleware('permission:setup.benefit-package.update');
+    Route::apiResource('benefit-packages', BenefitPackageController::class)->only(['destroy'])
+        ->parameters(['benefit-packages' => 'benefitPackage'])
+        ->middleware('permission:setup.benefit-package.delete');
     Route::get('settings/nin-provider', [NinProviderConfigurationController::class, 'show'])
         ->middleware('permission:any,settings.nin.manage,settings.edit');
     Route::put('settings/nin-provider', [NinProviderConfigurationController::class, 'update'])
@@ -373,9 +406,24 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,mobile-sync.push,mobile-sync.status');
     Route::get('mobile-enrollment-monitor/{record}', [MobileEnrollmentMonitorController::class, 'show'])
         ->middleware('permission:any,mobile-sync.push,mobile-sync.status');
-    Route::apiResource('lgas', LgaController::class);
-    Route::get('lgas/{lga}/wards', [LgaController::class, 'wards']);
-    Route::apiResource('wards', WardController::class);
+    Route::apiResource('lgas', LgaController::class)->only(['index', 'show'])
+        ->middleware('permission:any,setup.lga.view,setup.ward.view,setup.facility.view,setup.facility.create,setup.facility.update');
+    Route::apiResource('lgas', LgaController::class)->only(['store'])
+        ->middleware('permission:setup.lga.create');
+    Route::apiResource('lgas', LgaController::class)->only(['update'])
+        ->middleware('permission:setup.lga.update');
+    Route::apiResource('lgas', LgaController::class)->only(['destroy'])
+        ->middleware('permission:setup.lga.delete');
+    Route::get('lgas/{lga}/wards', [LgaController::class, 'wards'])
+        ->middleware('permission:any,setup.lga.view,setup.ward.view,setup.facility.view,setup.facility.create,setup.facility.update');
+    Route::apiResource('wards', WardController::class)->only(['index', 'show'])
+        ->middleware('permission:any,setup.ward.view,setup.facility.view,setup.facility.create,setup.facility.update');
+    Route::apiResource('wards', WardController::class)->only(['store'])
+        ->middleware('permission:setup.ward.create');
+    Route::apiResource('wards', WardController::class)->only(['update'])
+        ->middleware('permission:setup.ward.update');
+    Route::apiResource('wards', WardController::class)->only(['destroy'])
+        ->middleware('permission:setup.ward.delete');
     Route::apiResource('villages', VillageController::class);
     Route::apiResource('account-details', AccountDetailController::class);
     Route::apiResource('employment-details', EmploymentDetailController::class);

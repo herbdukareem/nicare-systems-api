@@ -81,7 +81,7 @@ const routes = [
     component: EnrolleesPage,
     meta: {
       requiresAuth: true,
-      permissions: ['enrollees.view', 'enrollee.status.change'],
+      permissions: ['enrollees.view'],
       title: 'Enrollees',
       breadcrumb: 'Enrollees',
     },
@@ -114,7 +114,7 @@ const routes = [
     component: EnrolleeIntegrityPage,
     meta: {
       requiresAuth: true,
-      permissions: ['enrollees.view', 'enrollees.update', 'enrollee.approve', 'enrollee.nin.verify', 'enrollee.status.change'],
+      permissions: ['enrollees.update', 'enrollee.approve', 'enrollee.nin.verify', 'enrollee.status.change'],
       title: 'NIN & Duplicates',
       breadcrumb: 'NIN & Duplicates',
     },
@@ -125,7 +125,7 @@ const routes = [
     component: BulkEnrollmentSlipPage,
     meta: {
       requiresAuth: true,
-      permissions: ['enrollees.view', 'enrollee.print-bulk-slip'],
+      permissions: ['enrollee.print-bulk-slip'],
       title: 'Bulk Enrollment Slip',
       breadcrumb: 'Bulk Enrollment Slip',
     },
@@ -136,7 +136,7 @@ const routes = [
     component: () => import('../components/enrollees/BulkIdCardPage.vue'),
     meta: {
       requiresAuth: true,
-      permissions: ['enrollees.view'],
+      permissions: ['enrollee.print-id-card'],
       title: 'Bulk ID Cards',
       breadcrumb: 'Bulk ID Cards',
     },
@@ -193,7 +193,7 @@ const routes = [
     props: { title: 'ID Card Printing', subtitle: 'Print and manage ID cards', icon: 'mdi-card-account-details' },
     meta: {
       requiresAuth: true,
-      permissions: ['enrollees.view'],
+      permissions: ['enrollee.print-id-card'],
       title: 'ID Card Printing',
       breadcrumb: 'ID Cards',
     },
@@ -218,7 +218,7 @@ const routes = [
     component: SetupWorkspace,
     meta: {
       requiresAuth: true,
-      permissions: ['setup.lga.view', 'setup.ward.view', 'setup.facility.view', 'setup.benefit-package.view', 'setup.funding-type.view', 'setup.benefactor.view', 'facilities.view', 'benefactor.view'],
+      permissions: ['setup.lga.view', 'setup.ward.view', 'setup.facility.view', 'setup.benefit-package.view', 'setup.funding-type.view', 'setup.benefactor.view'],
       title: 'Setup',
       breadcrumb: 'Setup',
     },
@@ -229,7 +229,7 @@ const routes = [
     component: SetupWorkspace,
     meta: {
       requiresAuth: true,
-      permissions: ['setup.lga.view', 'setup.ward.view', 'setup.facility.view', 'setup.benefit-package.view', 'setup.funding-type.view', 'setup.benefactor.view', 'facilities.view', 'benefactor.view'],
+      permissions: ['setup.lga.view', 'setup.ward.view', 'setup.facility.view', 'setup.benefit-package.view', 'setup.funding-type.view', 'setup.benefactor.view'],
       title: 'Setup',
       breadcrumb: 'Setup',
     },
@@ -759,7 +759,7 @@ const routes = [
     component: () => import('../components/reports/ReportsPage.vue'),
     meta: {
       requiresAuth: true,
-      permissions: ['reports.view', 'reports.generate', 'dashboard.view'],
+      permissions: ['reports.view', 'reports.generate'],
       title: 'Reports',
       breadcrumb: 'Reports',
     },
@@ -781,7 +781,7 @@ const routes = [
     component: () => import('../components/reports/AnalyticsPage.vue'),
     meta: {
       requiresAuth: true,
-      permissions: ['analytics.view', 'dashboard.view'],
+      permissions: ['analytics.view'],
       title: 'Analytics',
       breadcrumb: 'Analytics',
     },
