@@ -88,8 +88,9 @@ jobs:
         env:
           RUN_MIGRATIONS: ${{ github.event.inputs.run_migrations || 'false' }}
         run: |
-          ssh -p "$CPANEL_SSH_PORT" "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST" /bin/bash <<EOF
-          set -e
+          ssh -p "$CPANEL_SSH_PORT" "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST" \
+            "export CPANEL_DEPLOY_PATH_STAGING='$CPANEL_DEPLOY_PATH_STAGING' RUN_MIGRATIONS='$RUN_MIGRATIONS'; /bin/bash -se" <<'EOF'
+          set -euo pipefail
           cd "$CPANEL_DEPLOY_PATH_STAGING"
 
           mkdir -p bootstrap/cache
@@ -104,15 +105,23 @@ jobs:
             echo "composer not found on remote host; skipping composer install"
           fi
 
-          if [ -f artisan ]; then
-            php artisan optimize:clear || true
-            php artisan config:cache
-            php artisan route:cache || true
-            php artisan view:cache
-            php artisan storage:link || true
+          if [ ! -f artisan ]; then
+            echo "artisan not found in $CPANEL_DEPLOY_PATH_STAGING; skipping Laravel post-deploy tasks"
+            exit 0
+          fi
 
-            if [ "$RUN_MIGRATIONS" = "true" ]; then
-              php artisan migrate --force
-            fi
+          if ! command -v php >/dev/null 2>&1; then
+            echo "php not found on remote host; skipping artisan tasks"
+            exit 0
+          fi
+
+          php artisan optimize:clear || true
+          php artisan config:cache
+          php artisan route:cache || true
+          php artisan view:cache
+          php artisan storage:link || true
+
+          if [ "$RUN_MIGRATIONS" = "true" ]; then
+            php artisan migrate --force
           fi
           EOF
