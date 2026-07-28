@@ -295,10 +295,22 @@ protected $guarded = ['id'];
 
         return $attachments
             ->filter(fn ($attachment) => $attachment instanceof MobileEnrollmentAttachment
-                && $attachment->kind === 'passport'
+                && in_array($attachment->kind, $this->mobileProvidedPhotoKinds(), true)
                 && filled($attachment->file_path))
             ->sortByDesc(fn (MobileEnrollmentAttachment $attachment) => $attachment->created_at?->timestamp ?? $attachment->id)
-            ->first();
+            ->pipe(function ($items) {
+                $retake = $items->first(fn (MobileEnrollmentAttachment $attachment) => in_array($attachment->kind, ['retake_photo', 'retake-passport', 'retake'], true));
+
+                return $retake ?: $items->first();
+            });
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function mobileProvidedPhotoKinds(): array
+    {
+        return ['passport', 'retake_photo', 'retake-passport', 'retake'];
     }
 
     /**

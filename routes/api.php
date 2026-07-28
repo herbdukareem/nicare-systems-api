@@ -74,6 +74,7 @@ use App\Http\Controllers\Api\EnrolleeImportController;
 use App\Http\Controllers\Api\EnrolleeController as EnrolleeApiController;
 use App\Http\Controllers\Api\ExtendedReportingController;
 use App\Http\Controllers\Api\EnrollmentFormSchemaController;
+use App\Http\Controllers\Api\EnrollmentIntelligenceController;
 use App\Http\Controllers\Api\MobileEnrollmentMonitorController;
 use App\Http\Controllers\Api\MobileV1Controller;
 use App\Http\Controllers\Api\OfficerDeviceController;
@@ -139,6 +140,7 @@ Route::middleware(['auth:sanctum'])->prefix('mobile/v1')->group(function () {
     Route::post('pin-purchases', [MobileV1Controller::class, 'createPinPurchase'])->middleware('permission:any,mobile-sync.push,enrollees.create,premium.pin.generate,premium.pin.sell');
     Route::get('pin-purchases/{reference}/verify', [MobileV1Controller::class, 'verifyPinPurchase'])->middleware('permission:any,mobile-sync.push,enrollees.create,premium.pin.generate,premium.pin.sell');
     Route::post('pins/validate', [MobileV1Controller::class, 'validatePin'])->middleware('permission:any,mobile-sync.push,enrollees.create,premium.pin.view');
+    Route::get('nins/distinct', [MobileV1Controller::class, 'distinctNins'])->middleware('permission:any,mobile-sync.push,mobile-sync.status,enrollees.create,enrollee.nin.verify');
     Route::post('nin/verify', [MobileV1Controller::class, 'verifyNin'])->middleware('permission:any,mobile-sync.push,enrollees.create,enrollee.nin.verify');
     Route::post('enrollments/sync', [MobileV1Controller::class, 'syncEnrollments'])->middleware('permission:any,mobile-sync.push,enrollees.create');
     Route::post('enrollments/status', [MobileV1Controller::class, 'enrollmentStatuses'])->middleware('permission:any,mobile-sync.status,enrollees.create');
@@ -182,6 +184,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Enrollee routes
     Route::get('enrollees/pending-approval', [EnrolleeController::class, 'pendingApproval'])
         ->middleware('permission:any,enrollees.view,enrollee.approve,enrollee.nin.verify');
+    Route::get('enrollment/intelligence/nin-verification', [EnrollmentIntelligenceController::class, 'ninVerificationReport'])
+        ->middleware('permission:any,enrollee.nin.verify,reports.view');
     Route::get('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip'])
         ->middleware('permission:any,enrollees.view,enrollee.print-bulk-slip');
     Route::get('enrollees/bulk-id-card', [EnrolleeController::class, 'bulkIdCard'])

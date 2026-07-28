@@ -30,7 +30,7 @@ jobs:
         shell: bash
 
     env:
-      CPANEL_DEPLOY_PATH_STAGING: ${{ secrets.CPANEL_DEPLOY_PATH_STAGING }}
+      CPANEL_DEPLOY_PATH: ${{ secrets.CPANEL_DEPLOY_PATH }}
       CPANEL_SSH_HOST: ${{ secrets.CPANEL_SSH_HOST }}
       CPANEL_SSH_PORT: ${{ secrets.CPANEL_SSH_PORT }}
       CPANEL_SSH_USERNAME: ${{ secrets.CPANEL_SSH_USERNAME }}
@@ -64,7 +64,7 @@ jobs:
       - name: Ensure remote deploy path exists
         run: |
           ssh -p "$CPANEL_SSH_PORT" "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST" \
-            "mkdir -p \"$CPANEL_DEPLOY_PATH_STAGING\""
+            "mkdir -p \"$CPANEL_DEPLOY_PATH\""
 
       - name: Sync application files
         run: |
@@ -82,16 +82,17 @@ jobs:
             --exclude "storage/logs/" \
             --exclude "storage/framework/" \
             --exclude "public/storage/" \
-            ./ "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST:$CPANEL_DEPLOY_PATH_STAGING/"
+            ./ "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST:$CPANEL_DEPLOY_PATH/"
 
       - name: Run remote post-deploy tasks
         env:
           RUN_MIGRATIONS: ${{ github.event.inputs.run_migrations || 'false' }}
         run: |
           ssh -p "$CPANEL_SSH_PORT" "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST" \
-            "export CPANEL_DEPLOY_PATH_STAGING='$CPANEL_DEPLOY_PATH_STAGING' RUN_MIGRATIONS='$RUN_MIGRATIONS'; /bin/bash -se" <<'EOF'
+            "export CPANEL_DEPLOY_PATH='$CPANEL_DEPLOY_PATH' RUN_MIGRATIONS='$RUN_MIGRATIONS'; /bin/bash -se" <<'EOF'
           set -euo pipefail
-          cd "$CPANEL_DEPLOY_PATH_STAGING"
+          set -x
+          cd "$CPANEL_DEPLOY_PATH"
 
           mkdir -p bootstrap/cache
           mkdir -p storage/framework/cache/data
@@ -106,7 +107,7 @@ jobs:
           fi
 
           if [ ! -f artisan ]; then
-            echo "artisan not found in $CPANEL_DEPLOY_PATH_STAGING; skipping Laravel post-deploy tasks"
+            echo "artisan not found in $CPANEL_DEPLOY_PATH; skipping Laravel post-deploy tasks"
             exit 0
           fi
 

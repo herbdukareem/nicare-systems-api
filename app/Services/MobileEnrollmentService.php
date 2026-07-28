@@ -263,6 +263,8 @@ class MobileEnrollmentService
             throw new RuntimeException('You cannot upload attachments for another officer\'s mobile enrollment record.');
         }
 
+        $kind = Str::lower(trim($kind)) ?: 'passport';
+
         $disk = (string) config('filesystems.enrollee_passport_disk', 'public');
         $path = Storage::disk($disk)->putFile('mobile-enrollments/' . $record->id, $file, 'public');
 
@@ -278,7 +280,7 @@ class MobileEnrollmentService
             'uploaded_by' => $officer->id,
         ]);
 
-        if ($kind === 'passport' && $record->enrollee) {
+        if (in_array($kind, ['passport', 'retake_photo', 'retake-passport', 'retake'], true) && $record->enrollee) {
             $record->enrollee->update(['image_url' => $attachment->file_path]);
         }
 

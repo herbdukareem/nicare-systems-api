@@ -15,6 +15,7 @@ const RolesPermissionsPage = () => import('../components/settings/RolesPermissio
 const PendingEnrolleesPage = () => import('../components/enrollees/PendingEnrolleesPage.vue');
 const EnrollmentApprovalPage = () => import('../components/enrollees/EnrollmentApprovalPage.vue');
 const EnrolleeIntegrityPage = () => import('../components/enrollees/EnrolleeIntegrityPage.vue');
+const EnrollmentIntelligencePage = () => import('../components/enrollees/EnrollmentIntelligencePage.vue');
 const BulkEnrollmentSlipPage = () => import('../components/enrollees/BulkEnrollmentSlipPage.vue');
 const SetupWorkspace = () => import('../components/setup/SetupWorkspace.vue');
 
@@ -117,6 +118,17 @@ const routes = [
       permissions: ['enrollees.update', 'enrollee.approve', 'enrollee.nin.verify', 'enrollee.status.change'],
       title: 'NIN & Duplicates',
       breadcrumb: 'NIN & Duplicates',
+    },
+  },
+  {
+    path: '/enrollment/intelligence',
+    name: 'enrollment-intelligence',
+    component: EnrollmentIntelligencePage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollee.nin.verify', 'reports.view'],
+      title: 'Enrollment Intelligence',
+      breadcrumb: 'Enrollment Intelligence',
     },
   },
   {
