@@ -7,6 +7,7 @@ use App\Models\BenefitPackage;
 use App\Models\Benefactor;
 use App\Models\Enrollee;
 use App\Models\EnrolleeCategory;
+use App\Models\EnrollmentPhase;
 use App\Models\Facility;
 use App\Models\FundingType;
 use App\Models\InsuranceProgramme;
@@ -60,6 +61,7 @@ class MobileV1Controller extends BaseController
         $distinctNinCount = $this->scopedDistinctNinQuery($scope)->distinct('nin')->count('nin');
 
         return $this->sendResponse([
+            'server_time' => now()->toIso8601String(),
             'user' => $request->user()->load(['roles:id,name,label', 'roles.permissions:id,name,label,category']),
             'device' => $device,
             'officer_enrollment' => $scope,
@@ -115,6 +117,7 @@ class MobileV1Controller extends BaseController
             'benefit_packages' => $this->changed(BenefitPackage::query()->orderBy('name'), $since)->get(),
             'funding_types' => $this->changed(FundingType::query()->orderBy('name'), $since)->get(),
             'benefactors' => $this->changed(Benefactor::query()->orderBy('name'), $since)->get(),
+            'enrollment_phases' => $this->changed(EnrollmentPhase::query()->orderBy('name'), $since)->get(),
             'lgas' => $this->changed(Lga::query()->orderBy('name'), $since)
                 ->when($scope['lga_ids'] !== null, fn (Builder $query) => $query->whereIn('id', $scope['lga_ids']))
                 ->get(),

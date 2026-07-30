@@ -322,11 +322,33 @@
                   <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Provided enrollment photo</p>
                   <div class="tw-mt-3 tw-flex tw-justify-center">
                     <div class="tw-flex tw-h-44 tw-w-44 tw-items-center tw-justify-center tw-overflow-hidden tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-white">
-                      <img v-if="selectedRow.provided_image_url || selectedRow.image_url" :src="selectedRow.provided_image_url || selectedRow.image_url" alt="Enrollment passport photo" class="tw-h-full tw-w-full tw-object-cover" />
+                      <img v-if="selectedOfficerPhoto(selectedRow)" :src="selectedOfficerPhoto(selectedRow)" alt="Enrollment passport photo" class="tw-h-full tw-w-full tw-object-cover" />
                       <div v-else class="tw-flex tw-flex-col tw-items-center tw-gap-2 tw-text-slate-400">
                         <v-icon size="34">mdi-account-box-outline</v-icon>
                         <span class="tw-text-xs tw-font-medium">No uploaded photo</span>
                       </div>
+                    </div>
+                  </div>
+                  <div v-if="selectedRow.mobilePassportAttachments?.length" class="tw-mt-4 tw-space-y-3">
+                    <p class="tw-text-xs tw-text-slate-500">
+                      Choose which captured officer photo becomes the enrollee passport on approval.
+                    </p>
+                    <div class="tw-grid tw-gap-2 sm:tw-grid-cols-2">
+                      <button
+                        v-for="attachment in selectedRow.mobilePassportAttachments"
+                        :key="attachment.id"
+                        type="button"
+                        class="tw-flex tw-items-center tw-gap-3 tw-rounded-xl tw-border tw-bg-white tw-p-2.5 tw-text-left"
+                        :class="Number(selectedRow.selectedPhotoAttachmentId) === Number(attachment.id) ? 'tw-border-emerald-500 tw-ring-2 tw-ring-emerald-200' : 'tw-border-slate-200'"
+                        @click="selectedRow.selectedPhotoAttachmentId = attachment.id"
+                      >
+                        <img :src="attachment.file_path" :alt="attachment.original_name || attachment.label" class="tw-h-16 tw-w-16 tw-rounded-lg tw-object-cover" />
+                        <div class="tw-min-w-0">
+                          <p class="tw-text-sm tw-font-semibold tw-text-slate-900">{{ attachment.label }}</p>
+                          <p class="tw-text-xs tw-text-slate-500">{{ attachment.original_name || 'Mobile upload' }}</p>
+                          <p class="tw-text-[11px] tw-text-emerald-700" v-if="Number(selectedRow.selectedPhotoAttachmentId) === Number(attachment.id)">Selected for approval</p>
+                        </div>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -727,10 +749,17 @@ const openLocationMap = (point, title = 'Enrollment Location Map') => {
   locationMapOpen.value = true
 }
 
+const selectedOfficerPhoto = (row) => {
+  if (!row) return ''
+  const selected = (row.mobilePassportAttachments || []).find((attachment) => Number(attachment.id) === Number(row.selectedPhotoAttachmentId))
+  return selected?.file_path || row.provided_image_url || row.image_url || ''
+}
+
 const normalizeRow = (row) => {
   const comparison = row.nin_verification?.data?.comparison || row.nin_verification_data?.comparison || []
   const providerData = row.nin_verification?.data?.provider_data || row.nin_verification_data?.provider_data || {}
   const storedSelection = row.nin_verification?.meta?.approval_selection?.fields || row.nin_verification_meta?.approval_selection?.fields || {}
+  const mobilePassportAttachments = Array.isArray(row.mobile_passport_attachments) ? row.mobile_passport_attachments : []
 
   return {
     ...row,
@@ -742,6 +771,11 @@ const normalizeRow = (row) => {
     providerData,
     provided_image_url: row.provided_image_url || row.image_url || '',
     providerPhoto: normalizeProviderPhoto(providerData.photo),
+    mobilePassportAttachments: mobilePassportAttachments.map((attachment, index) => ({
+      ...attachment,
+      label: attachment.kind === 'passport' ? 'Original Capture' : `Retake ${index}`,
+    })),
+    selectedPhotoAttachmentId: row.current_mobile_photo_attachment_id || mobilePassportAttachments.find((attachment) => attachment.is_current)?.id || mobilePassportAttachments[mobilePassportAttachments.length - 1]?.id || null,
   }
 }
 
@@ -919,6 +953,10 @@ const approvalPayload = (row) => {
 
   if (row.mergeStrategy === 'manual') {
     payload.nin_field_selection = row.fieldSelection
+  }
+
+  if (row.selectedPhotoAttachmentId) {
+    payload.selected_enrollment_photo_attachment_id = row.selectedPhotoAttachmentId
   }
 
   return payload

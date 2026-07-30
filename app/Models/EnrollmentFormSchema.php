@@ -21,6 +21,7 @@ class EnrollmentFormSchema extends Model
         'benefactor_ids' => 'array',
         'nin_verification_policy' => 'array',
         'location_capture_policy' => 'array',
+        'enrollment_phase_policy' => 'array',
         'fields' => 'array',
         'rules' => 'array',
         'ui_schema' => 'array',

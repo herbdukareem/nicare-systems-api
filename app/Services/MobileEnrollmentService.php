@@ -98,6 +98,7 @@ class MobileEnrollmentService
             }
 
             $data = $this->normalizeLocationData($this->normalizeCoreData((array) ($recordPayload['data'] ?? $recordPayload)));
+            $data = $this->applyEnrollmentPhasePolicy($data, (array) ($schema->enrollment_phase_policy ?? []));
             $data = $this->resolveLockedVerifiedFieldEdits($data, $recordPayload, $ninPolicy);
             if (isset($recordPayload['data']) && is_array($recordPayload['data'])) {
                 $recordPayload['data'] = array_merge($recordPayload['data'], $data, [
@@ -335,6 +336,41 @@ class MobileEnrollmentService
         return $data;
     }
 
+    private function applyEnrollmentPhasePolicy(array $data, array $policy): array
+    {
+        $mode = (string) ($policy['mode'] ?? 'hidden');
+
+        if ($mode === 'hidden') {
+            $data['enrollment_phase_id'] = null;
+
+            return $data;
+        }
+
+        if ($mode === 'fixed') {
+            $data['enrollment_phase_id'] = isset($policy['fixed_phase_id']) && is_numeric($policy['fixed_phase_id'])
+                ? (int) $policy['fixed_phase_id']
+                : null;
+
+            return $data;
+        }
+
+        if (empty($data['enrollment_phase_id'])) {
+            return $data;
+        }
+
+        $allowedPhaseIds = collect((array) ($policy['allowed_phase_ids'] ?? []))
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+
+        if ($allowedPhaseIds !== [] && !in_array((int) $data['enrollment_phase_id'], $allowedPhaseIds, true)) {
+            $data['enrollment_phase_id'] = null;
+        }
+
+        return $data;
+    }
+
     private function ensureOfficerCanUseEnrollment(User $officer, ?int $schemaId, int $lgaId): void
     {
         if (!$officer->mobileEnrollmentEnabled()) {
@@ -418,6 +454,7 @@ class MobileEnrollmentService
                 'benefit_package_id' => $plan?->benefit_package_id ?? ($data['benefit_package_id'] ?? null),
                 'funding_type_id' => $plan?->funding_type_id ?? ($data['funding_type_id'] ?? null),
                 'benefactor_id' => $data['benefactor_id'] ?? null,
+                'enrollment_phase_id' => $data['enrollment_phase_id'] ?? null,
                 'relationship_to_principal' => $data['relationship_to_principal'] ?? 1,
                 'principal_enrollee_id' => $data['principal_enrollee_id'] ?? null,
                 'status' => Enrollee::STATUS_PENDING,

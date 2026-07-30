@@ -3,7 +3,7 @@
     <div class="tw-space-y-5">
       <AppPageHeader
         title="Enrollment Intelligence"
-        subtitle="Monitor NIN verification outcomes, spot backlogs quickly, and drill into recent verification activity."
+        subtitle="Track capture progress, approval movement, NIN outcomes, and the operational value flowing through the enrollment pipeline."
         kicker="Enrollment"
         icon="mdi-chart-box-outline"
       >
@@ -12,13 +12,15 @@
         </v-btn>
       </AppPageHeader>
 
-      <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-3 2xl:tw-grid-cols-6">
-        <AppMetricCard title="Attempts" icon="mdi-timeline-check-outline" tone="neutral" :value="summary.total_attempts" helper="Verification attempts in the selected date range" />
-        <AppMetricCard title="Verified" icon="mdi-check-decagram-outline" tone="success" :value="summary.verified" helper="Successful NIN verifications" />
-        <AppMetricCard title="Failed" icon="mdi-alert-circle-outline" tone="danger" :value="summary.failed" helper="Failed NIN verification attempts" />
-        <AppMetricCard title="Success Rate" icon="mdi-chart-arc" tone="info" :value="`${summary.success_rate}%`" helper="Verified attempts divided by total attempts" />
-        <AppMetricCard title="Pending Backlog" icon="mdi-timer-sand" tone="warning" :value="summary.pending_backlog" helper="Enrollees with NIN still waiting for verification" />
-        <AppMetricCard title="Mobile Verified" icon="mdi-cellphone-check" tone="secondary" :value="summary.mobile_verified" helper="Verified attempts from mobile-officer enrollment" />
+      <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-4 2xl:tw-grid-cols-8">
+        <AppMetricCard title="Captured" icon="mdi-account-plus-outline" tone="neutral" :value="summary.captured" helper="Enrollments captured in the selected date window" />
+        <AppMetricCard title="Pending Approval" icon="mdi-timer-sand" tone="warning" :value="summary.pending_approval" helper="Captured records still waiting for approval" />
+        <AppMetricCard title="Approved" icon="mdi-check-decagram-outline" tone="success" :value="summary.approved" helper="Approved enrollments in the selected window" />
+        <AppMetricCard title="Rejected" icon="mdi-close-octagon-outline" tone="danger" :value="summary.rejected" helper="Rejected enrollments in the selected window" />
+        <AppMetricCard title="Duplicates" icon="mdi-content-duplicate" tone="warning" :value="summary.duplicates" helper="Records flagged as possible duplicates" />
+        <AppMetricCard title="NIN Attempts" icon="mdi-timeline-check-outline" tone="info" :value="summary.total_attempts" helper="Verified plus failed NIN verification attempts" />
+        <AppMetricCard title="NIN Verified" icon="mdi-card-account-details-outline" tone="success" :value="summary.verified" helper="Successful NIN verifications" />
+        <AppMetricCard title="Enrollment Value" icon="mdi-cash-multiple" tone="secondary" :value="formatCurrency(summary.total_value)" helper="Plan-linked monetary value across captured enrollments" />
       </div>
 
       <AppCard title="Filters" icon="mdi-filter-variant" tone="primary">
@@ -28,122 +30,179 @@
           <v-select v-model="filters.lga_id" :items="lookups.lgas" item-title="name" item-value="id" label="LGA" density="compact" variant="outlined" clearable hide-details />
           <v-select v-model="filters.facility_id" :items="facilityOptions" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" clearable hide-details />
           <v-select v-model="filters.source" :items="lookups.sources" item-title="label" item-value="value" label="Enrollment source" density="compact" variant="outlined" clearable hide-details />
-          <v-select v-model="filters.status" :items="lookups.statuses" item-title="label" item-value="value" label="Verification status" density="compact" variant="outlined" clearable hide-details />
+          <v-select v-model="filters.status" :items="lookups.statuses" item-title="label" item-value="value" label="NIN status" density="compact" variant="outlined" clearable hide-details />
         </div>
 
         <div class="tw-mt-4 tw-flex tw-flex-wrap tw-gap-2">
-          <v-btn color="primary" prepend-icon="mdi-magnify" :loading="loading" @click="applyFilters">Load Report</v-btn>
+          <v-btn color="primary" prepend-icon="mdi-magnify" :loading="loading" @click="applyFilters">Load Dashboard</v-btn>
           <v-btn variant="outlined" prepend-icon="mdi-filter-off-outline" @click="resetFilters">Reset</v-btn>
         </div>
       </AppCard>
 
-      <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.4fr_0.9fr]">
-        <AppCard title="Verification Trend" icon="mdi-chart-line" tone="primary">
-          <LineChart :data="trendChartData" :height="280" />
-        </AppCard>
+      <AppCard tone="primary">
+        <v-tabs v-model="activeTab" color="primary" density="comfortable">
+          <v-tab value="overview">Overview</v-tab>
+          <v-tab value="nin">NIN Monitoring</v-tab>
+          <v-tab value="geography">Geography</v-tab>
+          <v-tab value="operations">Operations</v-tab>
+        </v-tabs>
 
-        <AppCard title="Outcome Mix" icon="mdi-chart-donut" tone="success">
-          <DoughnutChart :data="statusChartData" :height="280" />
-        </AppCard>
-      </div>
+        <v-window v-model="activeTab" class="tw-mt-4">
+          <v-window-item value="overview">
+            <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.4fr_0.9fr]">
+              <AppCard title="Enrollment Progress Trend" icon="mdi-chart-line" tone="primary">
+                <LineChart :data="enrollmentTrendChartData" :height="300" />
+              </AppCard>
 
-      <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.2fr_1fr]">
-        <AppCard title="Source Breakdown" icon="mdi-source-branch" tone="secondary">
-          <BarChart :data="sourceChartData" :height="260" />
-        </AppCard>
-
-        <AppCard title="Provider Breakdown" icon="mdi-account-network-outline" tone="info">
-          <div v-if="providerBreakdown.length" class="tw-space-y-3">
-            <div
-              v-for="provider in providerBreakdown"
-              :key="provider.label"
-              class="tw-flex tw-items-center tw-justify-between tw-border tw-border-slate-200 tw-bg-slate-50 tw-px-3 tw-py-2"
-            >
-              <div class="tw-min-w-0">
-                <p class="tw-truncate tw-text-sm tw-font-semibold tw-text-slate-900">{{ provider.label }}</p>
-                <p class="tw-text-xs tw-text-slate-500">Distinct verified NINs in the selected range</p>
-              </div>
-              <AppBadge tone="info" :label="String(provider.value)" size="sm" />
+              <AppCard title="Progress Mix" icon="mdi-chart-donut" tone="success">
+                <DoughnutChart :data="statusChartData" :height="300" />
+              </AppCard>
             </div>
-          </div>
-          <AppEmptyState
-            v-else
-            icon="mdi-database-search-outline"
-            title="No provider activity"
-            description="No NIN verification attempts matched the current filters."
-          />
-        </AppCard>
-      </div>
+          </v-window-item>
 
-      <AppCard title="Recent Verification Records" icon="mdi-table-search" tone="primary">
-        <AppDataTable
-          v-model:page="table.page"
-          v-model:items-per-page="table.perPage"
-          v-model:search="table.search"
-          :headers="headers"
-          :items="table.rows"
-          :items-length="table.total"
-          :loading="loading"
-          searchable
-          search-placeholder="Search by enrollee, enrollee ID, NIN, or phone"
-          @search="handleSearch"
-        >
-          <template #toolbar>
-            <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-text-slate-500">
-              <span class="tw-rounded-full tw-bg-slate-200 tw-px-2.5 tw-py-1 tw-font-semibold tw-text-slate-700">
-                {{ table.total }} record{{ table.total === 1 ? '' : 's' }}
-              </span>
-              <span>{{ activeDateRangeLabel }}</span>
+          <v-window-item value="nin">
+            <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.35fr_0.95fr]">
+              <AppCard title="NIN Verification Trend" icon="mdi-chart-line" tone="primary">
+                <LineChart :data="ninTrendChartData" :height="300" />
+              </AppCard>
+
+              <AppCard title="NIN Outcome Mix" icon="mdi-chart-donut" tone="success">
+                <DoughnutChart :data="ninStatusChartData" :height="300" />
+              </AppCard>
             </div>
-          </template>
 
-          <template #item.enrollee="{ item }">
-            <div class="tw-min-w-0">
-              <p class="tw-font-semibold tw-text-slate-900">{{ item.full_name || 'Unknown enrollee' }}</p>
-              <p class="tw-text-xs tw-text-slate-500">{{ item.enrollee_id || 'Pending ID' }}</p>
-              <p class="tw-mt-1 tw-text-xs tw-text-slate-500">{{ item.nin }}</p>
+            <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.1fr_0.9fr] tw-mt-5">
+              <AppCard title="Verification Source Breakdown" icon="mdi-source-branch" tone="secondary">
+                <BarChart :data="sourceChartData" :height="260" />
+              </AppCard>
+
+              <AppCard title="Verification Providers" icon="mdi-account-network-outline" tone="info">
+                <div v-if="providerBreakdown.length" class="tw-space-y-3">
+                  <div
+                    v-for="provider in providerBreakdown"
+                    :key="provider.label"
+                    class="tw-flex tw-items-center tw-justify-between tw-border tw-border-slate-200 tw-bg-slate-50 tw-px-3 tw-py-2"
+                  >
+                    <div class="tw-min-w-0">
+                      <p class="tw-truncate tw-text-sm tw-font-semibold tw-text-slate-900">{{ provider.label }}</p>
+                      <p class="tw-text-xs tw-text-slate-500">Verified/failed attempts in the current window</p>
+                    </div>
+                    <AppBadge tone="info" :label="String(provider.value)" size="sm" />
+                  </div>
+                </div>
+                <AppEmptyState
+                  v-else
+                  icon="mdi-database-search-outline"
+                  title="No provider activity"
+                  description="No NIN verification attempts matched the current filters."
+                />
+              </AppCard>
             </div>
-          </template>
 
-          <template #item.status="{ item }">
-            <AppStatusBadge :status="item.status" :label="item.status_label" size="sm" />
-          </template>
+            <AppCard title="Recent NIN Verification Records" icon="mdi-table-search" tone="primary" class="tw-mt-5">
+              <AppDataTable
+                v-model:page="verificationTable.page"
+                v-model:items-per-page="verificationTable.perPage"
+                v-model:search="verificationTable.search"
+                :headers="verificationHeaders"
+                :items="verificationTable.rows"
+                :items-length="verificationTable.total"
+                :loading="loading"
+                searchable
+                search-placeholder="Search by enrollee, enrollee ID, NIN, or phone"
+                @search="handleVerificationSearch"
+              >
+                <template #toolbar>
+                  <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-text-slate-500">
+                    <span class="tw-rounded-full tw-bg-slate-200 tw-px-2.5 tw-py-1 tw-font-semibold tw-text-slate-700">
+                      {{ verificationTable.total }} record{{ verificationTable.total === 1 ? '' : 's' }}
+                    </span>
+                    <span>{{ activeDateRangeLabel }}</span>
+                  </div>
+                </template>
 
-          <template #item.source="{ item }">
-            <div class="tw-text-sm tw-text-slate-700">{{ item.source_label }}</div>
-          </template>
+                <template #item.enrollee="{ item }">
+                  <div class="tw-min-w-0">
+                    <p class="tw-font-semibold tw-text-slate-900">{{ item.full_name || 'Unknown enrollee' }}</p>
+                    <p class="tw-text-xs tw-text-slate-500">{{ item.enrollee_id || 'Pending ID' }}</p>
+                    <p class="tw-mt-1 tw-text-xs tw-text-slate-500">{{ item.nin }}</p>
+                  </div>
+                </template>
 
-          <template #item.provider="{ item }">
-            <div class="tw-text-sm tw-text-slate-700">{{ item.provider }}</div>
-          </template>
+                <template #item.status="{ item }">
+                  <AppStatusBadge :status="item.status" :label="item.status_label" size="sm" />
+                </template>
 
-          <template #item.facility="{ item }">
-            <div class="tw-min-w-0">
-              <p class="tw-font-medium tw-text-slate-900">{{ item.facility_name || 'N/A' }}</p>
-              <p class="tw-text-xs tw-text-slate-500">{{ item.lga_name || 'No LGA' }}</p>
+                <template #item.source="{ item }">
+                  <div class="tw-text-sm tw-text-slate-700">{{ item.source_label }}</div>
+                </template>
+
+                <template #item.provider="{ item }">
+                  <div class="tw-text-sm tw-text-slate-700">{{ item.provider }}</div>
+                </template>
+
+                <template #item.facility="{ item }">
+                  <div class="tw-min-w-0">
+                    <p class="tw-font-medium tw-text-slate-900">{{ item.facility_name || 'N/A' }}</p>
+                    <p class="tw-text-xs tw-text-slate-500">{{ item.lga_name || 'No LGA' }}</p>
+                  </div>
+                </template>
+
+                <template #item.verified_at="{ item }">
+                  <DateDisplay :value="item.verified_at" format="medium" />
+                </template>
+
+                <template #item.failure_message="{ item }">
+                  <span class="tw-text-sm tw-text-slate-600">{{ item.failure_message || '-' }}</span>
+                </template>
+              </AppDataTable>
+            </AppCard>
+          </v-window-item>
+
+          <v-window-item value="geography">
+            <div class="tw-grid tw-gap-5 xl:tw-grid-cols-2">
+              <AppCard title="LGA Breakdown" icon="mdi-map-legend" tone="warning">
+                <BarChart :data="lgaBreakdownChartData" :height="320" />
+              </AppCard>
+
+              <AppCard title="Facility Breakdown" icon="mdi-hospital-building" tone="secondary">
+                <BarChart :data="facilityBreakdownChartData" :height="320" />
+              </AppCard>
             </div>
-          </template>
+          </v-window-item>
 
-          <template #item.verified_at="{ item }">
-            <DateDisplay :value="item.verified_at" format="medium" />
-          </template>
+          <v-window-item value="operations">
+            <AppCard title="Facility Summary Table" icon="mdi-table-large" tone="primary">
+              <AppDataTable
+                :headers="facilityHeaders"
+                :items="facilityTable.rows"
+                :items-length="facilityTable.total"
+                :loading="loading"
+                :items-per-page="facilityTable.perPage"
+              >
+                <template #toolbar>
+                  <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-text-slate-500">
+                    <span class="tw-rounded-full tw-bg-slate-200 tw-px-2.5 tw-py-1 tw-font-semibold tw-text-slate-700">
+                      {{ facilityTable.total }} facility row{{ facilityTable.total === 1 ? '' : 's' }}
+                    </span>
+                    <span>Premium value is derived from the linked plan amount.</span>
+                  </div>
+                </template>
 
-          <template #item.failure_message="{ item }">
-            <span class="tw-text-sm tw-text-slate-600">{{ item.failure_message || '-' }}</span>
-          </template>
+                <template #item.facility="{ item }">
+                  <div class="tw-min-w-0">
+                    <p class="tw-font-semibold tw-text-slate-900">{{ item.facility_name }}</p>
+                    <p class="tw-text-xs tw-text-slate-500">{{ item.lga_name }}</p>
+                  </div>
+                </template>
 
-          <template #no-data>
-            <AppEmptyState
-              icon="mdi-card-search-outline"
-              title="No verification records"
-              description="No NIN verification activity matched the selected filters."
-            >
-              <v-btn color="primary" prepend-icon="mdi-refresh" :loading="loading" @click="loadReport">
-                Reload
-              </v-btn>
-            </AppEmptyState>
-          </template>
-        </AppDataTable>
+                <template #item.value="{ item }">
+                  <span class="tw-text-sm tw-font-medium tw-text-slate-700">{{ formatCurrency(item.value) }}</span>
+                </template>
+              </AppDataTable>
+            </AppCard>
+          </v-window-item>
+        </v-window>
       </AppCard>
     </div>
   </AdminLayout>
@@ -169,6 +228,8 @@ import { useToast } from '../../composables/useToast'
 const { error } = useToast()
 
 const loading = ref(false)
+const activeTab = ref('overview')
+
 const lookups = reactive({
   lgas: [],
   facilities: [],
@@ -178,6 +239,12 @@ const lookups = reactive({
 
 const filters = reactive(defaultFilters())
 const summary = reactive({
+  captured: 0,
+  pending_approval: 0,
+  approved: 0,
+  rejected: 0,
+  duplicates: 0,
+  total_value: 0,
   total_attempts: 0,
   verified: 0,
   failed: 0,
@@ -189,12 +256,16 @@ const summary = reactive({
 
 const charts = reactive({
   trend: { labels: [], verified: [], failed: [] },
+  enrollment_trend: { labels: [], captured: [], pending_approval: [], approved: [], rejected: [] },
   status_breakdown: [],
+  nin_status_breakdown: [],
   source_breakdown: [],
   provider_breakdown: [],
+  lga_breakdown: [],
+  facility_breakdown: [],
 })
 
-const table = reactive({
+const verificationTable = reactive({
   rows: [],
   page: 1,
   perPage: 25,
@@ -202,7 +273,13 @@ const table = reactive({
   search: '',
 })
 
-const headers = [
+const facilityTable = reactive({
+  rows: [],
+  total: 0,
+  perPage: 25,
+})
+
+const verificationHeaders = [
   { title: 'Enrollee', key: 'enrollee', sortable: false },
   { title: 'Status', key: 'status', sortable: false },
   { title: 'Source', key: 'source', sortable: false },
@@ -210,6 +287,19 @@ const headers = [
   { title: 'Facility', key: 'facility', sortable: false },
   { title: 'Verified At', key: 'verified_at', sortable: false },
   { title: 'Failure Note', key: 'failure_message', sortable: false },
+]
+
+const facilityHeaders = [
+  { title: 'Facility', key: 'facility', sortable: false },
+  { title: 'Captured', key: 'captured', sortable: false },
+  { title: 'Pending', key: 'pending_approval', sortable: false },
+  { title: 'Approved', key: 'approved', sortable: false },
+  { title: 'Rejected', key: 'rejected', sortable: false },
+  { title: 'Duplicates', key: 'duplicates', sortable: false },
+  { title: 'NIN Attempts', key: 'nin_attempts', sortable: false },
+  { title: 'Verified', key: 'nin_verified', sortable: false },
+  { title: 'Failed', key: 'nin_failed', sortable: false },
+  { title: 'Value', key: 'value', sortable: false },
 ]
 
 function defaultFilters() {
@@ -235,10 +325,43 @@ const facilityOptions = computed(() => {
 })
 
 const providerBreakdown = computed(() => charts.provider_breakdown || [])
+const activeDateRangeLabel = computed(() => `Showing intelligence from ${filters.date_from} to ${filters.date_to}`)
 
-const activeDateRangeLabel = computed(() => `Showing verification activity from ${filters.date_from} to ${filters.date_to}`)
+const enrollmentTrendChartData = computed(() => ({
+  labels: charts.enrollment_trend.labels || [],
+  datasets: [
+    {
+      label: 'Captured',
+      data: charts.enrollment_trend.captured || [],
+      borderColor: '#1d4ed8',
+      backgroundColor: 'rgba(29, 78, 216, 0.12)',
+      fill: true,
+    },
+    {
+      label: 'Pending Approval',
+      data: charts.enrollment_trend.pending_approval || [],
+      borderColor: '#d97706',
+      backgroundColor: 'rgba(217, 119, 6, 0.12)',
+      fill: true,
+    },
+    {
+      label: 'Approved',
+      data: charts.enrollment_trend.approved || [],
+      borderColor: '#0f766e',
+      backgroundColor: 'rgba(15, 118, 110, 0.12)',
+      fill: true,
+    },
+    {
+      label: 'Rejected',
+      data: charts.enrollment_trend.rejected || [],
+      borderColor: '#dc2626',
+      backgroundColor: 'rgba(220, 38, 38, 0.08)',
+      fill: true,
+    },
+  ],
+}))
 
-const trendChartData = computed(() => ({
+const ninTrendChartData = computed(() => ({
   labels: charts.trend.labels || [],
   datasets: [
     {
@@ -263,6 +386,17 @@ const statusChartData = computed(() => ({
   datasets: [
     {
       data: (charts.status_breakdown || []).map((item) => item.value),
+      backgroundColor: ['#d97706', '#0f766e', '#dc2626', '#8b5cf6'],
+      borderColor: ['#ffffff', '#ffffff', '#ffffff', '#ffffff'],
+    },
+  ],
+}))
+
+const ninStatusChartData = computed(() => ({
+  labels: (charts.nin_status_breakdown || []).map((item) => item.label),
+  datasets: [
+    {
+      data: (charts.nin_status_breakdown || []).map((item) => item.value),
       backgroundColor: ['#0f766e', '#dc2626'],
       borderColor: ['#ffffff', '#ffffff'],
     },
@@ -280,12 +414,63 @@ const sourceChartData = computed(() => ({
   ],
 }))
 
+const lgaBreakdownChartData = computed(() => ({
+  labels: (charts.lga_breakdown || []).map((item) => item.label),
+  datasets: [
+    {
+      label: 'Captured',
+      data: (charts.lga_breakdown || []).map((item) => item.captured),
+      backgroundColor: '#1d4ed8',
+    },
+    {
+      label: 'Approved',
+      data: (charts.lga_breakdown || []).map((item) => item.approved),
+      backgroundColor: '#0f766e',
+    },
+    {
+      label: 'Pending',
+      data: (charts.lga_breakdown || []).map((item) => item.pending_approval),
+      backgroundColor: '#d97706',
+    },
+  ],
+}))
+
+const facilityBreakdownChartData = computed(() => ({
+  labels: (charts.facility_breakdown || []).map((item) => item.label),
+  datasets: [
+    {
+      label: 'Captured',
+      data: (charts.facility_breakdown || []).map((item) => item.captured),
+      backgroundColor: '#1d4ed8',
+    },
+    {
+      label: 'Approved',
+      data: (charts.facility_breakdown || []).map((item) => item.approved),
+      backgroundColor: '#0f766e',
+    },
+    {
+      label: 'Value',
+      data: (charts.facility_breakdown || []).map((item) => item.value),
+      backgroundColor: '#7c3aed',
+    },
+  ],
+}))
+
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('en-NG', {
+    style: 'currency',
+    currency: 'NGN',
+    maximumFractionDigits: 0,
+  }).format(Number(value || 0))
+}
+
 const buildParams = () => {
   const params = {
     ...filters,
-    page: table.page,
-    per_page: table.perPage,
-    search: table.search || null,
+    page: verificationTable.page,
+    per_page: verificationTable.perPage,
+    search: verificationTable.search || null,
+    facility_page: 1,
   }
 
   Object.keys(params).forEach((key) => {
@@ -299,10 +484,17 @@ const applyResponse = (payload = {}) => {
   Object.assign(summary, payload.summary || {})
   Object.assign(charts, payload.charts || {})
   Object.assign(lookups, payload.lookups || {})
-  table.rows = payload.table?.data || []
-  table.total = Number(payload.table?.meta?.total || 0)
-  table.page = Number(payload.table?.meta?.current_page || 1)
-  table.perPage = Number(payload.table?.meta?.per_page || table.perPage)
+
+  const verificationPayload = payload.tables?.recent_verifications || payload.table || {}
+  verificationTable.rows = verificationPayload.data || []
+  verificationTable.total = Number(verificationPayload.meta?.total || 0)
+  verificationTable.page = Number(verificationPayload.meta?.current_page || 1)
+  verificationTable.perPage = Number(verificationPayload.meta?.per_page || verificationTable.perPage)
+
+  const facilityPayload = payload.tables?.facility_summary || {}
+  facilityTable.rows = facilityPayload.data || []
+  facilityTable.total = Number(facilityPayload.meta?.total || 0)
+  facilityTable.perPage = Number(facilityPayload.meta?.per_page || facilityTable.perPage)
 }
 
 const loadReport = async () => {
@@ -319,8 +511,8 @@ const loadReport = async () => {
 }
 
 const applyFilters = async () => {
-  if (table.page !== 1) {
-    table.page = 1
+  if (verificationTable.page !== 1) {
+    verificationTable.page = 1
     return
   }
 
@@ -329,19 +521,19 @@ const applyFilters = async () => {
 
 const resetFilters = async () => {
   Object.assign(filters, defaultFilters())
-  table.search = ''
+  verificationTable.search = ''
 
-  if (table.page !== 1) {
-    table.page = 1
+  if (verificationTable.page !== 1) {
+    verificationTable.page = 1
     return
   }
 
   await loadReport()
 }
 
-const handleSearch = async () => {
-  if (table.page !== 1) {
-    table.page = 1
+const handleVerificationSearch = async () => {
+  if (verificationTable.page !== 1) {
+    verificationTable.page = 1
     return
   }
 
@@ -354,12 +546,13 @@ watch(() => filters.lga_id, () => {
   }
 })
 
-watch(() => table.page, () => {
+watch(() => verificationTable.page, () => {
   void loadReport()
 })
-watch(() => table.perPage, async () => {
-  if (table.page !== 1) {
-    table.page = 1
+
+watch(() => verificationTable.perPage, async () => {
+  if (verificationTable.page !== 1) {
+    verificationTable.page = 1
     return
   }
 

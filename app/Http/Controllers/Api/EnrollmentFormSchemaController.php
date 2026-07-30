@@ -27,6 +27,7 @@ class EnrollmentFormSchemaController extends BaseController
             'default_fields' => $this->service->defaultFields(),
             'default_nin_verification_policy' => $this->service->defaultNinVerificationPolicy(false),
             'default_location_capture_policy' => $this->service->defaultLocationCapturePolicy(),
+            'default_enrollment_phase_policy' => $this->service->defaultEnrollmentPhasePolicy(),
         ], 'Enrollment form schemas retrieved.');
     }
 
@@ -99,6 +100,11 @@ class EnrollmentFormSchemaController extends BaseController
             'location_capture_policy.capture_points.*' => ['string', Rule::in(['start', 'submit'])],
             'location_capture_policy.minimum_accuracy_meters' => ['nullable', 'integer', 'min:0'],
             'location_capture_policy.allow_submission_without_location' => ['nullable', 'boolean'],
+            'enrollment_phase_policy' => ['nullable', 'array'],
+            'enrollment_phase_policy.mode' => ['nullable', Rule::in(['hidden', 'fixed', 'select'])],
+            'enrollment_phase_policy.fixed_phase_id' => ['nullable', 'integer', 'exists:enrollment_phases,id'],
+            'enrollment_phase_policy.allowed_phase_ids' => ['nullable', 'array'],
+            'enrollment_phase_policy.allowed_phase_ids.*' => ['integer', 'exists:enrollment_phases,id'],
             'allow_offline_capture' => ['nullable', 'boolean'],
             'fields' => [$required, 'array'],
             'rules' => ['nullable', 'array'],

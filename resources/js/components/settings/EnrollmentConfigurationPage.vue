@@ -38,6 +38,11 @@
             :tone="item.location_capture_policy?.enabled ? 'info' : 'neutral'"
             size="sm"
           />
+          <AppBadge
+            :label="phasePolicyLabel(item.enrollment_phase_policy)"
+            :tone="item.enrollment_phase_policy?.mode === 'select' ? 'warning' : item.enrollment_phase_policy?.mode === 'fixed' ? 'success' : 'neutral'"
+            size="sm"
+          />
         </div>
       </template>
       <template #item.actions="{ item }">
@@ -136,6 +141,46 @@
             {{ derivedLocationPolicyHelp }}
           </div>
 
+          <div class="tw-mt-4 tw-grid tw-grid-cols-1 tw-gap-3 md:tw-grid-cols-2">
+            <v-select
+              v-model="form.enrollment_phase_policy.mode"
+              :items="phaseModeOptions"
+              label="Enrollment phase mode"
+              variant="outlined"
+              density="compact"
+            />
+            <v-select
+              v-model="form.enrollment_phase_policy.fixed_phase_id"
+              :items="filteredEnrollmentPhases"
+              item-title="name"
+              item-value="id"
+              label="Fixed enrollment phase"
+              variant="outlined"
+              density="compact"
+              clearable
+              :disabled="form.enrollment_phase_policy.mode !== 'fixed'"
+            />
+            <v-autocomplete
+              v-model="form.enrollment_phase_policy.allowed_phase_ids"
+              :items="filteredEnrollmentPhases"
+              item-title="name"
+              item-value="id"
+              label="Officer-selectable phases"
+              variant="outlined"
+              density="compact"
+              multiple
+              chips
+              closable-chips
+              clearable
+              class="md:tw-col-span-2"
+              :disabled="form.enrollment_phase_policy.mode !== 'select'"
+            />
+          </div>
+
+          <div class="tw-mt-3 tw-rounded-md tw-border tw-border-slate-200 tw-bg-slate-50 tw-px-3 tw-py-2 tw-text-sm tw-text-slate-600">
+            {{ derivedPhasePolicyHelp }}
+          </div>
+
           <div class="tw-mt-4 tw-grid tw-grid-cols-1 tw-gap-3 lg:tw-grid-cols-2">
             <v-textarea v-model="fieldsJson" label="Fields JSON" rows="14" variant="outlined" density="compact" />
             <div class="tw-grid tw-grid-cols-1 tw-gap-3">
@@ -191,6 +236,7 @@ const conflictStatusOptions = ['requires_review', 'nin_failed']
 const overwriteStrategyOptions = ['empty_only', 'always', 'never']
 const locationModeOptions = ['disabled', 'preferred', 'required', 'required_on_submit']
 const locationCapturePointOptions = ['start', 'submit']
+const phaseModeOptions = ['hidden', 'fixed', 'select']
 const schemas = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -206,11 +252,13 @@ const uiJson = ref('{}')
 const ninAutofillFieldsJson = ref('{}')
 const defaultNinPolicy = ref(null)
 const defaultLocationPolicy = ref(null)
+const defaultEnrollmentPhasePolicy = ref(null)
 
 const metadata = reactive({
   insurance_programmes: [],
   premium_plans: [],
   benefactors: [],
+  enrollment_phases: [],
 })
 
 const form = reactive({
@@ -250,9 +298,15 @@ const form = reactive({
     minimum_accuracy_meters: 100,
     allow_submission_without_location: true,
   },
+  enrollment_phase_policy: {
+    mode: 'hidden',
+    fixed_phase_id: null,
+    allowed_phase_ids: [],
+  },
 })
 
 const filteredPlans = computed(() => metadata.premium_plans.filter((plan) => !form.insurance_programme_id || Number(plan.insurance_programme_id) === Number(form.insurance_programme_id)))
+const filteredEnrollmentPhases = computed(() => metadata.enrollment_phases.filter((phase) => !form.benefactor_ids.length || !phase.benefactor_id || form.benefactor_ids.map(Number).includes(Number(phase.benefactor_id))))
 const dialogTitle = computed(() => {
   if (editingId.value) return 'Edit schema'
   if (duplicateSourceId.value) return 'Copy schema'
@@ -327,6 +381,24 @@ const derivedLocationPolicyHelp = computed(() => {
   return 'Location will be captured on the device when available and stored for approval-time audit review.'
 })
 
+const derivedPhasePolicyHelp = computed(() => {
+  if (form.enrollment_phase_policy.mode === 'fixed') {
+    return 'The selected enrollment phase is applied automatically on mobile and hidden from the officer.'
+  }
+
+  if (form.enrollment_phase_policy.mode === 'select') {
+    return 'The officer must choose one of the allowed enrollment phases before queueing the record.'
+  }
+
+  return 'Enrollment phase is hidden on mobile for this schema.'
+})
+
+const phasePolicyLabel = (policy = {}) => {
+  if (policy?.mode === 'fixed') return 'Fixed phase'
+  if (policy?.mode === 'select') return 'Officer selects phase'
+  return 'Phase hidden'
+}
+
 const setPolicy = (policy = null, requiresNin = false) => {
   const next = clonePolicy(policy)
   const defaultFields = defaultNinPolicy.value?.autofill?.fields || form.nin_verification_policy.autofill?.fields || {}
@@ -351,6 +423,14 @@ const setLocationPolicy = (policy = null) => {
   form.location_capture_policy = next
 }
 
+const setEnrollmentPhasePolicy = (policy = null) => {
+  const next = JSON.parse(JSON.stringify(policy || defaultEnrollmentPhasePolicy.value || form.enrollment_phase_policy))
+  next.mode = ['hidden', 'fixed', 'select'].includes(next.mode) ? next.mode : 'hidden'
+  next.fixed_phase_id = Number.isFinite(Number(next.fixed_phase_id)) ? Number(next.fixed_phase_id) : null
+  next.allowed_phase_ids = Array.isArray(next.allowed_phase_ids) ? next.allowed_phase_ids.map(Number).filter((id) => id > 0) : []
+  form.enrollment_phase_policy = next
+}
+
 const loadSchemas = async () => {
   loading.value = true
   try {
@@ -363,6 +443,7 @@ const loadSchemas = async () => {
     }
     defaultNinPolicy.value = response.data?.data?.default_nin_verification_policy || defaultNinPolicy.value
     defaultLocationPolicy.value = response.data?.data?.default_location_capture_policy || defaultLocationPolicy.value
+    defaultEnrollmentPhasePolicy.value = response.data?.data?.default_enrollment_phase_policy || defaultEnrollmentPhasePolicy.value
   } finally {
     loading.value = false
   }
@@ -374,6 +455,7 @@ const loadMetadata = async () => {
   metadata.insurance_programmes = payload.insurance_programmes || payload.programmes || []
   metadata.premium_plans = payload.premium_plans || []
   metadata.benefactors = payload.benefactors || []
+  metadata.enrollment_phases = payload.enrollment_phases || []
 }
 
 const openCreate = () => {
@@ -389,6 +471,7 @@ const openCreate = () => {
   form.allow_offline_capture = true
   setPolicy(null, false)
   setLocationPolicy(null)
+  setEnrollmentPhasePolicy(null)
   fieldsJson.value = fieldsJson.value || '[]'
   uiJson.value = '{}'
   formError.value = ''
@@ -408,6 +491,7 @@ const openEdit = (item) => {
   form.allow_offline_capture = Boolean(item.allow_offline_capture)
   setPolicy(item.nin_verification_policy, Boolean(item.requires_nin_verification))
   setLocationPolicy(item.location_capture_policy)
+  setEnrollmentPhasePolicy(item.enrollment_phase_policy)
   fieldsJson.value = JSON.stringify(item.fields || [], null, 2)
   uiJson.value = JSON.stringify({ ui_schema: item.ui_schema || {}, migration_hints: item.migration_hints || null }, null, 2)
   formError.value = ''
@@ -427,6 +511,7 @@ const openDuplicate = (item) => {
   form.allow_offline_capture = Boolean(item.allow_offline_capture)
   setPolicy(item.nin_verification_policy, Boolean(item.requires_nin_verification))
   setLocationPolicy(item.location_capture_policy)
+  setEnrollmentPhasePolicy(item.enrollment_phase_policy)
   fieldsJson.value = JSON.stringify(item.fields || [], null, 2)
   uiJson.value = JSON.stringify({ ui_schema: item.ui_schema || {}, migration_hints: item.migration_hints || null }, null, 2)
   formError.value = ''
@@ -439,12 +524,20 @@ const payload = () => {
   policy.autofill = policy.autofill || {}
   policy.autofill.fields = JSON.parse(ninAutofillFieldsJson.value || '{}')
   policy.autofill.editable_fields = Array.isArray(policy.autofill.editable_fields) ? policy.autofill.editable_fields : []
+  const phasePolicy = JSON.parse(JSON.stringify(form.enrollment_phase_policy || {}))
+  if (phasePolicy.mode !== 'fixed') {
+    phasePolicy.fixed_phase_id = null
+  }
+  if (phasePolicy.mode !== 'select') {
+    phasePolicy.allowed_phase_ids = []
+  }
 
   return {
     ...form,
     requires_nin_verification: form.requires_nin_verification,
     nin_verification_policy: policy,
     location_capture_policy: form.location_capture_policy,
+    enrollment_phase_policy: phasePolicy,
     fields: JSON.parse(fieldsJson.value || '[]'),
     ui_schema: ui.ui_schema || ui,
     migration_hints: ui.migration_hints || null,

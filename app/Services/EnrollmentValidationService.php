@@ -46,6 +46,7 @@ class EnrollmentValidationService
             'enrollee_category_id' => ['nullable', 'integer', 'exists:enrollee_categories,id'],
             'premium_plan_id' => ['required', 'integer', 'exists:premium_plans,id'],
             'benefactor_id' => ['nullable', 'integer', 'exists:benefactors,id'],
+            'enrollment_phase_id' => ['nullable', 'integer', 'exists:enrollment_phases,id'],
             'premium_pin' => ['nullable', 'string', 'max:255'],
             'relationship_to_principal' => ['nullable', 'integer', 'in:1,2,3,4'],
             'principal_enrollee_id' => ['nullable', 'integer', 'exists:enrollees,id'],
@@ -100,6 +101,36 @@ class EnrollmentValidationService
             $allowedBenefactors = array_values(array_filter(array_map('intval', $schema->benefactor_ids ?? [])));
             if (!empty($data['benefactor_id']) && $allowedBenefactors !== [] && !in_array((int) $data['benefactor_id'], $allowedBenefactors, true)) {
                 $validator->errors()->add('benefactor_id', 'The selected benefactor is not available for this enrollment configuration.');
+            }
+
+            $phasePolicy = is_array($schema->enrollment_phase_policy ?? null) ? $schema->enrollment_phase_policy : [];
+            $phaseMode = (string) ($phasePolicy['mode'] ?? 'hidden');
+            $selectedPhaseId = isset($data['enrollment_phase_id']) && is_numeric($data['enrollment_phase_id'])
+                ? (int) $data['enrollment_phase_id']
+                : null;
+            $fixedPhaseId = isset($phasePolicy['fixed_phase_id']) && is_numeric($phasePolicy['fixed_phase_id'])
+                ? (int) $phasePolicy['fixed_phase_id']
+                : null;
+            $allowedPhaseIds = collect((array) ($phasePolicy['allowed_phase_ids'] ?? []))
+                ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+                ->map(fn ($id) => (int) $id)
+                ->values()
+                ->all();
+
+            if ($phaseMode === 'hidden' && $selectedPhaseId !== null) {
+                $validator->errors()->add('enrollment_phase_id', 'This enrollment configuration does not allow officer-selected enrollment phases.');
+            }
+
+            if ($phaseMode === 'fixed' && $fixedPhaseId !== null && $selectedPhaseId !== $fixedPhaseId) {
+                $validator->errors()->add('enrollment_phase_id', 'This enrollment configuration requires the fixed enrollment phase selected by the schema.');
+            }
+
+            if ($phaseMode === 'select') {
+                if ($selectedPhaseId === null) {
+                    $validator->errors()->add('enrollment_phase_id', 'Select an enrollment phase before continuing.');
+                } elseif ($allowedPhaseIds !== [] && !in_array($selectedPhaseId, $allowedPhaseIds, true)) {
+                    $validator->errors()->add('enrollment_phase_id', 'The selected enrollment phase is not available for this enrollment configuration.');
+                }
             }
         });
 

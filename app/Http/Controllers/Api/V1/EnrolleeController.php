@@ -226,12 +226,29 @@ class EnrolleeController extends BaseController
             'nin_merge_strategy' => ['nullable', Rule::in(['keep_provided', 'prefer_verified', 'manual'])],
             'nin_field_selection' => ['nullable', 'array'],
             'nin_field_selection.*' => ['nullable', Rule::in(['provided', 'verified'])],
+            'selected_enrollment_photo_attachment_id' => ['nullable', 'integer'],
         ]);
 
         try {
             $enrollee = $this->ninVerificationService->applyApprovalSelection($enrollee, $validated, $request->user());
         } catch (\RuntimeException $exception) {
             return $this->sendError($exception->getMessage(), [], 422);
+        }
+
+        if (array_key_exists('selected_enrollment_photo_attachment_id', $validated)) {
+            $selectedPhotoId = $validated['selected_enrollment_photo_attachment_id']
+                ? (int) $validated['selected_enrollment_photo_attachment_id']
+                : null;
+            $selectedPhoto = $enrollee->mobilePassportAttachments()
+                ->first(fn ($attachment) => (int) $attachment->id === $selectedPhotoId);
+
+            if ($selectedPhotoId !== null && !$selectedPhoto) {
+                return $this->sendError('The selected enrollment passport photo does not belong to this mobile enrollment record.', [], 422);
+            }
+
+            if ($selectedPhoto) {
+                $enrollee->update(['image_url' => $selectedPhoto->file_path]);
+            }
         }
 
         $approvalDate = now();

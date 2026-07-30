@@ -2,10 +2,13 @@
 
 namespace Tests\Feature;
 
+use App\Http\Middleware\CheckPermission;
+use App\Jobs\MobileSyncProcessJob;
 use App\Models\Facility;
 use App\Models\MobileSyncRecord;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -19,6 +22,8 @@ class MobileSyncTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
+        $this->withoutMiddleware(CheckPermission::class);
+        Queue::fake();
         $this->user     = User::factory()->create();
         $this->facility = Facility::factory()->create(['accreditation_status' => 'active']);
         $this->actingAs($this->user, 'sanctum');
@@ -40,9 +45,10 @@ class MobileSyncTest extends TestCase
             ],
         ]);
 
-        $response->assertStatus(201)->assertJsonPath('success', true);
+        $response->assertStatus(202)->assertJsonPath('success', true);
 
         $this->assertDatabaseHas('mobile_sync_records', ['status' => 'pending']);
+        Queue::assertPushed(MobileSyncProcessJob::class);
     }
 
     public function test_can_check_sync_batch_status(): void
@@ -52,6 +58,7 @@ class MobileSyncTest extends TestCase
         MobileSyncRecord::create([
             'sync_batch_id' => $batchId,
             'device_id'     => 'DEVICE-001',
+            'officer_user_id' => $this->user->id,
             'payload'       => ['first_name' => 'Test'],
             'status'        => 'pending',
         ]);
@@ -66,6 +73,7 @@ class MobileSyncTest extends TestCase
         MobileSyncRecord::create([
             'sync_batch_id' => Str::uuid()->toString(),
             'device_id'     => 'DEVICE-002',
+            'officer_user_id' => $this->user->id,
             'payload'       => ['first_name' => 'Fail'],
             'status'        => 'failed',
             'error_message' => 'Duplicate NIN detected',

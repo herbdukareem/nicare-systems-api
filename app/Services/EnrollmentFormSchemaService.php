@@ -19,6 +19,7 @@ class EnrollmentFormSchemaService
     public const NIN_CONFLICT_STATUSES = ['requires_review', 'nin_failed'];
     public const LOCATION_CAPTURE_MODES = ['disabled', 'preferred', 'required', 'required_on_submit'];
     public const LOCATION_CAPTURE_POINTS = ['start', 'submit'];
+    public const ENROLLMENT_PHASE_MODES = ['hidden', 'fixed', 'select'];
 
     /**
      * @return array<int, array<string, mixed>>
@@ -133,6 +134,7 @@ class EnrollmentFormSchemaService
             'requires_nin_verification' => false,
             'nin_verification_policy' => $this->defaultNinVerificationPolicy(false),
             'location_capture_policy' => $this->defaultLocationCapturePolicy(),
+            'enrollment_phase_policy' => $this->defaultEnrollmentPhasePolicy(),
             'allow_offline_capture' => true,
             'fields' => $this->defaultFields(),
             'rules' => [],
@@ -212,6 +214,9 @@ class EnrollmentFormSchemaService
             'location_capture_policy' => $this->normalizeLocationCapturePolicy(
                 (array) ($attributes['location_capture_policy'] ?? [])
             ),
+            'enrollment_phase_policy' => $this->normalizeEnrollmentPhasePolicy(
+                (array) ($attributes['enrollment_phase_policy'] ?? [])
+            ),
             'allow_offline_capture' => (bool) ($attributes['allow_offline_capture'] ?? true),
             'fields' => $this->normalizeFields($attributes['fields'] ?? $this->defaultFields()),
             'rules' => $attributes['rules'] ?? [],
@@ -271,6 +276,18 @@ class EnrollmentFormSchemaService
             'capture_points' => ['start', 'submit'],
             'minimum_accuracy_meters' => 100,
             'allow_submission_without_location' => true,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function defaultEnrollmentPhasePolicy(): array
+    {
+        return [
+            'mode' => 'hidden',
+            'fixed_phase_id' => null,
+            'allowed_phase_ids' => [],
         ];
     }
 
@@ -346,6 +363,30 @@ class EnrollmentFormSchemaService
             'capture_points' => $capturePoints,
             'minimum_accuracy_meters' => $minimumAccuracy,
             'allow_submission_without_location' => (bool) ($policy['allow_submission_without_location'] ?? $default['allow_submission_without_location']),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $policy
+     * @return array<string, mixed>
+     */
+    public function normalizeEnrollmentPhasePolicy(array $policy): array
+    {
+        $default = $this->defaultEnrollmentPhasePolicy();
+        $mode = (string) ($policy['mode'] ?? $default['mode']);
+        $allowedPhaseIds = collect((array) ($policy['allowed_phase_ids'] ?? []))
+            ->filter(fn ($id) => is_numeric($id) && (int) $id > 0)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
+
+        return [
+            'mode' => in_array($mode, self::ENROLLMENT_PHASE_MODES, true) ? $mode : $default['mode'],
+            'fixed_phase_id' => is_numeric($policy['fixed_phase_id'] ?? null) && (int) $policy['fixed_phase_id'] > 0
+                ? (int) $policy['fixed_phase_id']
+                : null,
+            'allowed_phase_ids' => $allowedPhaseIds,
         ];
     }
 

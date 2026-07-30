@@ -314,6 +314,32 @@ protected $guarded = ['id'];
             });
     }
 
+    public function mobilePassportAttachments()
+    {
+        if (($this->enrollment_source ?? null) !== 'mobile_officer' || !$this->mobile_enrollment_record_id) {
+            return collect();
+        }
+
+        $record = $this->relationLoaded('mobileEnrollmentRecord')
+            ? $this->mobileEnrollmentRecord
+            : $this->mobileEnrollmentRecord()->with('attachments')->first();
+
+        if (!$record) {
+            return collect();
+        }
+
+        $attachments = $record->relationLoaded('attachments')
+            ? $record->attachments
+            : $record->attachments()->get();
+
+        return $attachments
+            ->filter(fn ($attachment) => $attachment instanceof MobileEnrollmentAttachment
+                && in_array($attachment->kind, $this->mobileProvidedPhotoKinds(), true)
+                && filled($attachment->file_path))
+            ->sortBy(fn (MobileEnrollmentAttachment $attachment) => $attachment->created_at?->timestamp ?? $attachment->id)
+            ->values();
+    }
+
     /**
      * @return array<int, string>
      */

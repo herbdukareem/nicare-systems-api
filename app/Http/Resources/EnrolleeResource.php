@@ -53,6 +53,15 @@ class EnrolleeResource extends JsonResource
             'educational_status' => $this->educational_status,
             'image_url' => $this->image_url,
             'provided_image_url' => $this->providedEnrollmentPhotoUrl(),
+            'current_mobile_photo_attachment_id' => $this->currentMobilePhotoAttachmentId(),
+            'mobile_passport_attachments' => $this->mobilePassportAttachments()->map(fn ($attachment) => [
+                'id' => $attachment->id,
+                'kind' => $attachment->kind,
+                'file_path' => $attachment->file_path,
+                'original_name' => $attachment->original_name,
+                'created_at' => $attachment->created_at,
+                'is_current' => $this->image_url && $attachment->file_path === $this->image_url,
+            ])->values(),
             'enrollee_type' => new EnrolleeTypeResource($this->whenLoaded('enrolleeType')),
             'type' => $this->whenLoaded('enrolleeType', function() {
                 return $this->enrolleeType->name ?? null;
@@ -201,5 +210,17 @@ class EnrolleeResource extends JsonResource
             'capture_location' => $formatPoint(is_array($location['capture_location'] ?? null) ? $location['capture_location'] : null),
             'submit_location' => $formatPoint(is_array($location['submit_location'] ?? null) ? $location['submit_location'] : null),
         ];
+    }
+
+    private function currentMobilePhotoAttachmentId(): ?int
+    {
+        $items = $this->mobilePassportAttachments();
+        if ($items->isEmpty()) {
+            return null;
+        }
+
+        $current = $items->first(fn ($attachment) => $this->image_url && $attachment->file_path === $this->image_url);
+
+        return $current?->id ?: $items->last()?->id;
     }
 }
