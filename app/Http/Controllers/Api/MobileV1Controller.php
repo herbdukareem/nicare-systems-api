@@ -22,6 +22,8 @@ use App\Services\OfficerDeviceService;
 use App\Services\PremiumCoverageService;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 use RuntimeException;
 
 class MobileV1Controller extends BaseController
@@ -117,7 +119,7 @@ class MobileV1Controller extends BaseController
             'benefit_packages' => $this->changed(BenefitPackage::query()->orderBy('name'), $since)->get(),
             'funding_types' => $this->changed(FundingType::query()->orderBy('name'), $since)->get(),
             'benefactors' => $this->changed(Benefactor::query()->orderBy('name'), $since)->get(),
-            'enrollment_phases' => $this->changed(EnrollmentPhase::query()->orderBy('name'), $since)->get(),
+            'enrollment_phases' => $this->enrollmentPhasesMetadata($since),
             'lgas' => $this->changed(Lga::query()->orderBy('name'), $since)
                 ->when($scope['lga_ids'] !== null, fn (Builder $query) => $query->whereIn('id', $scope['lga_ids']))
                 ->get(),
@@ -405,9 +407,25 @@ class MobileV1Controller extends BaseController
 
     private function changed(Builder $query, mixed $since): Builder
     {
+        $table = $query->getModel()->getTable();
+
         return is_string($since) && $since !== ''
-            ? $query->where('updated_at', '>', $since)
+            ? (Schema::hasColumn($table, 'updated_at')
+                ? $query->where($table . '.updated_at', '>', $since)
+                : $query)
             : $query;
+    }
+
+    private function enrollmentPhasesMetadata(mixed $since): Collection
+    {
+        if (!Schema::hasTable('enrollment_phases')) {
+            return collect();
+        }
+
+        $query = EnrollmentPhase::query()
+            ->orderBy(Schema::hasColumn('enrollment_phases', 'name') ? 'name' : 'id');
+
+        return $this->changed($query, $since)->get();
     }
 
     private function mobileStatusRelations(): array

@@ -12,15 +12,15 @@
         </v-btn>
       </AppPageHeader>
 
-      <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-4 2xl:tw-grid-cols-8">
-        <AppMetricCard title="Captured" icon="mdi-account-plus-outline" tone="neutral" :value="summary.captured" helper="Enrollments captured in the selected date window" />
-        <AppMetricCard title="Pending Approval" icon="mdi-timer-sand" tone="warning" :value="summary.pending_approval" helper="Captured records still waiting for approval" />
-        <AppMetricCard title="Approved" icon="mdi-check-decagram-outline" tone="success" :value="summary.approved" helper="Approved enrollments in the selected window" />
-        <AppMetricCard title="Rejected" icon="mdi-close-octagon-outline" tone="danger" :value="summary.rejected" helper="Rejected enrollments in the selected window" />
-        <AppMetricCard title="Duplicates" icon="mdi-content-duplicate" tone="warning" :value="summary.duplicates" helper="Records flagged as possible duplicates" />
-        <AppMetricCard title="NIN Attempts" icon="mdi-timeline-check-outline" tone="info" :value="summary.total_attempts" helper="Verified plus failed NIN verification attempts" />
-        <AppMetricCard title="NIN Verified" icon="mdi-card-account-details-outline" tone="success" :value="summary.verified" helper="Successful NIN verifications" />
-        <AppMetricCard title="Enrollment Value" icon="mdi-cash-multiple" tone="secondary" :value="formatCurrency(summary.total_value)" helper="Plan-linked monetary value across captured enrollments" />
+      <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-3 xl:tw-grid-cols-4 2xl:tw-grid-cols-8">
+        <AppStatCard compact label="Captured" icon="mdi-account-plus-outline" color="primary" :value="summary.captured" :loading="loading" />
+        <AppStatCard compact label="Pending Approval" icon="mdi-timer-sand" color="warning" :value="summary.pending_approval" :loading="loading" />
+        <AppStatCard compact label="Approved" icon="mdi-check-decagram-outline" color="success" :value="summary.approved" :loading="loading" />
+        <AppStatCard compact label="Rejected" icon="mdi-close-octagon-outline" color="danger" :value="summary.rejected" :loading="loading" />
+        <AppStatCard compact label="Duplicates" icon="mdi-content-duplicate" color="secondary" :value="summary.duplicates" :loading="loading" />
+        <AppStatCard compact label="NIN Attempts" icon="mdi-timeline-check-outline" color="info" :value="summary.total_attempts" :loading="loading" />
+        <AppStatCard compact label="NIN Verified" icon="mdi-card-account-details-outline" color="success" :value="summary.verified" :loading="loading" />
+        <AppStatCard compact label="Enrollment Value" icon="mdi-cash-multiple" color="secondary" :value="summary.total_value" :loading="loading" currency />
       </div>
 
       <AppCard title="Filters" icon="mdi-filter-variant" tone="primary">
@@ -215,8 +215,8 @@ import AppBadge from '../common/AppBadge.vue'
 import AppCard from '../common/AppCard.vue'
 import AppDataTable from '../common/AppDataTable.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
-import AppMetricCard from '../common/AppMetricCard.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
+import AppStatCard from '../common/AppStatCard.vue'
 import AppStatusBadge from '../common/AppStatusBadge.vue'
 import DateDisplay from '../common/DateDisplay.vue'
 import BarChart from '../charts/BarChart.vue'

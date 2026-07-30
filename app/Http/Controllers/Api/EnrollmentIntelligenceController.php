@@ -402,10 +402,10 @@ class EnrollmentIntelligenceController extends BaseController
             ->when(!empty($filters['source']), fn (Builder $query) => $query->where('enrollment_source', $filters['source']))
             ->when(!empty($filters['provider']), fn (Builder $query) => $query->where('nin_verification_provider', $filters['provider']))
             ->where(function (Builder $query) use ($dateFrom, $dateTo): void {
-                $query->whereBetween('enrollment_date', [$dateFrom, $dateTo])
+                $query->whereBetween('enrollees.enrollment_date', [$dateFrom, $dateTo])
                     ->orWhere(function (Builder $fallback) use ($dateFrom, $dateTo): void {
-                        $fallback->whereNull('enrollment_date')
-                            ->whereBetween('created_at', [$dateFrom, $dateTo]);
+                        $fallback->whereNull('enrollees.enrollment_date')
+                            ->whereBetween('enrollees.created_at', [$dateFrom, $dateTo]);
                     });
             });
     }
@@ -448,7 +448,7 @@ class EnrollmentIntelligenceController extends BaseController
 
     private function captureDateSql(): string
     {
-        return "DATE(COALESCE(enrollment_date, created_at))";
+        return "DATE(COALESCE(enrollees.enrollment_date, enrollees.created_at))";
     }
 
     private function statusLabel(string $status): string

@@ -21,35 +21,11 @@
         </v-btn>
       </AppPageHeader>
 
-      <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-4">
-        <AppMetricCard
-          title="Loaded queue"
-          icon="mdi-format-list-bulleted-square"
-          tone="neutral"
-          :value="rows.length"
-          helper="Pending records loaded into the current approval batch"
-        />
-        <AppMetricCard
-          title="Ready to approve"
-          icon="mdi-check-decagram-outline"
-          tone="success"
-          :value="readyCount"
-          helper="Records with no NIN-verification or duplicate blockers"
-        />
-        <AppMetricCard
-          title="Approved this batch"
-          icon="mdi-badge-account-horizontal-outline"
-          tone="info"
-          :value="approvedCount"
-          helper="Approvals completed during the current working session"
-        />
-        <AppMetricCard
-          title="Needs attention"
-          icon="mdi-alert-decagram-outline"
-          tone="warning"
-          :value="attentionCount"
-          helper="Records that still need verification, payment review, or duplicate resolution"
-        />
+      <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-4">
+        <AppStatCard compact label="Loaded queue" icon="mdi-format-list-bulleted-square" color="primary" :value="rows.length" :loading="loading" />
+        <AppStatCard compact label="Ready to approve" icon="mdi-check-decagram-outline" color="success" :value="readyCount" :loading="loading" />
+        <AppStatCard compact label="Approved this batch" icon="mdi-badge-account-horizontal-outline" color="info" :value="approvedCount" :loading="loading" />
+        <AppStatCard compact label="Needs attention" icon="mdi-alert-decagram-outline" color="warning" :value="attentionCount" :loading="loading" />
       </div>
 
       <AppCard title="Approval Filters" icon="mdi-filter-outline" tone="primary">
@@ -575,7 +551,7 @@ import AppCard from '../common/AppCard.vue'
 import AppConfirmDialog from '../common/AppConfirmDialog.vue'
 import AppDataTable from '../common/AppDataTable.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
-import AppMetricCard from '../common/AppMetricCard.vue'
+import AppStatCard from '../common/AppStatCard.vue'
 import AppModal from '../common/AppModal.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
 import AppStatusBadge from '../common/AppStatusBadge.vue'
