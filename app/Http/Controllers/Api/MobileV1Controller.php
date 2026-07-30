@@ -211,20 +211,40 @@ class MobileV1Controller extends BaseController
     public function distinctNins(Request $request)
     {
         $this->activeDevice($request);
+        $validated = $request->validate([
+            'cursor' => ['nullable', 'string', 'max:32'],
+            'limit' => ['nullable', 'integer', 'min:500', 'max:10000'],
+            'include_count' => ['nullable', 'boolean'],
+        ]);
         $scope = $this->officerEnrollmentScope($request);
+        $limit = (int) ($validated['limit'] ?? 5000);
+        $cursor = isset($validated['cursor']) && trim((string) $validated['cursor']) !== ''
+            ? trim((string) $validated['cursor'])
+            : null;
 
         $rows = $this->scopedDistinctNinQuery($scope)
             ->select('nin')
             ->distinct()
+            ->when($cursor !== null, fn (Builder $query) => $query->where('nin', '>', $cursor))
             ->orderBy('nin')
-            ->get()
+            ->limit($limit + 1)
             ->pluck('nin')
             ->values();
+        $hasMore = $rows->count() > $limit;
+
+        if ($hasMore) {
+            $rows = $rows->slice(0, $limit)->values();
+        }
 
         return $this->sendResponse([
             'scope_lga_ids' => $scope['lga_ids'],
             'restricted' => (bool) $scope['restricted'],
-            'count' => $rows->count(),
+            'count' => ($validated['include_count'] ?? false)
+                ? $this->scopedDistinctNinQuery($scope)->distinct('nin')->count('nin')
+                : null,
+            'limit' => $limit,
+            'has_more' => $hasMore,
+            'next_cursor' => $hasMore ? $rows->last() : null,
             'nins' => $rows,
         ], 'Scoped distinct NIN registry retrieved successfully.');
     }
