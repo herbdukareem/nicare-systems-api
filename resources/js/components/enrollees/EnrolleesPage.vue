@@ -422,10 +422,27 @@
           <v-text-field v-model="editForm.date_of_birth" type="date" label="Date of birth" density="compact" variant="outlined" />
           <v-text-field v-model="editForm.phone" label="Phone" density="compact" variant="outlined" />
           <v-text-field v-model="editForm.email" label="Email" density="compact" variant="outlined" />
+          <v-text-field v-model="editForm.community" label="Community" density="compact" variant="outlined" />
           <v-autocomplete
             v-model="editForm.occupation"
             :items="occupationOptions"
             label="Occupation"
+            density="compact"
+            variant="outlined"
+            clearable
+          />
+          <v-select
+            v-model="editForm.educational_status"
+            :items="educationalStatusOptions"
+            label="Educational Status"
+            density="compact"
+            variant="outlined"
+            clearable
+          />
+          <v-select
+            v-model="editForm.disability"
+            :items="disabilityOptions"
+            label="Special Needs"
             density="compact"
             variant="outlined"
             clearable
@@ -703,6 +720,29 @@ const occupationOptions = [
   'Not Stated',
 ]
 
+const educationalStatusOptions = [
+  'Primary',
+  'Secondary',
+  'Tertiary',
+  'Postgraduate',
+  'No Formal Education',
+  'Others',
+]
+
+const disabilityOptions = [
+  'None',
+  'Visual Impairment',
+  'Hearing Impairment',
+  'Speech Impairment',
+  'Physical/Mobility Disability',
+  'Intellectual Disability',
+  'Learning Disability',
+  'Mental/Psychosocial Disability',
+  'Albinism',
+  'Multiple Disabilities',
+  'Others',
+]
+
 const occupationAliasMap = {
   'petty trader': 'Trader/Business Owner',
   trader: 'Trader/Business Owner',
@@ -840,7 +880,10 @@ const detailGroups = computed(() => {
         { label: 'Email', value: enrollee.email },
         { label: 'Address', value: enrollee.address },
         { label: 'Village', value: enrollee.village },
+        { label: 'Community', value: enrollee.community },
         { label: 'Occupation', value: enrollee.occupation },
+        { label: 'Educational Status', value: enrollee.educational_status },
+        { label: 'Special Needs', value: enrollee.disability },
       ],
     },
     {
@@ -1040,7 +1083,10 @@ const openEdit = (item) => {
     date_of_birth: item.date_of_birth?.slice?.(0, 10),
     phone: item.phone,
     email: item.email,
+    community: item.community,
     occupation: normalizeOccupationValue(item.occupation),
+    educational_status: item.educational_status,
+    disability: item.disability,
     address: item.address,
     lga_id: item.lga?.id,
     ward_id: item.ward?.id,

@@ -37,9 +37,11 @@
               <v-text-field v-model="form.email" label="Email" variant="outlined" density="comfortable" />
               <v-textarea v-model="form.address" label="Address" rows="2" variant="outlined" density="comfortable" />
               <v-text-field v-model="form.village" label="Village" variant="outlined" density="comfortable" />
+              <v-text-field v-model="form.community" label="Community" variant="outlined" density="comfortable" />
               <v-select v-model="form.occupation" :items="occupationOptions" label="Occupation" variant="outlined" density="comfortable" />
+              <v-select v-model="form.educational_status" :items="educationalStatusOptions" label="Educational status" variant="outlined" density="comfortable" />
               <v-switch v-model="form.pregnant" label="Pregnant" color="primary" hide-details />
-              <v-select v-model="form.disability" :items="disabilityOptions" label="Disability" variant="outlined" density="comfortable" />
+              <v-select v-model="form.disability" :items="disabilityOptions" label="Special Needs" variant="outlined" density="comfortable" />
             </section>
           </v-stepper-window-item>
 
@@ -219,9 +221,11 @@ const form = ref({
   email: '',
   address: '',
   village: '',
+  community: '',
   pregnant: false,
   disability: '',
   occupation: '',
+  educational_status: '',
   insurance_programme_id: null,
   enrollee_category_id: null,
   premium_plan_id: null,
@@ -265,6 +269,7 @@ const flowSteps = [
 const sexOptions = [{ title: 'Male', value: 1 }, { title: 'Female', value: 2 }]
 const maritalOptions = [{ title: 'Single', value: 1 }, { title: 'Married', value: 2 }, { title: 'Divorced', value: 3 }, { title: 'Widowed', value: 4 }, { title: 'Not Stated', value: 5 }]
 const occupationOptions = ['Student', 'Farmer', 'Trader/Business Owner', 'Civil Servant', 'Private Sector Employee', 'Teacher/Lecturer', 'Health Worker', 'Artisan', 'Driver/Transport Worker', 'Security Personnel', 'Religious Leader', 'Homemaker', 'Retired', 'Unemployed', 'Self-Employed', 'Other', 'Not Stated']
+const educationalStatusOptions = ['Primary', 'Secondary', 'Tertiary', 'Postgraduate', 'No Formal Education', 'Others']
 const disabilityOptions = ['None', 'Visual Impairment', 'Hearing Impairment', 'Speech Impairment', 'Physical/Mobility Disability', 'Intellectual Disability', 'Learning Disability', 'Mental/Psychosocial Disability', 'Albinism', 'Multiple Disabilities', 'Others']
 const relationshipOptions = [{ title: 'Principal', value: 1 }, { title: 'Spouse', value: 2 }, { title: 'Child', value: 3 }, { title: 'Other', value: 4 }]
 
@@ -311,7 +316,9 @@ const fillSampleData = () => {
     email: `demo${Date.now()}@nicare.test`,
     address: 'Demo address',
     village: 'Demo village',
+    community: 'Demo community',
     occupation: 'Trader/Business Owner',
+    educational_status: 'Secondary',
     disability: 'None',
   }
 }

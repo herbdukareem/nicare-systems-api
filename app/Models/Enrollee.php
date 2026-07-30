@@ -52,6 +52,15 @@ class Enrollee extends Authenticatable
         'Not Stated',
     ];
 
+    public const EDUCATIONAL_STATUS_OPTIONS = [
+        'Primary',
+        'Secondary',
+        'Tertiary',
+        'Postgraduate',
+        'No Formal Education',
+        'Others',
+    ];
+
     public static function normalizeOccupation(?string $occupation): ?string
     {
         if ($occupation === null) {

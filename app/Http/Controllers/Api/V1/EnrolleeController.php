@@ -890,9 +890,11 @@ class EnrolleeController extends BaseController
             'marital_status' => $enrollee->marital_status,
             'address' => $enrollee->address,
             'village' => $enrollee->village,
+            'community' => $enrollee->community,
             'pregnant' => $enrollee->pregnant,
             'disability' => $enrollee->disability,
             'occupation' => $enrollee->occupation,
+            'educational_status' => $enrollee->educational_status,
             'image_url' => $enrollee->image_url,
             'facility' => $enrollee->relationLoaded('facility') && $enrollee->facility ? [
                 'id' => $enrollee->facility->id,

@@ -145,6 +145,9 @@
           <InfoItem label="Phone Number" :value="enrollee.phone" icon="mdi-phone" />
           <InfoItem label="Email Address" :value="enrollee.email || 'N/A'" icon="mdi-email" />
           <InfoItem label="Address" :value="enrollee.address || 'N/A'" icon="mdi-home-map-marker" />
+          <InfoItem label="Community" :value="enrollee.community || 'N/A'" icon="mdi-home-city-outline" />
+          <InfoItem label="Educational Status" :value="enrollee.educational_status || 'N/A'" icon="mdi-school-outline" />
+          <InfoItem label="Special Needs" :value="enrollee.disability || 'N/A'" icon="mdi-human-cane" />
         </div>
       </div>
 
