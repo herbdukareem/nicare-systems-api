@@ -337,8 +337,8 @@
             <div class="tw-flex tw-items-start tw-gap-4">
               <div class="tw-flex tw-h-24 tw-w-24 tw-items-center tw-justify-center tw-overflow-hidden tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-slate-100">
                 <img
-                  v-if="selected.image_url"
-                  :src="selected.image_url"
+                  v-if="selectedProfilePhoto(selected)"
+                  :src="selectedProfilePhoto(selected)"
                   :alt="selected.full_name || selected.name || 'Enrollee photo'"
                   class="tw-h-full tw-w-full tw-object-cover"
                 />
@@ -819,6 +819,21 @@ const statusLabel = (status) => ({
   3: 'Suspended',
   4: 'Inactive',
 }[Number(status)] || 'Unknown')
+
+const normalizeProviderPhoto = (photo) => {
+  if (!photo) return ''
+  return String(photo).startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`
+}
+
+const selectedProfilePhoto = (enrollee) => {
+  if (!enrollee) return ''
+
+  const providerPhoto = normalizeProviderPhoto(
+    enrollee.nin_verification?.data?.provider_data?.photo || enrollee.nin_verification_data?.provider_data?.photo
+  )
+
+  return enrollee.image_url || enrollee.provided_image_url || providerPhoto || ''
+}
 
 const normalizeOccupationValue = (value) => {
   if (!value) return null
