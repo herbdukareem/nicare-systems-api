@@ -293,7 +293,7 @@
                 />
               </template>
 
-              <div v-if="selectedRow.provided_image_url || selectedRow.image_url || selectedRow.providerPhoto" class="tw-mb-4 tw-grid tw-gap-3 md:tw-grid-cols-2">
+              <div v-if="selectedOfficerPhoto(selectedRow) || selectedVerifiedPhoto(selectedRow)" class="tw-mb-4 tw-grid tw-gap-3 md:tw-grid-cols-2">
                 <div class="tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
                   <div class="tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-2">
                     <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Provided enrollment photo</p>
@@ -343,7 +343,7 @@
                   <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Verified NIN photo</p>
                   <div class="tw-mt-3 tw-flex tw-justify-center">
                     <div class="tw-flex tw-h-44 tw-w-44 tw-items-center tw-justify-center tw-overflow-hidden tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-white">
-                      <img v-if="selectedRow.providerPhoto" :src="selectedRow.providerPhoto" alt="Verified NIN profile photo" class="tw-h-full tw-w-full tw-object-cover" />
+                      <img v-if="selectedVerifiedPhoto(selectedRow)" :src="selectedVerifiedPhoto(selectedRow)" alt="Verified NIN profile photo" class="tw-h-full tw-w-full tw-object-cover" />
                       <div v-else class="tw-flex tw-flex-col tw-items-center tw-gap-2 tw-text-slate-400">
                         <v-icon size="34">mdi-card-account-details-outline</v-icon>
                         <span class="tw-text-xs tw-font-medium">No provider photo returned</span>
@@ -739,6 +739,11 @@ const selectedOfficerPhoto = (row) => {
   if (!row) return ''
   const selected = (row.mobilePassportAttachments || []).find((attachment) => Number(attachment.id) === Number(row.selectedPhotoAttachmentId))
   return selected?.file_path || row.provided_image_url || row.image_url || ''
+}
+
+const selectedVerifiedPhoto = (row) => {
+  if (!row) return ''
+  return row.providerPhoto || row.image_url || row.provided_image_url || ''
 }
 
 const normalizeRow = (row) => {
