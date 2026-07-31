@@ -88,7 +88,7 @@ class MobileV1Controller extends BaseController
             'nin_precheck' => [
                 'mode' => 'local_distinct_registry',
                 'requires_local_duplicate_check_before_verification' => true,
-                'assigned_lga_ids' => $scope['lga_ids'],
+                'assigned_lga_ids' => $scope['nin_precheck_lga_ids'],
                 'distinct_nin_count' => $distinctNinCount,
             ],
         ], 'Mobile bootstrap retrieved successfully.');
@@ -237,7 +237,7 @@ class MobileV1Controller extends BaseController
         }
 
         return $this->sendResponse([
-            'scope_lga_ids' => $scope['lga_ids'],
+            'scope_lga_ids' => $scope['nin_precheck_lga_ids'],
             'restricted' => (bool) $scope['restricted'],
             'count' => ($validated['include_count'] ?? false)
                 ? $this->scopedDistinctNinQuery($scope)->distinct('nin')->count('nin')
@@ -503,6 +503,7 @@ class MobileV1Controller extends BaseController
                 'restricted' => false,
                 'lga_ids' => null,
                 'schema_ids' => null,
+                'nin_precheck_lga_ids' => [],
                 'assignments' => [],
             ];
         }
@@ -513,21 +514,38 @@ class MobileV1Controller extends BaseController
         $schemaIds = $assignments->contains(fn ($assignment) => $assignment->enrollment_form_schema_id === null)
             ? null
             : $assignments->pluck('enrollment_form_schema_id')->filter()->unique()->values()->all();
+        $ninPrecheckLgaIds = $assignments->pluck('lga_id')
+            ->filter(fn ($id) => $id !== null)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
 
         return [
             'enabled' => true,
             'restricted' => true,
             'lga_ids' => $lgaIds,
             'schema_ids' => $schemaIds,
+            'nin_precheck_lga_ids' => $ninPrecheckLgaIds,
             'assignments' => $assignments,
         ];
     }
 
     private function scopedDistinctNinQuery(array $scope): Builder
     {
-        return Enrollee::query()
+        $query = Enrollee::query()
             ->whereNotNull('nin')
-            ->where('nin', '!=', '')
-            ->when($scope['lga_ids'] !== null, fn (Builder $query) => $query->whereIn('lga_id', $scope['lga_ids']));
+            ->where('nin', '!=', '');
+
+        $ninPrecheckLgaIds = $scope['nin_precheck_lga_ids'] ?? null;
+        if ($ninPrecheckLgaIds === null) {
+            return $query;
+        }
+
+        if ($ninPrecheckLgaIds === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereIn('lga_id', $ninPrecheckLgaIds);
     }
 }
