@@ -295,36 +295,46 @@
 
               <div v-if="selectedRow.provided_image_url || selectedRow.image_url || selectedRow.providerPhoto" class="tw-mb-4 tw-grid tw-gap-3 md:tw-grid-cols-2">
                 <div class="tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
-                  <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Provided enrollment photo</p>
-                  <div class="tw-mt-3 tw-flex tw-justify-center">
+                  <div class="tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-2">
+                    <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Provided enrollment photo</p>
+                    <AppBadge
+                      v-if="selectedRow.mobilePassportAttachments?.length"
+                      tone="info"
+                      size="sm"
+                      :label="`${selectedRow.mobilePassportAttachments.length} captured photo${selectedRow.mobilePassportAttachments.length === 1 ? '' : 's'}`"
+                    />
+                  </div>
+                  <div v-if="selectedRow.mobilePassportAttachments?.length" class="tw-mt-4 tw-space-y-3">
+                    <p class="tw-text-xs tw-text-slate-500">
+                      Choose which captured officer photo becomes the enrollee passport on approval.
+                    </p>
+                    <div class="tw-grid tw-gap-3 sm:tw-grid-cols-2">
+                      <button
+                        v-for="attachment in selectedRow.mobilePassportAttachments"
+                        :key="attachment.id"
+                        type="button"
+                        class="tw-overflow-hidden tw-rounded-xl tw-border tw-bg-white tw-text-left"
+                        :class="Number(selectedRow.selectedPhotoAttachmentId) === Number(attachment.id) ? 'tw-border-emerald-500 tw-ring-2 tw-ring-emerald-200' : 'tw-border-slate-200'"
+                        @click="selectedRow.selectedPhotoAttachmentId = attachment.id"
+                      >
+                        <div class="tw-flex tw-h-44 tw-items-center tw-justify-center tw-overflow-hidden tw-bg-slate-100">
+                          <img :src="attachment.file_path" :alt="attachment.original_name || attachment.label" class="tw-h-full tw-w-full tw-object-cover" />
+                        </div>
+                        <div class="tw-space-y-1 tw-p-3">
+                          <p class="tw-text-sm tw-font-semibold tw-text-slate-900">{{ attachment.label }}</p>
+                          <p class="tw-text-xs tw-text-slate-500">{{ attachment.original_name || 'Mobile upload' }}</p>
+                          <p class="tw-text-[11px] tw-text-emerald-700" v-if="Number(selectedRow.selectedPhotoAttachmentId) === Number(attachment.id)">Selected for approval</p>
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                  <div v-else class="tw-mt-3 tw-flex tw-justify-center">
                     <div class="tw-flex tw-h-44 tw-w-44 tw-items-center tw-justify-center tw-overflow-hidden tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-white">
                       <img v-if="selectedOfficerPhoto(selectedRow)" :src="selectedOfficerPhoto(selectedRow)" alt="Enrollment passport photo" class="tw-h-full tw-w-full tw-object-cover" />
                       <div v-else class="tw-flex tw-flex-col tw-items-center tw-gap-2 tw-text-slate-400">
                         <v-icon size="34">mdi-account-box-outline</v-icon>
                         <span class="tw-text-xs tw-font-medium">No uploaded photo</span>
                       </div>
-                    </div>
-                  </div>
-                  <div v-if="selectedRow.mobilePassportAttachments?.length" class="tw-mt-4 tw-space-y-3">
-                    <p class="tw-text-xs tw-text-slate-500">
-                      Choose which captured officer photo becomes the enrollee passport on approval.
-                    </p>
-                    <div class="tw-grid tw-gap-2 sm:tw-grid-cols-2">
-                      <button
-                        v-for="attachment in selectedRow.mobilePassportAttachments"
-                        :key="attachment.id"
-                        type="button"
-                        class="tw-flex tw-items-center tw-gap-3 tw-rounded-xl tw-border tw-bg-white tw-p-2.5 tw-text-left"
-                        :class="Number(selectedRow.selectedPhotoAttachmentId) === Number(attachment.id) ? 'tw-border-emerald-500 tw-ring-2 tw-ring-emerald-200' : 'tw-border-slate-200'"
-                        @click="selectedRow.selectedPhotoAttachmentId = attachment.id"
-                      >
-                        <img :src="attachment.file_path" :alt="attachment.original_name || attachment.label" class="tw-h-16 tw-w-16 tw-rounded-lg tw-object-cover" />
-                        <div class="tw-min-w-0">
-                          <p class="tw-text-sm tw-font-semibold tw-text-slate-900">{{ attachment.label }}</p>
-                          <p class="tw-text-xs tw-text-slate-500">{{ attachment.original_name || 'Mobile upload' }}</p>
-                          <p class="tw-text-[11px] tw-text-emerald-700" v-if="Number(selectedRow.selectedPhotoAttachmentId) === Number(attachment.id)">Selected for approval</p>
-                        </div>
-                      </button>
                     </div>
                   </div>
                 </div>
@@ -749,7 +759,7 @@ const normalizeRow = (row) => {
     providerPhoto: normalizeProviderPhoto(providerData.photo),
     mobilePassportAttachments: mobilePassportAttachments.map((attachment, index) => ({
       ...attachment,
-      label: attachment.kind === 'passport' ? 'Original Capture' : `Retake ${index}`,
+      label: index === 0 ? 'Original Capture' : `Retake ${index}`,
     })),
     selectedPhotoAttachmentId: row.current_mobile_photo_attachment_id || mobilePassportAttachments.find((attachment) => attachment.is_current)?.id || mobilePassportAttachments[mobilePassportAttachments.length - 1]?.id || null,
   }
