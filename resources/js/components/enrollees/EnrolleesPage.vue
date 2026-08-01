@@ -448,7 +448,17 @@
             clearable
           />
           <v-select v-model="editForm.lga_id" :items="metadata.lgas" item-title="name" item-value="id" label="LGA" density="compact" variant="outlined" />
-          <v-text-field :model-value="selectedEditWardName" label="Ward" density="compact" variant="outlined" readonly />
+          <v-select
+            v-model="editForm.ward_id"
+            :items="editFilteredWards"
+            item-title="name"
+            item-value="id"
+            label="Ward"
+            density="compact"
+            variant="outlined"
+            clearable
+            :disabled="!editForm.lga_id"
+          />
           <v-select v-model="editForm.facility_id" :items="editFacilityOptions" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" />
           <v-select v-model="editForm.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding type" density="compact" variant="outlined" />
           <v-select v-model="editForm.benefactor_id" :items="metadata.benefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
@@ -855,7 +865,12 @@ const filteredFacilities = computed(() => metadata.facilities.filter((facility) 
   if (filters.lga_id) return Number(facility.lga_id) === Number(filters.lga_id)
   return true
 }))
-const editFacilityOptions = computed(() => metadata.facilities.filter((facility) => !editForm.lga_id || Number(facility.lga_id) === Number(editForm.lga_id)))
+const editFilteredWards = computed(() => metadata.wards.filter((ward) => editForm.lga_id && Number(ward.lga_id) === Number(editForm.lga_id)))
+const editFacilityOptions = computed(() => metadata.facilities.filter((facility) => {
+  if (editForm.ward_id) return Number(facility.ward_id) === Number(editForm.ward_id)
+  if (editForm.lga_id) return Number(facility.lga_id) === Number(editForm.lga_id)
+  return true
+}))
 
 const filteredBenefactors = computed(() => {
   const linked = metadata.benefactors.filter((benefactor) => {
@@ -873,7 +888,6 @@ const findOptionTitle = (items, id) => items.find((item) => Number(item.id) === 
 const selectedLgaName = computed(() => findOptionTitle(metadata.lgas, filters.lga_id))
 const selectedWardName = computed(() => findOptionTitle(metadata.wards, filters.ward_id))
 const selectedFacilityName = computed(() => findOptionTitle(metadata.facilities, filters.facility_id))
-const selectedEditWardName = computed(() => findOptionTitle(metadata.wards, editForm.ward_id))
 const selectedFundingName = computed(() => findOptionTitle(metadata.funding_types, filters.funding_type_id))
 const selectedBenefactorName = computed(() => findOptionTitle(metadata.benefactors, filters.benefactor_id))
 const selectedPhaseName = computed(() => findOptionTitle(metadata.enrollment_phases, filters.enrollment_phase_id))
@@ -1311,9 +1325,17 @@ watch(() => filters.funding_type_id, () => {
 })
 
 watch(() => editForm.lga_id, () => {
+  if (editForm.ward_id && !editFilteredWards.value.some((ward) => Number(ward.id) === Number(editForm.ward_id))) {
+    editForm.ward_id = null
+  }
   if (editForm.facility_id && !editFacilityOptions.value.some((facility) => Number(facility.id) === Number(editForm.facility_id))) {
     editForm.facility_id = null
-    editForm.ward_id = null
+  }
+})
+
+watch(() => editForm.ward_id, () => {
+  if (editForm.facility_id && !editFacilityOptions.value.some((facility) => Number(facility.id) === Number(editForm.facility_id))) {
+    editForm.facility_id = null
   }
 })
 
