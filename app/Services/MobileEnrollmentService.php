@@ -641,6 +641,10 @@ class MobileEnrollmentService
         $conflicts = [];
 
         foreach ($fields as $enrolleeField => $providerField) {
+            if ((string) $enrolleeField === 'photo') {
+                continue;
+            }
+
             $verifiedValue = data_get($providerData, (string) $providerField);
             if (blank($verifiedValue)) {
                 continue;
@@ -903,7 +907,6 @@ class MobileEnrollmentService
         }
 
         if ($field === 'photo') {
-            $updates['image_url'] = (string) $value;
             return;
         }
 

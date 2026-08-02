@@ -432,6 +432,16 @@
             clearable
           />
           <v-select
+            v-model="editForm.marital_status"
+            :items="maritalStatusOptions"
+            item-title="title"
+            item-value="value"
+            label="Marital Status"
+            density="compact"
+            variant="outlined"
+            clearable
+          />
+          <v-select
             v-model="editForm.educational_status"
             :items="educationalStatusOptions"
             label="Educational Status"
@@ -710,6 +720,14 @@ const sexOptions = [
   { title: 'Other', value: 3 },
 ]
 
+const maritalStatusOptions = [
+  { title: 'Single', value: 1 },
+  { title: 'Married', value: 2 },
+  { title: 'Divorced', value: 3 },
+  { title: 'Widowed', value: 4 },
+  { title: 'Not Stated', value: 5 },
+]
+
 const occupationOptions = [
   'Student',
   'Farmer',
@@ -722,6 +740,7 @@ const occupationOptions = [
   'Driver/Transport Worker',
   'Security Personnel',
   'Religious Leader',
+  'House Wife',
   'Homemaker',
   'Retired',
   'Unemployed',
@@ -767,8 +786,8 @@ const occupationAliasMap = {
   driver: 'Driver/Transport Worker',
   'transport worker': 'Driver/Transport Worker',
   'security officer': 'Security Personnel',
-  'house wife': 'Homemaker',
-  housewife: 'Homemaker',
+  'house wife': 'House Wife',
+  housewife: 'House Wife',
   'self employed': 'Self-Employed',
   none: 'Not Stated',
   'n a': 'Not Stated',
@@ -911,6 +930,7 @@ const detailGroups = computed(() => {
         { label: 'Village', value: enrollee.village },
         { label: 'Community', value: enrollee.community },
         { label: 'Occupation', value: enrollee.occupation },
+        { label: 'Marital Status', value: maritalStatusOptions.find((option) => Number(option.value) === Number(enrollee.marital_status))?.title || null },
         { label: 'Educational Status', value: enrollee.educational_status },
         { label: 'Special Needs', value: enrollee.disability },
       ],
@@ -1114,6 +1134,7 @@ const openEdit = (item) => {
     email: item.email,
     community: item.community,
     occupation: normalizeOccupationValue(item.occupation),
+    marital_status: item.marital_status !== undefined && item.marital_status !== null ? Number(item.marital_status) : null,
     educational_status: item.educational_status,
     disability: item.disability,
     address: item.address,

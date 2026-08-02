@@ -34,6 +34,7 @@ class NinProviderConfigurationController extends BaseController
             'success_path' => ['required', 'string', 'max:255'],
             'data_path' => ['required', 'string', 'max:255'],
             'timeout_seconds' => ['required', 'integer', 'min:5', 'max:60'],
+            'verification_value_amount' => ['required', 'numeric', 'min:0', 'max:1000000'],
             'public_self_enrollment_enabled' => ['required', 'boolean'],
             'public_verification_fee_amount' => ['required', 'numeric', 'min:0', 'max:1000000'],
             'public_pin_fee_required' => ['required', 'boolean'],

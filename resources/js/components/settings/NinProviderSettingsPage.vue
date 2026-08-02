@@ -106,6 +106,16 @@
 
       <AppCard title="Public Self-Enrollment Charges" icon="mdi-cash-sync" tone="success">
         <div class="tw-grid tw-gap-4 md:tw-grid-cols-2">
+          <v-text-field
+            v-model.number="form.verification_value_amount"
+            label="Operational verification value"
+            type="number"
+            min="0"
+            step="0.01"
+            prefix="NGN"
+            variant="outlined"
+            density="comfortable"
+          />
           <v-switch
             v-model="form.public_self_enrollment_enabled"
             color="primary"
@@ -213,6 +223,7 @@ const form = reactive({
   success_path: 'success',
   data_path: 'data',
   timeout_seconds: 15,
+  verification_value_amount: 0,
   public_self_enrollment_enabled: false,
   public_verification_fee_amount: 0,
   public_pin_fee_required: true,
@@ -235,6 +246,7 @@ const applyConfig = (config = {}) => {
     success_path: config.success_path ?? 'success',
     data_path: config.data_path ?? 'data',
     timeout_seconds: Number(config.timeout_seconds ?? 15),
+    verification_value_amount: Number(config.verification_value_amount ?? 0),
     public_self_enrollment_enabled: !!config.public_self_enrollment_enabled,
     public_verification_fee_amount: Number(config.public_verification_fee_amount ?? 0),
     public_pin_fee_required: config.public_pin_fee_required ?? true,

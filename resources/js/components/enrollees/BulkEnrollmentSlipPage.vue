@@ -12,13 +12,13 @@
 
       <div class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-p-5">
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-3">
-          <v-select v-model="filters.benefactor_id" :items="metadata.benefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
-          <v-select v-model="filters.facility_id" :items="metadata.facilities" item-title="name" item-value="id" label="Provider / Facility" density="compact" variant="outlined" clearable />
-          <v-select v-model="filters.insurance_programme_id" :items="metadata.insurance_programmes" item-title="name" item-value="id" label="Programme" density="compact" variant="outlined" clearable />
-          <v-select v-model="filters.enrollee_category_id" :items="metadata.enrollee_categories" item-title="name" item-value="id" label="Category" density="compact" variant="outlined" clearable />
-          <v-select v-model="filters.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding Type" density="compact" variant="outlined" clearable />
-          <v-select v-model="filters.enrollment_phase_id" :items="metadata.enrollment_phases" item-title="name" item-value="id" label="Enrollment Phase" density="compact" variant="outlined" clearable />
-          <v-select v-model="filters.approval_status" :items="approvalOptions" item-title="title" item-value="value" label="Approval Status" density="compact" variant="outlined" />
+          <v-autocomplete v-model="filters.benefactor_id" :items="metadata.benefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.facility_id" :items="metadata.facilities" item-title="name" item-value="id" label="Provider / Facility" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.insurance_programme_id" :items="metadata.insurance_programmes" item-title="name" item-value="id" label="Programme" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.enrollee_category_id" :items="metadata.enrollee_categories" item-title="name" item-value="id" label="Category" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding Type" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.enrollment_phase_id" :items="metadata.enrollment_phases" item-title="name" item-value="id" label="Enrollment Phase" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.approval_status" :items="approvalOptions" item-title="title" item-value="value" label="Approval Status" density="compact" variant="outlined" />
           <v-text-field v-model="filters.date_from" type="date" label="Date From" density="compact" variant="outlined" />
           <v-text-field v-model="filters.date_to" type="date" label="Date To" density="compact" variant="outlined" />
         </div>

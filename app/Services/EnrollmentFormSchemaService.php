@@ -232,7 +232,6 @@ class EnrollmentFormSchemaService
     private function normalizeFields(array $fields): array
     {
         return collect($fields)
-            ->filter(fn ($field) => (string) ($field['key'] ?? '') !== 'ward_id')
             ->values()
             ->all();
     }

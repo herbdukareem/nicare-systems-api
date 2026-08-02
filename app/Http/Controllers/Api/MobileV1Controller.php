@@ -61,6 +61,7 @@ class MobileV1Controller extends BaseController
         $device = $this->activeDevice($request);
         $scope = $this->officerEnrollmentScope($request);
         $distinctNinCount = $this->scopedDistinctNinQuery($scope)->distinct('nin')->count('nin');
+        $distinctNinUpdatedAt = $this->scopedDistinctNinUpdatedAt($scope);
 
         return $this->sendResponse([
             'server_time' => now()->toIso8601String(),
@@ -90,6 +91,7 @@ class MobileV1Controller extends BaseController
                 'requires_local_duplicate_check_before_verification' => true,
                 'assigned_lga_ids' => $scope['nin_precheck_lga_ids'],
                 'distinct_nin_count' => $distinctNinCount,
+                'registry_updated_at' => $distinctNinUpdatedAt,
             ],
         ], 'Mobile bootstrap retrieved successfully.');
     }
@@ -242,6 +244,7 @@ class MobileV1Controller extends BaseController
             'count' => ($validated['include_count'] ?? false)
                 ? $this->scopedDistinctNinQuery($scope)->distinct('nin')->count('nin')
                 : null,
+            'registry_updated_at' => $this->scopedDistinctNinUpdatedAt($scope),
             'limit' => $limit,
             'has_more' => $hasMore,
             'next_cursor' => $hasMore ? $rows->last() : null,
@@ -547,5 +550,16 @@ class MobileV1Controller extends BaseController
         }
 
         return $query->whereIn('lga_id', $ninPrecheckLgaIds);
+    }
+
+    private function scopedDistinctNinUpdatedAt(array $scope): ?string
+    {
+        $value = $this->scopedDistinctNinQuery($scope)->max('updated_at');
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format(\DateTimeInterface::ATOM);
+        }
+
+        return filled($value) ? (string) $value : null;
     }
 }

@@ -6,6 +6,9 @@ use App\Http\Controllers\Api\V1\BaseController;
 use App\Models\Enrollee;
 use App\Models\Facility;
 use App\Models\Lga;
+use App\Models\User;
+use App\Models\Ward;
+use App\Services\NinProviderConfigService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -15,6 +18,10 @@ use Illuminate\Validation\Rule;
 
 class EnrollmentIntelligenceController extends BaseController
 {
+    public function __construct(private readonly NinProviderConfigService $ninProviderConfigService)
+    {
+    }
+
     public function ninVerificationReport(Request $request)
     {
         $validated = $request->validate([
@@ -40,6 +47,7 @@ class EnrollmentIntelligenceController extends BaseController
         $activityBase = $this->verificationActivityQuery($validated, $dateFrom, $dateTo);
         $eligibleBase = $this->eligibleVerificationQuery($validated);
         $enrollmentBase = $this->enrollmentActivityQuery($validated, $dateFrom, $dateTo);
+        $verificationValueAmount = round((float) ($this->ninProviderConfigService->getConfig()['verification_value_amount'] ?? 0), 2);
 
         $verifiedCount = (clone $activityBase)
             ->where('nin_verification_status', Enrollee::NIN_VERIFICATION_VERIFIED)
@@ -144,14 +152,13 @@ class EnrollmentIntelligenceController extends BaseController
             ])
             ->values();
 
-        $lgaBreakdown = $this->enrollmentValueQuery($validated, $dateFrom, $dateTo)
+        $lgaBreakdown = $this->enrollmentActivityQuery($validated, $dateFrom, $dateTo)
             ->leftJoin('lgas', 'lgas.id', '=', 'enrollees.lga_id')
             ->selectRaw("COALESCE(lgas.name, 'Unassigned') as label")
             ->selectRaw('COUNT(enrollees.id) as captured_count')
             ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as pending_count', [Enrollee::STATUS_PENDING])
             ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as approved_count', [Enrollee::STATUS_ACTIVE])
             ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as rejected_count', [Enrollee::STATUS_REJECTED])
-            ->selectRaw('SUM(COALESCE(premium_plans.amount, 0)) as total_value')
             ->groupBy('label')
             ->orderByDesc('captured_count')
             ->limit(8)
@@ -162,21 +169,33 @@ class EnrollmentIntelligenceController extends BaseController
                 'pending_approval' => (int) $row->pending_count,
                 'approved' => (int) $row->approved_count,
                 'rejected' => (int) $row->rejected_count,
-                'value' => (float) round((float) $row->total_value, 2),
             ])
             ->values();
 
-        $facilityBreakdown = $this->enrollmentValueQuery($validated, $dateFrom, $dateTo)
-            ->leftJoin('facilities', 'facilities.id', '=', 'enrollees.facility_id')
-            ->leftJoin('lgas', 'lgas.id', '=', 'facilities.lga_id')
-            ->selectRaw("COALESCE(facilities.name, 'Unassigned') as facility_name")
+        $wardBreakdown = $this->enrollmentActivityQuery($validated, $dateFrom, $dateTo)
+            ->leftJoin('wards', 'wards.id', '=', 'enrollees.ward_id')
+            ->leftJoin('lgas', 'lgas.id', '=', 'wards.lga_id')
+            ->selectRaw("COALESCE(wards.name, 'Unassigned') as ward_name")
             ->selectRaw("COALESCE(lgas.name, 'No LGA') as lga_name")
             ->selectRaw('COUNT(enrollees.id) as captured_count')
             ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as pending_count', [Enrollee::STATUS_PENDING])
             ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as approved_count', [Enrollee::STATUS_ACTIVE])
             ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as rejected_count', [Enrollee::STATUS_REJECTED])
-            ->selectRaw('SUM(COALESCE(premium_plans.amount, 0)) as total_value')
-            ->groupBy('facility_name', 'lga_name')
+            ->groupBy('ward_name', 'lga_name')
+            ->orderByDesc('captured_count')
+            ->limit(10)
+            ->get()
+            ->map(fn ($row) => [
+                'label' => (string) $row->ward_name,
+                'lga_name' => (string) $row->lga_name,
+                'captured' => (int) $row->captured_count,
+                'pending_approval' => (int) $row->pending_count,
+                'approved' => (int) $row->approved_count,
+                'rejected' => (int) $row->rejected_count,
+            ])
+            ->values();
+
+        $facilityBreakdown = $this->facilitySummaryQuery($validated, $dateFrom, $dateTo)
             ->orderByDesc('captured_count')
             ->limit(8)
             ->get()
@@ -187,7 +206,7 @@ class EnrollmentIntelligenceController extends BaseController
                 'pending_approval' => (int) $row->pending_count,
                 'approved' => (int) $row->approved_count,
                 'rejected' => (int) $row->rejected_count,
-                'value' => (float) round((float) $row->total_value, 2),
+                'value' => (float) round(((int) $row->nin_attempts) * $verificationValueAmount, 2),
             ])
             ->values();
 
@@ -205,8 +224,27 @@ class EnrollmentIntelligenceController extends BaseController
                 'nin_attempts' => (int) $row->nin_attempts,
                 'nin_verified' => (int) $row->nin_verified,
                 'nin_failed' => (int) $row->nin_failed,
-                'value' => (float) round((float) $row->total_value, 2),
+                'value' => (float) round(((int) $row->nin_attempts) * $verificationValueAmount, 2),
             ]);
+
+        $officerSummary = $this->officerSummaryQuery($validated, $dateFrom, $dateTo)
+            ->orderByDesc('captured_count')
+            ->paginate((int) ($validated['per_page'] ?? 25), ['*'], 'officer_page')
+            ->through(function ($row) use ($verificationValueAmount): array {
+                return [
+                    'officer_name' => (string) $row->officer_name,
+                    'source_label' => $this->sourceLabel((string) $row->enrollment_source),
+                    'captured' => (int) $row->captured_count,
+                    'pending_approval' => (int) $row->pending_count,
+                    'approved' => (int) $row->approved_count,
+                    'rejected' => (int) $row->rejected_count,
+                    'duplicates' => (int) $row->duplicate_count,
+                    'nin_attempts' => (int) $row->nin_attempts,
+                    'nin_verified' => (int) $row->nin_verified,
+                    'nin_failed' => (int) $row->nin_failed,
+                    'value' => (float) round(((int) $row->nin_attempts) * $verificationValueAmount, 2),
+                ];
+            });
 
         $tableQuery = $this->verificationActivityQuery($validated, $dateFrom, $dateTo)
             ->with([
@@ -305,6 +343,7 @@ class EnrollmentIntelligenceController extends BaseController
                 'source_breakdown' => $sourceBreakdown,
                 'provider_breakdown' => $providerBreakdown,
                 'lga_breakdown' => $lgaBreakdown,
+                'ward_breakdown' => $wardBreakdown,
                 'facility_breakdown' => $facilityBreakdown,
             ],
             'table' => [
@@ -339,6 +378,17 @@ class EnrollmentIntelligenceController extends BaseController
                         'last_page' => $facilitySummary->lastPage(),
                         'from' => $facilitySummary->firstItem(),
                         'to' => $facilitySummary->lastItem(),
+                    ],
+                ],
+                'officer_summary' => [
+                    'data' => $officerSummary->items(),
+                    'meta' => [
+                        'total' => $officerSummary->total(),
+                        'per_page' => $officerSummary->perPage(),
+                        'current_page' => $officerSummary->currentPage(),
+                        'last_page' => $officerSummary->lastPage(),
+                        'from' => $officerSummary->firstItem(),
+                        'to' => $officerSummary->lastItem(),
                     ],
                 ],
             ],
@@ -431,7 +481,6 @@ class EnrollmentIntelligenceController extends BaseController
         return $this->enrollmentActivityQuery($filters, $dateFrom, $dateTo)
             ->leftJoin('facilities', 'facilities.id', '=', 'enrollees.facility_id')
             ->leftJoin('lgas', 'lgas.id', '=', 'facilities.lga_id')
-            ->leftJoin('premium_plans', 'premium_plans.id', '=', 'enrollees.premium_plan_id')
             ->selectRaw("COALESCE(facilities.name, 'Unassigned') as facility_name")
             ->selectRaw("COALESCE(lgas.name, 'No LGA') as lga_name")
             ->selectRaw('COUNT(enrollees.id) as captured_count')
@@ -442,8 +491,41 @@ class EnrollmentIntelligenceController extends BaseController
             ->selectRaw("SUM(CASE WHEN enrollees.nin_verification_status IN ('verified', 'failed') THEN 1 ELSE 0 END) as nin_attempts")
             ->selectRaw("SUM(CASE WHEN enrollees.nin_verification_status = 'verified' THEN 1 ELSE 0 END) as nin_verified")
             ->selectRaw("SUM(CASE WHEN enrollees.nin_verification_status = 'failed' THEN 1 ELSE 0 END) as nin_failed")
-            ->selectRaw('SUM(COALESCE(premium_plans.amount, 0)) as total_value')
             ->groupBy('facility_name', 'lga_name');
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private function officerSummaryQuery(array $filters, Carbon $dateFrom, Carbon $dateTo): Builder
+    {
+        $duplicateSql = Schema::hasColumn('enrollees', 'has_duplicate_nin')
+            ? 'SUM(CASE WHEN enrollees.is_possible_duplicate = 1 OR enrollees.has_duplicate_nin = 1 THEN 1 ELSE 0 END)'
+            : 'SUM(CASE WHEN enrollees.is_possible_duplicate = 1 THEN 1 ELSE 0 END)';
+
+        return $this->enrollmentActivityQuery($filters, $dateFrom, $dateTo)
+            ->leftJoin('users', 'users.id', '=', 'enrollees.created_by')
+            ->selectRaw("
+                COALESCE(
+                    users.name,
+                    CASE
+                        WHEN enrollees.enrollment_source = 'self_service' THEN 'Self Service / Applicant'
+                        WHEN enrollees.enrollment_source = 'mobile_officer' THEN 'Mobile Officer'
+                        WHEN enrollees.enrollment_source = 'staff' THEN 'Staff Enrollment'
+                        ELSE 'Unassigned Officer'
+                    END
+                ) as officer_name
+            ")
+            ->selectRaw("COALESCE(enrollees.enrollment_source, 'unknown') as enrollment_source")
+            ->selectRaw('COUNT(enrollees.id) as captured_count')
+            ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as pending_count', [Enrollee::STATUS_PENDING])
+            ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as approved_count', [Enrollee::STATUS_ACTIVE])
+            ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as rejected_count', [Enrollee::STATUS_REJECTED])
+            ->selectRaw("{$duplicateSql} as duplicate_count")
+            ->selectRaw("SUM(CASE WHEN enrollees.nin_verification_status IN ('verified', 'failed') THEN 1 ELSE 0 END) as nin_attempts")
+            ->selectRaw("SUM(CASE WHEN enrollees.nin_verification_status = 'verified' THEN 1 ELSE 0 END) as nin_verified")
+            ->selectRaw("SUM(CASE WHEN enrollees.nin_verification_status = 'failed' THEN 1 ELSE 0 END) as nin_failed")
+            ->groupBy('officer_name', 'enrollment_source');
     }
 
     private function captureDateSql(): string

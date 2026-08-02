@@ -88,8 +88,8 @@
           <template #item.verification="{ item }">
             <div class="tw-flex tw-flex-col tw-gap-1.5">
               <AppStatusBadge
-                :status="item.local_status === 'approved' ? 'approved' : item.status_label || 'pending'"
-                :label="item.local_status === 'approved' ? 'Approved' : item.status_label || 'Pending'"
+                :status="rowWorkflowStatus(item)"
+                :label="rowWorkflowLabel(item)"
                 size="sm"
               />
               <AppStatusBadge :status="item.nin_verification_status" :label="ninStatusLabel(item.nin_verification_status)" size="sm" />
@@ -145,6 +145,17 @@
               >
                 Approve
               </v-btn>
+              <v-btn
+                color="error"
+                variant="text"
+                size="small"
+                prepend-icon="mdi-close-octagon-outline"
+                :loading="rejectingId === item.id"
+                :disabled="cannotReject(item)"
+                @click="openRejectDialog(item)"
+              >
+                Reject
+              </v-btn>
             </div>
           </template>
 
@@ -179,8 +190,8 @@
                 <p class="tw-mt-0.5 tw-text-sm tw-text-slate-500">{{ selectedRow.enrollee_id || 'Pending ID assignment' }}</p>
                 <div class="tw-mt-2 tw-flex tw-flex-wrap tw-gap-1.5">
                   <AppStatusBadge
-                    :status="selectedRow.local_status === 'approved' ? 'approved' : selectedRow.status_label || 'pending'"
-                    :label="selectedRow.local_status === 'approved' ? 'Approved' : selectedRow.status_label || 'Pending'"
+                    :status="rowWorkflowStatus(selectedRow)"
+                    :label="rowWorkflowLabel(selectedRow)"
                     size="sm"
                   />
                   <AppStatusBadge :status="selectedRow.nin_verification_status" :label="ninStatusLabel(selectedRow.nin_verification_status)" size="sm" />
@@ -212,6 +223,16 @@
                   @click="openApproveDialog(selectedRow)"
                 >
                   Approve enrollee
+                </v-btn>
+                <v-btn
+                  color="error"
+                  variant="outlined"
+                  prepend-icon="mdi-close-octagon-outline"
+                  :loading="rejectingId === selectedRow.id"
+                  :disabled="cannotReject(selectedRow)"
+                  @click="openRejectDialog(selectedRow)"
+                >
+                  Reject enrollee
                 </v-btn>
               </div>
             </div>
@@ -296,7 +317,7 @@
               <div v-if="selectedOfficerPhoto(selectedRow) || selectedVerifiedPhoto(selectedRow)" class="tw-mb-4 tw-grid tw-gap-3 md:tw-grid-cols-2">
                 <div class="tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
                   <div class="tw-flex tw-flex-wrap tw-items-center tw-justify-between tw-gap-2">
-                    <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Provided enrollment photo</p>
+                    <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.15em] tw-text-slate-500">Officer live photo</p>
                     <AppBadge
                       v-if="selectedRow.mobilePassportAttachments?.length"
                       tone="info"
@@ -517,6 +538,36 @@
       />
 
       <AppModal
+        :model-value="rejectDialogOpen"
+        title="Reject enrollee"
+        subtitle="A rejection reason is required for auditability and downstream review."
+        icon="mdi-close-octagon-outline"
+        size="md"
+        color="error"
+        @update:modelValue="handleRejectDialog"
+      >
+        <div class="tw-space-y-4">
+          <p class="tw-text-sm tw-text-slate-600">{{ rejectDialogMessage }}</p>
+          <v-textarea
+            v-model="rejectionReason"
+            label="Rejection reason"
+            placeholder="Explain why this enrollee is being rejected."
+            rows="4"
+            density="compact"
+            variant="outlined"
+            counter="500"
+          />
+        </div>
+
+        <template #actions>
+          <v-btn variant="outlined" :disabled="rejectingId !== null" @click="closeRejectDialog">Cancel</v-btn>
+          <v-btn color="error" variant="flat" prepend-icon="mdi-close-octagon-outline" :loading="rejectingId !== null" @click="confirmReject">
+            Reject enrollee
+          </v-btn>
+        </template>
+      </AppModal>
+
+      <AppModal
         :model-value="locationMapOpen"
         :title="locationMapTitle"
         subtitle="Review the captured coordinates without leaving the approval workflow."
@@ -589,12 +640,16 @@ const rows = ref([])
 const loading = ref(false)
 const verifyingId = ref(null)
 const approvingId = ref(null)
+const rejectingId = ref(null)
 const limit = ref(50)
 const search = ref('')
 const detailModalOpen = ref(false)
 const selectedRowId = ref(null)
 const approvalDialogOpen = ref(false)
 const approvalTarget = ref(null)
+const rejectDialogOpen = ref(false)
+const rejectTarget = ref(null)
+const rejectionReason = ref('')
 const locationMapOpen = ref(false)
 const locationMapTitle = ref('Enrollment Location Map')
 const locationMapPoint = ref(null)
@@ -638,7 +693,7 @@ const decisionOptions = [
 
 const approvedCount = computed(() => rows.value.filter((row) => row.local_status === 'approved').length)
 const readyCount = computed(() => rows.value.filter((row) => !cannotApprove(row)).length)
-const attentionCount = computed(() => rows.value.filter((row) => row.local_status === 'failed' || requiresVerification(row) || row.is_possible_duplicate).length)
+const attentionCount = computed(() => rows.value.filter((row) => row.local_status === 'failed' || row.local_status === 'rejected' || requiresVerification(row) || row.is_possible_duplicate).length)
 
 const selectedRow = computed(() => rows.value.find((row) => row.id === selectedRowId.value) || null)
 
@@ -683,6 +738,11 @@ const approvalDialogWarning = computed(() => {
   }
 
   return 'The selected NIN merge strategy will be stored in the audit trail and enrollee verification metadata.'
+})
+
+const rejectDialogMessage = computed(() => {
+  if (!rejectTarget.value) return 'Provide a clear reason for rejecting this enrollee.'
+  return `Provide a clear reason for rejecting ${rejectTarget.value.full_name || rejectTarget.value.name || 'this enrollee'}.`
 })
 
 const apiItems = (response) => response?.data?.data?.data || response?.data?.data || []
@@ -738,12 +798,12 @@ const openLocationMap = (point, title = 'Enrollment Location Map') => {
 const selectedOfficerPhoto = (row) => {
   if (!row) return ''
   const selected = (row.mobilePassportAttachments || []).find((attachment) => Number(attachment.id) === Number(row.selectedPhotoAttachmentId))
-  return selected?.file_path || row.provided_image_url || row.image_url || ''
+  return selected?.file_path || row.provided_live_image_url || ''
 }
 
 const selectedVerifiedPhoto = (row) => {
   if (!row) return ''
-  return row.providerPhoto || row.image_url || row.provided_image_url || ''
+  return row.providerPhoto || ''
 }
 
 const normalizeRow = (row) => {
@@ -760,7 +820,8 @@ const normalizeRow = (row) => {
     fieldSelection: { ...defaultFieldSelection(comparison), ...storedSelection },
     comparison,
     providerData,
-    provided_image_url: row.provided_image_url || row.image_url || '',
+    provided_image_url: row.provided_image_url || '',
+    provided_live_image_url: row.provided_live_image_url || '',
     providerPhoto: normalizeProviderPhoto(providerData.photo),
     mobilePassportAttachments: mobilePassportAttachments.map((attachment, index) => ({
       ...attachment,
@@ -799,7 +860,20 @@ const loadBatch = async () => {
 }
 
 const requiresVerification = (row) => !!row.nin && row.nin_verification_status !== 'verified'
-const cannotApprove = (row) => row.local_status === 'approved' || row.is_possible_duplicate || requiresVerification(row)
+const rowWorkflowStatus = (row) => {
+  if (row?.local_status === 'approved' || Number(row?.status) === 1) return 'approved'
+  if (row?.local_status === 'rejected' || Number(row?.status) === 2) return 'rejected'
+  return row?.status_label || 'pending'
+}
+
+const rowWorkflowLabel = (row) => {
+  if (row?.local_status === 'approved' || Number(row?.status) === 1) return 'Approved'
+  if (row?.local_status === 'rejected' || Number(row?.status) === 2) return 'Rejected'
+  return row?.status_label || 'Pending'
+}
+
+const cannotApprove = (row) => row.local_status === 'approved' || row.local_status === 'rejected' || Number(row?.status) === 2 || row.is_possible_duplicate || requiresVerification(row)
+const cannotReject = (row) => row.local_status === 'approved' || row.local_status === 'rejected' || Number(row?.status) === 1 || Number(row?.status) === 2
 
 // Smart readiness checklist — translates raw flags into plain-language blockers/clearances for the officer
 const approvalChecks = (row) => {
@@ -937,6 +1011,25 @@ const closeApproveDialog = () => {
   approvalTarget.value = null
 }
 
+const openRejectDialog = (row) => {
+  rejectTarget.value = row
+  rejectionReason.value = ''
+  rejectDialogOpen.value = true
+}
+
+const closeRejectDialog = () => {
+  rejectDialogOpen.value = false
+  rejectTarget.value = null
+  rejectionReason.value = ''
+}
+
+const handleRejectDialog = (value) => {
+  rejectDialogOpen.value = value
+  if (!value) {
+    closeRejectDialog()
+  }
+}
+
 const approvalPayload = (row) => {
   const payload = {
     nin_merge_strategy: row.mergeStrategy,
@@ -975,6 +1068,37 @@ const confirmApprove = async () => {
     error(row.local_error)
   } finally {
     approvingId.value = null
+  }
+}
+
+const confirmReject = async () => {
+  if (!rejectTarget.value) return
+  if (!rejectionReason.value.trim()) {
+    error('Please provide a rejection reason')
+    return
+  }
+
+  const row = rejectTarget.value
+  rejectingId.value = row.id
+  row.local_error = ''
+
+  try {
+    const response = await enrolleeAPI.updateStatus(row.id, {
+      status: 2,
+      comment: rejectionReason.value.trim(),
+    })
+    Object.assign(row, normalizeRow({
+      ...row,
+      ...(response.data?.data || {}),
+      local_status: 'rejected',
+    }))
+    success(`${row.full_name || row.name} rejected`)
+    closeRejectDialog()
+  } catch (err) {
+    row.local_error = err.response?.data?.message || 'Rejection failed'
+    error(row.local_error)
+  } finally {
+    rejectingId.value = null
   }
 }
 

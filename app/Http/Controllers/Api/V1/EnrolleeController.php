@@ -611,11 +611,28 @@ class EnrolleeController extends BaseController
         try {
             $oldStatus = $enrollee->status;
             $newStatus = (int) $request->status;
+            $comment = trim((string) $request->comment);
+
+            if ($newStatus === Enrollee::STATUS_REJECTED && $comment === '') {
+                return $this->sendError('Validation Error', [
+                    'comment' => ['A rejection reason is required when rejecting an enrollee.'],
+                ], 422);
+            }
 
             $enrollee->update([
                 'status' => $newStatus,
                 'updated_at' => now(),
             ]);
+
+            if ($newStatus === Enrollee::STATUS_REJECTED && $enrollee->mobile_enrollment_record_id) {
+                MobileEnrollmentRecord::query()
+                    ->whereKey($enrollee->mobile_enrollment_record_id)
+                    ->update([
+                        'status' => MobileEnrollmentRecord::STATUS_REJECTED,
+                        'status_reason' => $comment !== '' ? $comment : 'Enrollee rejected during approval review.',
+                        'synced_at' => now(),
+                    ]);
+            }
 
             AuditTrail::create([
                 'auditable_type' => Enrollee::class,
@@ -627,7 +644,7 @@ class EnrolleeController extends BaseController
                 'old_values' => ['status' => $oldStatus],
                 'new_values' => [
                     'status' => $newStatus,
-                    'comment' => $request->comment,
+                    'comment' => $comment !== '' ? $comment : null,
                 ],
             ]);
 

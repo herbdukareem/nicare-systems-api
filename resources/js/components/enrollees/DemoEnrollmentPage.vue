@@ -268,7 +268,7 @@ const flowSteps = [
 ]
 const sexOptions = [{ title: 'Male', value: 1 }, { title: 'Female', value: 2 }]
 const maritalOptions = [{ title: 'Single', value: 1 }, { title: 'Married', value: 2 }, { title: 'Divorced', value: 3 }, { title: 'Widowed', value: 4 }, { title: 'Not Stated', value: 5 }]
-const occupationOptions = ['Student', 'Farmer', 'Trader/Business Owner', 'Civil Servant', 'Private Sector Employee', 'Teacher/Lecturer', 'Health Worker', 'Artisan', 'Driver/Transport Worker', 'Security Personnel', 'Religious Leader', 'Homemaker', 'Retired', 'Unemployed', 'Self-Employed', 'Other', 'Not Stated']
+const occupationOptions = ['Student', 'Farmer', 'Trader/Business Owner', 'Civil Servant', 'Private Sector Employee', 'Teacher/Lecturer', 'Health Worker', 'Artisan', 'Driver/Transport Worker', 'Security Personnel', 'Religious Leader', 'House Wife', 'Homemaker', 'Retired', 'Unemployed', 'Self-Employed', 'Other', 'Not Stated']
 const educationalStatusOptions = ['Primary', 'Secondary', 'Tertiary', 'Postgraduate', 'No Formal Education', 'Others']
 const disabilityOptions = ['None', 'Visual Impairment', 'Hearing Impairment', 'Speech Impairment', 'Physical/Mobility Disability', 'Intellectual Disability', 'Learning Disability', 'Mental/Psychosocial Disability', 'Albinism', 'Multiple Disabilities', 'Others']
 const relationshipOptions = [{ title: 'Principal', value: 1 }, { title: 'Spouse', value: 2 }, { title: 'Child', value: 3 }, { title: 'Other', value: 4 }]

@@ -71,34 +71,6 @@
               </AppCard>
             </div>
 
-            <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.1fr_0.9fr] tw-mt-5">
-              <AppCard title="Verification Source Breakdown" icon="mdi-source-branch" tone="secondary">
-                <BarChart :data="sourceChartData" :height="260" />
-              </AppCard>
-
-              <AppCard title="Verification Providers" icon="mdi-account-network-outline" tone="info">
-                <div v-if="providerBreakdown.length" class="tw-space-y-3">
-                  <div
-                    v-for="provider in providerBreakdown"
-                    :key="provider.label"
-                    class="tw-flex tw-items-center tw-justify-between tw-border tw-border-slate-200 tw-bg-slate-50 tw-px-3 tw-py-2"
-                  >
-                    <div class="tw-min-w-0">
-                      <p class="tw-truncate tw-text-sm tw-font-semibold tw-text-slate-900">{{ provider.label }}</p>
-                      <p class="tw-text-xs tw-text-slate-500">Verified/failed attempts in the current window</p>
-                    </div>
-                    <AppBadge tone="info" :label="String(provider.value)" size="sm" />
-                  </div>
-                </div>
-                <AppEmptyState
-                  v-else
-                  icon="mdi-database-search-outline"
-                  title="No provider activity"
-                  description="No NIN verification attempts matched the current filters."
-                />
-              </AppCard>
-            </div>
-
             <AppCard title="Recent NIN Verification Records" icon="mdi-table-search" tone="primary" class="tw-mt-5">
               <AppDataTable
                 v-model:page="verificationTable.page"
@@ -160,9 +132,13 @@
           </v-window-item>
 
           <v-window-item value="geography">
-            <div class="tw-grid tw-gap-5 xl:tw-grid-cols-2">
+            <div class="tw-space-y-5">
               <AppCard title="LGA Breakdown" icon="mdi-map-legend" tone="warning">
                 <BarChart :data="lgaBreakdownChartData" :height="320" />
+              </AppCard>
+
+              <AppCard title="Ward Breakdown" icon="mdi-map-marker-radius-outline" tone="info">
+                <BarChart :data="wardBreakdownChartData" :height="320" />
               </AppCard>
 
               <AppCard title="Facility Breakdown" icon="mdi-hospital-building" tone="secondary">
@@ -172,35 +148,67 @@
           </v-window-item>
 
           <v-window-item value="operations">
-            <AppCard title="Facility Summary Table" icon="mdi-table-large" tone="primary">
-              <AppDataTable
-                :headers="facilityHeaders"
-                :items="facilityTable.rows"
-                :items-length="facilityTable.total"
-                :loading="loading"
-                :items-per-page="facilityTable.perPage"
-              >
-                <template #toolbar>
-                  <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-text-slate-500">
-                    <span class="tw-rounded-full tw-bg-slate-200 tw-px-2.5 tw-py-1 tw-font-semibold tw-text-slate-700">
-                      {{ facilityTable.total }} facility row{{ facilityTable.total === 1 ? '' : 's' }}
-                    </span>
-                    <span>Premium value is derived from the linked plan amount.</span>
-                  </div>
-                </template>
+            <div class="tw-space-y-5">
+              <AppCard title="Facility Summary Table" icon="mdi-table-large" tone="primary">
+                <AppDataTable
+                  :headers="facilityHeaders"
+                  :items="facilityTable.rows"
+                  :items-length="facilityTable.total"
+                  :loading="loading"
+                  :items-per-page="facilityTable.perPage"
+                >
+                  <template #toolbar>
+                    <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-text-slate-500">
+                      <span class="tw-rounded-full tw-bg-slate-200 tw-px-2.5 tw-py-1 tw-font-semibold tw-text-slate-700">
+                        {{ facilityTable.total }} facility row{{ facilityTable.total === 1 ? '' : 's' }}
+                      </span>
+                      <span>Value is derived from the configured NIN provider verification amount per attempt.</span>
+                    </div>
+                  </template>
 
-                <template #item.facility="{ item }">
-                  <div class="tw-min-w-0">
-                    <p class="tw-font-semibold tw-text-slate-900">{{ item.facility_name }}</p>
-                    <p class="tw-text-xs tw-text-slate-500">{{ item.lga_name }}</p>
-                  </div>
-                </template>
+                  <template #item.facility="{ item }">
+                    <div class="tw-min-w-0">
+                      <p class="tw-font-semibold tw-text-slate-900">{{ item.facility_name }}</p>
+                      <p class="tw-text-xs tw-text-slate-500">{{ item.lga_name }}</p>
+                    </div>
+                  </template>
 
-                <template #item.value="{ item }">
-                  <span class="tw-text-sm tw-font-medium tw-text-slate-700">{{ formatCurrency(item.value) }}</span>
-                </template>
-              </AppDataTable>
-            </AppCard>
+                  <template #item.value="{ item }">
+                    <span class="tw-text-sm tw-font-medium tw-text-slate-700">{{ formatCurrency(item.value) }}</span>
+                  </template>
+                </AppDataTable>
+              </AppCard>
+
+              <AppCard title="Summary Table by Enrollment Officers" icon="mdi-account-supervisor-outline" tone="secondary">
+                <AppDataTable
+                  :headers="officerHeaders"
+                  :items="officerTable.rows"
+                  :items-length="officerTable.total"
+                  :loading="loading"
+                  :items-per-page="officerTable.perPage"
+                >
+                  <template #toolbar>
+                    <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-text-slate-500">
+                      <span class="tw-rounded-full tw-bg-slate-200 tw-px-2.5 tw-py-1 tw-font-semibold tw-text-slate-700">
+                        {{ officerTable.total }} officer row{{ officerTable.total === 1 ? '' : 's' }}
+                      </span>
+                      <span>Officer value uses the same configured NIN provider verification amount per attempt.</span>
+                    </div>
+                  </template>
+
+                  <template #item.officer="{ item }">
+                    <div class="tw-min-w-0">
+                      <p class="tw-font-semibold tw-text-slate-900">{{ item.officer_name }}</p>
+                      <p class="tw-text-xs tw-text-slate-500">{{ item.source_label }}</p>
+                    </div>
+                  </template>
+
+                  <template #item.value="{ item }">
+                    <span class="tw-text-sm tw-font-medium tw-text-slate-700">{{ formatCurrency(item.value) }}</span>
+                  </template>
+                </AppDataTable>
+              </AppCard>
+            </div>
           </v-window-item>
         </v-window>
       </AppCard>
@@ -211,10 +219,8 @@
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import AdminLayout from '../layout/AdminLayout.vue'
-import AppBadge from '../common/AppBadge.vue'
 import AppCard from '../common/AppCard.vue'
 import AppDataTable from '../common/AppDataTable.vue'
-import AppEmptyState from '../common/AppEmptyState.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
 import AppStatCard from '../common/AppStatCard.vue'
 import AppStatusBadge from '../common/AppStatusBadge.vue'
@@ -262,6 +268,7 @@ const charts = reactive({
   source_breakdown: [],
   provider_breakdown: [],
   lga_breakdown: [],
+  ward_breakdown: [],
   facility_breakdown: [],
 })
 
@@ -279,6 +286,12 @@ const facilityTable = reactive({
   perPage: 25,
 })
 
+const officerTable = reactive({
+  rows: [],
+  total: 0,
+  perPage: 25,
+})
+
 const verificationHeaders = [
   { title: 'Enrollee', key: 'enrollee', sortable: false },
   { title: 'Status', key: 'status', sortable: false },
@@ -291,6 +304,19 @@ const verificationHeaders = [
 
 const facilityHeaders = [
   { title: 'Facility', key: 'facility', sortable: false },
+  { title: 'Captured', key: 'captured', sortable: false },
+  { title: 'Pending', key: 'pending_approval', sortable: false },
+  { title: 'Approved', key: 'approved', sortable: false },
+  { title: 'Rejected', key: 'rejected', sortable: false },
+  { title: 'Duplicates', key: 'duplicates', sortable: false },
+  { title: 'NIN Attempts', key: 'nin_attempts', sortable: false },
+  { title: 'Verified', key: 'nin_verified', sortable: false },
+  { title: 'Failed', key: 'nin_failed', sortable: false },
+  { title: 'Value', key: 'value', sortable: false },
+]
+
+const officerHeaders = [
+  { title: 'Enrollment Officer', key: 'officer', sortable: false },
   { title: 'Captured', key: 'captured', sortable: false },
   { title: 'Pending', key: 'pending_approval', sortable: false },
   { title: 'Approved', key: 'approved', sortable: false },
@@ -324,7 +350,6 @@ const facilityOptions = computed(() => {
   return lookups.facilities.filter((facility) => Number(facility.lga_id) === Number(filters.lga_id))
 })
 
-const providerBreakdown = computed(() => charts.provider_breakdown || [])
 const activeDateRangeLabel = computed(() => `Showing intelligence from ${filters.date_from} to ${filters.date_to}`)
 
 const enrollmentTrendChartData = computed(() => ({
@@ -403,17 +428,6 @@ const ninStatusChartData = computed(() => ({
   ],
 }))
 
-const sourceChartData = computed(() => ({
-  labels: (charts.source_breakdown || []).map((item) => item.label),
-  datasets: [
-    {
-      label: 'Attempts',
-      data: (charts.source_breakdown || []).map((item) => item.value),
-      backgroundColor: ['#1d4ed8', '#0f766e', '#f59e0b', '#7c3aed'],
-    },
-  ],
-}))
-
 const lgaBreakdownChartData = computed(() => ({
   labels: (charts.lga_breakdown || []).map((item) => item.label),
   datasets: [
@@ -430,6 +444,27 @@ const lgaBreakdownChartData = computed(() => ({
     {
       label: 'Pending',
       data: (charts.lga_breakdown || []).map((item) => item.pending_approval),
+      backgroundColor: '#d97706',
+    },
+  ],
+}))
+
+const wardBreakdownChartData = computed(() => ({
+  labels: (charts.ward_breakdown || []).map((item) => item.label),
+  datasets: [
+    {
+      label: 'Captured',
+      data: (charts.ward_breakdown || []).map((item) => item.captured),
+      backgroundColor: '#1d4ed8',
+    },
+    {
+      label: 'Approved',
+      data: (charts.ward_breakdown || []).map((item) => item.approved),
+      backgroundColor: '#0f766e',
+    },
+    {
+      label: 'Pending',
+      data: (charts.ward_breakdown || []).map((item) => item.pending_approval),
       backgroundColor: '#d97706',
     },
   ],
@@ -495,6 +530,11 @@ const applyResponse = (payload = {}) => {
   facilityTable.rows = facilityPayload.data || []
   facilityTable.total = Number(facilityPayload.meta?.total || 0)
   facilityTable.perPage = Number(facilityPayload.meta?.per_page || facilityTable.perPage)
+
+  const officerPayload = payload.tables?.officer_summary || {}
+  officerTable.rows = officerPayload.data || []
+  officerTable.total = Number(officerPayload.meta?.total || 0)
+  officerTable.perPage = Number(officerPayload.meta?.per_page || officerTable.perPage)
 }
 
 const loadReport = async () => {
