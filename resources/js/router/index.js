@@ -16,6 +16,7 @@ const PendingEnrolleesPage = () => import('../components/enrollees/PendingEnroll
 const EnrollmentApprovalPage = () => import('../components/enrollees/EnrollmentApprovalPage.vue');
 const EnrolleeIntegrityPage = () => import('../components/enrollees/EnrolleeIntegrityPage.vue');
 const EnrollmentIntelligencePage = () => import('../components/enrollees/EnrollmentIntelligencePage.vue');
+const BhcpfExecutiveDashboardPage = () => import('../components/enrollees/BhcpfExecutiveDashboardPage.vue');
 const BulkEnrollmentSlipPage = () => import('../components/enrollees/BulkEnrollmentSlipPage.vue');
 const SetupWorkspace = () => import('../components/setup/SetupWorkspace.vue');
 
@@ -129,6 +130,17 @@ const routes = [
       permissions: ['enrollee.nin.verify', 'reports.view'],
       title: 'Enrollment Intelligence',
       breadcrumb: 'Enrollment Intelligence',
+    },
+  },
+  {
+    path: '/dashboard/executive/bhcpf-vulnerable',
+    name: 'bhcpf-executive-dashboard',
+    component: BhcpfExecutiveDashboardPage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['reports.view', 'enrollees.view'],
+      title: 'BHCPF Executive Dashboard',
+      breadcrumb: 'BHCPF Executive Dashboard',
     },
   },
   {

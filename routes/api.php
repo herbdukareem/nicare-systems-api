@@ -75,6 +75,7 @@ use App\Http\Controllers\Api\EnrolleeController as EnrolleeApiController;
 use App\Http\Controllers\Api\ExtendedReportingController;
 use App\Http\Controllers\Api\EnrollmentFormSchemaController;
 use App\Http\Controllers\Api\EnrollmentIntelligenceController;
+use App\Http\Controllers\Api\BhcpfExecutiveDashboardController;
 use App\Http\Controllers\Api\MobileEnrollmentMonitorController;
 use App\Http\Controllers\Api\MobileV1Controller;
 use App\Http\Controllers\Api\OfficerDeviceController;
@@ -186,6 +187,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,enrollees.view,enrollee.approve,enrollee.nin.verify');
     Route::get('enrollment/intelligence/nin-verification', [EnrollmentIntelligenceController::class, 'ninVerificationReport'])
         ->middleware('permission:any,enrollee.nin.verify,reports.view');
+    Route::get('dashboard/executive/bhcpf-vulnerable', [BhcpfExecutiveDashboardController::class, 'overview'])
+        ->middleware('permission:any,reports.view,reports.executive,enrollees.view');
     Route::get('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip'])
         ->middleware('permission:any,enrollees.view,enrollee.print-bulk-slip');
     Route::get('enrollees/bulk-id-card', [EnrolleeController::class, 'bulkIdCard'])

@@ -23,6 +23,7 @@ class DatabaseSeeder extends Seeder
         // Document requirements for referral and PA code requests
         $this->call(DocumentRequirementSeeder::class);
         $this->call(InsuranceProgrammeSeeder::class);
+        $this->call(BhcpfExecutiveTargetSeeder::class);
 
         // --class=CaseRecordsWithDetailsSeeder
         $this->call(CaseRecordsWithDetailsSeeder::class);

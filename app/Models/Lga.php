@@ -61,6 +61,11 @@ class Lga extends Model
         return $this->hasMany(Enrollee::class);
     }
 
+    public function bhcpfExecutiveTarget()
+    {
+        return $this->hasOne(BhcpfExecutiveTarget::class);
+    }
+
     public function premiumPins()
     {
         return $this->hasMany(PremiumPin::class, 'lga_id');
