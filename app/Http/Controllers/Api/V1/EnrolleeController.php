@@ -613,6 +613,12 @@ class EnrolleeController extends BaseController
             $newStatus = (int) $request->status;
             $comment = trim((string) $request->comment);
 
+            if ($this->hasDuplicateStatusConflict($enrollee)) {
+                return $this->sendError('Duplicate review required', [
+                    'duplicate' => [$this->duplicateStatusConflictMessage()],
+                ], 422);
+            }
+
             if ($newStatus === Enrollee::STATUS_REJECTED && $comment === '') {
                 return $this->sendError('Validation Error', [
                     'comment' => ['A rejection reason is required when rejecting an enrollee.'],
@@ -676,12 +682,23 @@ class EnrolleeController extends BaseController
         }
 
         $updatedCount = 0;
+        $blockedEnrollees = [];
 
         foreach ($enrollees as $enrollee) {
             $oldStatus = (int) $enrollee->status;
             $newStatus = (int) $validated['status'];
 
             if ($oldStatus === $newStatus) {
+                continue;
+            }
+
+            if ($this->hasDuplicateStatusConflict($enrollee)) {
+                $blockedEnrollees[] = [
+                    'id' => $enrollee->id,
+                    'enrollee_id' => $enrollee->enrollee_id,
+                    'name' => $enrollee->full_name,
+                    'reason' => $this->duplicateStatusConflictMessage(),
+                ];
                 continue;
             }
 
@@ -710,6 +727,8 @@ class EnrolleeController extends BaseController
         return $this->sendResponse([
             'updated_count' => $updatedCount,
             'requested_count' => count($validated['enrollee_ids']),
+            'blocked_count' => count($blockedEnrollees),
+            'blocked_enrollees' => $blockedEnrollees,
             'status' => (int) $validated['status'],
             'status_label' => $this->statusLabel((int) $validated['status']),
         ], 'Enrollee statuses updated successfully.');
@@ -1237,6 +1256,25 @@ class EnrolleeController extends BaseController
         return PremiumPin::where('used_by_enrollee_id', $enrollee->id)
             ->where('status', PremiumPin::STATUS_USED)
             ->exists();
+    }
+
+    private function hasDuplicateStatusConflict(Enrollee $enrollee): bool
+    {
+        if ($enrollee->duplicateFlags()->where('resolved', false)->exists()) {
+            return true;
+        }
+
+        if ((bool) $enrollee->is_possible_duplicate) {
+            return true;
+        }
+
+        return Schema::hasColumn('enrollees', 'has_duplicate_nin')
+            && (bool) ($enrollee->has_duplicate_nin ?? false);
+    }
+
+    private function duplicateStatusConflictMessage(): string
+    {
+        return 'Resolve duplicate flags before changing this enrollee status.';
     }
 
     private function statusLabel(int $status): string

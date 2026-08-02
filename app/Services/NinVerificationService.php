@@ -381,6 +381,10 @@ class NinVerificationService
 
         $verificationData = $enrollee->nin_verification_data ?? [];
         $providerData = is_array($verificationData['provider_data'] ?? null) ? $verificationData['provider_data'] : [];
+        $comparisonIndex = collect(is_array($verificationData['comparison'] ?? null) ? $verificationData['comparison'] : [])
+            ->filter(fn ($row) => is_array($row) && !blank($row['field'] ?? null))
+            ->keyBy(fn ($row) => (string) $row['field'])
+            ->all();
         $strategy = (string) ($approvalData['nin_merge_strategy'] ?? 'keep_provided');
         $fieldSelection = is_array($approvalData['nin_field_selection'] ?? null) ? $approvalData['nin_field_selection'] : [];
 
@@ -391,16 +395,21 @@ class NinVerificationService
         foreach ($this->comparableFields as $field) {
             $selectedSource = $this->selectedSourceForField($strategy, $fieldSelection, $field, $providerData);
             $resolvedSelection[$field] = $selectedSource;
+            $comparisonField = is_array($comparisonIndex[$field] ?? null) ? $comparisonIndex[$field] : [];
+            $providedValue = array_key_exists('provided', $comparisonField)
+                ? $comparisonField['provided']
+                : $this->currentValue($enrollee, $field);
+            $verifiedValue = array_key_exists('verified', $comparisonField)
+                ? $comparisonField['verified']
+                : ($providerData[$field] ?? null);
 
             $resolvedValue = $selectedSource === 'verified'
-                ? ($providerData[$field] ?? $this->currentValue($enrollee, $field))
-                : $this->currentValue($enrollee, $field);
+                ? $verifiedValue
+                : $providedValue;
 
             $resolvedProfile[$field] = $resolvedValue;
 
-            if ($selectedSource === 'verified') {
-                $this->writeResolvedField($updates, $field, $resolvedValue);
-            }
+            $this->writeResolvedField($updates, $field, $resolvedValue, true);
         }
 
         if (!blank($providerData['nin'] ?? null)) {
@@ -768,22 +777,26 @@ class NinVerificationService
         };
     }
 
-    private function writeResolvedField(array &$updates, string $field, mixed $value): void
+    private function writeResolvedField(array &$updates, string $field, mixed $value, bool $allowBlank = false): void
     {
-        if (blank($value)) {
+        if (!$allowBlank && blank($value)) {
             return;
         }
 
         if ($field === 'gender') {
             $mapped = $this->mapGenderToSex($value);
-            if ($mapped !== null) {
-                $updates['sex'] = $mapped;
-            }
+            $updates['sex'] = $mapped;
 
             return;
         }
 
-        $updates[$field] = $field === 'date_of_birth' ? $value : (string) $value;
+        if ($field === 'date_of_birth') {
+            $updates[$field] = blank($value) ? null : $value;
+
+            return;
+        }
+
+        $updates[$field] = blank($value) ? null : (string) $value;
     }
 
     private function selectedSourceForField(string $strategy, array $fieldSelection, string $field, array $providerData): string

@@ -7,6 +7,15 @@ use App\Models\Enrollee;
 class EnrolleeDuplicateDetectionService
 {
     /**
+     * @var array<int, int>
+     */
+    private array $duplicateStatuses = [
+        Enrollee::STATUS_PENDING,
+        Enrollee::STATUS_ACTIVE,
+        Enrollee::STATUS_REJECTED,
+    ];
+
+    /**
      * Check whether the given payload represents a duplicate enrollee.
      *
      * Returns an array with:
@@ -18,7 +27,10 @@ class EnrolleeDuplicateDetectionService
     {
         // Check 1: NIN match
         if (!empty($payload['nin'])) {
-            $existing = Enrollee::where('nin', $payload['nin'])->first();
+            $existing = Enrollee::query()
+                ->where('nin', $payload['nin'])
+                ->whereIn('status', $this->duplicateStatuses)
+                ->first();
             if ($existing) {
                 return [
                     'is_duplicate'        => true,
@@ -30,9 +42,11 @@ class EnrolleeDuplicateDetectionService
 
         // Check 2: Fuzzy name + exact DOB + gender + facility
         if (!empty($payload['date_of_birth']) && !empty($payload['gender']) && !empty($payload['facility_id'])) {
-            $candidates = Enrollee::whereDate('date_of_birth', $payload['date_of_birth'])
+            $candidates = Enrollee::query()
+                ->whereDate('date_of_birth', $payload['date_of_birth'])
                 ->where('sex', $payload['gender'])
                 ->where('facility_id', $payload['facility_id'])
+                ->whereIn('status', $this->duplicateStatuses)
                 ->get(['id', 'first_name', 'last_name']);
 
             $incomingName = strtolower(trim(($payload['first_name'] ?? '') . ' ' . ($payload['last_name'] ?? '')));
