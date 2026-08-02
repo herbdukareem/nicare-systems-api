@@ -536,9 +536,35 @@ class MobileV1Controller extends BaseController
 
     private function scopedDistinctNinQuery(array $scope): Builder
     {
-        $query = Enrollee::query()
+        $query = $this->scopedNinRegistryBaseQuery($scope)
             ->whereNotNull('nin')
-            ->where('nin', '!=', '');
+            ->where('nin', '!=', '')
+            ->whereIn('status', [
+                Enrollee::STATUS_PENDING,
+                Enrollee::STATUS_ACTIVE,
+                Enrollee::STATUS_REJECTED,
+            ]);
+
+        return $query;
+    }
+
+    private function scopedDistinctNinUpdatedAt(array $scope): ?string
+    {
+        $value = $this->scopedNinRegistryBaseQuery($scope)
+            ->whereNotNull('nin')
+            ->where('nin', '!=', '')
+            ->max('updated_at');
+
+        if ($value instanceof \DateTimeInterface) {
+            return $value->format(\DateTimeInterface::ATOM);
+        }
+
+        return filled($value) ? (string) $value : null;
+    }
+
+    private function scopedNinRegistryBaseQuery(array $scope): Builder
+    {
+        $query = Enrollee::query();
 
         $ninPrecheckLgaIds = $scope['nin_precheck_lga_ids'] ?? null;
         if ($ninPrecheckLgaIds === null) {
@@ -550,16 +576,5 @@ class MobileV1Controller extends BaseController
         }
 
         return $query->whereIn('lga_id', $ninPrecheckLgaIds);
-    }
-
-    private function scopedDistinctNinUpdatedAt(array $scope): ?string
-    {
-        $value = $this->scopedDistinctNinQuery($scope)->max('updated_at');
-
-        if ($value instanceof \DateTimeInterface) {
-            return $value->format(\DateTimeInterface::ATOM);
-        }
-
-        return filled($value) ? (string) $value : null;
     }
 }
