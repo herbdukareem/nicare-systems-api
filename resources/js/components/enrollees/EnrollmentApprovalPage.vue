@@ -798,7 +798,7 @@ const openLocationMap = (point, title = 'Enrollment Location Map') => {
 const selectedOfficerPhoto = (row) => {
   if (!row) return ''
   const selected = (row.mobilePassportAttachments || []).find((attachment) => Number(attachment.id) === Number(row.selectedPhotoAttachmentId))
-  return selected?.file_path || row.provided_live_image_url || ''
+  return selected?.file_path || row.provided_live_image_url || row.image_url || ''
 }
 
 const selectedVerifiedPhoto = (row) => {
