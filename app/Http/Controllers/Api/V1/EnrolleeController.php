@@ -15,6 +15,7 @@ use App\Models\PremiumPin;
 use App\Services\EnrolleeDuplicateDetectionService;
 use App\Services\EnrolleeService;
 use App\Services\NinVerificationService;
+use App\Services\VulnerableGroupAssignmentService;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -40,14 +41,18 @@ class EnrolleeController extends BaseController
 
     protected NinVerificationService $ninVerificationService;
 
+    protected VulnerableGroupAssignmentService $vulnerableGroupAssignmentService;
+
     public function __construct(
         EnrolleeService $enrolleeService,
         EnrolleeDuplicateDetectionService $duplicateService,
-        NinVerificationService $ninVerificationService
+        NinVerificationService $ninVerificationService,
+        VulnerableGroupAssignmentService $vulnerableGroupAssignmentService
     ) {
         $this->enrolleeService  = $enrolleeService;
         $this->duplicateService = $duplicateService;
         $this->ninVerificationService = $ninVerificationService;
+        $this->vulnerableGroupAssignmentService = $vulnerableGroupAssignmentService;
     }
 
     /**
@@ -231,6 +236,7 @@ class EnrolleeController extends BaseController
 
         try {
             $enrollee = $this->ninVerificationService->applyApprovalSelection($enrollee, $validated, $request->user());
+            $enrollee = $this->vulnerableGroupAssignmentService->syncForEnrollee($enrollee);
         } catch (\RuntimeException $exception) {
             return $this->sendError($exception->getMessage(), [], 422);
         }

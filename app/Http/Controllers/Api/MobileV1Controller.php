@@ -288,6 +288,7 @@ class MobileV1Controller extends BaseController
             'records.*.pin' => ['nullable', 'array'],
             'records.*.captured_photo_uri' => ['nullable', 'string', 'max:2048'],
             'records.*.photo_uri' => ['nullable', 'string', 'max:2048'],
+            'records.*.captured_live_photo_base64' => ['nullable', 'string'],
             'records.*.backend_record_id' => ['nullable', 'integer'],
             'records.*.location' => ['nullable', 'array'],
             'records.*.location.permission_status' => ['nullable', 'string', 'max:40'],

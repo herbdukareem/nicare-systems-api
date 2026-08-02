@@ -33,6 +33,7 @@ class MobileEnrollmentService
         private EnrolleeDuplicateDetectionService $duplicateDetectionService,
         private PremiumCoverageService $premiumCoverageService,
         private NinVerificationService $ninVerificationService,
+        private VulnerableGroupAssignmentService $vulnerableGroupAssignmentService,
         private BillingCheckoutService $billingCheckoutService,
         private BillingPaymentVerificationService $billingVerificationService
     ) {
@@ -156,6 +157,8 @@ class MobileEnrollmentService
                 'enrollee_id' => $enrollee->id,
                 'synced_at' => now(),
             ])->save();
+
+            $this->persistCapturedLivePhotoAttachment($record->fresh('enrollee'), $recordPayload, $officer);
 
             if ($this->policyNeedsNinVerification($ninPolicy)) {
                 return $this->processPolicyNinVerification($record->fresh('enrollee'), $officer, $ninPolicy);
@@ -288,6 +291,71 @@ class MobileEnrollmentService
         $record->update(['attachment_status' => 'uploaded']);
 
         return $attachment;
+    }
+
+    private function persistCapturedLivePhotoAttachment(MobileEnrollmentRecord $record, array $recordPayload, User $officer): void
+    {
+        $payload = trim((string) ($recordPayload['captured_live_photo_base64'] ?? ''));
+        if ($payload === '' || !$record->enrollee_id) {
+            return;
+        }
+
+        $existingAttachment = $record->attachments()
+            ->whereIn('kind', ['passport', 'retake_photo', 'retake-passport', 'retake'])
+            ->whereNotNull('file_path')
+            ->first();
+
+        if ($existingAttachment) {
+            if ($record->enrollee && blank($record->enrollee->image_url)) {
+                $record->enrollee->update(['image_url' => $existingAttachment->file_path]);
+            }
+
+            $record->update(['attachment_status' => 'uploaded']);
+
+            return;
+        }
+
+        if (!preg_match('/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/s', $payload, $matches)) {
+            throw new RuntimeException('Captured live photo payload is invalid.');
+        }
+
+        $mimeType = Str::lower(trim((string) ($matches[1] ?? 'image/jpeg')));
+        $encoded = preg_replace('/\s+/', '', (string) ($matches[2] ?? ''));
+        $bytes = base64_decode($encoded, true);
+
+        if ($bytes === false || $bytes === '') {
+            throw new RuntimeException('Captured live photo could not be decoded.');
+        }
+
+        $extension = match ($mimeType) {
+            'image/png' => 'png',
+            'image/webp' => 'webp',
+            default => 'jpg',
+        };
+
+        $disk = (string) config('filesystems.enrollee_passport_disk', 'public');
+        $relativePath = 'mobile-enrollments/' . $record->id . '/sync-live-' . Str::lower(Str::random(12)) . '.' . $extension;
+        Storage::disk($disk)->put($relativePath, $bytes, 'public');
+
+        $filePath = Storage::disk($disk)->url($relativePath);
+
+        MobileEnrollmentAttachment::create([
+            'mobile_enrollment_record_id' => $record->id,
+            'enrollee_id' => $record->enrollee_id,
+            'kind' => 'passport',
+            'file_path' => $filePath,
+            'original_name' => 'mobile-live-photo.' . $extension,
+            'mime_type' => $mimeType,
+            'size' => strlen($bytes),
+            'status' => 'uploaded',
+            'uploaded_by' => $officer->id,
+        ]);
+
+        if ($record->enrollee) {
+            $record->enrollee->update(['image_url' => $filePath]);
+        }
+
+        $record->update(['attachment_status' => 'uploaded']);
     }
 
     private function normalizeCoreData(array $data): array
@@ -430,7 +498,7 @@ class MobileEnrollmentService
                 ? PremiumPlan::find($data['premium_plan_id'])
                 : null;
 
-            return Enrollee::create([
+            $enrollee = Enrollee::create([
                 'nin' => $data['nin'] ?? null,
                 'first_name' => $data['first_name'],
                 'last_name' => $data['last_name'],
@@ -471,6 +539,8 @@ class MobileEnrollmentService
                     ? Enrollee::NIN_VERIFICATION_NOT_PROVIDED
                     : Enrollee::NIN_VERIFICATION_NOT_STARTED,
             ]);
+
+            return $this->vulnerableGroupAssignmentService->syncForEnrollee($enrollee);
         });
     }
 
@@ -691,6 +761,7 @@ class MobileEnrollmentService
             ];
 
             $enrollee->forceFill($updates + ['nin_verification_meta' => $meta])->save();
+            $enrollee = $this->vulnerableGroupAssignmentService->syncForEnrollee($enrollee);
         }
 
         return ['changes' => $changes, 'conflicts' => $conflicts];
