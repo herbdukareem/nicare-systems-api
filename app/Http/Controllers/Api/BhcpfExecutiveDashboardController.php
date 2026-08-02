@@ -54,7 +54,7 @@ class BhcpfExecutiveDashboardController extends BaseController
             ->groupBy('lga_id')
             ->pluck('aggregate', 'lga_id');
 
-        $overallTarget = (int) round((float) $targets->sum('final_target'));
+        $overallTarget = (int) round((float) $targets->sum('proposed_enrolments'));
         $totalEnrolled = (int) $captureCounts->sum();
         $todayStart = now()->startOfDay();
         $todayEnd = now()->endOfDay();
@@ -65,8 +65,9 @@ class BhcpfExecutiveDashboardController extends BaseController
         $lgaRows = $targets
             ->map(function (BhcpfExecutiveTarget $target) use ($captureCounts): array {
                 $captured = (int) ($captureCounts[$target->lga_id] ?? 0);
-                $progress = $target->final_target > 0
-                    ? round(($captured / (int) $target->final_target) * 100, 1)
+                $campaignTarget = (int) $target->proposed_enrolments;
+                $progress = $campaignTarget > 0
+                    ? round(($captured / $campaignTarget) * 100, 1)
                     : 0.0;
                 $status = $this->progressStatus($progress);
 
@@ -77,9 +78,9 @@ class BhcpfExecutiveDashboardController extends BaseController
                     'current_enrollee_count' => (int) $target->current_enrollee_count,
                     'poverty_index' => (int) $target->poverty_index,
                     'proposed_enrolments' => (int) $target->proposed_enrolments,
-                    'target' => (int) $target->final_target,
+                    'target' => $campaignTarget,
                     'captured' => $captured,
-                    'remaining' => max((int) $target->final_target - $captured, 0),
+                    'remaining' => max($campaignTarget - $captured, 0),
                     'progress_percent' => $progress,
                     'status' => $status['label'],
                     'status_tone' => $status['tone'],
