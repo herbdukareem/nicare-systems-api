@@ -483,11 +483,6 @@ const facilityBreakdownChartData = computed(() => ({
       data: (charts.facility_breakdown || []).map((item) => item.approved),
       backgroundColor: '#0f766e',
     },
-    {
-      label: 'Value',
-      data: (charts.facility_breakdown || []).map((item) => item.value),
-      backgroundColor: '#7c3aed',
-    },
   ],
 }))
 
