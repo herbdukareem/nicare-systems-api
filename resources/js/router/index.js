@@ -138,7 +138,7 @@ const routes = [
     component: BhcpfExecutiveDashboardPage,
     meta: {
       requiresAuth: true,
-      permissions: ['reports.view', 'enrollees.view'],
+      permissions: ['dashboard.bhcpf_executive.view'],
       title: 'BHCPF Executive Dashboard',
       breadcrumb: 'BHCPF Executive Dashboard',
     },

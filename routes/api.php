@@ -188,7 +188,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('enrollment/intelligence/nin-verification', [EnrollmentIntelligenceController::class, 'ninVerificationReport'])
         ->middleware('permission:any,enrollee.nin.verify,reports.view');
     Route::get('dashboard/executive/bhcpf-vulnerable', [BhcpfExecutiveDashboardController::class, 'overview'])
-        ->middleware('permission:any,reports.view,reports.executive,enrollees.view');
+        ->middleware('permission:dashboard.bhcpf_executive.view');
     Route::get('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip'])
         ->middleware('permission:any,enrollees.view,enrollee.print-bulk-slip');
     Route::get('enrollees/bulk-id-card', [EnrolleeController::class, 'bulkIdCard'])

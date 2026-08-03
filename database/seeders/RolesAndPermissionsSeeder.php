@@ -16,6 +16,7 @@ class RolesAndPermissionsSeeder extends Seeder
         $permissionsByCategory = [
             'Dashboard' => [
                 'dashboard.view',
+                'dashboard.bhcpf_executive.view',
                 'dashboard.facility.view',
                 'dashboard.desk_officer.view',
                 'dashboard.claims.view',
@@ -306,7 +307,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'label' => 'Enrollment Officer',
                 'description' => 'Registers and maintains enrollees.',
                 'permissions' => [
-                    'dashboard.view', 'enrollees.view', 'enrollees.create', 'enrollees.update',
+                    'dashboard.view', 'dashboard.bhcpf_executive.view', 'enrollees.view', 'enrollees.create', 'enrollees.update',
                     'enrollee.view', 'enrollee.create', 'enrollee.update', 'enrollee.status.change', 'enrollee.password.reset', 'enrollee.nin.verify', 'enrollee.print-id-card', 'enrollee.print-bulk-slip',
                     'enrollees.import', 'enrollees.export', 'facilities.view', 'coverage.view',
                     'eligibility.lookup', 'reports.view',
@@ -477,6 +478,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'description' => 'Read-only audit and reporting access.',
                 'permissions' => [
                     'audit-logs.view', 'audit.view', 'reports.view', 'reports.export',
+                    'dashboard.bhcpf_executive.view',
                     'enrollees.view', 'claims.view', 'payments.view', 'referrals.view',
                 ],
             ],
