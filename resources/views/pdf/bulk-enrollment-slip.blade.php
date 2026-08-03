@@ -147,7 +147,6 @@
   $pending  = $total - $approved;
   $agencyLogoPath = file_exists(public_path('logo.png')) ? 'file://' . public_path('logo.png') : null;
   $slipLogoPath = file_exists(public_path('state-logo.png')) ? 'file://' . public_path('state-logo.png') : $agencyLogoPath;
-  $coatOfArmsPath = file_exists(public_path('nigeria-coat-of-arms.jpg')) ? 'file://' . public_path('nigeria-coat-of-arms.jpg') : null;
 @endphp
 
 {{-- ══════════════ COVER PAGE ══════════════ --}}
@@ -156,11 +155,7 @@
 <div class="letterhead">
   <table class="lh-tbl">
     <tr>
-      <td class="lh-logo">
-        @if($coatOfArmsPath)
-          <img src="{{ $coatOfArmsPath }}" alt="Coat of Arms">
-        @endif
-      </td>
+      <td class="lh-logo"></td>
       <td class="lh-center">
         <div class="lh-state">Niger State</div>
         <div class="lh-agency">Contributory Health Agency (NGSCHA)</div>

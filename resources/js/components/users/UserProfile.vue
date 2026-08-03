@@ -324,7 +324,7 @@
           <v-text-field v-model="editForm.username" label="Username" variant="outlined" required />
         </div>
         <div class="tw-grid tw-grid-cols-1 tw-md:tw-grid-cols-2 tw-gap-4">
-          <v-text-field v-model="editForm.email" label="Email Address" type="email" variant="outlined" required />
+          <v-text-field v-model="editForm.email" label="Email Address" type="email" variant="outlined" />
           <v-text-field v-model="editForm.phone" label="Phone Number" variant="outlined" />
         </div>
         <v-select v-model="editForm.status" :items="statusOptions" label="Account Status" variant="outlined" required />

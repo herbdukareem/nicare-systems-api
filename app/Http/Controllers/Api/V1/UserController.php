@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Str;
 
 /**
  * Class UserController
@@ -71,6 +72,8 @@ class UserController extends BaseController
     public function store(StoreUserRequest $request)
     {
         $data = $request->validated();
+        $data['email'] = $this->normaliseNullableString($data['email'] ?? null);
+        $data['username'] = $this->normaliseNullableString($data['username'] ?? null);
 
         // Remove password confirmation from data
         unset($data['password_confirmation']);
@@ -90,7 +93,7 @@ class UserController extends BaseController
             'middle_name' => $data['middle_name'] ?? null,
             'date_of_birth' => $data['date_of_birth'] ?? null,
             'gender' => $data['gender'] ?? null,
-            'email' => $data['email'],
+            'email' => $data['email'] ?? null,
             'phone' => $data['phone'] ?? null,
             'department_id' => $data['department_id'] ?? null,
             'designation_id' => $data['designation_id'] ?? null,
@@ -109,6 +112,8 @@ class UserController extends BaseController
             $userableModel = \App\Models\Staff::create($userableData);
         } elseif ($userableType === 'DeskOfficer') {
             $userableModel = \App\Models\DeskOfficer::create($userableData);
+        } elseif ($userableType === 'EnrollmentOfficer') {
+            $userableModel = \App\Models\EnrollmentOfficer::create($userableData);
         }
 
         if (!$userableModel) {
@@ -118,6 +123,7 @@ class UserController extends BaseController
         // Set userable relationship data
         $data['userable_type'] = 'App\\Models\\' . $userableType;
         $data['userable_id'] = $userableModel->id;
+        $data['username'] = $data['username'] ?: $this->generateUsernameForUserType($userableType);
 
         $user = $this->userService->create($data);
 
@@ -131,6 +137,16 @@ class UserController extends BaseController
             $deskOfficerRole = \App\Models\Role::where('name', 'desk_officer')->first();
             if ($deskOfficerRole) {
                 $user->roles()->syncWithoutDetaching([$deskOfficerRole->id]);
+            }
+        } elseif ($userableType === 'EnrollmentOfficer') {
+            $enrollmentOfficerRole = \App\Models\Role::query()
+                ->whereIn('name', ['enrollment-officer', 'mobile-enrollment-officer'])
+                ->get()
+                ->sortBy(fn ($role) => $role->name === 'enrollment-officer' ? 0 : 1)
+                ->first();
+
+            if ($enrollmentOfficerRole) {
+                $user->roles()->syncWithoutDetaching([$enrollmentOfficerRole->id]);
             }
         }
 
@@ -730,5 +746,46 @@ class UserController extends BaseController
             default:
                 return 'Unknown';
         }
+    }
+
+    private function normaliseNullableString(?string $value): ?string
+    {
+        if ($value === null) {
+            return null;
+        }
+
+        $value = trim($value);
+
+        return $value === '' ? null : $value;
+    }
+
+    private function generateUsernameForUserType(string $userableType): string
+    {
+        $prefix = match ($userableType) {
+            'DeskOfficer' => 'NGSCHA/DO/',
+            'EnrollmentOfficer' => 'NGSCHA/EO/',
+            default => 'NGSCHA/USER/',
+        };
+
+        $existingUsernames = User::query()
+            ->where('username', 'like', $prefix . '%')
+            ->pluck('username');
+
+        $maxSuffix = $existingUsernames
+            ->map(function (string $username) use ($prefix): int {
+                $suffix = Str::after($username, $prefix);
+
+                return ctype_digit($suffix) ? (int) $suffix : 0;
+            })
+            ->max() ?? 0;
+
+        $nextNumber = max(1, $maxSuffix + 1);
+
+        do {
+            $candidate = $prefix . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
+            $nextNumber++;
+        } while (User::query()->where('username', $candidate)->exists());
+
+        return $candidate;
     }
 }

@@ -24,7 +24,7 @@ class StoreUserRequest extends FormRequest
     {
         return [
             'name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email', 'unique:users,email', 'max:255'],
+            'email' => ['nullable', 'email', 'unique:users,email', 'max:255'],
             'phone' => ['nullable', 'string', 'max:20'],
             'username' => ['nullable', 'string', 'unique:users,username', 'max:255'],
             'password' => ['required', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
@@ -32,7 +32,7 @@ class StoreUserRequest extends FormRequest
             'status' => ['required', 'integer', 'in:0,1,2'], // 0=pending, 1=active, 2=suspended
             'roles' => ['nullable', 'array'],
             'roles.*' => ['exists:roles,id'],
-            'userable_type' => ['required', 'string', 'in:Staff,DeskOfficer'],
+            'userable_type' => ['required', 'string', 'in:Staff,DeskOfficer,EnrollmentOfficer'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
@@ -41,7 +41,6 @@ class StoreUserRequest extends FormRequest
             'department_id' => ['nullable', 'exists:departments,id'],
             'designation_id' => ['nullable', 'exists:designations,id'],
             'address' => ['nullable', 'string'],
-            'userable_type' => ['nullable', 'string'],
             'userable_id' => ['nullable', 'integer'],
         ];
     }
@@ -53,7 +52,6 @@ class StoreUserRequest extends FormRequest
     {
         return [
             'name.required' => 'The full name is required.',
-            'email.required' => 'The email address is required.',
             'email.email' => 'Please provide a valid email address.',
             'email.unique' => 'This email address is already registered.',
             'username.unique' => 'This username is already taken.',

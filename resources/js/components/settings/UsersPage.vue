@@ -339,7 +339,6 @@
             label="Email"
             type="email"
             variant="outlined"
-            required
             :error-messages="validationErrors.email"
           />
         </div>
@@ -354,6 +353,8 @@
             v-model="userForm.username"
             label="Username"
             variant="outlined"
+            hint="Auto-generated if left blank"
+            persistent-hint
             :error-messages="validationErrors.username"
           />
         </div>
@@ -653,8 +654,8 @@
           <h4 class="tw-font-medium tw-text-blue-900 tw-mb-2">CSV Format Requirements:</h4>
           <ul class="tw-text-blue-800 tw-text-sm tw-list-disc tw-list-inside tw-space-y-1">
             <li><strong>name</strong> (required)</li>
-            <li><strong>email</strong> (required)</li>
-            <li><strong>username</strong> (optional)</li>
+              <li><strong>email</strong> (optional)</li>
+              <li><strong>username</strong> (optional)</li>
             <li><strong>phone</strong> (optional)</li>
             <li><strong>password</strong> (optional; default: password123)</li>
             <li><strong>status</strong> (Active / Pending / Suspended)</li>
@@ -751,6 +752,7 @@ const bulkActionOptions = [
 const userableTypeOptions = [
   { title: 'Staff', value: 'Staff' },
   { title: 'Desk Officer', value: 'DeskOfficer' },
+  { title: 'Enrollment Officer (EO)', value: 'EnrollmentOfficer' },
 ]
 const genderOptions = [
   { title: 'Male', value: 'Male' },
