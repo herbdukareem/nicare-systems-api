@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use ZipArchive;
 
 /**
  * Class EnrolleeController
@@ -531,25 +532,15 @@ class EnrolleeController extends BaseController
             ->limit(500)
             ->get();
 
-        $maxSyncSlipCount = 120;
-        if ($enrollees->count() > $maxSyncSlipCount) {
-            return $this->sendError(
-                "This selection contains {$enrollees->count()} enrollees. Bulk enrollment slip PDF generation is currently limited to {$maxSyncSlipCount} enrollees per download to avoid server timeout. Please narrow the filters by facility, benefactor, approval status, or date range and try again.",
-                [],
-                422
-            );
+        $generatedAt = now();
+        $generatedBy = auth()->user();
+        $syncPdfChunkSize = 100;
+
+        if ($enrollees->count() <= $syncPdfChunkSize) {
+            return $this->streamBulkEnrollmentSlipPdf($enrollees, $data, $generatedBy, $generatedAt);
         }
 
-        $this->hydratePdfPhotoSources($enrollees, 180, 225, 78);
-
-        $pdf = Pdf::setOptions(['isRemoteEnabled' => false])->loadView('pdf.bulk-enrollment-slip', [
-            'enrollees' => $enrollees,
-            'filters' => $data,
-            'generatedBy' => auth()->user(),
-            'generatedAt' => now(),
-        ])->setPaper('a4');
-
-        return $pdf->stream('bulk_enrollment_slip_' . now()->format('Ymd_His') . '.pdf');
+        return $this->downloadBulkEnrollmentSlipZip($enrollees, $data, $generatedBy, $generatedAt, $syncPdfChunkSize);
     }
 
     /**
@@ -1170,6 +1161,100 @@ class EnrolleeController extends BaseController
         }
 
         @ini_set('max_execution_time', (string) $seconds);
+    }
+
+    private function streamBulkEnrollmentSlipPdf(
+        Collection $enrollees,
+        array $filters,
+        $generatedBy,
+        Carbon $generatedAt,
+        ?int $partNumber = null,
+        ?int $totalParts = null
+    ) {
+        $this->hydratePdfPhotoSources($enrollees, 180, 225, 78);
+
+        $pdf = $this->makeBulkEnrollmentSlipPdf($enrollees, $filters, $generatedBy, $generatedAt, $partNumber, $totalParts);
+        $filename = $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts);
+
+        return $pdf->stream($filename);
+    }
+
+    private function downloadBulkEnrollmentSlipZip(
+        Collection $enrollees,
+        array $filters,
+        $generatedBy,
+        Carbon $generatedAt,
+        int $chunkSize
+    ) {
+        $tempDir = storage_path('app/temp/bulk-enrollment-slip');
+        if (!is_dir($tempDir)) {
+            mkdir($tempDir, 0777, true);
+        }
+
+        $zipFileName = 'bulk_enrollment_slips_' . $generatedAt->format('Ymd_His') . '.zip';
+        $zipPath = $tempDir . DIRECTORY_SEPARATOR . $zipFileName;
+
+        if (file_exists($zipPath)) {
+            @unlink($zipPath);
+        }
+
+        $zip = new ZipArchive();
+        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
+            return $this->sendError('Could not prepare the bulk enrollment slip package.', [], 500);
+        }
+
+        $chunks = $enrollees->chunk($chunkSize)->values();
+        $totalParts = $chunks->count();
+
+        foreach ($chunks as $index => $chunk) {
+            $partNumber = $index + 1;
+            $this->hydratePdfPhotoSources($chunk, 180, 225, 78);
+
+            $pdf = $this->makeBulkEnrollmentSlipPdf($chunk, $filters, $generatedBy, $generatedAt, $partNumber, $totalParts);
+            $zip->addFromString(
+                $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts),
+                $pdf->output()
+            );
+        }
+
+        $zip->close();
+
+        return response()->download($zipPath, $zipFileName, [
+            'Content-Type' => 'application/zip',
+        ])->deleteFileAfterSend(true);
+    }
+
+    private function makeBulkEnrollmentSlipPdf(
+        Collection $enrollees,
+        array $filters,
+        $generatedBy,
+        Carbon $generatedAt,
+        ?int $partNumber = null,
+        ?int $totalParts = null
+    )
+    {
+        return Pdf::setOptions(['isRemoteEnabled' => false])->loadView('pdf.bulk-enrollment-slip', [
+            'enrollees' => $enrollees,
+            'filters' => $filters,
+            'generatedBy' => $generatedBy,
+            'generatedAt' => $generatedAt,
+            'partNumber' => $partNumber,
+            'totalParts' => $totalParts,
+        ])->setPaper('a4');
+    }
+
+    private function bulkEnrollmentSlipFileName(
+        Carbon $generatedAt,
+        ?int $partNumber = null,
+        ?int $totalParts = null
+    ): string {
+        $base = 'bulk_enrollment_slip_' . $generatedAt->format('Ymd_His');
+
+        if ($partNumber && $totalParts) {
+            return $base . '_part_' . $partNumber . '_of_' . $totalParts . '.pdf';
+        }
+
+        return $base . '.pdf';
     }
 
     private function hydratePdfPhotoSources(

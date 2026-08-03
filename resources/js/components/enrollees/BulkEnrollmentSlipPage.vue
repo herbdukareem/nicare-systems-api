@@ -7,7 +7,7 @@
       </div>
 
       <v-alert type="info" variant="tonal">
-        Select at least a Benefactor or Provider/Facility before generating the PDF.
+        Select at least a Benefactor or Provider/Facility before generating the slip file. Large batches may download as a ZIP package of multiple PDFs.
       </v-alert>
 
       <div class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-p-5">
@@ -23,7 +23,7 @@
           <v-text-field v-model="filters.date_to" type="date" label="Date To" density="compact" variant="outlined" />
         </div>
         <div class="tw-mt-4 tw-flex tw-justify-end">
-          <v-btn color="primary" prepend-icon="mdi-file-pdf-box" :loading="downloading" @click="downloadPdf">Download Single PDF</v-btn>
+          <v-btn color="primary" prepend-icon="mdi-file-download-outline" :loading="downloading" @click="downloadPdf">Download Slip File</v-btn>
         </div>
       </div>
     </div>
@@ -42,6 +42,19 @@ const metadata = reactive({ benefactors: [], facilities: [], insurance_programme
 const filters = reactive({ benefactor_id: null, facility_id: null, insurance_programme_id: null, enrollee_category_id: null, funding_type_id: null, enrollment_phase_id: null, approval_status: 'all', date_from: '', date_to: '' });
 const approvalOptions = [{ title: 'All', value: 'all' }, { title: 'Pending', value: 'pending' }, { title: 'Approved', value: 'approved' }];
 
+const extractFilename = (response, fallback) => {
+  const disposition = response?.headers?.['content-disposition'] || response?.headers?.['Content-Disposition'];
+  if (!disposition) return fallback;
+
+  const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match?.[1]) {
+    return decodeURIComponent(utf8Match[1]);
+  }
+
+  const plainMatch = disposition.match(/filename="?([^"]+)"?/i);
+  return plainMatch?.[1] || fallback;
+};
+
 const downloadBlob = (blob, filename) => {
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');
@@ -49,6 +62,27 @@ const downloadBlob = (blob, filename) => {
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+};
+
+const extractErrorMessage = async (err) => {
+  const fallback = 'Could not download bulk enrollment slip';
+  const payload = err?.response?.data;
+
+  if (!payload) {
+    return fallback;
+  }
+
+  if (payload instanceof Blob) {
+    try {
+      const text = await payload.text();
+      const parsed = JSON.parse(text);
+      return parsed?.message || fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  return payload?.message || fallback;
 };
 
 const downloadPdf = async () => {
@@ -62,10 +96,15 @@ const downloadPdf = async () => {
     const params = { ...filters };
     Object.keys(params).forEach((key) => (params[key] === '' || params[key] === null) && delete params[key]);
     const response = await enrolleeAPI.bulkEnrollmentSlip(params);
-    downloadBlob(response.data, `bulk_enrollment_slip_${new Date().toISOString().slice(0, 10)}.pdf`);
-    success('Bulk enrollment slip downloaded');
+    const contentType = response?.headers?.['content-type'] || '';
+    const fallbackName = contentType.includes('zip')
+      ? `bulk_enrollment_slips_${new Date().toISOString().slice(0, 10)}.zip`
+      : `bulk_enrollment_slip_${new Date().toISOString().slice(0, 10)}.pdf`;
+    const filename = extractFilename(response, fallbackName);
+    downloadBlob(response.data, filename);
+    success(contentType.includes('zip') ? 'Bulk enrollment slip package downloaded' : 'Bulk enrollment slip downloaded');
   } catch (e) {
-    error(e.response?.data?.message || 'Could not download bulk enrollment slip');
+    error(await extractErrorMessage(e));
   } finally {
     downloading.value = false;
   }

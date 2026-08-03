@@ -73,14 +73,12 @@
 
   .slip-hdr { background: #0d3b6e; color: white; padding: 2mm 3mm; }
   .slip-hdr-tbl { width: 100%; border-collapse: collapse; }
-  .slip-hdr-logo-cell { width: 16mm; vertical-align: middle; }
+  .slip-hdr-logo-cell { width: 18mm; vertical-align: middle; }
   .slip-hdr-logo {
-    width: 12mm;
-    height: 12mm;
+    width: 14mm;
+    height: 14mm;
     display: block;
-    border-radius: 2mm;
-    background: rgba(255,255,255,0.12);
-    padding: 1mm;
+    object-fit: contain;
   }
   .slip-hdr-main { vertical-align: middle; padding: 0 2mm; }
   .slip-hdr-meta { width: 34mm; vertical-align: middle; text-align: right; }
@@ -146,7 +144,7 @@
   $approved = $enrollees->filter(fn($e) => !empty($e->approval_date))->count();
   $pending  = $total - $approved;
   $agencyLogoPath = file_exists(public_path('logo.png')) ? 'file://' . public_path('logo.png') : null;
-  $slipLogoPath = file_exists(public_path('state-logo.png')) ? 'file://' . public_path('state-logo.png') : $agencyLogoPath;
+  $slipLogoPath = $agencyLogoPath;
 @endphp
 
 {{-- ══════════════ COVER PAGE ══════════════ --}}
