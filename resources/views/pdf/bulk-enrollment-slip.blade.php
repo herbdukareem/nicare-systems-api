@@ -3,9 +3,9 @@
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: A4; margin: 14mm 14mm 14mm 14mm; }
+  @page { size: A4; margin: 12mm 12mm 12mm 12mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: DejaVu Sans, Arial, sans-serif; color: #111; font-size: 9pt; line-height: 1.4; }
+  body { font-family: Helvetica, Arial, sans-serif; color: #111; font-size: 9pt; line-height: 1.4; }
 
   /* ── LETTERHEAD ── */
   .letterhead { width: 100%; border-bottom: 2pt solid #0d3b6e; padding-bottom: 4mm; margin-bottom: 4mm; }
@@ -69,23 +69,34 @@
   .page-break { page-break-after: always; }
 
   /* ── SLIP ── */
-  .slip { border: 1pt solid #0d3b6e; margin-bottom: 4mm; page-break-inside: avoid; }
+  .slip { border: 1pt solid #0d3b6e; margin-bottom: 3mm; page-break-inside: avoid; }
 
-  .slip-hdr { background: #0d3b6e; color: white; padding: 2.5mm 3mm; }
+  .slip-hdr { background: #0d3b6e; color: white; padding: 2mm 3mm; }
   .slip-hdr-tbl { width: 100%; border-collapse: collapse; }
-  .slip-hdr-title { font-size: 8pt; font-weight: bold; letter-spacing: 0.4px; text-transform: uppercase; }
-  .slip-hdr-sub { font-size: 6.5pt; color: rgba(255,255,255,0.75); margin-top: 0.5mm; }
+  .slip-hdr-logo-cell { width: 16mm; vertical-align: middle; }
+  .slip-hdr-logo {
+    width: 12mm;
+    height: 12mm;
+    display: block;
+    border-radius: 2mm;
+    background: rgba(255,255,255,0.12);
+    padding: 1mm;
+  }
+  .slip-hdr-main { vertical-align: middle; padding: 0 2mm; }
+  .slip-hdr-meta { width: 34mm; vertical-align: middle; text-align: right; }
+  .slip-hdr-title { font-size: 8pt; font-weight: bold; letter-spacing: 0.25px; text-transform: uppercase; }
+  .slip-hdr-sub { font-size: 6.3pt; color: rgba(255,255,255,0.78); margin-top: 0.4mm; }
   .slip-serial {
     background: white;
     color: #0d3b6e;
-    font-size: 7.5pt;
+    font-size: 7pt;
     font-weight: bold;
-    padding: 1mm 3.5mm;
+    padding: 0.9mm 3mm;
   }
 
   .slip-body-tbl { width: 100%; border-collapse: collapse; }
-  .slip-fields-td { vertical-align: top; padding: 3mm 3mm 2mm; }
-  .slip-photo-td { width: 30mm; vertical-align: top; padding: 3mm; border-left: 0.5pt solid #d8e0ec; text-align: center; }
+  .slip-fields-td { vertical-align: top; padding: 2.5mm 3mm 2mm; }
+  .slip-photo-td { width: 30mm; vertical-align: top; padding: 2.5mm 3mm; border-left: 0.5pt solid #d8e0ec; text-align: center; }
 
   .photo-box { width: 24mm; height: 30mm; border: 1pt solid #b0bcc8; background: #edf1f7; display: block; margin: 0 auto; }
   .photo-lbl { font-size: 6pt; color: #888; margin-top: 1.5mm; text-align: center; }
@@ -100,7 +111,7 @@
   .nicare-badge-val { font-size: 8pt; font-weight: bold; color: #0d3b6e; margin-top: 0.5mm; }
 
   .field-tbl { width: 100%; border-collapse: collapse; }
-  .field-tbl tr td { padding: 1.8mm 1mm; border-bottom: 0.5pt solid #e8ecf4; vertical-align: top; }
+  .field-tbl tr td { padding: 1.55mm 1mm; border-bottom: 0.5pt solid #e8ecf4; vertical-align: top; }
   .field-tbl tr:last-child td { border-bottom: none; }
   .f-lbl { font-size: 7pt; color: #555; text-transform: uppercase; letter-spacing: 0.2px; width: 34%; white-space: nowrap; }
   .f-val { font-size: 8pt; font-weight: bold; color: #111; }
@@ -111,18 +122,18 @@
   .slip-cert {
     border-top: 0.5pt solid #d0d8e8;
     background: #f7f9ff;
-    padding: 2.5mm 3mm;
-    font-size: 7.5pt;
+    padding: 2mm 3mm;
+    font-size: 7.1pt;
     color: #333;
     font-style: italic;
-    line-height: 1.5;
+    line-height: 1.4;
   }
   .cert-sig-tbl { width: 100%; border-collapse: collapse; margin-top: 4mm; }
   .cert-sig-tbl td { padding: 0 2mm; }
   .cert-sig-line { border-bottom: 1pt solid #555; height: 8mm; }
   .cert-sig-lbl { font-size: 6.5pt; color: #555; margin-top: 1mm; }
 
-  .slip-foot { background: #0d3b6e; color: rgba(255,255,255,0.85); padding: 1.5mm 3mm; font-size: 6.5pt; }
+  .slip-foot { background: #0d3b6e; color: rgba(255,255,255,0.85); padding: 1.3mm 3mm; font-size: 6.3pt; }
   .sf-tbl { width: 100%; border-collapse: collapse; }
   .sf-right { text-align: right; }
 </style>
@@ -134,6 +145,9 @@
   $total    = $enrollees->count();
   $approved = $enrollees->filter(fn($e) => !empty($e->approval_date))->count();
   $pending  = $total - $approved;
+  $agencyLogoPath = file_exists(public_path('logo.png')) ? 'file://' . public_path('logo.png') : null;
+  $slipLogoPath = file_exists(public_path('state-logo.png')) ? 'file://' . public_path('state-logo.png') : $agencyLogoPath;
+  $coatOfArmsPath = file_exists(public_path('nigeria-coat-of-arms.jpg')) ? 'file://' . public_path('nigeria-coat-of-arms.jpg') : null;
 @endphp
 
 {{-- ══════════════ COVER PAGE ══════════════ --}}
@@ -143,8 +157,8 @@
   <table class="lh-tbl">
     <tr>
       <td class="lh-logo">
-        @if(file_exists(public_path('nigeria-coat-of-arms.jpg')))
-          <img src="file://{{ public_path('nigeria-coat-of-arms.jpg') }}" alt="Coat of Arms">
+        @if($coatOfArmsPath)
+          <img src="{{ $coatOfArmsPath }}" alt="Coat of Arms">
         @endif
       </td>
       <td class="lh-center">
@@ -153,8 +167,8 @@
         <div class="lh-unit">Health Insurance Management System — NiCare</div>
       </td>
       <td class="lh-logo">
-        @if(file_exists(public_path('logo.png')))
-          <img src="file://{{ public_path('logo.png') }}" alt="NGSCHA Logo">
+        @if($agencyLogoPath)
+          <img src="{{ $agencyLogoPath }}" alt="NGSCHA Logo">
         @endif
       </td>
     </tr>
@@ -272,8 +286,22 @@
 
   {{-- Slip header --}}
   <div class="slip-hdr">
-    <div class="slip-hdr-title">Niger State Contributory Health Agency (NGSCHA)</div>
-    <div class="slip-hdr-sub">Health Insurance Enrollment Confirmation Slip</div>
+    <table class="slip-hdr-tbl">
+      <tr>
+        <td class="slip-hdr-logo-cell">
+          @if($slipLogoPath)
+            <img src="{{ $slipLogoPath }}" alt="NGSCHA Logo" class="slip-hdr-logo">
+          @endif
+        </td>
+        <td class="slip-hdr-main">
+          <div class="slip-hdr-title">Niger State Contributory Health Agency (NGSCHA)</div>
+          <div class="slip-hdr-sub">Health Insurance Enrollment Confirmation Slip</div>
+        </td>
+        <td class="slip-hdr-meta">
+          <div class="slip-serial">{{ $slipRef }}</div>
+        </td>
+      </tr>
+    </table>
   </div>
 
   {{-- Slip body --}}

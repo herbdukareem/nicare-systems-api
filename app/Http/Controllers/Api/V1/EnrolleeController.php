@@ -466,7 +466,7 @@ class EnrolleeController extends BaseController
 
     public function bulkEnrollmentSlip(Request $request)
     {
-        $this->extendPdfExecutionWindow(120);
+        $this->extendPdfExecutionWindow(300);
 
         $data = $request->validate([
             'benefactor_id' => ['nullable', 'exists:benefactors,id'],
@@ -530,7 +530,17 @@ class EnrolleeController extends BaseController
             ->orderBy('last_name')
             ->limit(500)
             ->get();
-        $this->hydratePdfPhotoSources($enrollees);
+
+        $maxSyncSlipCount = 120;
+        if ($enrollees->count() > $maxSyncSlipCount) {
+            return $this->sendError(
+                "This selection contains {$enrollees->count()} enrollees. Bulk enrollment slip PDF generation is currently limited to {$maxSyncSlipCount} enrollees per download to avoid server timeout. Please narrow the filters by facility, benefactor, approval status, or date range and try again.",
+                [],
+                422
+            );
+        }
+
+        $this->hydratePdfPhotoSources($enrollees, 180, 225, 78);
 
         $pdf = Pdf::setOptions(['isRemoteEnabled' => false])->loadView('pdf.bulk-enrollment-slip', [
             'enrollees' => $enrollees,
@@ -1162,34 +1172,47 @@ class EnrolleeController extends BaseController
         @ini_set('max_execution_time', (string) $seconds);
     }
 
-    private function hydratePdfPhotoSources(Collection $enrollees): void
+    private function hydratePdfPhotoSources(
+        Collection $enrollees,
+        ?int $maxWidth = null,
+        ?int $maxHeight = null,
+        int $jpegQuality = 82
+    ): void
     {
-        $enrollees->each(function (Enrollee $enrollee): void {
-            $enrollee->setAttribute('pdf_photo_src', $this->resolvePdfPhotoSource($enrollee->image_url));
+        $enrollees->each(function (Enrollee $enrollee) use ($maxWidth, $maxHeight, $jpegQuality): void {
+            $enrollee->setAttribute(
+                'pdf_photo_src',
+                $this->resolvePdfPhotoSource($enrollee->image_url, $maxWidth, $maxHeight, $jpegQuality)
+            );
         });
     }
 
-    private function resolvePdfPhotoSource(?string $imageUrl): ?string
+    private function resolvePdfPhotoSource(
+        ?string $imageUrl,
+        ?int $maxWidth = null,
+        ?int $maxHeight = null,
+        int $jpegQuality = 82
+    ): ?string
     {
         if (!$imageUrl) {
             return null;
         }
 
         if (preg_match('#^data:#i', $imageUrl)) {
-            return $imageUrl;
+            return $this->optimiseDataUriForPdf($imageUrl, $maxWidth, $maxHeight, $jpegQuality);
         }
 
         $publicPath = ltrim((string) parse_url($imageUrl, PHP_URL_PATH), '/');
         if ($publicPath !== '' && str_starts_with($publicPath, 'storage/')) {
             $diskPath = substr($publicPath, strlen('storage/'));
-            return $this->buildDiskImageDataUri('public', $diskPath);
+            return $this->buildDiskImageDataUri('public', $diskPath, $maxWidth, $maxHeight, $jpegQuality);
         }
 
         $passportDisk = config('filesystems.enrollee_passport_disk', config('filesystems.default', 'public'));
         $passportBaseUrl = rtrim((string) config("filesystems.disks.{$passportDisk}.url"), '/');
         if ($passportBaseUrl !== '' && str_starts_with($imageUrl, $passportBaseUrl . '/')) {
             $diskPath = ltrim(substr($imageUrl, strlen($passportBaseUrl)), '/');
-            return $this->buildDiskImageDataUri($passportDisk, $diskPath);
+            return $this->buildDiskImageDataUri($passportDisk, $diskPath, $maxWidth, $maxHeight, $jpegQuality);
         }
 
         if (!preg_match('#^https?://#i', $imageUrl)) {
@@ -1207,13 +1230,21 @@ class EnrolleeController extends BaseController
                 return null;
             }
 
-            return $this->buildImageDataUri($bytes, $this->guessImageMimeType($imageUrl));
+            return $this->buildImageDataUri(
+                ...$this->prepareImagePayload($bytes, $this->guessImageMimeType($imageUrl), $maxWidth, $maxHeight, $jpegQuality)
+            );
         } catch (\Throwable $e) {
             return null;
         }
     }
 
-    private function buildDiskImageDataUri(string $disk, ?string $path): ?string
+    private function buildDiskImageDataUri(
+        string $disk,
+        ?string $path,
+        ?int $maxWidth = null,
+        ?int $maxHeight = null,
+        int $jpegQuality = 82
+    ): ?string
     {
         if (!$path) {
             return null;
@@ -1221,9 +1252,95 @@ class EnrolleeController extends BaseController
 
         try {
             $bytes = Storage::disk($disk)->get($path);
-            return $this->buildImageDataUri($bytes, $this->guessImageMimeType($path));
+            return $this->buildImageDataUri(
+                ...$this->prepareImagePayload($bytes, $this->guessImageMimeType($path), $maxWidth, $maxHeight, $jpegQuality)
+            );
         } catch (\Throwable $e) {
             return null;
+        }
+    }
+
+    private function optimiseDataUriForPdf(
+        string $dataUri,
+        ?int $maxWidth = null,
+        ?int $maxHeight = null,
+        int $jpegQuality = 82
+    ): ?string
+    {
+        if (!preg_match('#^data:(?<mime>[-\w.+/]+);base64,(?<payload>.+)$#is', $dataUri, $matches)) {
+            return $dataUri;
+        }
+
+        $bytes = base64_decode((string) $matches['payload'], true);
+        if ($bytes === false) {
+            return $dataUri;
+        }
+
+        return $this->buildImageDataUri(
+            ...$this->prepareImagePayload($bytes, (string) $matches['mime'], $maxWidth, $maxHeight, $jpegQuality)
+        );
+    }
+
+    /**
+     * @return array{0:string,1:string}
+     */
+    private function prepareImagePayload(
+        string $bytes,
+        string $mimeType,
+        ?int $maxWidth = null,
+        ?int $maxHeight = null,
+        int $jpegQuality = 82
+    ): array
+    {
+        if (!$maxWidth && !$maxHeight) {
+            return [$bytes, $mimeType];
+        }
+
+        $image = @imagecreatefromstring($bytes);
+        if (!$image) {
+            return [$bytes, $mimeType];
+        }
+
+        try {
+            $sourceWidth = imagesx($image);
+            $sourceHeight = imagesy($image);
+
+            if ($sourceWidth < 1 || $sourceHeight < 1) {
+                return [$bytes, $mimeType];
+            }
+
+            $targetWidth = $maxWidth ?: $sourceWidth;
+            $targetHeight = $maxHeight ?: $sourceHeight;
+            $scale = min($targetWidth / $sourceWidth, $targetHeight / $sourceHeight, 1);
+
+            if ($scale >= 1) {
+                return [$bytes, $mimeType];
+            }
+
+            $resizedWidth = max(1, (int) round($sourceWidth * $scale));
+            $resizedHeight = max(1, (int) round($sourceHeight * $scale));
+            $canvas = imagecreatetruecolor($resizedWidth, $resizedHeight);
+
+            if (!$canvas) {
+                return [$bytes, $mimeType];
+            }
+
+            $background = imagecolorallocate($canvas, 255, 255, 255);
+            imagefill($canvas, 0, 0, $background);
+            imagecopyresampled($canvas, $image, 0, 0, 0, 0, $resizedWidth, $resizedHeight, $sourceWidth, $sourceHeight);
+
+            ob_start();
+            imagejpeg($canvas, null, max(50, min($jpegQuality, 90)));
+            $optimisedBytes = ob_get_clean();
+            imagedestroy($canvas);
+
+            if (!is_string($optimisedBytes) || $optimisedBytes === '') {
+                return [$bytes, $mimeType];
+            }
+
+            return [$optimisedBytes, 'image/jpeg'];
+        } finally {
+            imagedestroy($image);
         }
     }
 
