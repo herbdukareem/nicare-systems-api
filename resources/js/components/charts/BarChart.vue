@@ -1,6 +1,6 @@
 <template>
   <div class="tw-relative">
-    <canvas ref="chartCanvas"></canvas>
+    <canvas ref="chartCanvas" @click="handleCanvasClick"></canvas>
   </div>
 </template>
 
@@ -41,6 +41,8 @@ const props = defineProps({
     default: 300
   }
 });
+
+const emit = defineEmits(['select']);
 
 const chartCanvas = ref(null);
 let chartInstance = null;
@@ -124,6 +126,36 @@ const createChart = () => {
       ...defaultOptions,
       ...props.options
     }
+  });
+};
+
+const handleCanvasClick = (event) => {
+  if (!chartInstance) {
+    return;
+  }
+
+  const elements = chartInstance.getElementsAtEventForMode(
+    event,
+    'nearest',
+    { intersect: true },
+    true
+  );
+
+  if (!elements.length) {
+    return;
+  }
+
+  const [{ index, datasetIndex }] = elements;
+  const label = chartInstance.data?.labels?.[index];
+  const dataset = chartInstance.data?.datasets?.[datasetIndex];
+  const value = dataset?.data?.[index];
+
+  emit('select', {
+    index,
+    datasetIndex,
+    label,
+    value,
+    datasetLabel: dataset?.label ?? '',
   });
 };
 

@@ -101,7 +101,7 @@ class BhcpfExecutiveDashboardController extends BaseController
         $supportList = collect($lgaRows)->sortBy('progress_percent')->take(5)->values();
 
         $dailyRows = $this->buildDailyRows($dateFrom, $dateTo);
-        $demographics = $this->demographicBreakdown($dateFrom, $dateTo, $targets);
+        $demographics = $this->demographicBreakdowns($dateFrom, $dateTo, $targets, collect($lgaRows));
 
         return $this->sendResponse([
             'campaign' => [
@@ -132,7 +132,10 @@ class BhcpfExecutiveDashboardController extends BaseController
                     'captured' => $dailyRows->pluck('captured')->all(),
                     'cumulative' => $dailyRows->pluck('cumulative')->all(),
                 ],
-                'demographics' => $demographics,
+                'demographics' => [
+                    'overall' => $demographics['overall'],
+                    'by_lga' => $demographics['by_lga'],
+                ],
             ],
             'tables' => [
                 'lga_progress' => $lgaRows,
@@ -175,7 +178,7 @@ class BhcpfExecutiveDashboardController extends BaseController
                     }
                 });
             })
-            ->whereBetween(DB::raw("DATE(COALESCE(enrollment_date, created_at))"), [
+            ->whereBetween(DB::raw("DATE(COALESCE(enrollees.enrollment_date, enrollees.created_at))"), [
                 $dateFrom->toDateString(),
                 $dateTo->toDateString(),
             ]);
@@ -184,7 +187,7 @@ class BhcpfExecutiveDashboardController extends BaseController
     private function buildDailyRows(Carbon $dateFrom, Carbon $dateTo): Collection
     {
         $rows = $this->campaignCaptureQuery($dateFrom, $dateTo)
-            ->selectRaw("DATE(COALESCE(enrollment_date, created_at)) as capture_date")
+            ->selectRaw("DATE(COALESCE(enrollees.enrollment_date, enrollees.created_at)) as capture_date")
             ->selectRaw('COUNT(*) as captured_count')
             ->groupBy('capture_date')
             ->orderBy('capture_date')
@@ -213,63 +216,192 @@ class BhcpfExecutiveDashboardController extends BaseController
         return $items;
     }
 
-    private function demographicBreakdown(Carbon $dateFrom, Carbon $dateTo, Collection $targets): array
+    private function demographicBreakdowns(
+        Carbon $dateFrom,
+        Carbon $dateTo,
+        Collection $targets,
+        Collection $lgaRows
+    ): array
     {
-        $baseQuery = $this->campaignCaptureQuery($dateFrom, $dateTo);
+        $referenceDate = now()->startOfDay();
+        $records = $this->campaignCaptureQuery($dateFrom, $dateTo)
+            ->leftJoin('vulnerable_groups as vg', 'vg.id', '=', 'enrollees.vulnerable_group_id')
+            ->get([
+                'enrollees.lga_id',
+                'enrollees.date_of_birth',
+                'enrollees.sex',
+                'enrollees.disability',
+                'vg.code as vulnerable_group_code',
+            ]);
 
-        $plwdCaptured = (clone $baseQuery)
-            ->whereNotNull('disability')
-            ->whereRaw("LOWER(TRIM(disability)) NOT IN ('', 'none', 'not stated')")
-            ->count();
+        $overallCounts = $this->emptyDemographicCounts();
+        $countsByLga = [];
 
-        $under5Captured = (clone $baseQuery)
-            ->whereNotNull('date_of_birth')
-            ->whereDate('date_of_birth', '>', now()->subYears(5)->toDateString())
-            ->count();
+        foreach ($records as $record) {
+            $lgaId = $record->lga_id ? (int) $record->lga_id : null;
 
-        $femaleReproductiveCaptured = (clone $baseQuery)
-            ->where('sex', 2)
-            ->whereNotNull('date_of_birth')
-            ->whereBetween('date_of_birth', [
-                now()->subYears(45)->toDateString(),
-                now()->subYears(15)->toDateString(),
-            ])
-            ->count();
+            if ($this->hasPlwdStatus($record->disability)) {
+                $overallCounts['plwd']++;
+                if ($lgaId !== null) {
+                    $countsByLga[$lgaId] = $countsByLga[$lgaId] ?? $this->emptyDemographicCounts();
+                    $countsByLga[$lgaId]['plwd']++;
+                }
+            }
 
-        $elderlyCaptured = (clone $baseQuery)
-            ->whereNotNull('date_of_birth')
-            ->whereDate('date_of_birth', '<=', now()->subYears(85)->toDateString())
-            ->count();
+            if ($this->isUnderFive($record->date_of_birth, $referenceDate)) {
+                $overallCounts['under_5']++;
+                if ($lgaId !== null) {
+                    $countsByLga[$lgaId] = $countsByLga[$lgaId] ?? $this->emptyDemographicCounts();
+                    $countsByLga[$lgaId]['under_5']++;
+                }
+            }
 
-        $othersCaptured = (clone $baseQuery)
-            ->whereHas('vulnerableGroup', fn (Builder $query) => $query->where('code', 'others'))
-            ->count();
+            if ($this->isFemaleReproductive($record->sex, $record->date_of_birth, $referenceDate)) {
+                $overallCounts['female_reproductive']++;
+                if ($lgaId !== null) {
+                    $countsByLga[$lgaId] = $countsByLga[$lgaId] ?? $this->emptyDemographicCounts();
+                    $countsByLga[$lgaId]['female_reproductive']++;
+                }
+            }
 
+            if ($this->isElderly($record->date_of_birth, $referenceDate)) {
+                $overallCounts['elderly']++;
+                if ($lgaId !== null) {
+                    $countsByLga[$lgaId] = $countsByLga[$lgaId] ?? $this->emptyDemographicCounts();
+                    $countsByLga[$lgaId]['elderly']++;
+                }
+            }
+
+            if (($record->vulnerable_group_code ?? null) === 'others') {
+                $overallCounts['others']++;
+                if ($lgaId !== null) {
+                    $countsByLga[$lgaId] = $countsByLga[$lgaId] ?? $this->emptyDemographicCounts();
+                    $countsByLga[$lgaId]['others']++;
+                }
+            }
+        }
+
+        $overallTargets = [
+            'plwd_target' => (int) $targets->sum('plwd_target'),
+            'under_5_target' => (int) $targets->sum('under_5_target'),
+            'female_reproductive_target' => (int) $targets->sum('female_reproductive_target'),
+            'elderly_target' => (int) $targets->sum('elderly_target'),
+            'others_target' => (int) $targets->sum('others_target'),
+        ];
+
+        $byLga = $lgaRows
+            ->mapWithKeys(function (array $lgaRow) use ($countsByLga): array {
+                $lgaId = (int) $lgaRow['lga_id'];
+
+                return [
+                    $lgaId => [
+                        'lga_id' => $lgaId,
+                        'lga_name' => $lgaRow['lga_name'],
+                        'rows' => $this->formatDemographicRows(
+                            $countsByLga[$lgaId] ?? $this->emptyDemographicCounts(),
+                            [
+                                'plwd_target' => (int) $lgaRow['plwd_target'],
+                                'under_5_target' => (int) $lgaRow['under_5_target'],
+                                'female_reproductive_target' => (int) $lgaRow['female_reproductive_target'],
+                                'elderly_target' => (int) $lgaRow['elderly_target'],
+                                'others_target' => (int) $lgaRow['others_target'],
+                            ]
+                        ),
+                    ],
+                ];
+            })
+            ->all();
+
+        return [
+            'overall' => $this->formatDemographicRows($overallCounts, $overallTargets),
+            'by_lga' => $byLga,
+        ];
+    }
+
+    /**
+     * @return array{plwd:int,under_5:int,female_reproductive:int,elderly:int,others:int}
+     */
+    private function emptyDemographicCounts(): array
+    {
+        return [
+            'plwd' => 0,
+            'under_5' => 0,
+            'female_reproductive' => 0,
+            'elderly' => 0,
+            'others' => 0,
+        ];
+    }
+
+    private function hasPlwdStatus(?string $disability): bool
+    {
+        if ($disability === null) {
+            return false;
+        }
+
+        $normalized = strtolower(trim($disability));
+
+        return $normalized !== '' && !in_array($normalized, ['none', 'not stated'], true);
+    }
+
+    private function isUnderFive($dateOfBirth, Carbon $referenceDate): bool
+    {
+        if (!$dateOfBirth) {
+            return false;
+        }
+
+        return Carbon::parse($dateOfBirth)->gt($referenceDate->copy()->subYears(5));
+    }
+
+    private function isFemaleReproductive($sex, $dateOfBirth, Carbon $referenceDate): bool
+    {
+        if ((int) $sex !== 2 || !$dateOfBirth) {
+            return false;
+        }
+
+        $dob = Carbon::parse($dateOfBirth);
+
+        return $dob->between(
+            $referenceDate->copy()->subYears(45),
+            $referenceDate->copy()->subYears(15)
+        );
+    }
+
+    private function isElderly($dateOfBirth, Carbon $referenceDate): bool
+    {
+        if (!$dateOfBirth) {
+            return false;
+        }
+
+        return Carbon::parse($dateOfBirth)->lte($referenceDate->copy()->subYears(85));
+    }
+
+    private function formatDemographicRows(array $capturedCounts, array $targetCounts): array
+    {
         return [
             [
                 'label' => 'PLWD',
-                'captured' => (int) $plwdCaptured,
-                'target' => (int) $targets->sum('plwd_target'),
+                'captured' => (int) ($capturedCounts['plwd'] ?? 0),
+                'target' => (int) ($targetCounts['plwd_target'] ?? 0),
             ],
             [
                 'label' => 'Children <5',
-                'captured' => (int) $under5Captured,
-                'target' => (int) $targets->sum('under_5_target'),
+                'captured' => (int) ($capturedCounts['under_5'] ?? 0),
+                'target' => (int) ($targetCounts['under_5_target'] ?? 0),
             ],
             [
                 'label' => 'Female Reproductive',
-                'captured' => (int) $femaleReproductiveCaptured,
-                'target' => (int) $targets->sum('female_reproductive_target'),
+                'captured' => (int) ($capturedCounts['female_reproductive'] ?? 0),
+                'target' => (int) ($targetCounts['female_reproductive_target'] ?? 0),
             ],
             [
                 'label' => 'Elderly',
-                'captured' => (int) $elderlyCaptured,
-                'target' => (int) $targets->sum('elderly_target'),
+                'captured' => (int) ($capturedCounts['elderly'] ?? 0),
+                'target' => (int) ($targetCounts['elderly_target'] ?? 0),
             ],
             [
                 'label' => 'Others',
-                'captured' => (int) $othersCaptured,
-                'target' => (int) $targets->sum('others_target'),
+                'captured' => (int) ($capturedCounts['others'] ?? 0),
+                'target' => (int) ($targetCounts['others_target'] ?? 0),
             ],
         ];
     }

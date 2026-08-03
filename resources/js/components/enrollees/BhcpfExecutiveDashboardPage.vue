@@ -51,12 +51,20 @@
         >
           {{ isFullscreen ? 'Exit Full Screen' : 'Full Screen' }}
         </v-btn>
+        <v-btn
+          variant="outlined"
+          color="secondary"
+          :prepend-icon="showFilters ? 'mdi-filter-minus-outline' : 'mdi-filter-outline'"
+          @click="toggleFilters"
+        >
+          {{ showFilters ? 'Hide Filters' : 'Filters' }}
+        </v-btn>
         <v-btn color="primary" prepend-icon="mdi-refresh" :loading="loading" @click="loadDashboard">
           Refresh
         </v-btn>
       </AppPageHeader>
 
-      <AppCard title="Report Window" icon="mdi-calendar-range" tone="primary">
+      <AppCard v-if="showFilters" title="Report Window" icon="mdi-calendar-range" tone="primary">
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-3">
           <v-text-field v-model="localFilters.date_from" label="Date from" type="date" density="compact" variant="outlined" hide-details />
           <v-text-field v-model="localFilters.date_to" label="Date to" type="date" density="compact" variant="outlined" hide-details />
@@ -77,46 +85,69 @@
         <AppStatCard compact label="Progress" icon="mdi-chart-arc" color="primary" :value="formatPercent(summary.overall_progress_percent)" :loading="loading" />
       </div>
 
-      <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.45fr_0.9fr]">
-        <AppCard title="LGA Progress Overview" icon="mdi-chart-bar" tone="primary">
-          <BarChart :data="lgaProgressChartData" :options="lgaProgressChartOptions" :height="720" />
+      <AppCard title="LGA Progress Overview" icon="mdi-chart-bar" tone="primary">
+        <template #actions>
+          <span class="tw-rounded-full tw-bg-slate-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-text-slate-700">
+            Click an LGA bar to inspect its demographic breakdown
+          </span>
+        </template>
+        <BarChart
+          :data="lgaProgressChartData"
+          :options="lgaProgressChartOptions"
+          :height="720"
+          @select="handleLgaChartSelect"
+        />
+      </AppCard>
+
+      <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.2fr_0.8fr]">
+        <AppCard title="Daily Enrollment Trend" icon="mdi-chart-line" tone="primary">
+          <LineChart :data="dailyTrendChartData" :height="320" />
         </AppCard>
 
-        <div class="tw-space-y-5">
-          <AppCard title="Best Performing LGA" icon="mdi-trophy-outline" tone="success">
-            <div v-if="summary.best_performing_lga" class="tw-rounded-2xl tw-bg-emerald-50 tw-p-4">
-              <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.2em] tw-text-emerald-700">Best Performance</p>
-              <p class="tw-mt-2 tw-text-2xl tw-font-black tw-text-slate-900">{{ summary.best_performing_lga.lga_name }}</p>
-              <p class="tw-mt-1 tw-text-sm tw-text-slate-600">
-                {{ formatNumber(summary.best_performing_lga.captured) }} captured of {{ formatNumber(summary.best_performing_lga.target) }}
-              </p>
-              <p class="tw-mt-3 tw-text-lg tw-font-bold tw-text-emerald-700">{{ formatPercent(summary.best_performing_lga.progress_percent) }}</p>
+        <AppCard title="Demographic Breakdown" icon="mdi-account-group" tone="secondary">
+          <template #actions>
+            <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2">
+              <span class="tw-rounded-full tw-bg-slate-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-text-slate-700">
+                {{ activeDemographicLabel }}
+              </span>
+              <v-btn
+                v-if="selectedLgaId !== null"
+                variant="text"
+                density="comfortable"
+                color="secondary"
+                prepend-icon="mdi-close-circle-outline"
+                @click="clearSelectedLga"
+              >
+                Show All LGAs
+              </v-btn>
             </div>
-          </AppCard>
+          </template>
+          <BarChart :data="demographicChartData" :options="demographicChartOptions" :height="320" />
+        </AppCard>
+      </div>
 
-          <AppCard title="Lowest Performing LGA" icon="mdi-alert-outline" tone="warning">
-            <div v-if="summary.lowest_performing_lga" class="tw-rounded-2xl tw-bg-amber-50 tw-p-4">
-              <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.2em] tw-text-amber-700">Needs Attention</p>
-              <p class="tw-mt-2 tw-text-2xl tw-font-black tw-text-slate-900">{{ summary.lowest_performing_lga.lga_name }}</p>
-              <p class="tw-mt-1 tw-text-sm tw-text-slate-600">
-                {{ formatNumber(summary.lowest_performing_lga.captured) }} captured of {{ formatNumber(summary.lowest_performing_lga.target) }}
-              </p>
-              <p class="tw-mt-3 tw-text-lg tw-font-bold tw-text-amber-700">{{ formatPercent(summary.lowest_performing_lga.progress_percent) }}</p>
-            </div>
-          </AppCard>
+      <div class="tw-grid tw-gap-5 xl:tw-grid-cols-2">
+        <AppCard title="Best Performing LGA" icon="mdi-trophy-outline" tone="success">
+          <div v-if="summary.best_performing_lga" class="tw-rounded-2xl tw-bg-emerald-50 tw-p-4">
+            <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.2em] tw-text-emerald-700">Best Performance</p>
+            <p class="tw-mt-2 tw-text-2xl tw-font-black tw-text-slate-900">{{ summary.best_performing_lga.lga_name }}</p>
+            <p class="tw-mt-1 tw-text-sm tw-text-slate-600">
+              {{ formatNumber(summary.best_performing_lga.captured) }} captured of {{ formatNumber(summary.best_performing_lga.target) }}
+            </p>
+            <p class="tw-mt-3 tw-text-lg tw-font-bold tw-text-emerald-700">{{ formatPercent(summary.best_performing_lga.progress_percent) }}</p>
+          </div>
+        </AppCard>
 
-          <AppCard title="Status Guide" icon="mdi-lightbulb-on-outline" tone="info">
-            <div class="tw-grid tw-gap-2">
-              <div v-for="status in statusLegend" :key="status.label" class="tw-flex tw-items-center tw-justify-between tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-white tw-px-4 tw-py-3">
-                <div class="tw-flex tw-items-center tw-gap-3">
-                  <span class="tw-inline-flex tw-h-3 tw-w-3 tw-rounded-full" :style="{ backgroundColor: status.color }"></span>
-                  <span class="tw-text-sm tw-font-semibold tw-text-slate-700">{{ status.label }}</span>
-                </div>
-                <span class="tw-text-xs tw-font-medium tw-text-slate-500">{{ status.range }}</span>
-              </div>
-            </div>
-          </AppCard>
-        </div>
+        <AppCard title="Lowest Performing LGA" icon="mdi-alert-outline" tone="warning">
+          <div v-if="summary.lowest_performing_lga" class="tw-rounded-2xl tw-bg-amber-50 tw-p-4">
+            <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.2em] tw-text-amber-700">Needs Attention</p>
+            <p class="tw-mt-2 tw-text-2xl tw-font-black tw-text-slate-900">{{ summary.lowest_performing_lga.lga_name }}</p>
+            <p class="tw-mt-1 tw-text-sm tw-text-slate-600">
+              {{ formatNumber(summary.lowest_performing_lga.captured) }} captured of {{ formatNumber(summary.lowest_performing_lga.target) }}
+            </p>
+            <p class="tw-mt-3 tw-text-lg tw-font-bold tw-text-amber-700">{{ formatPercent(summary.lowest_performing_lga.progress_percent) }}</p>
+          </div>
+        </AppCard>
       </div>
 
       <div class="tw-grid tw-gap-5 xl:tw-grid-cols-2">
@@ -142,16 +173,6 @@
               <span class="tw-text-lg tw-font-black tw-text-rose-700">{{ formatPercent(item.progress_percent) }}</span>
             </div>
           </div>
-        </AppCard>
-      </div>
-
-      <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.2fr_0.8fr]">
-        <AppCard title="Daily Enrollment Trend" icon="mdi-chart-line" tone="primary">
-          <LineChart :data="dailyTrendChartData" :height="320" />
-        </AppCard>
-
-        <AppCard title="Demographic Breakdown" icon="mdi-account-group" tone="secondary">
-          <BarChart :data="demographicChartData" :options="demographicChartOptions" :height="320" />
         </AppCard>
       </div>
 
@@ -209,15 +230,32 @@
         </AppCard>
 
         <AppCard title="Demographic Target vs Captured" icon="mdi-chart-bar-stacked" tone="secondary">
+          <template #actions>
+            <span class="tw-rounded-full tw-bg-slate-100 tw-px-3 tw-py-1 tw-text-xs tw-font-semibold tw-text-slate-700">
+              {{ activeDemographicLabel }}
+            </span>
+          </template>
           <AppDataTable
             :headers="demographicHeaders"
-            :items="demographicRows"
-            :items-length="demographicRows.length"
+            :items="activeDemographicRows"
+            :items-length="activeDemographicRows.length"
             :loading="loading"
             :items-per-page="10"
           />
         </AppCard>
       </div>
+
+      <AppCard title="Status Guide" icon="mdi-lightbulb-on-outline" tone="info">
+        <div class="tw-grid tw-gap-3 lg:tw-grid-cols-2 2xl:tw-grid-cols-5">
+          <div v-for="status in statusLegend" :key="status.label" class="tw-flex tw-items-center tw-justify-between tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-white tw-px-4 tw-py-3">
+            <div class="tw-flex tw-items-center tw-gap-3">
+              <span class="tw-inline-flex tw-h-3 tw-w-3 tw-rounded-full" :style="{ backgroundColor: status.color }"></span>
+              <span class="tw-text-sm tw-font-semibold tw-text-slate-700">{{ status.label }}</span>
+            </div>
+            <span class="tw-text-xs tw-font-medium tw-text-slate-500">{{ status.range }}</span>
+          </div>
+        </div>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>
@@ -240,6 +278,7 @@ const firstLadyImage = '/first-lady.jpg'
 const loading = ref(false)
 const dashboardRoot = ref(null)
 const isFullscreen = ref(false)
+const showFilters = ref(false)
 const campaign = reactive({
   name: '',
   start_date: '',
@@ -271,9 +310,11 @@ const summary = reactive({
 
 const lgaRows = ref([])
 const dailyRows = ref([])
-const demographicRows = ref([])
+const overallDemographicRows = ref([])
+const demographicRowsByLga = ref({})
 const topPerformers = ref([])
 const supportList = ref([])
+const selectedLgaId = ref(null)
 
 const statusLegend = [
   { label: 'Completed', range: '100%+', color: '#2563eb' },
@@ -355,16 +396,16 @@ const dailyTrendChartData = computed(() => ({
 }))
 
 const demographicChartData = computed(() => ({
-  labels: demographicRows.value.map((item) => item.label),
+  labels: activeDemographicRows.value.map((item) => item.label),
   datasets: [
     {
       label: 'Captured',
-      data: demographicRows.value.map((item) => item.captured),
+      data: activeDemographicRows.value.map((item) => item.captured),
       backgroundColor: ['#2563eb', '#15803d', '#f59e0b', '#7c3aed', '#dc2626'],
     },
     {
       label: 'Target',
-      data: demographicRows.value.map((item) => item.target),
+      data: activeDemographicRows.value.map((item) => item.target),
       backgroundColor: 'rgba(15, 23, 42, 0.16)',
       borderColor: '#0f172a',
       borderWidth: 1,
@@ -388,6 +429,24 @@ const demographicChartOptions = {
   },
 }
 
+const selectedLgaBreakdown = computed(() => {
+  if (selectedLgaId.value === null) {
+    return null
+  }
+
+  return demographicRowsByLga.value?.[selectedLgaId.value] || null
+})
+
+const activeDemographicRows = computed(() => selectedLgaBreakdown.value?.rows || overallDemographicRows.value)
+
+const activeDemographicLabel = computed(() => {
+  if (selectedLgaBreakdown.value?.lga_name) {
+    return `Selected LGA: ${selectedLgaBreakdown.value.lga_name}`
+  }
+
+  return 'All LGAs'
+})
+
 const syncFullscreenState = () => {
   isFullscreen.value = document.fullscreenElement === dashboardRoot.value
 }
@@ -410,6 +469,23 @@ const toggleFullscreen = async () => {
   }
 }
 
+const handleLgaChartSelect = (payload) => {
+  const lga = lgaRows.value.find((item) => item.lga_name === payload?.label)
+  if (!lga) {
+    return
+  }
+
+  selectedLgaId.value = lga.lga_id
+}
+
+const clearSelectedLga = () => {
+  selectedLgaId.value = null
+}
+
+const toggleFilters = () => {
+  showFilters.value = !showFilters.value
+}
+
 const loadDashboard = async () => {
   loading.value = true
 
@@ -426,9 +502,11 @@ const loadDashboard = async () => {
     Object.assign(summary, payload.summary || {})
     lgaRows.value = payload.tables?.lga_progress || []
     dailyRows.value = payload.tables?.daily_performance || []
-    demographicRows.value = payload.charts?.demographics || []
+    overallDemographicRows.value = payload.charts?.demographics?.overall || []
+    demographicRowsByLga.value = payload.charts?.demographics?.by_lga || {}
     topPerformers.value = payload.tables?.top_performing || []
     supportList.value = payload.tables?.needs_support || []
+    selectedLgaId.value = null
   } catch (err) {
     error(err.response?.data?.message || 'Unable to load the BHCPF executive dashboard.')
   } finally {

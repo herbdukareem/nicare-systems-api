@@ -81,16 +81,9 @@
     object-fit: contain;
   }
   .slip-hdr-main { vertical-align: middle; padding: 0 2mm; }
-  .slip-hdr-meta { width: 34mm; vertical-align: middle; text-align: right; }
+  .slip-hdr-meta { width: 1mm; vertical-align: middle; text-align: right; }
   .slip-hdr-title { font-size: 8pt; font-weight: bold; letter-spacing: 0.25px; text-transform: uppercase; }
   .slip-hdr-sub { font-size: 6.3pt; color: rgba(255,255,255,0.78); margin-top: 0.4mm; }
-  .slip-serial {
-    background: white;
-    color: #0d3b6e;
-    font-size: 7pt;
-    font-weight: bold;
-    padding: 0.9mm 3mm;
-  }
 
   .slip-body-tbl { width: 100%; border-collapse: collapse; }
   .slip-fields-td { vertical-align: top; padding: 2.5mm 3mm 2mm; }
@@ -279,7 +272,6 @@
 {{-- ══════════════ INDIVIDUAL SLIPS ══════════════ --}}
 @foreach($enrollees as $enrollee)
 @php
-  $slipRef    = 'NGSCHA-' . $generatedAt->format('Y') . '-' . str_pad($loop->iteration, 4, '0', STR_PAD_LEFT);
   $isApproved = !empty($enrollee->approval_date);
   $statusText = $isApproved
     ? 'APPROVED — ' . optional($enrollee->approval_date)->format('d M Y')
@@ -305,11 +297,9 @@
         </td>
         <td class="slip-hdr-main">
           <div class="slip-hdr-title">Niger State Contributory Health Agency (NGSCHA)</div>
-          <div class="slip-hdr-sub">Health Insurance Enrollment Confirmation Slip</div>
+          <div class="slip-hdr-sub">NiCare Health Insurance Enrollment Confirmation Slip</div>
         </td>
-        <td class="slip-hdr-meta">
-          <div class="slip-serial">{{ $slipRef }}</div>
-        </td>
+        <td class="slip-hdr-meta"></td>
       </tr>
     </table>
   </div>
@@ -406,7 +396,7 @@
   <div class="slip-foot">
     <table class="sf-tbl">
       <tr>
-        <td>Ref: {{ $slipRef }} &nbsp;|&nbsp; Batch: {{ $batchRef }}</td>
+        <td>Batch: {{ $batchRef }}</td>
         <td class="sf-right">{{ $generatedAt->format('d M Y H:i') }} &nbsp;|&nbsp; {{ $generatedBy->name ?? 'System' }}</td>
       </tr>
     </table>
