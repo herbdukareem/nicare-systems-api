@@ -28,6 +28,21 @@
           </span>
         </template>
       
+        <div class="tw-flex tw-items-center tw-gap-3 tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-white tw-px-3 tw-py-2 tw-shadow-sm">
+          <img
+            :src="firstLadyImage"
+            alt="Her Excellency Hajiya Fatima Mohammed Bago, First Lady of Niger State"
+            class="tw-h-12 tw-w-12 tw-rounded-xl tw-object-cover tw-object-top"
+          >
+          <div class="tw-min-w-0">
+            <p class="tw-truncate tw-text-sm tw-font-bold tw-text-slate-900">
+              Hajiya Fatima Mohammed Bago
+            </p>
+            <p class="tw-text-xs tw-font-medium tw-text-slate-600">
+              First Lady of Niger State
+            </p>
+          </div>
+        </div>
         <v-btn
           variant="outlined"
           color="secondary"
@@ -220,6 +235,7 @@ import { dashboardAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
 
 const { error } = useToast()
+const firstLadyImage = '/first-lady.jpg'
 
 const loading = ref(false)
 const dashboardRoot = ref(null)
