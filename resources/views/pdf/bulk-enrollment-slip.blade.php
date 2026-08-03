@@ -143,7 +143,24 @@
   $total    = $enrollees->count();
   $approved = $enrollees->filter(fn($e) => !empty($e->approval_date))->count();
   $pending  = $total - $approved;
-  $agencyLogoPath = file_exists(public_path('logo.png')) ? 'file://' . public_path('logo.png') : null;
+  $agencyLogoPath = null;
+  $logoCandidates = [
+    [public_path('logo-slip.jpg'), 'image/jpeg'],
+    [public_path('logo.png'), 'image/png'],
+  ];
+  foreach ($logoCandidates as [$logoFilePath, $logoMimeType]) {
+    if (!file_exists($logoFilePath)) {
+      continue;
+    }
+
+    $logoBytes = @file_get_contents($logoFilePath);
+    if ($logoBytes === false) {
+      continue;
+    }
+
+    $agencyLogoPath = 'data:' . $logoMimeType . ';base64,' . base64_encode($logoBytes);
+    break;
+  }
   $slipLogoPath = $agencyLogoPath;
 @endphp
 
