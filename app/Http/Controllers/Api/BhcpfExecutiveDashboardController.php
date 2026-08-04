@@ -130,7 +130,7 @@ class BhcpfExecutiveDashboardController extends BaseController
                 'daily_trend' => [
                     'labels' => $dailyRows->pluck('date_label')->all(),
                     'captured' => $dailyRows->pluck('captured')->all(),
-                    'cumulative' => $dailyRows->pluck('cumulative')->all(),
+                    'approved' => $dailyRows->pluck('approved')->all(),
                 ],
                 'demographics' => [
                     'overall' => $demographics['overall'],
@@ -189,6 +189,7 @@ class BhcpfExecutiveDashboardController extends BaseController
         $rows = $this->campaignCaptureQuery($dateFrom, $dateTo)
             ->selectRaw("DATE(COALESCE(enrollees.enrollment_date, enrollees.created_at)) as capture_date")
             ->selectRaw('COUNT(*) as captured_count')
+            ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as approved_count', [Enrollee::STATUS_ACTIVE])
             ->groupBy('capture_date')
             ->orderBy('capture_date')
             ->get()
@@ -196,18 +197,17 @@ class BhcpfExecutiveDashboardController extends BaseController
 
         $items = collect();
         $cursor = $dateFrom->copy();
-        $cumulative = 0;
 
         while ($cursor->lte($dateTo)) {
             $dateKey = $cursor->toDateString();
             $captured = (int) data_get($rows, "{$dateKey}.captured_count", 0);
-            $cumulative += $captured;
+            $approved = (int) data_get($rows, "{$dateKey}.approved_count", 0);
 
             $items->push([
                 'date' => $dateKey,
                 'date_label' => $cursor->format('d M'),
                 'captured' => $captured,
-                'cumulative' => $cumulative,
+                'approved' => $approved,
             ]);
 
             $cursor->addDay();

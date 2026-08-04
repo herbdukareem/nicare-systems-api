@@ -100,8 +100,8 @@
       </AppCard>
 
       <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.2fr_0.8fr]">
-        <AppCard title="Daily Enrollment Trend" icon="mdi-chart-line" tone="primary">
-          <LineChart :data="dailyTrendChartData" :height="320" />
+        <AppCard title="Daily Enrollment Trend" icon="mdi-chart-bar" tone="primary">
+          <BarChart :data="dailyTrendChartData" :options="dailyTrendChartOptions" :height="320" />
         </AppCard>
 
         <AppCard title="Demographic Breakdown" icon="mdi-account-group" tone="secondary">
@@ -268,7 +268,6 @@ import AppDataTable from '../common/AppDataTable.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
 import AppStatCard from '../common/AppStatCard.vue'
 import BarChart from '../charts/BarChart.vue'
-import LineChart from '../charts/LineChart.vue'
 import { dashboardAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
 
@@ -336,7 +335,7 @@ const lgaHeaders = [
 const dailyHeaders = [
   { title: 'Date', key: 'date_label', sortable: false },
   { title: 'Captured', key: 'captured', sortable: false },
-  { title: 'Cumulative', key: 'cumulative', sortable: false },
+  { title: 'Approved', key: 'approved', sortable: false },
 ]
 
 const demographicHeaders = [
@@ -379,21 +378,35 @@ const dailyTrendChartData = computed(() => ({
     {
       label: 'Captured',
       data: dailyRows.value.map((item) => item.captured),
+      backgroundColor: '#0891b2',
       borderColor: '#0891b2',
-      backgroundColor: 'rgba(8, 145, 178, 0.12)',
-      fill: true,
-      pointBackgroundColor: '#0891b2',
+      borderWidth: 1,
     },
     {
-      label: 'Cumulative',
-      data: dailyRows.value.map((item) => item.cumulative),
-      borderColor: '#0f172a',
-      backgroundColor: 'rgba(15, 23, 42, 0.05)',
-      fill: false,
-      pointBackgroundColor: '#0f172a',
+      label: 'Approved',
+      data: dailyRows.value.map((item) => item.approved),
+      backgroundColor: '#16a34a',
+      borderColor: '#16a34a',
+      borderWidth: 1,
     },
   ],
 }))
+
+const dailyTrendChartOptions = {
+  plugins: {
+    legend: {
+      position: 'top',
+    },
+  },
+  scales: {
+    y: {
+      beginAtZero: true,
+      ticks: {
+        callback: (value) => Number(value).toLocaleString(),
+      },
+    },
+  },
+}
 
 const demographicChartData = computed(() => ({
   labels: activeDemographicRows.value.map((item) => item.label),
