@@ -383,37 +383,35 @@ class CapitationController extends Controller
         $longDescription = strtoupper(trim("{$capitation->name} {$year}"));
 
         return response()->streamDownload(function () use ($details, $shortDescription, $longDescription) {
-            $out = fopen('php://output', 'w');
+            $escape = static fn (mixed $value): string => htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8');
+            $textCell = static fn (mixed $value): string => '<td style="mso-number-format:\'\\@\';">&nbsp;' . htmlspecialchars((string) $value, ENT_QUOTES, 'UTF-8') . '</td>';
 
-            // The blank column after account number and the four trailing zero
-            // columns are part of the legacy Remita import arrangement.
-            fputcsv($out, [
-                'SN', 'SORT CODE', 'ACCT. NUMBER', '', 'NO. ENROLLEES', 'AMOUNT',
-                'DESCRIPTION 1', 'DESCRIPTION 2', 'ACCOUNT NAME', '', '', '', '',
-            ], "\t");
+            // Remita uses the legacy 13-column arrangement. Excel must receive
+            // sort codes and account numbers as text so it cannot strip leading zeroes.
+            echo "\xEF\xBB\xBF<html><head><meta charset=\"UTF-8\"></head><body><table border=\"1\">";
+            echo '<tr><th>SN</th><th>SORT CODE</th><th>ACCT. NUMBER</th><th></th><th>NO. ENROLLEES</th><th>AMOUNT</th>'
+                . '<th>DESCRIPTION 1</th><th>DESCRIPTION 2</th><th>ACCOUNT NAME</th><th></th><th></th><th></th><th></th></tr>';
 
             foreach ($details->values() as $index => $detail) {
                 $account = $detail->facility?->accountDetail;
                 $bank = $account?->bank;
 
-                fputcsv($out, [
-                    $index + 1,
-                    $bank?->sort_code ?? '',
-                    $account?->account_number ?? '',
-                    '',
-                    (int) ($detail->total_enrollees ?? $detail->total_enrolled ?? 0),
-                    number_format((float) ($detail->total_amount ?? $detail->amount ?? 0), 2, '.', ''),
-                    $shortDescription,
-                    $longDescription,
-                    preg_replace('/[^a-zA-Z0-9_ -]/', ' ', (string) $account?->account_name) ?? '',
-                    0,
-                    0,
-                    0,
-                    0,
-                ], "\t");
+                $accountName = preg_replace('/[^a-zA-Z0-9_ -]/', ' ', (string) $account?->account_name) ?? '';
+                echo '<tr>'
+                    . '<td>' . ($index + 1) . '</td>'
+                    . $textCell($bank?->sort_code)
+                    . $textCell($account?->account_number)
+                    . '<td></td>'
+                    . '<td>' . (int) ($detail->total_enrollees ?? $detail->total_enrolled ?? 0) . '</td>'
+                    . '<td>' . number_format((float) ($detail->total_amount ?? $detail->amount ?? 0), 2, '.', '') . '</td>'
+                    . '<td>' . $escape($shortDescription) . '</td>'
+                    . '<td>' . $escape($longDescription) . '</td>'
+                    . '<td>' . $escape($accountName) . '</td>'
+                    . '<td>0</td><td>0</td><td>0</td><td>0</td>'
+                    . '</tr>';
             }
 
-            fclose($out);
+            echo '</table></body></html>';
         }, 'NiCare_Cap_Payment_Remita_Format_' . $capitation->id . '.xls', [
             'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
         ]);
