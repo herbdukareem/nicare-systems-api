@@ -6,11 +6,21 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Services\Billing\PaymentCollectionConfigurationService;
 
 class PremiumPlanResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        $virtualAccountsEnabled = app(PaymentCollectionConfigurationService::class)->get()['enabled'] ?? false;
+        $bankTransferAvailable = $this->supportsBankTransfer() || ($virtualAccountsEnabled && $this->requiresPayment());
+        $transferAccount = $this->bankTransferDetails() ?: ($bankTransferAvailable ? [
+            'enabled' => true,
+            'bank_name' => 'Paystack',
+            'account_name' => 'Generated after submission',
+            'account_number' => 'Generated after submission',
+            'instructions' => 'A secure virtual account will be generated for this payment after submission.',
+        ] : null);
         return [
             'id' => $this->id,
             'insurance_programme_id' => $this->insurance_programme_id,
@@ -31,13 +41,13 @@ class PremiumPlanResource extends JsonResource
             'self_enrollment_enabled' => (bool) $this->self_enrollment_enabled,
             'payment_gateway' => $this->payment_gateway,
             'bank_transfer_enabled' => (bool) $this->bank_transfer_enabled,
-            'bank_transfer_available' => $this->supportsBankTransfer(),
+            'bank_transfer_available' => $bankTransferAvailable,
             'bank_transfer_bank_name' => $this->bank_transfer_bank_name,
             'bank_transfer_account_name' => $this->bank_transfer_account_name,
             'bank_transfer_account_number' => $this->bank_transfer_account_number,
             'bank_transfer_instructions' => $this->bank_transfer_instructions,
-            'bank_transfer_account' => $this->bankTransferDetails(),
-            'available_payment_methods' => $this->availablePaymentMethods(),
+            'bank_transfer_account' => $transferAccount,
+            'available_payment_methods' => $bankTransferAvailable ? array_values(array_unique([...$this->availablePaymentMethods(), 'bank_transfer'])) : $this->availablePaymentMethods(),
             'payment_split_profile_code' => $this->payment_split_profile_code,
             'merchant_id' => $this->merchant_id,
             'merchant_service_type_id' => $this->merchant_service_type_id,

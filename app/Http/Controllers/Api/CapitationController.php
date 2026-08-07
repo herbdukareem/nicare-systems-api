@@ -373,6 +373,53 @@ class CapitationController extends Controller
     }
 
     /**
+     * Export the bank-upload spreadsheet expected by the legacy Remita process.
+     */
+    public function exportRemita(Capitation $capitation): StreamedResponse
+    {
+        $details = $this->service->getBreakdown($capitation);
+        $year = (string) ($capitation->year ?: substr((string) $capitation->period_start, 0, 4));
+        $shortDescription = strtoupper(substr((string) $capitation->name, 0, 2) . substr($year, -2) . 'CAP');
+        $longDescription = strtoupper(trim("{$capitation->name} {$year}"));
+
+        return response()->streamDownload(function () use ($details, $shortDescription, $longDescription) {
+            $out = fopen('php://output', 'w');
+
+            // The blank column after account number and the four trailing zero
+            // columns are part of the legacy Remita import arrangement.
+            fputcsv($out, [
+                'SN', 'SORT CODE', 'ACCT. NUMBER', '', 'NO. ENROLLEES', 'AMOUNT',
+                'DESCRIPTION 1', 'DESCRIPTION 2', 'ACCOUNT NAME', '', '', '', '',
+            ], "\t");
+
+            foreach ($details->values() as $index => $detail) {
+                $account = $detail->facility?->accountDetail;
+                $bank = $account?->bank;
+
+                fputcsv($out, [
+                    $index + 1,
+                    $bank?->sort_code ?? '',
+                    $account?->account_number ?? '',
+                    '',
+                    (int) ($detail->total_enrollees ?? $detail->total_enrolled ?? 0),
+                    number_format((float) ($detail->total_amount ?? $detail->amount ?? 0), 2, '.', ''),
+                    $shortDescription,
+                    $longDescription,
+                    preg_replace('/[^a-zA-Z0-9_ -]/', ' ', (string) $account?->account_name) ?? '',
+                    0,
+                    0,
+                    0,
+                    0,
+                ], "\t");
+            }
+
+            fclose($out);
+        }, 'NiCare_Cap_Payment_Remita_Format_' . $capitation->id . '.xls', [
+            'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
+        ]);
+    }
+
+    /**
      * GET /api/capitation/facilities/{facility}/capitation-history
      */
     public function facilityHistory(Facility $facility): JsonResponse

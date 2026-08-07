@@ -41,7 +41,7 @@
             <v-select v-model="form.purchaser_type" label="Purchasing as" :items="purchaserTypes" item-title="label" item-value="value" variant="outlined" density="compact" />
             <v-radio-group v-if="selectedPlanSupportsBankTransfer" v-model="form.payment_method" inline hide-details>
               <v-radio label="Pay online now" value="online_payment" />
-              <v-radio label="Bank transfer" value="bank_transfer" />
+              <v-radio label="Pay by bank transfer" value="bank_transfer" />
             </v-radio-group>
             <v-text-field v-model="form.payer_name" label="Full name / agent name" variant="outlined" density="compact" :error-messages="errors.payer_name" />
             <v-text-field v-model="form.payer_phone" label="Phone number" variant="outlined" density="compact" :error-messages="errors.payer_phone" />
@@ -62,7 +62,8 @@
               <div class="pin-page__transfer-note">We will generate a payment reference after you submit this request. Use that reference as your transfer narration.</div>
             </div>
 
-            <div v-if="paymentCollection" class="pin-page__transfer-card pin-page__transfer-card--active">
+            <PaymentCollectionInstructions v-if="paymentCollection?.provider" :collection="paymentCollection" class="tw-mt-4" />
+            <div v-else-if="paymentCollection" class="pin-page__transfer-card pin-page__transfer-card--active">
               <div class="pin-page__transfer-title">Transfer instructions</div>
               <div><strong>Reference:</strong> {{ purchaseReference }}</div>
               <div><strong>Bank:</strong> {{ paymentCollection.bank_name }}</div>
@@ -83,6 +84,7 @@
 </template>
 
 <script setup>
+import PaymentCollectionInstructions from '../common/PaymentCollectionInstructions.vue'
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { publicEnrollmentAPI } from '../../utils/enrolleeApi'

@@ -7,6 +7,8 @@ use App\Models\PremiumPlan;
 use App\Models\PremiumPurchase;
 use App\Services\Billing\BillingCheckoutService;
 use App\Services\Billing\BillingPaymentVerificationService;
+use App\Services\Billing\PaymentCollectionConfigurationService;
+use App\Services\Billing\PaymentCollectionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -16,11 +18,13 @@ class EnrolleePortalRenewalService
     public function __construct(
         private PremiumCoverageService $premiumCoverageService,
         private BillingCheckoutService $billingCheckoutService,
-        private BillingPaymentVerificationService $verificationService
+        private BillingPaymentVerificationService $verificationService,
+        private PaymentCollectionConfigurationService $collectionSettings,
+        private PaymentCollectionService $collectionService
     ) {
     }
 
-    public function create(Enrollee $enrollee, int $planId): array
+    public function create(Enrollee $enrollee, int $planId, ?string $collectionMode = null): array
     {
         $plan = PremiumPlan::with(['programme', 'benefitPackage', 'fundingType'])->findOrFail($planId);
 
@@ -70,6 +74,11 @@ class EnrolleePortalRenewalService
             throw new RuntimeException('The enrollee account must have an email address before online renewal can continue.');
         }
 
+        if ((bool) ($this->collectionSettings->get()['enabled'] ?? false)) {
+            $collection = $this->collectionService->createForPurchase($purchase, $collectionMode ?: ($this->collectionSettings->get()['default_mode'] ?? 'per_payment'), 'coverage_renewal', ['name' => $purchase->payer_name, 'email' => $purchase->payer_email, 'phone' => $purchase->payer_phone]);
+            return ['purchase' => $purchase->fresh(['plan', 'fundingType']), 'checkout' => null, 'payment_collection' => $collection, 'requires_payment' => true, 'renewed' => false];
+        }
+
         $checkout = $this->billingCheckoutService->initializePurchaseCheckout(
             $purchase,
             '/enroll/plans?checkout_return=1'
@@ -86,6 +95,7 @@ class EnrolleePortalRenewalService
         return [
             'purchase' => $purchase->fresh(['plan', 'fundingType']),
             'checkout' => $checkout,
+            'payment_collection' => null,
             'requires_payment' => true,
             'renewed' => false,
         ];
@@ -136,7 +146,7 @@ class EnrolleePortalRenewalService
         return $purchase;
     }
 
-    private function applyConfirmedRenewal(Enrollee $enrollee, PremiumPurchase $purchase): Enrollee
+    public function applyConfirmedRenewal(Enrollee $enrollee, PremiumPurchase $purchase): Enrollee
     {
         return DB::transaction(function () use ($enrollee, $purchase) {
             $lockedEnrollee = Enrollee::lockForUpdate()->findOrFail($enrollee->id);

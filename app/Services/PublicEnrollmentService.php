@@ -9,6 +9,8 @@ use App\Models\PremiumPlan;
 use App\Models\PremiumPurchase;
 use App\Models\User;
 use App\Services\Billing\BillingCheckoutService;
+use App\Services\Billing\PaymentCollectionConfigurationService;
+use App\Services\Billing\PaymentCollectionService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -21,6 +23,8 @@ class PublicEnrollmentService
     public function __construct(
         private PremiumCoverageService $premiumCoverageService,
         private BillingCheckoutService $billingCheckoutService,
+        private PaymentCollectionConfigurationService $collectionSettings,
+        private PaymentCollectionService $collectionService,
         private SystemAuditUserResolver $systemAuditUserResolver,
         private NinProviderConfigService $ninProviderConfigService,
         private NinVerificationService $ninVerificationService,
@@ -51,7 +55,7 @@ class PublicEnrollmentService
             }
         }
 
-        if ($enrollmentMethod === 'bank_transfer' && !$plan->supportsBankTransfer()) {
+        if ($enrollmentMethod === 'bank_transfer' && !(bool) ($this->collectionSettings->get()['enabled'] ?? false) && !$plan->supportsBankTransfer()) {
             throw new RuntimeException('The selected premium plan does not currently support direct bank transfer.');
         }
 
@@ -112,7 +116,8 @@ class PublicEnrollmentService
             );
         }
 
-        if ($usesBankTransfer) {
+        $virtualCollectionsEnabled = (bool) ($this->collectionSettings->get()['enabled'] ?? false);
+        if ($usesBankTransfer && !$virtualCollectionsEnabled) {
             $paymentCollection = $plan->bankTransferDetails($paymentReference);
         }
 
@@ -131,6 +136,7 @@ class PublicEnrollmentService
             $paymentCollection,
             $passportPath,
             $paymentBreakdown
+            , $virtualCollectionsEnabled
         ) {
             $purchase = null;
             $purchaseDetails = [
@@ -165,6 +171,15 @@ class PublicEnrollmentService
                     'amount' => $paymentBreakdown['total_amount'],
                     'sold_by' => null,
                 ]);
+
+                if ($usesBankTransfer && $virtualCollectionsEnabled) {
+                    $paymentCollection = $this->collectionService->createForPurchase(
+                        $purchase,
+                        $this->collectionSettings->get()['default_mode'] ?? 'per_payment',
+                        'premium_enrollment',
+                        ['first_name' => $data['first_name'], 'last_name' => $data['last_name'], 'email' => $data['email'] ?? null, 'phone' => $data['phone'] ?? null]
+                    );
+                }
             }
 
             $enrollee = Enrollee::create([

@@ -193,7 +193,7 @@
           <div class="tw-flex tw-gap-1">
             <v-btn icon="mdi-eye" size="small" variant="text" color="primary" title="View breakdown" @click="openBreakdown(item)" />
             <v-btn icon="mdi-printer" size="small" variant="text" color="teal" title="Print invoice" @click="printPeriodQuickInvoice(item)" />
-            <v-btn v-if="canExport" icon="mdi-download" size="small" variant="text" title="Export CSV" @click="exportPeriod(item)" />
+            <v-btn v-if="canExport" icon="mdi-file-excel" size="small" variant="text" title="Export Remita payment format" @click="exportRemitaPeriod(item)" />
           </div>
         </template>
       </AppDataTable>
@@ -212,7 +212,7 @@
           </div>
           <v-btn variant="outlined" @click="breakdownDialog = false">Close</v-btn>
           <v-btn color="teal" variant="flat" prepend-icon="mdi-printer" @click="printBreakdownInvoice">Print Invoice</v-btn>
-          <v-btn color="primary" variant="flat" prepend-icon="mdi-download" @click="exportPeriod(selectedPeriod)">Export CSV</v-btn>
+          <v-btn v-if="canExport" color="primary" variant="flat" prepend-icon="mdi-file-excel" @click="exportRemitaPeriod(selectedPeriod)">Export Remita Format</v-btn>
         </template>
 
         <div class="tw-space-y-4">
@@ -878,6 +878,23 @@ const exportPeriod = async (period) => {
   URL.revokeObjectURL(url)
 }
 
+const exportRemitaPeriod = async (period) => {
+  if (!period) return
+  try {
+    const response = await capitationAPI.exportRemita(period.id)
+    const url = URL.createObjectURL(new Blob([response.data], { type: 'application/vnd.ms-excel' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `NiCare_Cap_Payment_Remita_Format_${period.id}.xls`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    error(err?.response?.data?.message || 'Failed to export Remita payment format')
+  }
+}
+
 // ── Invoice printing ─────────────────────────────────────────────────────────
 
 const printInvoice = (period, items, mode, dataSource = 'breakdown') => {
@@ -925,9 +942,9 @@ const printInvoice = (period, items, mode, dataSource = 'breakdown') => {
       <td style="text-align:left;font-weight:600">${item.facility?.name || item.facility_name || 'N/A'}</td>
       <td style="text-align:center">${Number(item.total_enrollees || item.total_enrolled || 0).toLocaleString()}</td>
       <td style="text-align:center">₦${Number(item.total_amount || item.amount || 0).toLocaleString()}</td>
-      <td style="text-align:center">${item.facility?.account_number || item.account_number || '—'}</td>
-      <td style="text-align:left">${item.facility?.account_name || item.account_name || '—'}</td>
-      <td style="text-align:center">${item.facility?.bank_name || item.facility?.bank || item.bank_name || '—'}</td>
+      <td style="text-align:center">${item.facility?.account_detail?.account_number || item.facility?.account_number || item.account_number || '—'}</td>
+      <td style="text-align:left">${item.facility?.account_detail?.account_name || item.facility?.account_name || item.account_name || '—'}</td>
+      <td style="text-align:center">${item.facility?.account_detail?.bank?.name || item.facility?.bank_name || item.facility?.bank || item.bank_name || '—'}</td>
       <td style="text-align:center;${itemStatusStyle(item)}">${getItemStatus(item)}</td>
     </tr>`).join('')
 

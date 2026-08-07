@@ -938,6 +938,17 @@ const routes = [
     },
   },
   {
+    path: '/settings/payment-collections',
+    name: 'settings-payment-collections',
+    component: () => import('../components/settings/PaymentCollectionSettingsPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['settings.payment-collection.manage', 'settings.edit'],
+      title: 'Virtual Account Collection',
+      breadcrumb: 'Virtual Accounts',
+    },
+  },
+  {
     path: '/settings/organization',
     name: 'settings-organization',
     component: () => import('../components/settings/OrganizationSettingsPage.vue'),

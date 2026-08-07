@@ -159,10 +159,11 @@ class EnrolleeAuthController extends Controller
     {
         $validated = $request->validate([
             'premium_plan_id' => ['required', 'integer', 'exists:premium_plans,id'],
+            'collection_mode' => ['nullable', 'in:per_payment,per_payer'],
         ]);
 
         try {
-            $result = $service->create($request->user(), (int) $validated['premium_plan_id']);
+            $result = $service->create($request->user(), (int) $validated['premium_plan_id'], $validated['collection_mode'] ?? null);
         } catch (RuntimeException $exception) {
             return response()->json([
                 'success' => false,

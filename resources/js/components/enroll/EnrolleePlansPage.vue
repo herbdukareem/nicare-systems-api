@@ -15,6 +15,7 @@
       title="Renewal status"
       :message="statusMessage"
     />
+    <PaymentCollectionInstructions v-if="paymentCollection" class="tw-mb-5" :collection="paymentCollection" />
 
     <AppCard v-if="currentPlan" class="tw-mb-6" title="Your Current Plan" icon="mdi-shield-check" tone="success" muted>
       <div class="tw-flex tw-items-center tw-gap-3 tw-mb-1">
@@ -167,6 +168,7 @@ import AppCard from '../common/AppCard.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
 import AppSkeleton from '../common/AppSkeleton.vue'
+import PaymentCollectionInstructions from '../common/PaymentCollectionInstructions.vue'
 
 const route = useRoute()
 const enrolleeAuth = useEnrolleeAuthStore()
@@ -181,6 +183,7 @@ const selectedPlan = ref(null)
 const purchaseReference = ref('')
 const statusMessage = ref('')
 const renewalReady = ref(false)
+const paymentCollection = ref(null)
 
 const currentPlan = computed(() => enrolleeAuth.enrollee?.premium_plan || null)
 
@@ -232,6 +235,7 @@ const startRenewal = async () => {
     })
 
     const payload = response.data?.data || {}
+    paymentCollection.value = payload.payment_collection || null
     purchaseReference.value = payload.purchase?.payment_reference || ''
     renewalReady.value = !!payload.renewed
 
@@ -244,7 +248,7 @@ const startRenewal = async () => {
 
     if (payload.requires_payment) {
       statusMessage.value = `Renewal ${purchaseReference.value} was created. Complete payment, then verify it here to activate your plan.`
-      openCheckout(payload.checkout?.authorization_url)
+      if (payload.checkout?.authorization_url) openCheckout(payload.checkout.authorization_url)
     } else {
       statusMessage.value = `Your ${selectedPlan.value.name} renewal has been applied successfully.`
       success('Premium plan renewed successfully.')

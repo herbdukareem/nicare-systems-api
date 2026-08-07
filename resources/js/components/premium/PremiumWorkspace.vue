@@ -58,11 +58,7 @@
           <v-switch v-if="mode === 'plans'" v-model="planForm.payment_required" label="Requires payment before PIN generation" color="primary" hide-details />
           <v-switch v-if="mode === 'plans'" v-model="planForm.self_enrollment_enabled" label="Allow public self-enrollment" color="primary" hide-details />
           <v-select v-if="mode === 'plans' && planForm.payment_required" v-model="planForm.payment_gateway" :items="metadata.payment_gateways" item-title="name" item-value="code" label="Payment gateway" density="comfortable" variant="outlined" />
-          <v-switch v-if="mode === 'plans' && planForm.payment_required" v-model="planForm.bank_transfer_enabled" label="Allow dedicated bank transfer" color="primary" hide-details />
-          <v-text-field v-if="mode === 'plans' && planForm.payment_required && planForm.bank_transfer_enabled" v-model="planForm.bank_transfer_bank_name" label="Transfer bank name" density="comfortable" variant="outlined" />
-          <v-text-field v-if="mode === 'plans' && planForm.payment_required && planForm.bank_transfer_enabled" v-model="planForm.bank_transfer_account_name" label="Transfer account name" density="comfortable" variant="outlined" />
-          <v-text-field v-if="mode === 'plans' && planForm.payment_required && planForm.bank_transfer_enabled" v-model="planForm.bank_transfer_account_number" label="Transfer account number" density="comfortable" variant="outlined" />
-          <v-textarea v-if="mode === 'plans' && planForm.payment_required && planForm.bank_transfer_enabled" v-model="planForm.bank_transfer_instructions" label="Transfer instructions" rows="2" density="comfortable" variant="outlined" class="lg:tw-col-span-2" />
+          <AppAlert v-if="mode === 'plans' && planForm.payment_required" class="lg:tw-col-span-3" tone="info" title="Payment collection is configured globally" message="Plans no longer store bank accounts. Enable Paystack virtual accounts in Settings to offer temporary or reusable transfer accounts; hosted checkout remains available through the selected gateway." />
           <v-select
             v-if="mode === 'plans' && planForm.payment_required && planForm.payment_gateway && selectedGatewaySupportsSplitProfiles"
             v-model="planForm.payment_split_profile_code"
@@ -97,6 +93,7 @@
           <v-text-field v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.payer_name" label="Payer name" density="comfortable" variant="outlined" />
           <v-text-field v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.payer_email" label="Payer email" density="comfortable" variant="outlined" />
           <v-select v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.payment_method" :items="paymentMethods" label="Payment method" density="comfortable" variant="outlined" />
+          <v-select v-if="mode === 'purchases' && purchaseForm.payment_method === 'bank_transfer'" v-model="purchaseForm.collection_mode" :items="collectionModes" label="Virtual account mode" density="comfortable" variant="outlined" />
           <v-text-field v-if="mode === 'sell-pin' || mode === 'purchases'" v-model="purchaseForm.payment_reference" label="Payment reference" density="comfortable" variant="outlined" />
           <v-alert v-if="mode === 'sell-pin' && purchaseForm.payment_method === 'online_payment'" type="warning" variant="tonal" density="compact" class="lg:tw-col-span-2">
             Secure hosted checkout is available from the Purchases screen. Sell PIN is kept for cash, transfer, POS, and already-confirmed purchase flows.
@@ -234,11 +231,6 @@ const blankPlanForm = () => ({
   payment_required: false,
   self_enrollment_enabled: false,
   payment_gateway: null,
-  bank_transfer_enabled: false,
-  bank_transfer_bank_name: '',
-  bank_transfer_account_name: '',
-  bank_transfer_account_number: '',
-  bank_transfer_instructions: '',
   payment_split_profile_code: null,
   merchant_id: null,
   merchant_service_type_id: null,
@@ -252,7 +244,8 @@ const blankPlanForm = () => ({
 const planForm = ref(blankPlanForm())
 const pinForm = ref({ premium_plan_id: null, quantity: 100, payment_reference: '' })
 const saleForm = ref({ pin: '' })
-const purchaseForm = ref({ premium_plan_id: null, payer_type: 'individual', payer_name: '', payer_email: '', payment_method: 'cash', payment_reference: '', quantity: 1 })
+const purchaseForm = ref({ premium_plan_id: null, payer_type: 'individual', payer_name: '', payer_email: '', payment_method: 'cash', collection_mode: 'per_payment', payment_reference: '', quantity: 1 })
+const collectionModes = [{ title: 'Temporary account for this payment', value: 'per_payment' }, { title: 'Reusable account for this payer', value: 'per_payer' }]
 const coverageForm = ref({ enrollee_id: null, premium_plan_id: null, activation_source: 'admin' })
 const eligibilityForm = ref({ enrollee_number: '', date: '' })
 const benefactorForm = ref({ name: '', type: 'individual', registration_number: '', contact_person: '', phone: '', email: '', status: 1 })
@@ -512,11 +505,6 @@ const editPlan = (plan) => {
     payment_required: Boolean(plan.payment_required),
     self_enrollment_enabled: Boolean(plan.self_enrollment_enabled),
     payment_gateway: plan.payment_gateway || null,
-    bank_transfer_enabled: Boolean(plan.bank_transfer_enabled),
-    bank_transfer_bank_name: plan.bank_transfer_bank_name || '',
-    bank_transfer_account_name: plan.bank_transfer_account_name || '',
-    bank_transfer_account_number: plan.bank_transfer_account_number || '',
-    bank_transfer_instructions: plan.bank_transfer_instructions || '',
     payment_split_profile_code: plan.payment_split_profile_code || null,
     merchant_id: plan.merchant_id || null,
     merchant_service_type_id: plan.merchant_service_type_id || null,
@@ -605,11 +593,11 @@ const planPayload = () => ({
   duration_days: planForm.value.has_no_expiry ? null : planForm.value.duration_days,
   maximum_dependants: planForm.value.is_family_plan ? planForm.value.maximum_dependants : 0,
   payment_gateway: planForm.value.payment_required ? planForm.value.payment_gateway : null,
-  bank_transfer_enabled: planForm.value.payment_required ? planForm.value.bank_transfer_enabled : false,
-  bank_transfer_bank_name: planForm.value.payment_required && planForm.value.bank_transfer_enabled ? planForm.value.bank_transfer_bank_name : null,
-  bank_transfer_account_name: planForm.value.payment_required && planForm.value.bank_transfer_enabled ? planForm.value.bank_transfer_account_name : null,
-  bank_transfer_account_number: planForm.value.payment_required && planForm.value.bank_transfer_enabled ? planForm.value.bank_transfer_account_number : null,
-  bank_transfer_instructions: planForm.value.payment_required && planForm.value.bank_transfer_enabled ? planForm.value.bank_transfer_instructions : null,
+  bank_transfer_enabled: false,
+  bank_transfer_bank_name: null,
+  bank_transfer_account_name: null,
+  bank_transfer_account_number: null,
+  bank_transfer_instructions: null,
   payment_split_profile_code: planForm.value.payment_required ? planForm.value.payment_split_profile_code : null,
   merchant_id: planForm.value.payment_required ? planForm.value.merchant_id : null,
   merchant_service_type_id: planForm.value.payment_required ? planForm.value.merchant_service_type_id : null,

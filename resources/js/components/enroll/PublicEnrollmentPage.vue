@@ -206,7 +206,7 @@
                 <h3 class="tw-text-sm tw-font-semibold tw-text-slate-900">How would you like to enroll?</h3>
                 <v-radio-group v-model="form.enrollment_method" inline hide-details class="tw-mt-2">
                   <v-radio label="Enroll and pay online" value="online_payment" />
-                  <v-radio v-if="selectedPlanSupportsBankTransfer" label="Direct bank transfer" value="bank_transfer" />
+                  <v-radio v-if="selectedPlanSupportsBankTransfer" label="Pay by bank transfer" value="bank_transfer" />
                   <v-radio label="Use a Premium PIN" value="premium_pin" />
                 </v-radio-group>
                 <v-text-field
@@ -221,12 +221,12 @@
                   persistent-hint
                 />
                 <div v-if="form.enrollment_method === 'bank_transfer' && selectedTransferAccount" class="enroll__transfer-card">
-                  <div class="enroll__transfer-title">Dedicated account for this plan</div>
+                  <div class="enroll__transfer-title">Bank-transfer payment</div>
                   <div><strong>Bank:</strong> {{ selectedTransferAccount.bank_name }}</div>
                   <div><strong>Account name:</strong> {{ selectedTransferAccount.account_name }}</div>
                   <div><strong>Account number:</strong> {{ selectedTransferAccount.account_number }}</div>
                   <div v-if="selectedTransferAccount.instructions" class="enroll__transfer-note">{{ selectedTransferAccount.instructions }}</div>
-                  <div class="enroll__transfer-note">After you submit, we will generate a payment reference for your transfer narration.</div>
+                  <div class="enroll__transfer-note">After submission, the system will generate the secure transfer instructions and payment reference for this payment.</div>
                 </div>
               </div>
 
@@ -339,7 +339,8 @@
 
         <p class="tw-text-sm tw-leading-6 tw-text-slate-600">{{ successSummary }}</p>
 
-        <div v-if="paymentCollection" class="enroll__transfer-card enroll__transfer-card--active">
+        <PaymentCollectionInstructions v-if="paymentCollection?.provider" :collection="paymentCollection" class="tw-mt-4" />
+        <div v-else-if="paymentCollection" class="enroll__transfer-card enroll__transfer-card--active">
           <div class="enroll__transfer-title">Transfer instructions</div>
           <div><strong>Reference:</strong> {{ submittedPaymentReference }}</div>
           <div><strong>Bank:</strong> {{ paymentCollection.bank_name }}</div>
@@ -368,6 +369,7 @@
 </template>
 
 <script setup>
+import PaymentCollectionInstructions from '../common/PaymentCollectionInstructions.vue'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 import { useToast } from '../../composables/useToast'

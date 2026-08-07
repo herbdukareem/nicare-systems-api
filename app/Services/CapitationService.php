@@ -369,7 +369,7 @@ class CapitationService
     public function getDetailsForStage(Capitation $capitation, string $stage = 'generated', ?int $fundingTypeId = null): Collection
     {
         $query = $capitation->capitationDetails()
-            ->with(['facility.lga', 'fundingType'])
+            ->with(['facility.lga', 'facility.accountDetail.bank', 'fundingType'])
             ->when($fundingTypeId, fn ($detailQuery) => $detailQuery->where('funding_type_id', $fundingTypeId));
 
         match ($stage) {
@@ -524,7 +524,7 @@ class CapitationService
 
     public function getBreakdown(Capitation $capitation, string $stage = 'generated'): Collection
     {
-        $query = $capitation->capitationDetails()->with(['facility', 'fundingType']);
+        $query = $capitation->capitationDetails()->with(['facility.accountDetail.bank', 'fundingType']);
 
         match ($stage) {
             'reviewed' => $query->whereNotNull('reviewed_at'),

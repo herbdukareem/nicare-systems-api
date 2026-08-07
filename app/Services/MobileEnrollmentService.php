@@ -16,6 +16,8 @@ use App\Models\User;
 use App\Models\Ward;
 use App\Services\Billing\BillingCheckoutService;
 use App\Services\Billing\BillingPaymentVerificationService;
+use App\Services\Billing\PaymentCollectionConfigurationService;
+use App\Services\Billing\PaymentCollectionService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -35,7 +37,9 @@ class MobileEnrollmentService
         private NinVerificationService $ninVerificationService,
         private VulnerableGroupAssignmentService $vulnerableGroupAssignmentService,
         private BillingCheckoutService $billingCheckoutService,
-        private BillingPaymentVerificationService $billingVerificationService
+        private BillingPaymentVerificationService $billingVerificationService,
+        private PaymentCollectionConfigurationService $collectionSettings,
+        private PaymentCollectionService $collectionService
     ) {
     }
 
@@ -201,6 +205,11 @@ class MobileEnrollmentService
             'sold_by' => $officer->id,
         ]);
 
+        if ((bool) ($this->collectionSettings->get()['enabled'] ?? false)) {
+            $collection = $this->collectionService->createForPurchase($purchase, $this->collectionSettings->get()['default_mode'] ?? 'per_payment', 'premium_pin_purchase', ['name' => $purchase->payer_name, 'email' => $purchase->payer_email, 'phone' => $purchase->payer_phone]);
+            return ['purchase' => $purchase->fresh(['plan']), 'checkout' => null, 'payment_collection' => $collection];
+        }
+
         try {
             $checkout = $this->billingCheckoutService->initializePurchaseCheckout(
                 $purchase,
@@ -222,6 +231,7 @@ class MobileEnrollmentService
         return [
             'purchase' => $purchase->fresh(['plan']),
             'checkout' => $checkout,
+            'payment_collection' => null,
         ];
     }
 

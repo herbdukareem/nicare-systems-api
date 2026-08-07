@@ -29,6 +29,7 @@ class StorePremiumPurchaseRequest extends FormRequest
             'payment_status' => ['nullable', 'in:pending,paid,confirmed,cancelled'],
             'payment_reference' => ['nullable', 'string', 'max:255'],
             'initialize_checkout' => ['nullable', 'boolean'],
+            'collection_mode' => ['nullable', 'in:per_payment,per_payer'],
             'quantity' => ['nullable', 'integer', 'min:1'],
             'amount' => ['nullable', 'numeric', 'min:0'],
             'paid_at' => ['nullable', 'date'],
@@ -38,7 +39,7 @@ class StorePremiumPurchaseRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
-            if ($this->input('payment_method') !== 'bank_transfer') {
+            if ($this->input('payment_method') !== 'bank_transfer' || $this->filled('collection_mode')) {
                 return;
             }
 

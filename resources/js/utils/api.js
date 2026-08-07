@@ -181,6 +181,7 @@ export const capitationAPI = {
   finalise: (id) => api.post(`/capitation/periods/${id}/finalise`),
   pay: (id, payload) => api.post(`/capitation/periods/${id}/pay`, payload),
   export: (id) => api.get(`/capitation/periods/${id}/export`, { responseType: 'blob' }),
+  exportRemita: (id) => api.get(`/capitation/periods/${id}/export-remita`, { responseType: 'blob' }),
 };
 
 export const facilityAPI = {
@@ -289,6 +290,7 @@ export const premiumAPI = {
   cancelPurchase: (id) => api.post(`/premium/purchases/${id}/cancel`),
   checkoutPurchase: (id) => api.post(`/premium/purchases/${id}/checkout`),
   verifyPurchase: (id) => api.post(`/premium/purchases/${id}/verify`),
+  createCollection: (id, data) => api.post(`/premium/purchases/${id}/collection`, data),
   payrollBatches: (params) => api.get('/premium/payroll-batches', { params }),
   createPayrollBatch: (data) => api.post('/premium/payroll-batches', data),
   approvePayrollBatch: (id) => api.post(`/premium/payroll-batches/${id}/approve`),
@@ -326,6 +328,11 @@ export const ninProviderAPI = {
 export const paymentGatewaySettingsAPI = {
   getConfig: () => api.get('/settings/payment-gateways'),
   updateConfig: (data) => api.put('/settings/payment-gateways', data),
+};
+
+export const paymentCollectionSettingsAPI = {
+  getConfig: () => api.get('/settings/payment-collections'),
+  updateConfig: (data) => api.put('/settings/payment-collections', data),
 };
 
 export const organizationSettingsAPI = {

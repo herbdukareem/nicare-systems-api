@@ -7,6 +7,7 @@ use App\Http\Requests\StorePremiumPurchaseRequest;
 use App\Models\PremiumPurchase;
 use App\Services\Billing\BillingCheckoutService;
 use App\Services\Billing\BillingPaymentVerificationService;
+use App\Services\Billing\PaymentCollectionService;
 use App\Services\PremiumCoverageService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -25,15 +26,18 @@ class PremiumPurchaseController extends Controller
     public function store(
         StorePremiumPurchaseRequest $request,
         PremiumCoverageService $service,
-        BillingCheckoutService $checkoutService
+        BillingCheckoutService $checkoutService,
+        PaymentCollectionService $collectionService
     ): JsonResponse
     {
         $purchase = $service->createPurchase($request->validated());
         $plan = $purchase->plan()->firstOrFail();
         $checkout = null;
-        $paymentCollection = $purchase->payment_method === 'bank_transfer'
+        $paymentCollection = $request->filled('collection_mode')
+            ? $collectionService->createForPurchase($purchase, $request->string('collection_mode')->toString(), 'premium_pin_purchase', ['name' => $purchase->payer_name, 'email' => $purchase->payer_email, 'phone' => $purchase->payer_phone])
+            : ($purchase->payment_method === 'bank_transfer'
             ? $plan->bankTransferDetails($purchase->payment_reference)
-            : null;
+            : null);
 
         if ($request->boolean('initialize_checkout') && $purchase->payment_method === 'online_payment') {
             $checkout = $checkoutService->initializePurchaseCheckout($purchase);

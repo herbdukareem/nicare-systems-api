@@ -67,6 +67,9 @@ use App\Http\Controllers\Api\MobileSyncController;
 use App\Http\Controllers\Api\NinProviderConfigurationController;
 use App\Http\Controllers\Api\OrganizationSettingsController;
 use App\Http\Controllers\Api\PaymentGatewayConfigurationController;
+use App\Http\Controllers\Api\PaymentCollectionConfigurationController;
+use App\Http\Controllers\Api\PaymentCollectionController;
+use App\Http\Controllers\Api\PaymentCollectionWebhookController;
 use App\Http\Controllers\Api\PublicEnrollmentController;
 use App\Http\Controllers\Api\PublicEnrollmentPaymentController;
 use App\Http\Controllers\Api\PublicPremiumPinController;
@@ -106,6 +109,7 @@ Route::get('test', function () {
 use App\Http\Controllers\Api\EnrolleeAuthController;
 
 Route::get('organization-settings', [OrganizationSettingsController::class, 'show'])->middleware('throttle:60,1');
+Route::post('webhooks/payment-collections/paystack', [PaymentCollectionWebhookController::class, 'paystack'])->withoutMiddleware(['web'])->middleware('throttle:120,1');
 
 Route::post('enroll/login', [EnrolleeAuthController::class, 'login'])->middleware('security');
 Route::get('enroll/plans', [EnrolleeAuthController::class, 'plans']);
@@ -337,6 +341,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('purchases/{premiumPurchase}/cancel', [PremiumPurchaseController::class, 'cancel']);
         Route::post('purchases/{premiumPurchase}/checkout', [PremiumPurchaseController::class, 'initializeCheckout']);
         Route::post('purchases/{premiumPurchase}/verify', [PremiumPurchaseController::class, 'verify']);
+        Route::post('purchases/{premiumPurchase}/collection', [PaymentCollectionController::class, 'createForPurchase'])->middleware('permission:premium.purchase.create');
 
         Route::apiResource('payroll-batches', PayrollBatchController::class)->only(['index', 'store'])->parameters(['payroll-batches' => 'payrollBatch']);
         Route::post('payroll-batches/{payrollBatch}/approve', [PayrollBatchController::class, 'approve']);
@@ -388,6 +393,13 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,settings.payment-gateway.manage,settings.edit');
     Route::put('settings/payment-gateways', [PaymentGatewayConfigurationController::class, 'update'])
         ->middleware('permission:any,settings.payment-gateway.manage,settings.edit');
+    Route::get('settings/payment-collections', [PaymentCollectionConfigurationController::class, 'show'])
+        ->middleware('permission:any,settings.payment-collection.manage,settings.edit');
+    Route::put('settings/payment-collections', [PaymentCollectionConfigurationController::class, 'update'])
+        ->middleware('permission:any,settings.payment-collection.manage,settings.edit');
+    Route::get('payment-collections', [PaymentCollectionController::class, 'index'])->middleware('permission:payment.collection.review');
+    Route::post('payment-collections/{paymentIntent}/manual-settle', [PaymentCollectionController::class, 'manuallySettle'])->middleware('permission:payment.collection.settle-manually');
+    Route::post('payment-collections/{paymentIntent}/refund', [PaymentCollectionController::class, 'refund'])->middleware('permission:payment.collection.refund');
     Route::apiResource('enrollment-form-schemas', EnrollmentFormSchemaController::class)
         ->parameters(['enrollment-form-schemas' => 'schema'])
         ->middleware('permission:any,users.view,settings.edit,enrollees.create');
@@ -590,6 +602,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('periods/{capitation}/finalise', [CapitationController::class, 'finalise'])->middleware('permission:capitation.approve,capitation.finalise');
         Route::post('periods/{capitation}/pay', [CapitationController::class, 'pay'])->middleware('permission:capitation.pay');
         Route::get('periods/{capitation}/export', [CapitationController::class, 'export'])->middleware('permission:capitation.export');
+        Route::get('periods/{capitation}/export-remita', [CapitationController::class, 'exportRemita'])->middleware('permission:capitation.export');
         Route::get('facilities/{facility}/capitation-history', [CapitationController::class, 'facilityHistory'])->middleware('permission:capitation.view');
     });
 

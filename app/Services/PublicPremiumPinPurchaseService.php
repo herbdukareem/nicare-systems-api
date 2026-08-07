@@ -6,6 +6,8 @@ use App\Models\PremiumPlan;
 use App\Models\PremiumPurchase;
 use App\Services\Billing\BillingCheckoutService;
 use App\Services\Billing\BillingPaymentVerificationService;
+use App\Services\Billing\PaymentCollectionConfigurationService;
+use App\Services\Billing\PaymentCollectionService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -15,7 +17,9 @@ class PublicPremiumPinPurchaseService
     public function __construct(
         private PremiumCoverageService $premiumCoverageService,
         private BillingCheckoutService $billingCheckoutService,
-        private BillingPaymentVerificationService $verificationService
+        private BillingPaymentVerificationService $verificationService,
+        private PaymentCollectionConfigurationService $collectionSettings,
+        private PaymentCollectionService $collectionService
     ) {
     }
 
@@ -32,7 +36,8 @@ class PublicPremiumPinPurchaseService
             throw new RuntimeException('This premium plan does not require a paid Premium PIN.');
         }
 
-        if ($paymentMethod === 'bank_transfer' && !$plan->supportsBankTransfer()) {
+        $virtualCollectionsEnabled = (bool) ($this->collectionSettings->get()['enabled'] ?? false);
+        if ($paymentMethod === 'bank_transfer' && !$virtualCollectionsEnabled && !$plan->supportsBankTransfer()) {
             throw new RuntimeException('This premium plan does not have a dedicated bank transfer account configured yet.');
         }
 
@@ -62,6 +67,15 @@ class PublicPremiumPinPurchaseService
             'amount' => (float) $plan->amount * $quantity,
             'sold_by' => null,
         ]);
+
+        if ($paymentMethod === 'bank_transfer' && $virtualCollectionsEnabled) {
+            $paymentCollection = $this->collectionService->createForPurchase(
+                $purchase,
+                $this->collectionSettings->get()['default_mode'] ?? 'per_payment',
+                'premium_pin_purchase',
+                ['name' => $purchase->payer_name, 'email' => $purchase->payer_email, 'phone' => $purchase->payer_phone]
+            );
+        }
 
         $checkout = null;
 
