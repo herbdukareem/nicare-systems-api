@@ -193,7 +193,7 @@
           <div class="tw-flex tw-gap-1">
             <v-btn icon="mdi-eye" size="small" variant="text" color="primary" title="View breakdown" @click="openBreakdown(item)" />
             <v-btn icon="mdi-printer" size="small" variant="text" color="teal" title="Print invoice" @click="printPeriodQuickInvoice(item)" />
-            <v-btn v-if="canExport" icon="mdi-file-excel" size="small" variant="text" title="Export Remita payment format" @click="exportRemitaPeriod(item)" />
+            <v-btn v-if="canExportRemita(item)" icon="mdi-file-excel" size="small" variant="text" title="Export Remita payment format" @click="exportRemitaPeriod(item)" />
           </div>
         </template>
       </AppDataTable>
@@ -212,7 +212,7 @@
           </div>
           <v-btn variant="outlined" @click="breakdownDialog = false">Close</v-btn>
           <v-btn color="teal" variant="flat" prepend-icon="mdi-printer" @click="printBreakdownInvoice">Print Invoice</v-btn>
-          <v-btn v-if="canExport" color="primary" variant="flat" prepend-icon="mdi-file-excel" @click="exportRemitaPeriod(selectedPeriod)">Export Remita Format</v-btn>
+          <v-btn v-if="canExportRemita(selectedPeriod)" color="primary" variant="flat" prepend-icon="mdi-file-excel" @click="exportRemitaPeriod(selectedPeriod)">Export Remita Format</v-btn>
         </template>
 
         <div class="tw-space-y-4">
@@ -463,6 +463,12 @@ const workflowActions = [
 const hasAnyPermission = (permissions) => permissions.some((p) => authStore.hasPermission(p))
 const visibleWorkflowActions = computed(() => workflowActions.filter((a) => hasAnyPermission(a.permissions)))
 const canExport = computed(() => authStore.hasPermission('capitation.export'))
+const canExportRemita = (period) => {
+  const total = Number(period?.capitation_details_count || 0)
+  const paid = Number(period?.paid_count || 0)
+
+  return props.mode === 'payments' && canExport.value && total > 0 && paid === total
+}
 
 const workflowMode = computed(() => ['review', 'approval', 'payments'].includes(props.mode))
 const workflowStage = computed(() => ({ review: 'review', approval: 'approval', payments: 'payment' })[props.mode] || 'generated')

@@ -182,7 +182,7 @@ const routes = [
     component: EnrolleeProfilePage,
     meta: {
       requiresAuth: true,
-      permissions: ['enrollees.view', 'enrollee.status.change'],
+      permissions: ['enrollees.view', 'enrollee.status.change', 'coverage.renew'],
       title: 'Enrollee Profile',
       breadcrumb: 'Enrollee Profile',
     },

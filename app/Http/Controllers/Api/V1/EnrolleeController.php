@@ -14,6 +14,7 @@ use App\Models\MobileEnrollmentRecord;
 use App\Models\PremiumPin;
 use App\Services\EnrolleeDuplicateDetectionService;
 use App\Services\EnrolleeService;
+use App\Services\EnrolleePortalRenewalService;
 use App\Services\NinVerificationService;
 use App\Services\VulnerableGroupAssignmentService;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -194,6 +195,51 @@ class EnrolleeController extends BaseController
             'facilityTransfers.toFacility', 'createdBy', 'approvedBy', 'ninVerifiedBy',
         ])->loadCount('dependants');
         return $this->sendResponse(new EnrolleeResource($enrollee), 'Enrollee retrieved successfully');
+    }
+
+    /**
+     * Start a payment-backed coverage renewal using the enrollee's current plan.
+     */
+    public function renewCoverage(Enrollee $enrollee, Request $request, EnrolleePortalRenewalService $renewals)
+    {
+        $plan = $enrollee->premiumPlan;
+
+        if (!$plan || $plan->status !== 'active') {
+            return $this->sendError('This enrollee does not have an active premium plan available for renewal.', [], 422);
+        }
+
+        $validated = $request->validate([
+            'payer_email' => ['nullable', 'email'],
+            'payment_method' => ['required', 'in:online,bank_transfer'],
+        ]);
+
+        try {
+            $result = $renewals->create(
+                $enrollee,
+                $plan->id,
+                null,
+                "/enrollees/{$enrollee->id}?checkout_return=1",
+                $validated['payer_email'] ?? null,
+                $validated['payment_method']
+            );
+        } catch (\RuntimeException $exception) {
+            return $this->sendError($exception->getMessage(), [], 422);
+        }
+
+        return $this->sendResponse($result, 'Coverage renewal payment request created.', 201);
+    }
+
+    public function verifyCoverageRenewal(Enrollee $enrollee, Request $request, EnrolleePortalRenewalService $renewals)
+    {
+        $validated = $request->validate(['payment_reference' => ['required', 'string']]);
+
+        try {
+            $result = $renewals->verifyForEnrollee($enrollee, $validated['payment_reference']);
+        } catch (\RuntimeException $exception) {
+            return $this->sendError($exception->getMessage(), [], 422);
+        }
+
+        return $this->sendResponse($result, $result['renewed'] ? 'Coverage renewal payment confirmed.' : 'Payment is still pending.');
     }
 
     /**

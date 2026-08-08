@@ -24,7 +24,7 @@ class EnrolleePortalRenewalService
     ) {
     }
 
-    public function create(Enrollee $enrollee, int $planId, ?string $collectionMode = null): array
+    public function create(Enrollee $enrollee, int $planId, ?string $collectionMode = null, ?string $callbackPath = null, ?string $payerEmail = null, ?string $paymentMethod = null): array
     {
         $plan = PremiumPlan::with(['programme', 'benefitPackage', 'fundingType'])->findOrFail($planId);
 
@@ -38,7 +38,7 @@ class EnrolleePortalRenewalService
             'payer_type' => 'individual',
             'payer_name' => $enrollee->full_name ?: trim(($enrollee->first_name ?? '') . ' ' . ($enrollee->last_name ?? '')),
             'payer_phone' => $enrollee->phone,
-            'payer_email' => $enrollee->email,
+            'payer_email' => $payerEmail ?: $enrollee->email,
             'payer_details' => [
                 'channel' => 'enrollee_portal_renewal',
                 'enrollee_id' => $enrollee->id,
@@ -74,14 +74,17 @@ class EnrolleePortalRenewalService
             throw new RuntimeException('The enrollee account must have an email address before online renewal can continue.');
         }
 
-        if ((bool) ($this->collectionSettings->get()['enabled'] ?? false)) {
+        $useVirtualAccount = $paymentMethod === 'bank_transfer'
+            || ($paymentMethod === null && (bool) ($this->collectionSettings->get()['enabled'] ?? false));
+
+        if ($useVirtualAccount) {
             $collection = $this->collectionService->createForPurchase($purchase, $collectionMode ?: ($this->collectionSettings->get()['default_mode'] ?? 'per_payment'), 'coverage_renewal', ['name' => $purchase->payer_name, 'email' => $purchase->payer_email, 'phone' => $purchase->payer_phone]);
             return ['purchase' => $purchase->fresh(['plan', 'fundingType']), 'checkout' => null, 'payment_collection' => $collection, 'requires_payment' => true, 'renewed' => false];
         }
 
         $checkout = $this->billingCheckoutService->initializePurchaseCheckout(
             $purchase,
-            '/enroll/plans?checkout_return=1'
+            $callbackPath ?? '/enroll/plans?checkout_return=1'
         );
 
         $purchase->update([
@@ -102,6 +105,11 @@ class EnrolleePortalRenewalService
     }
 
     public function verify(Enrollee $enrollee, string $reference): array
+    {
+        return $this->verifyForEnrollee($enrollee, $reference);
+    }
+
+    public function verifyForEnrollee(Enrollee $enrollee, string $reference): array
     {
         $purchase = $this->findAccessiblePurchase($enrollee, $reference);
 

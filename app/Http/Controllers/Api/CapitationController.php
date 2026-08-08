@@ -377,7 +377,13 @@ class CapitationController extends Controller
      */
     public function exportRemita(Capitation $capitation): StreamedResponse
     {
-        $details = $this->service->getBreakdown($capitation);
+        $totalDetails = $capitation->capitationDetails()->count();
+        $details = $this->service->getBreakdown($capitation, 'paid');
+
+        if ($totalDetails === 0 || $details->count() !== $totalDetails) {
+            abort(422, 'The Remita payment format is available only after all capitation details have been marked paid.');
+        }
+
         $year = (string) ($capitation->year ?: substr((string) $capitation->period_start, 0, 4));
         $shortDescription = strtoupper(substr((string) $capitation->name, 0, 2) . substr($year, -2) . 'CAP');
         $longDescription = strtoupper(trim("{$capitation->name} {$year}"));

@@ -123,6 +123,15 @@
             >
               Reset Password
             </v-btn>
+            <v-btn
+              v-if="canRenewCoverage"
+              color="success"
+              variant="outlined"
+              prepend-icon="mdi-refresh"
+              @click="renewalDialog = true"
+            >
+              Renew Coverage
+            </v-btn>
             <v-btn color="primary" variant="outlined" prepend-icon="mdi-pencil" @click="editEnrollee">Edit Profile</v-btn>
             <v-btn color="primary" prepend-icon="mdi-download" @click="downloadProfile">Download PDF</v-btn>
           </div>
@@ -338,14 +347,56 @@
         </p>
       </div>
     </AppModal>
+
+    <AppModal
+      v-model="renewalDialog"
+      title="Pay for Coverage Renewal"
+      :subtitle="enrollee?.name || enrollee?.enrollee_id || ''"
+      icon="mdi-refresh-circle"
+      size="sm"
+      :loading="renewalSaving"
+    >
+      <template #actions>
+        <v-btn variant="outlined" :disabled="renewalSaving" @click="renewalDialog = false">Cancel</v-btn>
+        <v-btn v-if="!paymentCollection" color="primary" variant="flat" :loading="renewalSaving" prepend-icon="mdi-credit-card-outline" @click="renewCoverage('online')">
+          Pay Online
+        </v-btn>
+        <v-btn v-if="!paymentCollection" color="success" variant="outlined" :loading="renewalSaving" prepend-icon="mdi-bank-transfer" @click="renewCoverage('bank_transfer')">
+          Bank Transfer
+        </v-btn>
+      </template>
+
+      <div class="tw-space-y-3">
+        <v-alert type="warning" variant="tonal" density="comfortable">
+          Coverage is activated only after the renewal payment has been confirmed.
+        </v-alert>
+        <div class="tw-rounded-xl tw-border tw-border-gray-200 tw-bg-gray-50 tw-p-4">
+          <p class="tw-text-xs tw-uppercase tw-tracking-[0.24em] tw-text-gray-500">Renewal plan</p>
+          <p class="tw-mt-2 tw-font-semibold tw-text-gray-900">{{ enrollee?.premium_plan?.name || 'N/A' }}</p>
+          <p class="tw-mt-1 tw-text-sm tw-text-gray-500">Choose card/online checkout or a virtual-account bank transfer.</p>
+        </div>
+        <v-text-field
+          v-if="!enrollee?.email"
+          v-model="renewalEmail"
+          label="Payer email for payment receipt"
+          type="email"
+          variant="outlined"
+          density="comfortable"
+          hint="Required by the payment provider. This does not change the enrollee profile."
+          persistent-hint
+        />
+        <PaymentCollectionInstructions v-if="paymentCollection" :collection="paymentCollection" />
+      </div>
+    </AppModal>
   </AdminLayout>
 </template>
 
 <script setup>
-import { ref, onMounted, defineComponent, h, resolveComponent } from 'vue'
+import { computed, ref, onMounted, defineComponent, h, resolveComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
 import AppModal from '../common/AppModal.vue'
+import PaymentCollectionInstructions from '../common/PaymentCollectionInstructions.vue'
 import { useToast } from '../../composables/useToast'
 import { enrolleeAPI } from '../../utils/api'
 import { useAuthStore } from '../../stores/auth'
@@ -363,8 +414,12 @@ const loadError = ref('')
 const fileInput = ref(null)
 const statusDialog = ref(false)
 const passwordDialog = ref(false)
+const renewalDialog = ref(false)
 const statusSaving = ref(false)
 const passwordSaving = ref(false)
+const renewalSaving = ref(false)
+const paymentCollection = ref(null)
+const renewalEmail = ref('')
 const statusForm = ref({
   status: null,
   comment: '',
@@ -378,6 +433,7 @@ const statistics = ref({ totalClaims: 0, totalBenefits: 0, facilitiesVisited: 0,
 const activeCoverage = ref(null)
 const canChangeStatus = auth.hasPermission('enrollee.status.change') || auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve')
 const canResetPassword = auth.hasPermission('enrollee.password.reset')
+const canRenewCoverage = computed(() => auth.hasPermission('coverage.renew'))
 const manageableStatusOptions = [
   { title: 'Pending Approval', value: 0 },
   { title: 'Approved', value: 1 },
@@ -542,6 +598,50 @@ const closePasswordDialog = () => {
   }
 }
 
+const renewCoverage = async (paymentMethod) => {
+  if (!enrollee.value || !canRenewCoverage.value) {
+    error('This enrollee is not eligible for coverage renewal.')
+    return
+  }
+
+  if (!enrollee.value.email && !renewalEmail.value.trim()) {
+    error('Enter a payer email before continuing to payment.')
+    return
+  }
+
+  renewalSaving.value = true
+  try {
+    const response = await enrolleeAPI.renewCoverage(enrollee.value.id, {
+      payer_email: renewalEmail.value.trim() || undefined,
+      payment_method: paymentMethod,
+    })
+    const payload = response.data?.data || {}
+    paymentCollection.value = payload.payment_collection || null
+
+    if (payload.renewed && payload.enrollee) {
+      enrollee.value = payload.enrollee
+      activeCoverage.value = buildActiveCoverage(enrollee.value)
+      renewalDialog.value = false
+      success('Coverage renewal completed successfully.')
+      return
+    }
+
+    if (payload.checkout?.authorization_url) {
+      const checkout = window.open(payload.checkout.authorization_url, 'coverage-renewal-checkout', 'width=520,height=760,noopener,noreferrer')
+      if (!checkout) window.location.href = payload.checkout.authorization_url
+      renewalDialog.value = false
+      success('Payment request created. Complete the secure checkout to activate coverage.')
+      return
+    }
+
+    success('Payment request created. Complete the transfer using the account details shown.')
+  } catch (err) {
+    error(err.response?.data?.message || 'Unable to create the coverage renewal payment request.')
+  } finally {
+    renewalSaving.value = false
+  }
+}
+
 const saveStatusChange = async () => {
   if (!enrollee.value) return
   if (statusForm.value.status === null || statusForm.value.status === undefined || statusForm.value.status === '') {
@@ -676,5 +776,22 @@ const buildActiveCoverage = (record) => {
 /* Lifecycle */
 onMounted(() => {
   loadEnrollee()
+
+  const paymentReference = String(route.query.payment_reference || '')
+  if (route.query.checkout_return && paymentReference) {
+    enrolleeAPI.verifyCoverageRenewal(route.params.id, paymentReference)
+      .then((response) => {
+        const payload = response.data?.data || {}
+        if (payload.renewed && payload.enrollee) {
+          enrollee.value = payload.enrollee
+          activeCoverage.value = buildActiveCoverage(enrollee.value)
+          success('Payment confirmed. Coverage renewed successfully.')
+        } else {
+          error(`Payment is still ${payload.verification?.status || 'pending'}. Coverage has not been activated.`)
+        }
+      })
+      .catch((err) => error(err.response?.data?.message || 'Unable to verify the renewal payment.'))
+      .finally(() => router.replace({ query: {} }))
+  }
 })
 </script>

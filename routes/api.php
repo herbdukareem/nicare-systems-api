@@ -216,7 +216,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('enrollees', [EnrolleeController::class, 'store'])
         ->middleware('permission:enrollees.create');
     Route::get('enrollees/{enrollee}', [EnrolleeController::class, 'show'])
-        ->middleware('permission:any,enrollees.view,enrollee.status.change');
+        ->middleware('permission:any,enrollees.view,enrollee.status.change,coverage.renew');
+    Route::post('enrollees/{enrollee}/renew-coverage', [EnrolleeController::class, 'renewCoverage'])
+        ->middleware('permission:coverage.renew');
+    Route::post('enrollees/{enrollee}/renew-coverage/verify', [EnrolleeController::class, 'verifyCoverageRenewal'])
+        ->middleware('permission:coverage.renew');
     Route::match(['put', 'patch'], 'enrollees/{enrollee}', [EnrolleeController::class, 'update'])
         ->middleware('permission:any,enrollees.update,enrollees.edit');
     Route::patch('enrollees/{enrollee}/password', [EnrolleeApiController::class, 'resetPassword'])

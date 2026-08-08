@@ -365,7 +365,10 @@
             <BenefactorBadge v-if="relationName(selected.benefactor)" :label="relationName(selected.benefactor)" />
           </div>
 
-          <div class="tw-flex tw-gap-2">
+          <div class="tw-flex tw-flex-wrap tw-gap-2">
+            <v-btn size="small" color="primary" variant="outlined" prepend-icon="mdi-open-in-new" @click="openFullProfile(selected)">
+              Open Full Profile
+            </v-btn>
             <v-btn size="small" color="primary" variant="outlined" :disabled="!canEdit" @click="openEdit(selected)">
               <v-icon start size="16">mdi-pencil</v-icon>
               Edit
@@ -522,6 +525,33 @@
       </AppModal>
 
       <AppModal
+        v-model="renewalDialog"
+        title="Renew Coverage"
+        :subtitle="selected ? (selected.full_name || selected.name || selected.enrollee_id) : ''"
+        icon="mdi-refresh-circle"
+        size="sm"
+        :loading="renewalSaving"
+      >
+        <template #actions>
+          <v-btn variant="outlined" :disabled="renewalSaving" @click="renewalDialog = false">Cancel</v-btn>
+          <v-btn color="success" variant="flat" :loading="renewalSaving" prepend-icon="mdi-refresh" @click="renewSelectedCoverage">
+            Renew Coverage
+          </v-btn>
+        </template>
+
+        <div class="tw-space-y-3">
+          <v-alert type="warning" variant="tonal" density="comfortable">
+            The renewed period will begin after the current coverage ends, or today if it has already expired.
+          </v-alert>
+          <div class="tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
+            <p class="tw-text-xs tw-uppercase tw-tracking-[0.24em] tw-text-slate-500">Renewal plan</p>
+            <p class="tw-mt-2 tw-font-semibold tw-text-slate-900">{{ relationName(selected?.premium_plan) || 'N/A' }}</p>
+            <p class="tw-mt-1 tw-text-sm tw-text-slate-500">Coverage will be renewed using this plan.</p>
+          </div>
+        </div>
+      </AppModal>
+
+      <AppModal
         v-model="statusDialog"
         title="Change Enrollee Status"
         :subtitle="statusTarget ? (statusTarget.full_name || statusTarget.name || statusTarget.enrollee_id) : ''"
@@ -590,6 +620,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
 import AppAlert from '../common/AppAlert.vue'
 import AppBadge from '../common/AppBadge.vue'
@@ -613,6 +644,7 @@ import { useAuthStore } from '../../stores/auth'
 
 const { success, error } = useToast()
 const auth = useAuthStore()
+const router = useRouter()
 
 const canView = computed(() => auth.hasPermission('enrollees.view'))
 const canEdit = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollee.update'))
@@ -620,6 +652,7 @@ const canChangeStatus = computed(() => auth.hasPermission('enrollee.status.chang
 const canResetPassword = computed(() => auth.hasPermission('enrollee.password.reset'))
 const canDelete = computed(() => auth.hasPermission('enrollees.delete'))
 const canExport = computed(() => auth.hasPermission('enrollees.export'))
+const canRenewSelectedCoverage = computed(() => auth.hasPermission('coverage.renew'))
 
 const metadata = reactive({
   insurance_programmes: [],
@@ -659,6 +692,7 @@ const detailDrawer = ref(false)
 const editDialog = ref(false)
 const statusDialog = ref(false)
 const passwordDialog = ref(false)
+const renewalDialog = ref(false)
 const deleteDialog = ref(false)
 const editForm = reactive({})
 const statusForm = reactive({
@@ -674,6 +708,7 @@ const exporting = ref(false)
 const saving = ref(false)
 const statusSaving = ref(false)
 const passwordSaving = ref(false)
+const renewalSaving = ref(false)
 const deleting = ref(false)
 const hasLoaded = ref(false)
 const loadError = ref('')
@@ -840,6 +875,7 @@ const responseSummary = (response) => {
 }
 
 const formatNumber = (value) => Number(value || 0).toLocaleString()
+const formatDate = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString() : 'N/A'
 const relationName = (object) => object?.name || object?.full_name || null
 const statusLabel = (status) => ({
   0: 'Pending Approval',
@@ -1120,6 +1156,11 @@ const openDetails = async (item) => {
   }
 }
 
+const openFullProfile = (item) => {
+  if (!item?.id) return
+  router.push({ name: 'enrollee-profile', params: { id: item.id } })
+}
+
 const openEdit = (item) => {
   selected.value = item
   Object.keys(editForm).forEach((key) => delete editForm[key])
@@ -1263,6 +1304,16 @@ const savePasswordReset = async () => {
   } finally {
     passwordSaving.value = false
   }
+}
+
+const renewSelectedCoverage = async () => {
+  if (!selected.value || !canRenewSelectedCoverage.value) {
+    error('This enrollee is not eligible for coverage renewal.')
+    return
+  }
+
+  renewalDialog.value = false
+  router.push({ name: 'enrollee-profile', params: { id: selected.value.id } })
 }
 
 const promptDelete = (item) => {

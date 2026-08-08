@@ -120,6 +120,8 @@ export const enrolleeAPI = {
   getDuplicateFlags: (params) => api.get('/enrollees/duplicates', { params }),
   resolveDuplicateFlag: (id, data) => api.post(`/enrollees/duplicates/${id}/resolve`, data),
   getById: (id) => api.get(`/enrollees/${id}`),
+  renewCoverage: (id, data = {}) => api.post(`/enrollees/${id}/renew-coverage`, data),
+  verifyCoverageRenewal: (id, paymentReference) => api.post(`/enrollees/${id}/renew-coverage/verify`, { payment_reference: paymentReference }),
   create: (data) => api.post('/enrollees', data),
   verifyNin: (id, data = {}) => api.post(`/enrollees/${id}/verify-nin`, data),
   approve: (id, data = {}) => api.post(`/enrollees/${id}/approve`, data),
