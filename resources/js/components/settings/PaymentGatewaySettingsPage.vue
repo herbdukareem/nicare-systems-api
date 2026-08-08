@@ -164,6 +164,21 @@
               density="comfortable"
               class="md:tw-col-span-2"
             />
+
+            <div class="md:tw-col-span-2 tw-rounded-lg tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
+              <div class="tw-flex tw-flex-wrap tw-items-start tw-justify-between tw-gap-3">
+                <div>
+                  <p class="tw-text-sm tw-font-semibold tw-text-slate-900">Checkout processing fee</p>
+                  <p class="tw-mt-1 tw-text-xs tw-text-slate-600">Use the provider's actual commercial terms. When enabled, the payer sees the fee separately and the gateway receives the total payable amount.</p>
+                </div>
+                <v-switch v-model="selectedGatewayEnvironmentConfig.checkout_fee_policy.customer_bears_processing_fee" color="primary" label="Customer pays fee" hide-details inset />
+              </div>
+              <div v-if="selectedGatewayEnvironmentConfig.checkout_fee_policy.customer_bears_processing_fee" class="tw-mt-4 tw-grid tw-gap-4 md:tw-grid-cols-3">
+                <v-text-field v-model.number="selectedGatewayEnvironmentConfig.checkout_fee_policy.percentage" label="Percentage fee" type="number" min="0" step="0.01" suffix="%" variant="outlined" density="comfortable" />
+                <v-text-field v-model.number="selectedGatewayEnvironmentConfig.checkout_fee_policy.flat_amount" label="Flat fee" type="number" min="0" step="0.01" prefix="₦" variant="outlined" density="comfortable" />
+                <v-text-field v-model.number="selectedGatewayEnvironmentConfig.checkout_fee_policy.maximum_amount" label="Fee cap (optional)" type="number" min="0" step="0.01" prefix="₦" variant="outlined" density="comfortable" hint="Use 0 for no cap" persistent-hint />
+              </div>
+            </div>
           </div>
         </AppCard>
       </div>
@@ -389,6 +404,7 @@ const defaultPaystackEnvironment = () => ({
   currency: 'NGN',
   callback_path: '/enroll/start?checkout_return=1',
   request_amount_multiplier: 100,
+  checkout_fee_policy: { customer_bears_processing_fee: true, percentage: 1.5, flat_amount: 100, maximum_amount: 0 },
   response_paths: {
     success: 'status',
     message: 'message',
@@ -412,6 +428,7 @@ const defaultMonnifyEnvironment = (environment = 'test') => ({
   callback_path: '/enroll/start?checkout_return=1',
   payment_methods: ['CARD', 'ACCOUNT_TRANSFER', 'USSD'],
   request_amount_multiplier: 1,
+  checkout_fee_policy: { customer_bears_processing_fee: false, percentage: 0, flat_amount: 0, maximum_amount: 0 },
   response_paths: {
     success: 'requestSuccessful',
     message: 'responseMessage',
@@ -431,6 +448,7 @@ const defaultRemitaEnvironment = (environment = 'test') => ({
   currency: 'NGN',
   callback_path: '/enroll/start?checkout_return=1',
   request_amount_multiplier: 1,
+  checkout_fee_policy: { customer_bears_processing_fee: false, percentage: 0, flat_amount: 0, maximum_amount: 0 },
   response_paths: {
     success: 'status',
     message: 'message',
@@ -453,6 +471,7 @@ const defaultQuicktellerEnvironment = (environment = 'test') => ({
   currency: '566',
   callback_path: '/enroll/start?checkout_return=1',
   request_amount_multiplier: 100,
+  checkout_fee_policy: { customer_bears_processing_fee: false, percentage: 0, flat_amount: 0, maximum_amount: 0 },
   response_paths: {
     success: '',
     message: 'ResponseDescription',
@@ -630,6 +649,10 @@ const normalizeEnvironmentConfig = (baseEnvironment, environmentConfig = {}) => 
   response_paths: {
     ...(baseEnvironment.response_paths || {}),
     ...(environmentConfig?.response_paths || {}),
+  },
+  checkout_fee_policy: {
+    ...(baseEnvironment.checkout_fee_policy || {}),
+    ...(environmentConfig?.checkout_fee_policy || {}),
   },
   successful_payment_values: Array.isArray(environmentConfig?.successful_payment_values)
     ? environmentConfig.successful_payment_values

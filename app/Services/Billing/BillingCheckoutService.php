@@ -53,6 +53,22 @@ class BillingCheckoutService
         ], $configuration);
     }
 
+    /**
+     * Returns the customer-facing amount for a premium plan without creating a
+     * transaction. Each gateway adapter owns its fee calculation semantics.
+     */
+    public function quotePremiumPlanCheckout(PremiumPlan $plan): array
+    {
+        [$gatewayCode, $configuration] = $this->gatewayForPlan($plan);
+        $quote = $this->gatewayManager->gateway($gatewayCode)->quoteCheckout((float) $plan->amount, $configuration);
+
+        return [
+            ...$quote,
+            'provider' => $gatewayCode,
+            'currency' => $configuration['currency'] ?? 'NGN',
+        ];
+    }
+
     public function initializePublicEnrollmentCheckout(PremiumPlan $plan, array $payer, string $reference): array
     {
         $gatewayCode = $plan->payment_gateway ?: $this->configurationService->getActiveGatewayCode();
@@ -132,5 +148,21 @@ class BillingCheckoutService
         ]);
 
         return $parts !== [] ? implode(' ', $parts) : 'Customer';
+    }
+
+    private function gatewayForPlan(PremiumPlan $plan): array
+    {
+        $gatewayCode = $plan->payment_gateway ?: $this->configurationService->getActiveGatewayCode();
+        $configuration = $this->configurationService->getConfig($gatewayCode);
+
+        if (!in_array($gatewayCode, ['paystack', 'monnify', 'remita', 'quickteller'], true)) {
+            throw new RuntimeException('The selected plan is not linked to a supported online checkout gateway yet.');
+        }
+
+        if (!$this->configurationService->isGatewayEnabled($gatewayCode)) {
+            throw new RuntimeException("The configured {$gatewayCode} gateway is not enabled for online checkout.");
+        }
+
+        return [$gatewayCode, $configuration];
     }
 }

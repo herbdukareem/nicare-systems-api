@@ -14,6 +14,9 @@ class PremiumPurchase extends Model
     protected $casts = [
         'payer_details' => 'array',
         'amount' => 'decimal:2',
+        'base_amount' => 'decimal:2',
+        'processing_fee' => 'decimal:2',
+        'customer_total' => 'decimal:2',
         'gateway_response' => 'array',
         'paid_at' => 'datetime',
         'confirmed_at' => 'datetime',

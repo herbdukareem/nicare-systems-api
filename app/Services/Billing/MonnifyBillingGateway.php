@@ -14,6 +14,11 @@ class MonnifyBillingGateway implements BillingPaymentGatewayInterface
         return 'monnify';
     }
 
+    public function quoteCheckout(float $baseAmount, array $configuration): array
+    {
+        return CheckoutFeeQuote::for($baseAmount, $configuration);
+    }
+
     public function initializeCheckout(array $payload, array $configuration): array
     {
         $response = Http::baseUrl($configuration['base_url'])

@@ -13,6 +13,11 @@ class QuicktellerBillingGateway implements BillingPaymentGatewayInterface
         return 'quickteller';
     }
 
+    public function quoteCheckout(float $baseAmount, array $configuration): array
+    {
+        return CheckoutFeeQuote::for($baseAmount, $configuration);
+    }
+
     public function initializeCheckout(array $payload, array $configuration): array
     {
         $merchantCode = trim((string) ($configuration['merchant_code'] ?? ''));

@@ -146,7 +146,7 @@
               color="success"
               variant="outlined"
               prepend-icon="mdi-refresh"
-              @click="renewalDialog = true"
+              @click="openRenewalDialog"
             >
               Renew Coverage
             </v-btn>
@@ -202,7 +202,7 @@
       <AppCard title="Coverage & premium" subtitle="Eligibility, plan period, and care assignment" icon="mdi-shield-check-outline" tone="success">
         <template #actions>
           <AppBadge :label="activeCoverage ? 'Eligible for care' : 'No active coverage'" :tone="activeCoverage ? 'success' : 'warning'" size="sm" />
-          <v-btn v-if="canRenewCoverage" size="small" color="success" variant="outlined" prepend-icon="mdi-refresh" @click="renewalDialog = true">Renew coverage</v-btn>
+          <v-btn v-if="canRenewCoverage" size="small" color="success" variant="outlined" prepend-icon="mdi-refresh" @click="openRenewalDialog">Renew coverage</v-btn>
         </template>
         <div v-if="activeCoverage" class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-4">
           <InfoItem label="Programme" :value="activeCoverage.insurance_programme?.name || 'N/A'" icon="mdi-shield-account" />
@@ -367,6 +367,9 @@
     >
       <template #actions>
         <v-btn variant="outlined" :disabled="renewalSaving" @click="renewalDialog = false">Cancel</v-btn>
+        <v-btn v-if="paymentCollection" color="primary" variant="flat" :loading="renewalSaving" prepend-icon="mdi-refresh" @click="verifyTransferPayment">
+          Check payment status
+        </v-btn>
         <v-btn v-if="!paymentCollection" color="primary" variant="flat" :loading="renewalSaving" prepend-icon="mdi-credit-card-outline" @click="renewCoverage('online')">
           Pay Online
         </v-btn>
@@ -384,6 +387,27 @@
           <p class="tw-mt-2 tw-font-semibold tw-text-gray-900">{{ enrollee?.premium_plan?.name || 'N/A' }}</p>
           <p class="tw-mt-1 tw-text-sm tw-text-gray-500">Choose card/online checkout or a virtual-account bank transfer.</p>
         </div>
+        <div v-if="renewalQuote" class="tw-overflow-hidden tw-rounded-xl tw-border tw-border-slate-200">
+          <div class="tw-bg-slate-50 tw-px-4 tw-py-3">
+            <p class="tw-text-sm tw-font-semibold tw-text-slate-900">Payment summary</p>
+            <p class="tw-mt-1 tw-text-xs tw-text-slate-500">The processing fee is based on the selected gateway's configured checkout terms.</p>
+          </div>
+          <dl class="tw-space-y-2 tw-p-4 tw-text-sm">
+            <div class="tw-flex tw-items-center tw-justify-between tw-gap-4">
+              <dt class="tw-text-slate-600">Coverage price</dt>
+              <dd class="tw-font-medium tw-text-slate-900">{{ formatMoney(renewalQuote.base_amount, renewalQuote.currency) }}</dd>
+            </div>
+            <div class="tw-flex tw-items-center tw-justify-between tw-gap-4">
+              <dt class="tw-text-slate-600">Processing fee</dt>
+              <dd class="tw-font-medium tw-text-slate-900">{{ formatMoney(renewalQuote.processing_fee, renewalQuote.currency) }}</dd>
+            </div>
+            <div class="tw-flex tw-items-center tw-justify-between tw-gap-4 tw-border-t tw-border-slate-200 tw-pt-3">
+              <dt class="tw-font-semibold tw-text-slate-900">Total payable</dt>
+              <dd class="tw-text-base tw-font-bold tw-text-primary">{{ formatMoney(renewalQuote.customer_total, renewalQuote.currency) }}</dd>
+            </div>
+          </dl>
+        </div>
+        <v-alert v-else-if="renewalQuoteLoading" type="info" variant="tonal" density="comfortable">Calculating the payment total…</v-alert>
         <v-text-field
           v-if="!enrollee?.email"
           v-model="renewalEmail"
@@ -433,6 +457,8 @@ const passwordSaving = ref(false)
 const renewalSaving = ref(false)
 const paymentCollection = ref(null)
 const renewalEmail = ref('')
+const renewalQuote = ref(null)
+const renewalQuoteLoading = ref(false)
 const statusForm = ref({
   status: null,
   comment: '',
@@ -613,6 +639,57 @@ const closePasswordDialog = () => {
   }
 }
 
+const formatMoney = (amount, currency = 'NGN') => new Intl.NumberFormat('en-NG', {
+  style: 'currency',
+  currency: currency || 'NGN',
+  minimumFractionDigits: 2,
+}).format(Number(amount || 0))
+
+const openRenewalDialog = async () => {
+  if (!enrollee.value || !canRenewCoverage.value) return
+
+  renewalDialog.value = true
+  paymentCollection.value = null
+  renewalQuote.value = null
+  renewalQuoteLoading.value = true
+  try {
+    const pendingResponse = await enrolleeAPI.getPendingCoverageRenewalCollection(enrollee.value.id)
+    paymentCollection.value = pendingResponse.data?.data || null
+    if (paymentCollection.value) return
+
+    const response = await enrolleeAPI.getCoverageRenewalQuote(enrollee.value.id)
+    renewalQuote.value = response.data?.data || null
+  } catch (err) {
+    error(err.response?.data?.message || 'Unable to calculate the renewal payment total.')
+  } finally {
+    renewalQuoteLoading.value = false
+  }
+}
+
+const verifyTransferPayment = async () => {
+  if (!enrollee.value || !paymentCollection.value?.payment_reference) return
+
+  renewalSaving.value = true
+  try {
+    const response = await enrolleeAPI.verifyCoverageRenewal(enrollee.value.id, paymentCollection.value.payment_reference)
+    const payload = response.data?.data || {}
+    if (payload.renewed && payload.enrollee) {
+      enrollee.value = payload.enrollee
+      activeCoverage.value = buildActiveCoverage(enrollee.value)
+      paymentCollection.value = null
+      renewalDialog.value = false
+      success('Payment confirmed and coverage activated.')
+      return
+    }
+
+    error(payload.verification?.message || 'The transfer is still pending confirmation. Please try again shortly.')
+  } catch (err) {
+    error(err.response?.data?.message || 'Unable to verify the transfer at this time.')
+  } finally {
+    renewalSaving.value = false
+  }
+}
+
 const renewCoverage = async (paymentMethod) => {
   if (!enrollee.value || !canRenewCoverage.value) {
     error('This enrollee is not eligible for coverage renewal.')
@@ -621,6 +698,11 @@ const renewCoverage = async (paymentMethod) => {
 
   if (!enrollee.value.email && !renewalEmail.value.trim()) {
     error('Enter a payer email before continuing to payment.')
+    return
+  }
+
+  if (renewalQuoteLoading.value || !renewalQuote.value) {
+    error('Wait for the payment total before continuing.')
     return
   }
 

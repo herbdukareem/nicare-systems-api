@@ -9,6 +9,7 @@ use App\Services\Billing\BillingCheckoutService;
 use App\Services\Billing\BillingPaymentVerificationService;
 use App\Services\Billing\PaymentCollectionConfigurationService;
 use App\Services\Billing\PaymentCollectionService;
+use App\Models\PaymentIntent;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use RuntimeException;
@@ -32,6 +33,10 @@ class EnrolleePortalRenewalService
             throw new RuntimeException('The selected premium plan is not active.');
         }
 
+        $quote = $plan->requiresPayment()
+            ? $this->billingCheckoutService->quotePremiumPlanCheckout($plan)
+            : ['base_amount' => (float) $plan->amount, 'processing_fee' => 0, 'customer_total' => (float) $plan->amount];
+
         $purchase = $this->premiumCoverageService->createPurchase([
             'premium_plan_id' => $plan->id,
             'funding_type_id' => $plan->funding_type_id,
@@ -48,7 +53,13 @@ class EnrolleePortalRenewalService
             'payment_status' => $plan->requiresPayment() ? 'pending' : 'confirmed',
             'payment_reference' => $this->uniqueReference(),
             'quantity' => 1,
-            'amount' => (float) $plan->amount,
+            // amount remains the amount sent to the payment provider for
+            // backwards compatibility. The individual quote fields preserve
+            // the plan price and the transparent customer surcharge.
+            'amount' => $quote['customer_total'],
+            'base_amount' => $quote['base_amount'],
+            'processing_fee' => $quote['processing_fee'],
+            'customer_total' => $quote['customer_total'],
             'sold_by' => null,
         ]);
 
@@ -102,6 +113,47 @@ class EnrolleePortalRenewalService
             'requires_payment' => true,
             'renewed' => false,
         ];
+    }
+
+    public function quote(Enrollee $enrollee): array
+    {
+        $plan = $enrollee->premiumPlan;
+        if (!$plan || $plan->status !== 'active') {
+            throw new RuntimeException('This enrollee does not have an active premium plan available for renewal.');
+        }
+
+        $quote = $plan->requiresPayment()
+            ? $this->billingCheckoutService->quotePremiumPlanCheckout($plan)
+            : ['base_amount' => (float) $plan->amount, 'processing_fee' => 0, 'customer_total' => (float) $plan->amount, 'currency' => 'NGN'];
+
+        return [
+            'plan_id' => $plan->id,
+            'plan_name' => $plan->name,
+            'requires_payment' => $plan->requiresPayment(),
+            ...$quote,
+        ];
+    }
+
+    public function pendingCollection(Enrollee $enrollee): ?array
+    {
+        $purchaseIds = PremiumPurchase::query()
+            ->where('payment_status', 'pending')
+            ->where('payer_details->channel', 'enrollee_portal_renewal')
+            ->where('payer_details->enrollee_id', $enrollee->id)
+            ->pluck('id');
+
+        if ($purchaseIds->isEmpty()) {
+            return null;
+        }
+
+        $intent = PaymentIntent::with('accounts')
+            ->where('payable_type', PremiumPurchase::class)
+            ->whereIn('payable_id', $purchaseIds)
+            ->whereIn('status', ['pending', 'awaiting_payment', 'review_required'])
+            ->latest()
+            ->first();
+
+        return $intent ? $this->collectionService->present($intent) : null;
     }
 
     public function verify(Enrollee $enrollee, string $reference): array

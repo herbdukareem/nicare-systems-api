@@ -13,6 +13,11 @@ class PaystackBillingGateway implements BillingPaymentGatewayInterface
         return 'paystack';
     }
 
+    public function quoteCheckout(float $baseAmount, array $configuration): array
+    {
+        return CheckoutFeeQuote::for($baseAmount, $configuration);
+    }
+
     public function initializeCheckout(array $payload, array $configuration): array
     {
         $response = Http::baseUrl($configuration['base_url'])

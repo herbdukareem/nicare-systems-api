@@ -17,7 +17,7 @@ class BillingPaymentVerificationService
 
     public function verifyPurchase(PremiumPurchase $purchase): array
     {
-        if ($purchase->payment_method !== 'online_payment') {
+        if (!in_array($purchase->payment_method, ['online_payment', 'virtual_account'], true)) {
             $isConfirmed = $purchase->payment_status === 'confirmed';
             $status = $purchase->payment_status === 'cancelled'
                 ? 'cancelled'

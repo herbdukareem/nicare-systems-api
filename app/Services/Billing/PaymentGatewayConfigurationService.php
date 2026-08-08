@@ -206,7 +206,26 @@ class PaymentGatewayConfigurationService
 
     private function defaultEnvironmentConfig(string $code, string $environment): array
     {
-        return match ($code) {
+        $checkoutFeePolicy = [
+            'customer_bears_processing_fee' => false,
+            'percentage' => 0,
+            'flat_amount' => 0,
+            'maximum_amount' => 0,
+        ];
+
+        // These are the terms confirmed for the currently configured Paystack
+        // test account. Administrators can override them per environment when
+        // their provider agreement differs.
+        if ($code === 'paystack') {
+            $checkoutFeePolicy = [
+                'customer_bears_processing_fee' => true,
+                'percentage' => 1.5,
+                'flat_amount' => 100,
+                'maximum_amount' => 0,
+            ];
+        }
+
+        return array_replace(['checkout_fee_policy' => $checkoutFeePolicy], match ($code) {
             'paystack' => [
                 'base_url' => 'https://api.paystack.co',
                 'initialize_endpoint' => '/transaction/initialize',
@@ -286,7 +305,7 @@ class PaymentGatewayConfigurationService
                 'successful_payment_values' => ['00'],
             ],
             default => [],
-        };
+        });
     }
 
     private function legacyEnvironmentConfig(string $code, array $config): array

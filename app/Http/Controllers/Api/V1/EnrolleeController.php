@@ -200,6 +200,20 @@ class EnrolleeController extends BaseController
     /**
      * Start a payment-backed coverage renewal using the enrollee's current plan.
      */
+    public function renewalCoverageQuote(Enrollee $enrollee, EnrolleePortalRenewalService $renewals)
+    {
+        try {
+            return $this->sendResponse($renewals->quote($enrollee), 'Coverage renewal quote retrieved.');
+        } catch (\RuntimeException $exception) {
+            return $this->sendError($exception->getMessage(), [], 422);
+        }
+    }
+
+    public function pendingCoverageRenewalCollection(Enrollee $enrollee, EnrolleePortalRenewalService $renewals)
+    {
+        return $this->sendResponse($renewals->pendingCollection($enrollee), 'Pending coverage renewal collection retrieved.');
+    }
+
     public function renewCoverage(Enrollee $enrollee, Request $request, EnrolleePortalRenewalService $renewals)
     {
         $plan = $enrollee->premiumPlan;
