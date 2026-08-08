@@ -12,6 +12,7 @@ use App\Models\EnrolleeFacilityTransfer;
 use App\Models\Facility;
 use App\Models\MobileEnrollmentRecord;
 use App\Models\PremiumPin;
+use App\Models\PremiumPurchase;
 use App\Services\EnrolleeDuplicateDetectionService;
 use App\Services\EnrolleeService;
 use App\Services\EnrolleePortalRenewalService;
@@ -212,6 +213,37 @@ class EnrolleeController extends BaseController
     public function pendingCoverageRenewalCollection(Enrollee $enrollee, EnrolleePortalRenewalService $renewals)
     {
         return $this->sendResponse($renewals->pendingCollection($enrollee), 'Pending coverage renewal collection retrieved.');
+    }
+
+    public function coverageRenewalTransactions(Enrollee $enrollee, Request $request)
+    {
+        $transactions = PremiumPurchase::query()
+            ->with('plan:id,name')
+            ->where('payer_details->channel', 'enrollee_portal_renewal')
+            ->where('payer_details->enrollee_id', $enrollee->id)
+            ->latest()
+            ->paginate(min(25, max(5, $request->integer('per_page', 10))));
+
+        return $this->sendResponse($transactions, 'Coverage renewal payment transactions retrieved.');
+    }
+
+    public function downloadCoverageRenewalReceipt(Enrollee $enrollee, PremiumPurchase $premiumPurchase)
+    {
+        if (
+            data_get($premiumPurchase->payer_details, 'channel') !== 'enrollee_portal_renewal'
+            || (int) data_get($premiumPurchase->payer_details, 'enrollee_id') !== (int) $enrollee->id
+        ) {
+            abort(404);
+        }
+
+        if ($premiumPurchase->payment_status !== 'confirmed') {
+            return $this->sendError('A receipt is available only after the payment has been confirmed.', [], 422);
+        }
+
+        return Pdf::loadView('pdf.coverage-renewal-receipt', [
+            'enrollee' => $enrollee,
+            'purchase' => $premiumPurchase->load('plan'),
+        ])->download("coverage-renewal-receipt-{$premiumPurchase->payment_reference}.pdf");
     }
 
     public function renewCoverage(Enrollee $enrollee, Request $request, EnrolleePortalRenewalService $renewals)

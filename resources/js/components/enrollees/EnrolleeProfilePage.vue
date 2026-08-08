@@ -224,6 +224,58 @@
         </v-alert>
       </AppCard>
 
+      <AppCard v-if="canRenewCoverage" title="Coverage renewal payments" subtitle="Recent payment attempts and confirmed renewal receipts" icon="mdi-receipt-text-outline" tone="success">
+        <AppDataTable
+          :headers="renewalTransactionHeaders"
+          :items="renewalTransactions"
+          :loading="renewalTransactionsLoading"
+          :items-length="renewalTransactionsTotal"
+          :page="renewalTransactionsPage"
+          :items-per-page="10"
+          @update:page="loadRenewalTransactions"
+        >
+          <template #item.reference="{ item }">
+            <span class="tw-font-mono tw-text-xs tw-font-medium tw-text-slate-800">{{ item.payment_reference }}</span>
+          </template>
+          <template #item.amount="{ item }">
+            <span class="tw-font-semibold">{{ formatMoney(item.customer_total || item.amount) }}</span>
+          </template>
+          <template #item.status="{ item }">
+            <AppBadge :label="paymentStatusLabel(item.payment_status)" :tone="paymentStatusTone(item.payment_status)" size="sm" />
+          </template>
+          <template #item.created_at="{ item }">{{ formatDateTime(item.created_at) }}</template>
+          <template #item.actions="{ item }">
+            <div class="tw-flex tw-justify-end tw-gap-1">
+              <v-tooltip text="Check payment status">
+                <template #activator="{ props }">
+                  <v-btn
+                    v-if="item.payment_status === 'pending'"
+                    v-bind="props"
+                    icon="mdi-refresh"
+                    variant="text"
+                    size="small"
+                    :loading="renewalTransactionCheckingId === item.id"
+                    @click="checkRenewalTransaction(item)"
+                  />
+                </template>
+              </v-tooltip>
+              <v-tooltip text="Download receipt">
+                <template #activator="{ props }">
+                  <v-btn
+                    v-if="item.payment_status === 'confirmed'"
+                    v-bind="props"
+                    icon="mdi-download-outline"
+                    variant="text"
+                    size="small"
+                    @click="downloadRenewalReceipt(item)"
+                  />
+                </template>
+              </v-tooltip>
+            </div>
+          </template>
+        </AppDataTable>
+      </AppCard>
+
       <!-- Employment -->
       <AppCard v-if="enrollee.employment_detail" title="Employment" icon="mdi-briefcase-outline" tone="secondary">
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-4">
@@ -430,6 +482,7 @@ import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
 import AppBadge from '../common/AppBadge.vue'
 import AppCard from '../common/AppCard.vue'
+import AppDataTable from '../common/AppDataTable.vue'
 import AppModal from '../common/AppModal.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
 import AppStatusBadge from '../common/AppStatusBadge.vue'
@@ -459,6 +512,11 @@ const paymentCollection = ref(null)
 const renewalEmail = ref('')
 const renewalQuote = ref(null)
 const renewalQuoteLoading = ref(false)
+const renewalTransactions = ref([])
+const renewalTransactionsLoading = ref(false)
+const renewalTransactionsPage = ref(1)
+const renewalTransactionsTotal = ref(0)
+const renewalTransactionCheckingId = ref(null)
 const statusForm = ref({
   status: null,
   comment: '',
@@ -479,6 +537,14 @@ const manageableStatusOptions = [
   { title: 'Rejected', value: 2 },
   { title: 'Suspended', value: 3 },
   { title: 'Inactive', value: 4 },
+]
+const renewalTransactionHeaders = [
+  { title: 'Reference', key: 'reference', sortable: false },
+  { title: 'Plan', key: 'plan.name', sortable: false },
+  { title: 'Total paid', key: 'amount', align: 'end', sortable: false },
+  { title: 'Status', key: 'status', sortable: false },
+  { title: 'Created', key: 'created_at', sortable: false },
+  { title: '', key: 'actions', align: 'end', sortable: false },
 ]
 
 /* -------- Small presentational components (render functions to keep SFC lean) -------- */
@@ -529,6 +595,7 @@ const loadEnrollee = async () => {
     enrollee.value = response.data.data
     activeCoverage.value = buildActiveCoverage(enrollee.value)
     loadStatistics()
+    loadRenewalTransactions()
   } catch (err) {
     loadError.value = err.response?.data?.message || 'Failed to load enrollee details.'
     error(loadError.value)
@@ -549,6 +616,64 @@ const loadStatistics = async () => {
     }
   } catch (err) {
     console.error('Failed to load enrollee statistics:', err)
+  }
+}
+
+const loadRenewalTransactions = async (page = renewalTransactionsPage.value) => {
+  if (!enrollee.value || !canRenewCoverage.value) return
+
+  renewalTransactionsLoading.value = true
+  try {
+    const response = await enrolleeAPI.getCoverageRenewalTransactions(enrollee.value.id, { page, per_page: 10 })
+    const payload = response.data?.data || {}
+    renewalTransactions.value = payload.data || []
+    renewalTransactionsPage.value = payload.current_page || page
+    renewalTransactionsTotal.value = payload.total || renewalTransactions.value.length
+  } catch (err) {
+    error(err.response?.data?.message || 'Unable to load coverage renewal payments.')
+  } finally {
+    renewalTransactionsLoading.value = false
+  }
+}
+
+const paymentStatusLabel = (status) => ({ confirmed: 'Confirmed', pending: 'Pending', cancelled: 'Cancelled' }[status] || status || 'Unknown')
+const paymentStatusTone = (status) => ({ confirmed: 'success', pending: 'warning', cancelled: 'danger' }[status] || 'secondary')
+const formatDateTime = (value) => value ? new Intl.DateTimeFormat('en-NG', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value)) : 'N/A'
+
+const checkRenewalTransaction = async (transaction) => {
+  if (!enrollee.value || !transaction.payment_reference) return
+
+  renewalTransactionCheckingId.value = transaction.id
+  try {
+    const response = await enrolleeAPI.verifyCoverageRenewal(enrollee.value.id, transaction.payment_reference)
+    const payload = response.data?.data || {}
+    if (payload.renewed && payload.enrollee) {
+      enrollee.value = payload.enrollee
+      activeCoverage.value = buildActiveCoverage(enrollee.value)
+      success('Payment confirmed and coverage activated.')
+    } else {
+      error(payload.verification?.message || 'Payment is still pending confirmation.')
+    }
+    loadRenewalTransactions()
+  } catch (err) {
+    error(err.response?.data?.message || 'Unable to check this payment status.')
+  } finally {
+    renewalTransactionCheckingId.value = null
+  }
+}
+
+const downloadRenewalReceipt = async (transaction) => {
+  if (!enrollee.value) return
+  try {
+    const response = await enrolleeAPI.downloadCoverageRenewalReceipt(enrollee.value.id, transaction.id)
+    const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `coverage-renewal-receipt-${transaction.payment_reference}.pdf`
+    link.click()
+    window.URL.revokeObjectURL(url)
+  } catch (err) {
+    error(err.response?.data?.message || 'Unable to download this payment receipt.')
   }
 }
 
