@@ -8,10 +8,25 @@
     </div>
 
     <div class="tw-space-y-6" v-else-if="enrollee">
+      <AppPageHeader
+        title="Enrollee profile"
+        :subtitle="`${enrollee.name} · ${enrollee.enrollee_id}`"
+        kicker="Enrollment"
+        icon="mdi-account-details-outline"
+      >
+        <template #meta>
+          <AppStatusBadge :status="statusLabel(enrollee)" :label="statusLabel(enrollee)" />
+          <AppBadge :label="enrollee.type || 'Unclassified'" tone="secondary" size="sm" />
+          <AppBadge :label="activeCoverage ? 'Coverage active' : 'Coverage inactive'" :tone="activeCoverage ? 'success' : 'warning'" size="sm" />
+        </template>
+        <v-btn size="small" variant="outlined" prepend-icon="mdi-arrow-left" @click="router.push({ name: 'enrollees' })">All enrollees</v-btn>
+        <v-btn size="small" color="primary" variant="flat" prepend-icon="mdi-download" @click="downloadProfile">Download PDF</v-btn>
+      </AppPageHeader>
+
       <!-- Header -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
-        <div class="tw-flex tw-items-start tw-justify-between tw-gap-6">
-          <div class="tw-flex tw-items-start tw-gap-6">
+      <AppCard class="enrollee-profile-hero" :padded="false">
+        <div class="tw-grid tw-gap-6 tw-p-5 xl:tw-grid-cols-[minmax(0,1fr)_auto]">
+          <div class="tw-flex tw-flex-col tw-gap-5 sm:tw-flex-row sm:tw-items-start">
             <!-- Avatar -->
             <div class="tw-relative">
               <div
@@ -104,9 +119,10 @@
           </div>
 
           <!-- Actions -->
-          <div class="tw-flex tw-flex-col sm:tw-flex-row tw-gap-2 sm:tw-items-start">
+          <div class="tw-flex tw-flex-wrap tw-gap-2 xl:tw-max-w-[34rem] xl:tw-justify-end">
             <v-btn
               v-if="canChangeStatus"
+              size="small"
               color="warning"
               variant="outlined"
               prepend-icon="mdi-swap-horizontal"
@@ -116,6 +132,7 @@
             </v-btn>
             <v-btn
               v-if="canResetPassword"
+              size="small"
               color="secondary"
               variant="outlined"
               prepend-icon="mdi-lock-reset"
@@ -125,6 +142,7 @@
             </v-btn>
             <v-btn
               v-if="canRenewCoverage"
+              size="small"
               color="success"
               variant="outlined"
               prepend-icon="mdi-refresh"
@@ -132,15 +150,13 @@
             >
               Renew Coverage
             </v-btn>
-            <v-btn color="primary" variant="outlined" prepend-icon="mdi-pencil" @click="editEnrollee">Edit Profile</v-btn>
-            <v-btn color="primary" prepend-icon="mdi-download" @click="downloadProfile">Download PDF</v-btn>
+            <v-btn size="small" color="primary" variant="outlined" prepend-icon="mdi-pencil" @click="editEnrollee">Edit profile</v-btn>
           </div>
         </div>
-      </div>
+      </AppCard>
 
       <!-- Personal Info -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
-        <h2 class="tw-text-xl tw-font-semibold tw-text-gray-900 tw-mb-4">Personal Information</h2>
+      <AppCard title="Personal information" subtitle="Identity and contact details" icon="mdi-account-card-outline" tone="primary">
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-4">
           <InfoItem label="Full Name" :value="enrollee.name" icon="mdi-account-badge" />
           <InfoItem label="NIN" :value="enrollee.nin || 'N/A'" icon="mdi-card-account-details" />
@@ -158,22 +174,20 @@
           <InfoItem label="Educational Status" :value="enrollee.educational_status || 'N/A'" icon="mdi-school-outline" />
           <InfoItem label="Special Needs" :value="enrollee.disability || 'N/A'" icon="mdi-human-cane" />
         </div>
-      </div>
+      </AppCard>
 
       <!-- Location -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
-        <h2 class="tw-text-xl tw-font-semibold tw-text-gray-900 tw-mb-4">Location Information</h2>
+      <AppCard title="Location" subtitle="Residence and assigned provider" icon="mdi-map-marker-radius-outline" tone="secondary">
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-4 tw-gap-4">
           <InfoItem label="LGA" :value="enrollee.lga_name || 'N/A'" icon="mdi-map" />
           <InfoItem label="Ward" :value="enrollee.ward?.name || 'N/A'" icon="mdi-map-marker" />
           <InfoItem label="Village" :value="enrollee.village || 'N/A'" icon="mdi-home-group" />
           <InfoItem label="Primary Facility" :value="enrollee.facility_name || 'N/A'" icon="mdi-hospital-building" />
         </div>
-      </div>
+      </AppCard>
 
       <!-- Enrollment -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
-        <h2 class="tw-text-xl tw-font-semibold tw-text-gray-900 tw-mb-4">Enrollment Details</h2>
+      <AppCard title="Enrollment" subtitle="Programme, funding, and plan assignment" icon="mdi-clipboard-text-outline" tone="info">
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-4">
           <InfoItem label="Enrollee ID" :value="enrollee.enrollee_id" icon="mdi-identifier" />
           <InfoItem label="Enrollment Date" :value="formatDate(enrollee.enrollment_date)" icon="mdi-calendar-plus" />
@@ -182,16 +196,14 @@
           <InfoItem label="Funding Type" :value="enrollee.funding_type?.name || 'N/A'" icon="mdi-cash-multiple" />
           <InfoItem label="Premium Plan" :value="enrollee.premium_plan?.name || enrollee.premium_plan?.id || 'N/A'" icon="mdi-clipboard-list" />
         </div>
-      </div>
+      </AppCard>
 
       <!-- Coverage & Premium -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
-        <div class="tw-flex tw-items-center tw-justify-between tw-mb-4">
-          <h2 class="tw-text-xl tw-font-semibold tw-text-gray-900">Coverage & Premium</h2>
-          <v-chip :color="activeCoverage ? 'success' : 'warning'" size="small" variant="flat">
-            {{ activeCoverage ? 'Eligible' : 'No active coverage' }}
-          </v-chip>
-        </div>
+      <AppCard title="Coverage & premium" subtitle="Eligibility, plan period, and care assignment" icon="mdi-shield-check-outline" tone="success">
+        <template #actions>
+          <AppBadge :label="activeCoverage ? 'Eligible for care' : 'No active coverage'" :tone="activeCoverage ? 'success' : 'warning'" size="sm" />
+          <v-btn v-if="canRenewCoverage" size="small" color="success" variant="outlined" prepend-icon="mdi-refresh" @click="renewalDialog = true">Renew coverage</v-btn>
+        </template>
         <div v-if="activeCoverage" class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-4">
           <InfoItem label="Programme" :value="activeCoverage.insurance_programme?.name || 'N/A'" icon="mdi-shield-account" />
           <InfoItem label="Category" :value="activeCoverage.enrollee_category?.name || 'N/A'" icon="mdi-account-tag" />
@@ -210,11 +222,10 @@
         <v-alert v-else type="warning" variant="tonal" density="comfortable">
           This enrollee does not currently have active coverage.
         </v-alert>
-      </div>
+      </AppCard>
 
       <!-- Employment -->
-      <div v-if="enrollee.employment_detail" class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
-        <h2 class="tw-text-xl tw-font-semibold tw-text-gray-900 tw-mb-4">Employment Details</h2>
+      <AppCard v-if="enrollee.employment_detail" title="Employment" icon="mdi-briefcase-outline" tone="secondary">
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-3 tw-gap-4">
           <InfoItem label="Occupation" :value="enrollee.occupation || 'N/A'" icon="mdi-briefcase" />
           <InfoItem label="CNO" :value="enrollee.cno || 'N/A'" icon="mdi-clipboard-text" />
@@ -223,29 +234,27 @@
           <InfoItem label="Salary Scheme" :value="enrollee.salary_scheme || 'N/A'" icon="mdi-cash-100" />
           <InfoItem label="Date of First Appointment" :value="formatDate(enrollee.dfa)" icon="mdi-calendar-start" />
         </div>
-      </div>
+      </AppCard>
 
       <!-- Next of Kin -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
-        <h2 class="tw-text-xl tw-font-semibold tw-text-gray-900 tw-mb-4">Next of Kin Information</h2>
+      <AppCard title="Next of kin" subtitle="Emergency contact" icon="mdi-account-heart-outline" tone="warning">
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-2 lg:tw-grid-cols-4 tw-gap-4">
           <InfoItem label="Name" :value="enrollee.nok_name || 'N/A'" icon="mdi-account-heart-outline" />
           <InfoItem label="Phone Number" :value="enrollee.nok_phone_number || 'N/A'" icon="mdi-phone" />
           <InfoItem label="Relationship" :value="enrollee.nok_relationship || 'N/A'" icon="mdi-account-group" />
           <InfoItem label="Address" :value="enrollee.nok_address || 'N/A'" icon="mdi-home-map-marker" />
         </div>
-      </div>
+      </AppCard>
 
       <!-- Activity stats -->
-      <div class="tw-bg-white tw-rounded-xl tw-shadow-sm tw-border tw-border-gray-100 tw-p-6">
-        <h2 class="tw-text-xl tw-font-semibold tw-text-gray-900 tw-mb-4">Activity Statistics</h2>
+      <AppCard title="Activity" subtitle="Care and claims activity" icon="mdi-chart-timeline-variant" tone="info">
         <div class="tw-grid tw-grid-cols-1 md:tw-grid-cols-4 tw-gap-6">
           <StatTile color="blue" icon="mdi-file-document" :value="statistics.totalClaims" label="Total Claims" />
           <StatTile color="green" icon="mdi-currency-ngn" :value="formatCurrency(statistics.totalBenefits)" label="Total Benefits" />
           <StatTile color="purple" icon="mdi-hospital-building" :value="statistics.facilitiesVisited" label="Facilities Visited" />
           <StatTile color="orange" icon="mdi-calendar-check" :value="statistics.lastVisit" label="Days Since Last Visit" />
         </div>
-      </div>
+      </AppCard>
     </div>
 
     <div v-else-if="loadError" class="tw-max-w-2xl tw-mx-auto tw-mt-8">
@@ -395,7 +404,11 @@
 import { computed, ref, onMounted, defineComponent, h, resolveComponent } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
+import AppBadge from '../common/AppBadge.vue'
+import AppCard from '../common/AppCard.vue'
 import AppModal from '../common/AppModal.vue'
+import AppPageHeader from '../common/AppPageHeader.vue'
+import AppStatusBadge from '../common/AppStatusBadge.vue'
 import PaymentCollectionInstructions from '../common/PaymentCollectionInstructions.vue'
 import { useToast } from '../../composables/useToast'
 import { enrolleeAPI } from '../../utils/api'
@@ -449,12 +462,14 @@ const InfoItem = defineComponent({
   setup(props) {
     const VIcon = resolveComponent('v-icon')
     return () =>
-      h('div', { class: 'tw-bg-gray-50 tw-rounded-lg tw-p-4 tw-h-full' }, [
-        h('div', { class: 'tw-flex tw-items-center tw-gap-2 tw-text-gray-600 tw-text-sm' }, [
-          h(VIcon, { size: 18, color: 'grey' }, { default: () => props.icon }),
+      h('div', { class: 'qds-card-muted tw-rounded-lg tw-p-3.5 tw-h-full tw-transition-colors hover:tw-bg-white' }, [
+        h('div', { class: 'tw-flex tw-items-center tw-gap-2 tw-text-slate-500 tw-text-xs tw-font-medium' }, [
+          h('div', { class: 'qds-icon-shell qds-tone-secondary tw-h-7 tw-w-7' }, [
+            h(VIcon, { size: 15 }, { default: () => props.icon }),
+          ]),
           h('span', props.label),
         ]),
-        h('p', { class: 'tw-font-medium tw-text-gray-900 tw-mt-1 break-words' }, String(props.value ?? 'N/A')),
+        h('p', { class: 'tw-font-semibold tw-text-slate-900 tw-mt-2 tw-break-words' }, String(props.value ?? 'N/A')),
       ])
   },
 })
