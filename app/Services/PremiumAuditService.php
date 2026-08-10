@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\AuditTrail;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Request;
 
@@ -29,10 +30,14 @@ class PremiumAuditService
 
     private function resolveAuditUserId(): int
     {
-        if (auth()->id()) {
-            return (int) auth()->id();
+        $user = auth()->user();
+        if ($user instanceof User) {
+            return (int) $user->id;
         }
 
+        // Enrollee portal identities are stored in the enrollees table, while
+        // audit_trails.user_id is intentionally constrained to staff users.
+        // Attribute portal-initiated changes to the system audit actor instead.
         return $this->systemAuditUserResolver->resolveId();
     }
 }

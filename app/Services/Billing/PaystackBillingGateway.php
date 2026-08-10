@@ -67,13 +67,22 @@ class PaystackBillingGateway implements BillingPaymentGatewayInterface
 
         $paidStatus = (string) Arr::get($data, $configuration['response_paths']['paid_status'], '');
         $isPaid = in_array(strtolower($paidStatus), array_map('strtolower', $configuration['successful_payment_values'] ?? ['success']), true);
+        $providerMessage = Arr::get($data, 'data.gateway_response')
+            ?: Arr::get($data, 'data.message')
+            ?: Arr::get($data, $configuration['response_paths']['message']);
 
         return [
             'provider' => $this->code(),
             'reference' => $reference,
             'paid' => $isPaid,
             'status' => $paidStatus ?: ($isPaid ? 'success' : 'pending'),
-            'message' => Arr::get($data, $configuration['response_paths']['message']),
+            // The top-level Paystack message describes the API lookup, not
+            // necessarily the payment result (for example: "Verification
+            // successful" with an abandoned transaction). Prefer the actual
+            // provider transaction message when payment is not confirmed.
+            'message' => $isPaid
+                ? Arr::get($data, $configuration['response_paths']['message'])
+                : $providerMessage,
             'raw_response' => $data,
         ];
     }

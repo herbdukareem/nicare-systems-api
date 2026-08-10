@@ -55,21 +55,23 @@ class PremiumCoverageService
             ? $data['sold_by']
             : $this->currentActorUserId();
 
-        $purchase = PremiumPurchase::create(array_merge($data, [
-            'quantity' => $quantity,
-            'amount' => $data['amount'] ?? ($plan->amount * $quantity),
-            'payment_status' => $data['payment_status'] ?? 'pending',
-            'gateway_code' => $data['gateway_code'] ?? $plan->payment_gateway,
-            'gateway_status' => $data['gateway_status'] ?? null,
-            'authorization_url' => $data['authorization_url'] ?? null,
-            'gateway_access_code' => $data['gateway_access_code'] ?? null,
-            'gateway_response' => $data['gateway_response'] ?? null,
-            'sold_by' => $soldBy,
-        ]));
+        return DB::transaction(function () use ($data, $quantity, $plan, $soldBy): PremiumPurchase {
+            $purchase = PremiumPurchase::create(array_merge($data, [
+                'quantity' => $quantity,
+                'amount' => $data['amount'] ?? ($plan->amount * $quantity),
+                'payment_status' => $data['payment_status'] ?? 'pending',
+                'gateway_code' => $data['gateway_code'] ?? $plan->payment_gateway,
+                'gateway_status' => $data['gateway_status'] ?? null,
+                'authorization_url' => $data['authorization_url'] ?? null,
+                'gateway_access_code' => $data['gateway_access_code'] ?? null,
+                'gateway_response' => $data['gateway_response'] ?? null,
+                'sold_by' => $soldBy,
+            ]));
 
-        $this->audit->record($purchase, 'premium_purchase_created', "Premium purchase {$purchase->id} created.", [], $purchase->toArray());
+            $this->audit->record($purchase, 'premium_purchase_created', "Premium purchase {$purchase->id} created.", [], $purchase->toArray());
 
-        return $purchase;
+            return $purchase;
+        });
     }
 
     public function sellPin(PremiumPin $pin, PremiumPurchase $purchase): PremiumPin
