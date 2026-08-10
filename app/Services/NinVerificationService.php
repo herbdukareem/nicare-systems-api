@@ -527,14 +527,24 @@ class NinVerificationService
                     return $configured;
                 }
 
+                $unwrapped = $this->unwrapProviderEnvelope($configured);
+                if ($unwrapped !== []) {
+                    return $unwrapped;
+                }
+
                 $fallbackCandidate = $configured;
             }
         }
 
         $commonFallbacks = [
             'data._raw.data',
+            'data._raw.data.data',
+            'data._raw.profile',
             'data.data',
+            'data.profile',
             '_raw.data',
+            '_raw.data.data',
+            '_raw.profile',
             'response.data',
             'result.data',
             'result',
@@ -549,15 +559,29 @@ class NinVerificationService
                     return $candidate;
                 }
 
+                $unwrapped = $this->unwrapProviderEnvelope($candidate);
+                if ($unwrapped !== []) {
+                    return $unwrapped;
+                }
+
                 $fallbackCandidate ??= $candidate;
             }
         }
 
         if (is_array($fallbackCandidate) && $fallbackCandidate !== []) {
+            $unwrapped = $this->unwrapProviderEnvelope($fallbackCandidate);
+            if ($unwrapped !== []) {
+                return $unwrapped;
+            }
+
             return $fallbackCandidate;
         }
 
-        return $this->looksLikeProviderPayload($body) ? $body : [];
+        if ($this->looksLikeProviderPayload($body)) {
+            return $body;
+        }
+
+        return $this->unwrapProviderEnvelope($body);
     }
 
     /**
@@ -633,9 +657,47 @@ class NinVerificationService
         return isset($body['nin'])
             || isset($body['first_name'])
             || isset($body['last_name'])
+            || isset($body['mobile'])
+            || isset($body['image'])
             || isset($body['idNumber'])
             || isset($body['firstName'])
-            || isset($body['lastName']);
+            || isset($body['lastName'])
+            || isset($body['dateOfBirth'])
+            || isset($body['birthdate'])
+            || isset($body['firstname'])
+            || isset($body['surname'])
+            || isset($body['telephoneno'])
+            || isset($body['telephoneNo'])
+            || isset($body['phoneNumber']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function unwrapProviderEnvelope(array $payload): array
+    {
+        $queue = [$payload];
+
+        while ($queue !== []) {
+            $candidate = array_shift($queue);
+            if (!is_array($candidate) || $candidate === []) {
+                continue;
+            }
+
+            if ($this->looksLikeProviderPayload($candidate)) {
+                return $candidate;
+            }
+
+            foreach (['data', '_raw', 'payload', 'result', 'response', 'profile'] as $key) {
+                $nested = $candidate[$key] ?? null;
+                if (is_array($nested) && $nested !== []) {
+                    $queue[] = $nested;
+                }
+            }
+        }
+
+        return [];
     }
 
     /**
@@ -712,14 +774,14 @@ class NinVerificationService
     private function fieldAliases(string $internalField): array
     {
         return match ($internalField) {
-            'nin' => ['idNumber'],
-            'first_name' => ['firstName'],
-            'middle_name' => ['middleName'],
-            'last_name' => ['lastName'],
-            'date_of_birth' => ['dateOfBirth'],
-            'phone' => ['mobile'],
-            'photo' => ['image'],
-            'address' => ['address'],
+            'nin' => ['idNumber', 'ninNumber', 'nin_number'],
+            'first_name' => ['firstName', 'firstname', 'givenName', 'given_name'],
+            'middle_name' => ['middleName', 'middlename', 'otherName', 'other_name'],
+            'last_name' => ['lastName', 'lastname', 'surname', 'familyName', 'family_name'],
+            'date_of_birth' => ['dateOfBirth', 'birthdate', 'birth_date', 'dob'],
+            'phone' => ['mobile', 'phoneNumber', 'phone_number', 'telephoneno', 'telephoneNo'],
+            'photo' => ['image', 'photoUrl', 'photo_url', 'passport', 'passportPhoto'],
+            'address' => ['address', 'residentialAddress', 'residential_address'],
             default => [],
         };
     }
