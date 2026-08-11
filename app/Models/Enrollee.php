@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Services\EnrolleeIdGenerator;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 
 /**
@@ -282,18 +283,14 @@ protected $guarded = ['id'];
     {
         $mobilePassport = $this->latestMobilePassportAttachment();
 
-        return $mobilePassport?->file_path ?: $this->image_url;
+        return $mobilePassport?->file_path
+            ?: $this->mobilePayloadPhotoUrl()
+            ?: $this->image_url;
     }
 
     public function latestMobilePassportAttachment(): ?MobileEnrollmentAttachment
     {
-        if (($this->enrollment_source ?? null) !== 'mobile_officer' || !$this->mobile_enrollment_record_id) {
-            return null;
-        }
-
-        $record = $this->relationLoaded('mobileEnrollmentRecord')
-            ? $this->mobileEnrollmentRecord
-            : $this->mobileEnrollmentRecord()->with('attachments')->first();
+        $record = $this->resolveMobileEnrollmentRecord();
 
         if (!$record) {
             return null;
@@ -317,13 +314,7 @@ protected $guarded = ['id'];
 
     public function mobilePassportAttachments()
     {
-        if (($this->enrollment_source ?? null) !== 'mobile_officer' || !$this->mobile_enrollment_record_id) {
-            return collect();
-        }
-
-        $record = $this->relationLoaded('mobileEnrollmentRecord')
-            ? $this->mobileEnrollmentRecord
-            : $this->mobileEnrollmentRecord()->with('attachments')->first();
+        $record = $this->resolveMobileEnrollmentRecord();
 
         if (!$record) {
             return collect();
@@ -347,6 +338,100 @@ protected $guarded = ['id'];
     private function mobileProvidedPhotoKinds(): array
     {
         return ['passport', 'retake_photo', 'retake-passport', 'retake'];
+    }
+
+    private function mobilePayloadPhotoUrl(): ?string
+    {
+        $record = $this->resolveMobileEnrollmentRecord();
+        if (!$record) {
+            return null;
+        }
+
+        $payload = is_array($record->payload) ? $record->payload : [];
+        $candidates = [
+            $payload['captured_live_photo_base64'] ?? null,
+            $payload['captured_photo_uri'] ?? null,
+            $payload['photo_uri'] ?? null,
+        ];
+
+        foreach ((array) ($payload['attachments'] ?? []) as $attachment) {
+            if (!is_array($attachment)) {
+                continue;
+            }
+
+            $kind = Str::lower(trim((string) ($attachment['kind'] ?? '')));
+            if ($kind !== '' && !$this->isMobileProvidedPhotoKind($kind)) {
+                continue;
+            }
+
+            $candidates[] = $attachment['uri'] ?? null;
+        }
+
+        foreach ($candidates as $candidate) {
+            $normalized = $this->normalizeMobilePhotoCandidate($candidate);
+            if ($normalized !== null) {
+                return $normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private function isMobileProvidedPhotoKind(string $kind): bool
+    {
+        return in_array($kind, $this->mobileProvidedPhotoKinds(), true)
+            || str_contains($kind, 'photo')
+            || str_contains($kind, 'passport');
+    }
+
+    private function normalizeMobilePhotoCandidate(mixed $candidate): ?string
+    {
+        $value = trim((string) $candidate);
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('#^data:image/[-\w.+]+;base64,#i', $value) === 1) {
+            return $value;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+            return in_array($scheme, ['http', 'https'], true) ? $value : null;
+        }
+
+        if (Str::startsWith($value, ['/storage/', 'storage/', '/uploads/', 'uploads/'])) {
+            return $value;
+        }
+
+        return null;
+    }
+
+    private function resolveMobileEnrollmentRecord(): ?MobileEnrollmentRecord
+    {
+        if (($this->enrollment_source ?? null) !== 'mobile_officer') {
+            return null;
+        }
+
+        if ($this->relationLoaded('mobileEnrollmentRecord') && $this->mobileEnrollmentRecord) {
+            $record = $this->mobileEnrollmentRecord;
+
+            if (!$record->relationLoaded('attachments')) {
+                $record->load('attachments');
+            }
+
+            return $record;
+        }
+
+        if ($this->mobile_enrollment_record_id) {
+            return $this->mobileEnrollmentRecord()->with('attachments')->first();
+        }
+
+        return MobileEnrollmentRecord::query()
+            ->with('attachments')
+            ->where('enrollee_id', $this->id)
+            ->latest('id')
+            ->first();
     }
 
     /**

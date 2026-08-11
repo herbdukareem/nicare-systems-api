@@ -334,6 +334,8 @@ class EnrolleeController extends BaseController
             return $this->sendError($exception->getMessage(), [], 422);
         }
 
+        $photoSelection = data_get($enrollee->nin_verification_meta, 'approval_selection.fields.photo', 'provided');
+
         if (array_key_exists('selected_enrollment_photo_attachment_id', $validated)) {
             $selectedPhotoId = $validated['selected_enrollment_photo_attachment_id']
                 ? (int) $validated['selected_enrollment_photo_attachment_id']
@@ -345,7 +347,7 @@ class EnrolleeController extends BaseController
                 return $this->sendError('The selected enrollment passport photo does not belong to this mobile enrollment record.', [], 422);
             }
 
-            if ($selectedPhoto) {
+            if ($photoSelection === 'provided' && $selectedPhoto) {
                 $enrollee->update(['image_url' => $selectedPhoto->file_path]);
             }
         }

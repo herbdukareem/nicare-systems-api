@@ -33,8 +33,8 @@
                 class="tw-w-32 tw-h-32 tw-rounded-2xl tw-bg-gradient-to-br tw-from-gray-100 tw-to-gray-50 tw-overflow-hidden tw-ring-2 tw-ring-offset-2 tw-ring-offset-white tw-ring-gray-200"
               >
                 <img
-                  v-if="enrollee.image_url"
-                  :src="enrollee.image_url"
+                  v-if="selectedProfilePhoto(enrollee)"
+                  :src="selectedProfilePhoto(enrollee)"
                   alt="Profile Picture"
                   class="tw-w-full tw-h-full tw-object-cover"
                 />
@@ -546,6 +546,21 @@ const renewalTransactionHeaders = [
   { title: 'Created', key: 'created_at', sortable: false },
   { title: '', key: 'actions', align: 'end', sortable: false },
 ]
+
+const normalizeProviderPhoto = (photo) => {
+  if (!photo) return ''
+  return String(photo).startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`
+}
+
+const selectedProfilePhoto = (enrollee) => {
+  if (!enrollee) return ''
+
+  const providerPhoto = normalizeProviderPhoto(
+    enrollee.nin_verification?.data?.provider_data?.photo || enrollee.nin_verification_data?.provider_data?.photo
+  )
+
+  return enrollee.image_url || enrollee.provided_image_url || providerPhoto || ''
+}
 
 /* -------- Small presentational components (render functions to keep SFC lean) -------- */
 const InfoItem = defineComponent({

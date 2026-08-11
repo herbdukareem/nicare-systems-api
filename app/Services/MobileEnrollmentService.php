@@ -305,15 +305,11 @@ class MobileEnrollmentService
 
     private function persistCapturedLivePhotoAttachment(MobileEnrollmentRecord $record, array $recordPayload, User $officer): void
     {
-        $payload = trim((string) ($recordPayload['captured_live_photo_base64'] ?? ''));
-        if ($payload === '' || !$record->enrollee_id) {
+        if (!$record->enrollee_id) {
             return;
         }
 
-        $existingAttachment = $record->attachments()
-            ->whereIn('kind', ['passport', 'retake_photo', 'retake-passport', 'retake'])
-            ->whereNotNull('file_path')
-            ->first();
+        $existingAttachment = $this->reconcileExistingLivePhotoAttachment($record);
 
         if ($existingAttachment) {
             if ($record->enrollee && blank($record->enrollee->image_url)) {
@@ -325,8 +321,31 @@ class MobileEnrollmentService
             return;
         }
 
+        $payload = $this->extractPersistableLivePhotoSource($recordPayload);
+        if ($payload === null) {
+            return;
+        }
+
         if (!preg_match('/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/s', $payload, $matches)) {
-            throw new RuntimeException('Captured live photo payload is invalid.');
+            $attachment = MobileEnrollmentAttachment::create([
+                'mobile_enrollment_record_id' => $record->id,
+                'enrollee_id' => $record->enrollee_id,
+                'kind' => 'passport',
+                'file_path' => $payload,
+                'original_name' => 'mobile-live-photo',
+                'mime_type' => null,
+                'size' => null,
+                'status' => 'uploaded',
+                'uploaded_by' => $officer->id,
+            ]);
+
+            if ($record->enrollee) {
+                $record->enrollee->update(['image_url' => $attachment->file_path]);
+            }
+
+            $record->update(['attachment_status' => 'uploaded']);
+
+            return;
         }
 
         $mimeType = Str::lower(trim((string) ($matches[1] ?? 'image/jpeg')));
@@ -366,6 +385,98 @@ class MobileEnrollmentService
         }
 
         $record->update(['attachment_status' => 'uploaded']);
+    }
+
+    private function reconcileExistingLivePhotoAttachment(MobileEnrollmentRecord $record): ?MobileEnrollmentAttachment
+    {
+        $attachments = $record->relationLoaded('attachments')
+            ? $record->attachments
+            : $record->attachments()->get();
+
+        $existingAttachment = $attachments
+            ->filter(fn ($attachment) => $attachment instanceof MobileEnrollmentAttachment
+                && $this->isMobilePhotoKind((string) $attachment->kind)
+                && filled($attachment->file_path))
+            ->sortByDesc(fn (MobileEnrollmentAttachment $attachment) => $attachment->created_at?->timestamp ?? $attachment->id)
+            ->first();
+
+        if (!$existingAttachment) {
+            return null;
+        }
+
+        $attachments
+            ->filter(fn ($attachment) => $attachment instanceof MobileEnrollmentAttachment && $this->isMobilePhotoKind((string) $attachment->kind))
+            ->each(function (MobileEnrollmentAttachment $attachment) use ($record): void {
+                if ((int) ($attachment->enrollee_id ?? 0) !== (int) $record->enrollee_id) {
+                    $attachment->update(['enrollee_id' => $record->enrollee_id]);
+                }
+            });
+
+        return $existingAttachment->fresh();
+    }
+
+    private function extractPersistableLivePhotoSource(array $recordPayload): ?string
+    {
+        $candidates = [
+            $recordPayload['captured_live_photo_base64'] ?? null,
+            $recordPayload['captured_photo_uri'] ?? null,
+            $recordPayload['photo_uri'] ?? null,
+        ];
+
+        foreach ((array) ($recordPayload['attachments'] ?? []) as $attachment) {
+            if (!is_array($attachment)) {
+                continue;
+            }
+
+            $kind = Str::lower(trim((string) ($attachment['kind'] ?? '')));
+            if ($kind !== '' && !$this->isMobilePhotoKind($kind)) {
+                continue;
+            }
+
+            $candidates[] = $attachment['uri'] ?? null;
+        }
+
+        foreach ($candidates as $candidate) {
+            $normalized = $this->normalizePersistablePhotoSource($candidate);
+            if ($normalized !== null) {
+                return $normalized;
+            }
+        }
+
+        return null;
+    }
+
+    private function normalizePersistablePhotoSource(mixed $candidate): ?string
+    {
+        $value = trim((string) $candidate);
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('#^data:image/[-\w.+]+;base64,#i', $value) === 1) {
+            return $value;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+
+            return in_array($scheme, ['http', 'https'], true) ? $value : null;
+        }
+
+        if (Str::startsWith($value, ['/storage/', 'storage/', '/uploads/', 'uploads/'])) {
+            return $value;
+        }
+
+        return null;
+    }
+
+    private function isMobilePhotoKind(string $kind): bool
+    {
+        $normalized = Str::lower(trim($kind));
+
+        return in_array($normalized, ['passport', 'retake_photo', 'retake-passport', 'retake'], true)
+            || str_contains($normalized, 'photo')
+            || str_contains($normalized, 'passport');
     }
 
     private function normalizeCoreData(array $data): array

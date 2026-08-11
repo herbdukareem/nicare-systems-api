@@ -53,7 +53,7 @@ class EnrolleeResource extends JsonResource
             'educational_status' => $this->educational_status,
             'image_url' => $this->image_url,
             'provided_image_url' => $this->providedEnrollmentPhotoUrl(),
-            'provided_live_image_url' => $this->latestMobilePassportAttachment()?->file_path,
+            'provided_live_image_url' => $this->providedEnrollmentPhotoUrl(),
             'current_mobile_photo_attachment_id' => $this->currentMobilePhotoAttachmentId(),
             'mobile_passport_attachments' => $this->mobilePassportAttachments()->map(fn ($attachment) => [
                 'id' => $attachment->id,

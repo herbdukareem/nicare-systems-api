@@ -311,6 +311,7 @@
                   variant="outlined"
                   hide-details
                   class="tw-w-full md:tw-w-64"
+                  @update:modelValue="setMergeStrategy(selectedRow, $event)"
                 />
               </template>
 
@@ -358,6 +359,18 @@
                       </div>
                     </div>
                   </div>
+                  <div class="tw-mt-3 tw-flex tw-justify-center">
+                    <v-btn
+                      size="small"
+                      variant="outlined"
+                      :color="selectedRow.fieldSelection.photo === 'provided' ? 'primary' : 'default'"
+                      :disabled="!selectedOfficerPhoto(selectedRow)"
+                      prepend-icon="mdi-account-check-outline"
+                      @click="setPhotoDecision(selectedRow, 'provided')"
+                    >
+                      Keep provided photo
+                    </v-btn>
+                  </div>
                 </div>
 
                 <div class="tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
@@ -370,6 +383,18 @@
                         <span class="tw-text-xs tw-font-medium">No provider photo returned</span>
                       </div>
                     </div>
+                  </div>
+                  <div class="tw-mt-3 tw-flex tw-justify-center">
+                    <v-btn
+                      size="small"
+                      variant="outlined"
+                      :color="selectedRow.fieldSelection.photo === 'verified' ? 'primary' : 'default'"
+                      :disabled="!selectedVerifiedPhoto(selectedRow)"
+                      prepend-icon="mdi-shield-account-outline"
+                      @click="setPhotoDecision(selectedRow, 'verified')"
+                    >
+                      Use verified photo
+                    </v-btn>
                   </div>
                 </div>
               </div>
@@ -409,28 +434,20 @@
                           <td class="tw-px-2.5 tw-py-2 tw-text-slate-600">{{ field.provided || 'N/A' }}</td>
                           <td class="tw-px-2.5 tw-py-2 tw-text-slate-600">{{ field.verified || 'N/A' }}</td>
                           <td class="tw-px-2.5 tw-py-2">
-                            <template v-if="selectedRow.mergeStrategy === 'manual'">
-                              <v-select
-                                v-model="selectedRow.fieldSelection[field.field]"
-                                :items="decisionOptions"
-                                item-title="label"
-                                item-value="value"
-                                density="compact"
-                                variant="outlined"
-                                hide-details
-                                class="tw-min-w-40"
-                              />
-                              <p v-if="!field.matches" class="tw-mt-1 tw-text-[11px] tw-text-slate-500">
-                                Suggested: {{ field.recommended_source === 'verified' ? 'Use verified data' : 'Keep provided data' }}
-                              </p>
-                            </template>
-                            <template v-else>
-                              <AppStatusBadge
-                                :status="resolvedDecision(selectedRow, field.field)"
-                                :label="resolvedDecisionLabel(selectedRow, field.field)"
-                                size="sm"
-                              />
-                            </template>
+                            <v-select
+                              v-model="selectedRow.fieldSelection[field.field]"
+                              :items="decisionOptions"
+                              item-title="label"
+                              item-value="value"
+                              density="compact"
+                              variant="outlined"
+                              hide-details
+                              class="tw-min-w-40"
+                              @update:modelValue="setFieldDecision(selectedRow, field.field, $event)"
+                            />
+                            <p v-if="!field.matches" class="tw-mt-1 tw-text-[11px] tw-text-slate-500">
+                              Suggested: {{ field.recommended_source === 'verified' ? 'Use verified data' : 'Keep provided data' }}
+                            </p>
                           </td>
                         </tr>
                       </tbody>
@@ -759,9 +776,21 @@ const normalizeProviderPhoto = (photo) => {
   return String(photo).startsWith('data:') ? photo : `data:image/jpeg;base64,${photo}`
 }
 
-const defaultFieldSelection = (comparison = []) => {
+const selectionForStrategy = (strategy, verifiedValue, fallback = 'provided') => {
+  if (strategy === 'prefer_verified') {
+    return verifiedValue ? 'verified' : 'provided'
+  }
+
+  if (strategy === 'keep_provided') {
+    return 'provided'
+  }
+
+  return fallback
+}
+
+const defaultFieldSelection = (comparison = [], strategy = 'keep_provided') => {
   return comparison.reduce((carry, field) => {
-    carry[field.field] = field.recommended_source || 'provided'
+    carry[field.field] = selectionForStrategy(strategy, field.verified, field.recommended_source || 'provided')
     return carry
   }, {})
 }
@@ -798,7 +827,7 @@ const openLocationMap = (point, title = 'Enrollment Location Map') => {
 const selectedOfficerPhoto = (row) => {
   if (!row) return ''
   const selected = (row.mobilePassportAttachments || []).find((attachment) => Number(attachment.id) === Number(row.selectedPhotoAttachmentId))
-  return selected?.file_path || row.provided_live_image_url || row.image_url || ''
+  return selected?.file_path || row.provided_live_image_url || row.provided_image_url || row.image_url || ''
 }
 
 const selectedVerifiedPhoto = (row) => {
@@ -810,25 +839,56 @@ const normalizeRow = (row) => {
   const comparison = row.nin_verification?.data?.comparison || row.nin_verification_data?.comparison || []
   const providerData = row.nin_verification?.data?.provider_data || row.nin_verification_data?.provider_data || {}
   const storedSelection = row.nin_verification?.meta?.approval_selection?.fields || row.nin_verification_meta?.approval_selection?.fields || {}
+  const storedStrategy = row.nin_verification?.meta?.approval_selection?.strategy || row.nin_verification_meta?.approval_selection?.strategy || ''
   const mobilePassportAttachments = Array.isArray(row.mobile_passport_attachments) ? row.mobile_passport_attachments : []
+  const providerPhoto = normalizeProviderPhoto(providerData.photo)
+  const mergeStrategy = row.nin
+    ? (storedStrategy || (comparison.some((field) => !field.matches) ? 'manual' : 'keep_provided'))
+    : 'keep_provided'
+  const baseFieldSelection = defaultFieldSelection(comparison, mergeStrategy)
+  const providedPhoto = row.provided_live_image_url || row.provided_image_url || row.image_url || ''
 
   return {
     ...row,
     local_status: row.local_status || 'pending',
     local_error: row.local_error || '',
-    mergeStrategy: row.nin ? (comparison.some((field) => !field.matches) ? 'manual' : 'keep_provided') : 'keep_provided',
-    fieldSelection: { ...defaultFieldSelection(comparison), ...storedSelection },
+    mergeStrategy,
+    fieldSelection: {
+      ...baseFieldSelection,
+      photo: storedSelection.photo || selectionForStrategy(mergeStrategy, providerPhoto, providedPhoto ? 'provided' : 'verified'),
+      ...storedSelection,
+    },
     comparison,
     providerData,
     provided_image_url: row.provided_image_url || '',
     provided_live_image_url: row.provided_live_image_url || '',
-    providerPhoto: normalizeProviderPhoto(providerData.photo),
+    providerPhoto,
     mobilePassportAttachments: mobilePassportAttachments.map((attachment, index) => ({
       ...attachment,
       label: index === 0 ? 'Original Capture' : `Retake ${index}`,
     })),
     selectedPhotoAttachmentId: row.current_mobile_photo_attachment_id || mobilePassportAttachments.find((attachment) => attachment.is_current)?.id || mobilePassportAttachments[mobilePassportAttachments.length - 1]?.id || null,
   }
+}
+
+const setMergeStrategy = (row, strategy) => {
+  if (!row) return
+
+  row.mergeStrategy = strategy
+
+  if (strategy === 'manual') {
+    return
+  }
+
+  row.comparison.forEach((field) => {
+    row.fieldSelection[field.field] = selectionForStrategy(strategy, field.verified, field.recommended_source || 'provided')
+  })
+
+  row.fieldSelection.photo = selectionForStrategy(
+    strategy,
+    selectedVerifiedPhoto(row),
+    selectedOfficerPhoto(row) ? 'provided' : 'verified'
+  )
 }
 
 const loadMetadata = async () => {
@@ -934,10 +994,12 @@ const applySuggestedDecisions = (row) => {
   row.comparison.forEach((field) => {
     row.fieldSelection[field.field] = field.recommended_source
   })
+  row.fieldSelection.photo = selectedVerifiedPhoto(row) ? 'verified' : 'provided'
+  row.mergeStrategy = 'manual'
 }
 
 const resolvedDecision = (row, field) => {
-  if (row.mergeStrategy === 'manual') {
+  if (row.fieldSelection?.[field]) {
     return row.fieldSelection[field] || 'provided'
   }
 
@@ -958,6 +1020,21 @@ const handleDetailModal = (value) => {
   if (!value) {
     selectedRowId.value = null
   }
+}
+
+const setFieldDecision = (row, field, value) => {
+  if (!row) return
+  row.fieldSelection[field] = value === 'verified' ? 'verified' : 'provided'
+  row.mergeStrategy = 'manual'
+}
+
+const setPhotoDecision = (row, value) => {
+  if (!row) return
+  if (value === 'verified' && !selectedVerifiedPhoto(row)) return
+  if (value === 'provided' && !selectedOfficerPhoto(row)) return
+
+  row.fieldSelection.photo = value === 'verified' ? 'verified' : 'provided'
+  row.mergeStrategy = 'manual'
 }
 
 const applyVerificationResponse = (row, response) => {
@@ -1035,7 +1112,7 @@ const approvalPayload = (row) => {
     nin_merge_strategy: row.mergeStrategy,
   }
 
-  if (row.mergeStrategy === 'manual') {
+  if (row.nin) {
     payload.nin_field_selection = row.fieldSelection
   }
 

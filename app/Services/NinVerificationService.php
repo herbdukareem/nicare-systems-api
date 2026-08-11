@@ -412,6 +412,14 @@ class NinVerificationService
             $this->writeResolvedField($updates, $field, $resolvedValue, true);
         }
 
+        $photoSource = $this->selectedSourceForField($strategy, $fieldSelection, 'photo', $providerData);
+        $resolvedSelection['photo'] = $photoSource;
+        $providedPhoto = $enrollee->providedEnrollmentPhotoUrl();
+        $verifiedPhoto = $this->normalizeProviderPhoto($providerData['photo'] ?? null);
+        $resolvedPhoto = $photoSource === 'verified' ? $verifiedPhoto : $providedPhoto;
+        $resolvedProfile['photo'] = $resolvedPhoto;
+        $updates['image_url'] = blank($resolvedPhoto) ? null : $resolvedPhoto;
+
         if (!blank($providerData['nin'] ?? null)) {
             $updates['nin'] = (string) $providerData['nin'];
         }
@@ -863,7 +871,7 @@ class NinVerificationService
 
     private function selectedSourceForField(string $strategy, array $fieldSelection, string $field, array $providerData): string
     {
-        if ($strategy === 'manual' && isset($fieldSelection[$field])) {
+        if (isset($fieldSelection[$field])) {
             return $fieldSelection[$field] === 'verified' ? 'verified' : 'provided';
         }
 
@@ -872,6 +880,19 @@ class NinVerificationService
         }
 
         return 'provided';
+    }
+
+    private function normalizeProviderPhoto(mixed $photo): ?string
+    {
+        if (blank($photo)) {
+            return null;
+        }
+
+        $value = trim((string) $photo);
+
+        return Str::startsWith($value, 'data:')
+            ? $value
+            : 'data:image/jpeg;base64,' . $value;
     }
 
     private function normalizeGender(mixed $value): ?string
