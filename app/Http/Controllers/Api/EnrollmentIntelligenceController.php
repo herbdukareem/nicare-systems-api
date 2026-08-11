@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exports\EnrollmentIntelligenceExport;
 use App\Http\Controllers\Api\V1\BaseController;
 use App\Models\Enrollee;
 use App\Models\Facility;
@@ -15,6 +16,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Validation\Rule;
+use Maatwebsite\Excel\Facades\Excel;
 
 class EnrollmentIntelligenceController extends BaseController
 {
@@ -24,25 +26,7 @@ class EnrollmentIntelligenceController extends BaseController
 
     public function ninVerificationReport(Request $request)
     {
-        $validated = $request->validate([
-            'date_from' => ['nullable', 'date'],
-            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-            'lga_id' => ['nullable', 'exists:lgas,id'],
-            'facility_id' => ['nullable', 'exists:facilities,id'],
-            'source' => ['nullable', Rule::in(['mobile_officer', 'self_service', 'staff'])],
-            'status' => ['nullable', Rule::in([Enrollee::NIN_VERIFICATION_VERIFIED, Enrollee::NIN_VERIFICATION_FAILED])],
-            'provider' => ['nullable', 'string', 'max:255'],
-            'search' => ['nullable', 'string', 'max:255'],
-            'page' => ['nullable', 'integer', 'min:1'],
-            'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
-        ]);
-
-        $dateTo = !empty($validated['date_to'])
-            ? Carbon::parse($validated['date_to'])->endOfDay()
-            : now()->endOfDay();
-        $dateFrom = !empty($validated['date_from'])
-            ? Carbon::parse($validated['date_from'])->startOfDay()
-            : $dateTo->copy()->subDays(29)->startOfDay();
+        [$validated, $dateFrom, $dateTo] = $this->resolveValidatedFilters($request);
 
         $activityBase = $this->verificationActivityQuery($validated, $dateFrom, $dateTo);
         $eligibleBase = $this->eligibleVerificationQuery($validated);
@@ -413,6 +397,160 @@ class EnrollmentIntelligenceController extends BaseController
         ], 'NIN verification intelligence retrieved successfully.');
     }
 
+    public function exportNinVerificationReport(Request $request)
+    {
+        [$validated, $dateFrom, $dateTo] = $this->resolveValidatedFilters($request);
+
+        $verificationValueAmount = round((float) ($this->ninProviderConfigService->getConfig()['verification_value_amount'] ?? 0), 2);
+
+        $verifiedCount = (clone $this->verificationActivityQuery($validated, $dateFrom, $dateTo))
+            ->where('nin_verification_status', Enrollee::NIN_VERIFICATION_VERIFIED)
+            ->count();
+        $failedCount = (clone $this->verificationActivityQuery($validated, $dateFrom, $dateTo))
+            ->where('nin_verification_status', Enrollee::NIN_VERIFICATION_FAILED)
+            ->count();
+        $totalAttempts = $verifiedCount + $failedCount;
+        $pendingBacklog = (clone $this->eligibleVerificationQuery($validated))
+            ->where(function (Builder $query): void {
+                $query->whereNull('nin_verification_status')
+                    ->orWhere('nin_verification_status', Enrollee::NIN_VERIFICATION_NOT_STARTED);
+            })
+            ->count();
+        $distinctNins = (clone $this->verificationActivityQuery($validated, $dateFrom, $dateTo))->distinct('nin')->count('nin');
+        $mobileVerifiedCount = (clone $this->verificationActivityQuery($validated, $dateFrom, $dateTo))
+            ->where('enrollment_source', 'mobile_officer')
+            ->where('nin_verification_status', Enrollee::NIN_VERIFICATION_VERIFIED)
+            ->count();
+        $capturedCount = (clone $this->enrollmentActivityQuery($validated, $dateFrom, $dateTo))->count();
+        $pendingApprovalCount = (clone $this->enrollmentActivityQuery($validated, $dateFrom, $dateTo))->where('status', Enrollee::STATUS_PENDING)->count();
+        $approvedCount = (clone $this->enrollmentActivityQuery($validated, $dateFrom, $dateTo))->where('status', Enrollee::STATUS_ACTIVE)->count();
+        $rejectedCount = (clone $this->enrollmentActivityQuery($validated, $dateFrom, $dateTo))->where('status', Enrollee::STATUS_REJECTED)->count();
+        $duplicateCount = (clone $this->enrollmentActivityQuery($validated, $dateFrom, $dateTo))
+            ->where(function (Builder $query): void {
+                $query->where('is_possible_duplicate', true);
+
+                if (Schema::hasColumn('enrollees', 'has_duplicate_nin')) {
+                    $query->orWhere('has_duplicate_nin', 1);
+                }
+            })
+            ->count();
+        $totalValue = (float) round((float) $this->enrollmentValueQuery($validated, $dateFrom, $dateTo)->sum('premium_plans.amount'), 2);
+
+        $summaryRows = [
+            ['Filters', 'Date From', $dateFrom->toDateString()],
+            ['Filters', 'Date To', $dateTo->toDateString()],
+            ['Filters', 'LGA', $this->resolveLgaName($validated['lga_id'] ?? null)],
+            ['Filters', 'Facility', $this->resolveFacilityName($validated['facility_id'] ?? null)],
+            ['Filters', 'Enrollment Source', $validated['source'] ? $this->sourceLabel((string) $validated['source']) : 'All'],
+            ['Filters', 'NIN Status', $validated['status'] ? $this->statusLabel((string) $validated['status']) : 'All'],
+            ['Filters', 'Provider', $validated['provider'] ?? 'All'],
+            ['Filters', 'Search', $validated['search'] ?? 'All'],
+            ['Summary', 'Captured', $capturedCount],
+            ['Summary', 'Pending Approval', $pendingApprovalCount],
+            ['Summary', 'Approved', $approvedCount],
+            ['Summary', 'Rejected', $rejectedCount],
+            ['Summary', 'Duplicates', $duplicateCount],
+            ['Summary', 'Total Verification Attempts', $totalAttempts],
+            ['Summary', 'Verified', $verifiedCount],
+            ['Summary', 'Failed', $failedCount],
+            ['Summary', 'Pending Backlog', $pendingBacklog],
+            ['Summary', 'Distinct NINs', $distinctNins],
+            ['Summary', 'Mobile Verified', $mobileVerifiedCount],
+            ['Summary', 'Enrollment Value', $totalValue],
+            ['Summary', 'Verification Value Per Attempt', $verificationValueAmount],
+        ];
+
+        $verificationRows = $this->verificationActivityQuery($validated, $dateFrom, $dateTo)
+            ->with([
+                'facility:id,name,lga_id',
+                'lga:id,name',
+                'insuranceProgramme:id,name',
+                'premiumPlan:id,name',
+                'ninVerifiedBy:id,name',
+            ])
+            ->when(!empty($validated['status']), fn (Builder $query) => $query->where('nin_verification_status', $validated['status']))
+            ->when(!empty($validated['search']), function (Builder $query) use ($validated): void {
+                $search = trim((string) $validated['search']);
+                $query->where(function (Builder $nested) use ($search): void {
+                    $nested->where('enrollee_id', 'like', "%{$search}%")
+                        ->orWhere('nin', 'like', "%{$search}%")
+                        ->orWhere('first_name', 'like', "%{$search}%")
+                        ->orWhere('last_name', 'like', "%{$search}%")
+                        ->orWhere('middle_name', 'like', "%{$search}%")
+                        ->orWhere('phone', 'like', "%{$search}%");
+                });
+            })
+            ->orderByDesc('nin_verified_at')
+            ->get()
+            ->map(function (Enrollee $enrollee): array {
+                return [
+                    $enrollee->enrollee_id,
+                    $enrollee->full_name,
+                    $enrollee->nin,
+                    $this->statusLabel((string) $enrollee->nin_verification_status),
+                    $this->sourceLabel((string) ($enrollee->enrollment_source ?: 'unknown')),
+                    $enrollee->nin_verification_provider ?: 'Unknown',
+                    $enrollee->facility?->name,
+                    $enrollee->lga?->name,
+                    $enrollee->insuranceProgramme?->name,
+                    $enrollee->premiumPlan?->name,
+                    $enrollee->phone,
+                    $enrollee->ninVerifiedBy?->name,
+                    optional($enrollee->nin_verified_at)?->format('Y-m-d H:i:s'),
+                    data_get($enrollee->nin_verification_meta, 'message'),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $facilityRows = $this->facilitySummaryQuery($validated, $dateFrom, $dateTo)
+            ->orderByDesc('captured_count')
+            ->get()
+            ->map(function ($row) use ($verificationValueAmount): array {
+                return [
+                    (string) $row->facility_name,
+                    (string) $row->lga_name,
+                    (int) $row->captured_count,
+                    (int) $row->pending_count,
+                    (int) $row->approved_count,
+                    (int) $row->rejected_count,
+                    (int) $row->duplicate_count,
+                    (int) $row->nin_attempts,
+                    (int) $row->nin_verified,
+                    (int) $row->nin_failed,
+                    (float) round(((int) $row->nin_attempts) * $verificationValueAmount, 2),
+                ];
+            })
+            ->values()
+            ->all();
+
+        $officerRows = $this->officerSummaryQuery($validated, $dateFrom, $dateTo)
+            ->orderByDesc('captured_count')
+            ->get()
+            ->map(function ($row) use ($verificationValueAmount): array {
+                return [
+                    (string) $row->officer_name,
+                    $this->sourceLabel((string) $row->enrollment_source),
+                    (int) $row->captured_count,
+                    (int) $row->pending_count,
+                    (int) $row->approved_count,
+                    (int) $row->rejected_count,
+                    (int) $row->duplicate_count,
+                    (int) $row->nin_attempts,
+                    (int) $row->nin_verified,
+                    (int) $row->nin_failed,
+                    (float) round(((int) $row->nin_attempts) * $verificationValueAmount, 2),
+                ];
+            })
+            ->values()
+            ->all();
+
+        return Excel::download(
+            new EnrollmentIntelligenceExport($summaryRows, $verificationRows, $facilityRows, $officerRows),
+            'enrollment_intelligence_' . now()->format('Y_m_d_H_i_s') . '.xlsx'
+        );
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      */
@@ -552,5 +690,59 @@ class EnrollmentIntelligenceController extends BaseController
             'staff' => 'Staff Enrollment',
             default => 'Unknown',
         };
+    }
+
+    /**
+     * @return array{0: array<string, mixed>, 1: Carbon, 2: Carbon}
+     */
+    private function resolveValidatedFilters(Request $request): array
+    {
+        $validated = $request->validate($this->filterRules());
+
+        $dateTo = !empty($validated['date_to'])
+            ? Carbon::parse($validated['date_to'])->endOfDay()
+            : now()->endOfDay();
+        $dateFrom = !empty($validated['date_from'])
+            ? Carbon::parse($validated['date_from'])->startOfDay()
+            : $dateTo->copy()->subDays(29)->startOfDay();
+
+        return [$validated, $dateFrom, $dateTo];
+    }
+
+    /**
+     * @return array<string, array<int, mixed>>
+     */
+    private function filterRules(): array
+    {
+        return [
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'lga_id' => ['nullable', 'exists:lgas,id'],
+            'facility_id' => ['nullable', 'exists:facilities,id'],
+            'source' => ['nullable', Rule::in(['mobile_officer', 'self_service', 'staff'])],
+            'status' => ['nullable', Rule::in([Enrollee::NIN_VERIFICATION_VERIFIED, Enrollee::NIN_VERIFICATION_FAILED])],
+            'provider' => ['nullable', 'string', 'max:255'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+        ];
+    }
+
+    private function resolveLgaName(mixed $lgaId): string
+    {
+        if (blank($lgaId)) {
+            return 'All';
+        }
+
+        return (string) (Lga::query()->whereKey($lgaId)->value('name') ?: 'Selected');
+    }
+
+    private function resolveFacilityName(mixed $facilityId): string
+    {
+        if (blank($facilityId)) {
+            return 'All';
+        }
+
+        return (string) (Facility::query()->whereKey($facilityId)->value('name') ?: 'Selected');
     }
 }

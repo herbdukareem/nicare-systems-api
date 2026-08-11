@@ -7,6 +7,7 @@
         kicker="Enrollment"
         icon="mdi-chart-box-outline"
       >
+        <AppExportButton label="Export Excel" :loading="exporting" @click="exportExcel" />
         <v-btn color="primary" prepend-icon="mdi-refresh" :loading="loading" @click="loadReport">
           Refresh
         </v-btn>
@@ -221,6 +222,7 @@ import { computed, onMounted, reactive, ref, watch } from 'vue'
 import AdminLayout from '../layout/AdminLayout.vue'
 import AppCard from '../common/AppCard.vue'
 import AppDataTable from '../common/AppDataTable.vue'
+import AppExportButton from '../common/AppExportButton.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
 import AppStatCard from '../common/AppStatCard.vue'
 import AppStatusBadge from '../common/AppStatusBadge.vue'
@@ -234,6 +236,7 @@ import { useToast } from '../../composables/useToast'
 const { error } = useToast()
 
 const loading = ref(false)
+const exporting = ref(false)
 const activeTab = ref('overview')
 
 const lookups = reactive({
@@ -542,6 +545,29 @@ const loadReport = async () => {
     error(err.response?.data?.message || 'Unable to load enrollment intelligence.')
   } finally {
     loading.value = false
+  }
+}
+
+const exportExcel = async () => {
+  exporting.value = true
+
+  try {
+    const response = await enrolleeAPI.exportNinVerificationIntelligence(buildParams())
+    const blob = new Blob([response.data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    const url = URL.createObjectURL(blob)
+    const disposition = response.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename=\"?([^\"]+)\"?/i)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = match?.[1] || `enrollment_intelligence_${new Date().toISOString().slice(0, 10)}.xlsx`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    error(err.response?.data?.message || 'Unable to export enrollment intelligence.')
+  } finally {
+    exporting.value = false
   }
 }
 
