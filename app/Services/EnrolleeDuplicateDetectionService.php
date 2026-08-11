@@ -16,6 +16,37 @@ class EnrolleeDuplicateDetectionService
     ];
 
     /**
+     * Find an existing enrollee by normalized NIN.
+     */
+    public function findExistingByNin(?string $nin, ?int $ignoreEnrolleeId = null): ?Enrollee
+    {
+        $normalizedNin = Enrollee::normalizeNin($nin);
+        if ($normalizedNin === null) {
+            return null;
+        }
+
+        $baseQuery = Enrollee::query()
+            ->whereNotNull('nin')
+            ->whereIn('status', $this->duplicateStatuses)
+            ->when($ignoreEnrolleeId, fn ($query) => $query->whereKeyNot($ignoreEnrolleeId));
+
+        $exact = (clone $baseQuery)
+            ->where('nin', $normalizedNin)
+            ->first();
+
+        if ($exact) {
+            return $exact;
+        }
+
+        return $baseQuery
+            ->select(['id', 'nin', 'status'])
+            ->get()
+            ->first(function (Enrollee $enrollee) use ($normalizedNin): bool {
+                return Enrollee::normalizeNin($enrollee->nin) === $normalizedNin;
+            });
+    }
+
+    /**
      * Check whether the given payload represents a duplicate enrollee.
      *
      * Returns an array with:
@@ -23,14 +54,11 @@ class EnrolleeDuplicateDetectionService
      *   - matched_enrollee_id (?int)
      *   - match_type          (?string)  'nin_match' | 'name_dob_match'
      */
-    public function check(array $payload): array
+    public function check(array $payload, ?int $ignoreEnrolleeId = null): array
     {
         // Check 1: NIN match
         if (!empty($payload['nin'])) {
-            $existing = Enrollee::query()
-                ->where('nin', $payload['nin'])
-                ->whereIn('status', $this->duplicateStatuses)
-                ->first();
+            $existing = $this->findExistingByNin((string) $payload['nin'], $ignoreEnrolleeId);
             if ($existing) {
                 return [
                     'is_duplicate'        => true,
@@ -47,6 +75,7 @@ class EnrolleeDuplicateDetectionService
                 ->where('sex', $payload['gender'])
                 ->where('facility_id', $payload['facility_id'])
                 ->whereIn('status', $this->duplicateStatuses)
+                ->when($ignoreEnrolleeId, fn ($query) => $query->whereKeyNot($ignoreEnrolleeId))
                 ->get(['id', 'first_name', 'last_name']);
 
             $incomingName = strtolower(trim(($payload['first_name'] ?? '') . ' ' . ($payload['last_name'] ?? '')));

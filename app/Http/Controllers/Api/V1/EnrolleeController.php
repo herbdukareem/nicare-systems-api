@@ -158,11 +158,17 @@ class EnrolleeController extends BaseController
      */
     public function store(StoreEnrolleeRequest $request)
     {
-        $data     = $request->validated();
-        $enrollee = $this->enrolleeService->create($data);
+        $data = $request->validated();
 
-        // T5: duplicate detection after creation
         $dupResult = $this->duplicateService->check(array_merge($data, ['gender' => $data['sex'] ?? null]));
+        if (($dupResult['is_duplicate'] ?? false) && ($dupResult['match_type'] ?? null) === 'nin_match') {
+            return $this->sendError('This NIN already belongs to another enrollee record.', [
+                'nin' => ['This NIN already belongs to another enrollee record.'],
+                'matched_enrollee_id' => [$dupResult['matched_enrollee_id'] ?? null],
+            ], 422);
+        }
+
+        $enrollee = $this->enrolleeService->create($data);
 
         if ($dupResult['is_duplicate']) {
             // Flag the newly created enrollee

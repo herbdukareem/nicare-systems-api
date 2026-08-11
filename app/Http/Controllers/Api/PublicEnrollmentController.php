@@ -11,6 +11,7 @@ use App\Models\InsuranceProgramme;
 use App\Models\Lga;
 use App\Models\PremiumPlan;
 use App\Models\Ward;
+use App\Services\EnrolleeDuplicateDetectionService;
 use App\Services\NinProviderConfigService;
 use App\Services\Billing\PaymentGatewayConfigurationService;
 use App\Services\PublicEnrollmentService;
@@ -23,7 +24,8 @@ class PublicEnrollmentController extends BaseController
 {
     public function __construct(
         private PaymentGatewayConfigurationService $paymentGatewayConfigurationService,
-        private NinProviderConfigService $ninProviderConfigService
+        private NinProviderConfigService $ninProviderConfigService,
+        private EnrolleeDuplicateDetectionService $duplicateDetectionService
     )
     {
     }
@@ -74,6 +76,12 @@ class PublicEnrollmentController extends BaseController
 
     public function store(Request $request, PublicEnrollmentService $service)
     {
+        if ($request->has('nin')) {
+            $request->merge([
+                'nin' => Enrollee::normalizeNin($request->input('nin')),
+            ]);
+        }
+
         $validated = $request->validate([
             'premium_plan_id' => ['required', 'exists:premium_plans,id'],
             'nin' => ['required', 'string', 'max:255', 'unique:enrollees,nin'],
@@ -95,6 +103,12 @@ class PublicEnrollmentController extends BaseController
             'payment_reference' => ['nullable', 'string', 'max:255'],
             'passport' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
         ]);
+
+        if ($this->duplicateDetectionService->findExistingByNin((string) $validated['nin'])) {
+            return $this->sendError('This NIN already belongs to another enrollee record.', [
+                'nin' => ['This NIN already belongs to another enrollee record.'],
+            ], 422);
+        }
 
         try {
             $result = $service->submitApplication($validated);

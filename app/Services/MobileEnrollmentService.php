@@ -489,6 +489,10 @@ class MobileEnrollmentService
             };
         }
 
+        if (array_key_exists('nin', $data)) {
+            $data['nin'] = Enrollee::normalizeNin($data['nin']);
+        }
+
         return $data;
     }
 

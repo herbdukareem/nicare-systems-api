@@ -5,6 +5,7 @@ namespace App\Http\Requests;
 use App\Models\Enrollee;
 use App\Models\Facility;
 use App\Models\PremiumPlan;
+use App\Services\EnrolleeDuplicateDetectionService;
 use App\Services\EnrollmentLocationResolver;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
@@ -40,6 +41,10 @@ class StoreEnrolleeRequest extends FormRequest
 
         if (($data['relationship_to_principal'] ?? 1) == 1) {
             $data['principal_enrollee_id'] = null;
+        }
+
+        if (array_key_exists('nin', $data)) {
+            $data['nin'] = Enrollee::normalizeNin($data['nin']);
         }
 
         $data = app(EnrollmentLocationResolver::class)->resolve($data);
@@ -97,6 +102,15 @@ class StoreEnrolleeRequest extends FormRequest
     public function withValidator(Validator $validator): void
     {
         $validator->after(function (Validator $validator) {
+            if ($this->filled('nin')) {
+                $existing = app(EnrolleeDuplicateDetectionService::class)
+                    ->findExistingByNin((string) $this->input('nin'));
+
+                if ($existing) {
+                    $validator->errors()->add('nin', 'This NIN already belongs to another enrollee record.');
+                }
+            }
+
             if ($this->filled('lga_id') && $this->filled('ward_id')) {
                 $wardBelongsToLga = \App\Models\Ward::whereKey($this->input('ward_id'))
                     ->where('lga_id', $this->input('lga_id'))

@@ -63,6 +63,17 @@ class Enrollee extends Authenticatable
         'Others',
     ];
 
+    public static function normalizeNin(?string $nin): ?string
+    {
+        if ($nin === null) {
+            return null;
+        }
+
+        $normalized = preg_replace('/\D+/', '', trim($nin));
+
+        return $normalized !== '' ? $normalized : null;
+    }
+
     public static function normalizeOccupation(?string $occupation): ?string
     {
         if ($occupation === null) {
@@ -152,9 +163,15 @@ protected $guarded = ['id'];
     protected static function booted(): void
     {
         static::creating(function (self $enrollee): void {
+            $enrollee->nin = self::normalizeNin($enrollee->nin);
+
             if (blank($enrollee->enrollee_id)) {
                 $enrollee->enrollee_id = app(EnrolleeIdGenerator::class)->generate();
             }
+        });
+
+        static::updating(function (self $enrollee): void {
+            $enrollee->nin = self::normalizeNin($enrollee->nin);
         });
     }
 
