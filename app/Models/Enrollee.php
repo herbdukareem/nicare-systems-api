@@ -288,6 +288,32 @@ protected $guarded = ['id'];
             ?: $this->image_url;
     }
 
+    public function verifiedNinPhotoUrl(): ?string
+    {
+        $candidates = [
+            data_get($this->nin_verification_data, 'provider_data.photo'),
+            data_get($this->nin_verification_data, 'provider_data.image'),
+            data_get($this->nin_verification_data, '_raw.data.photo'),
+            data_get($this->nin_verification_data, '_raw.data.image'),
+        ];
+
+        foreach ($candidates as $candidate) {
+            $normalized = $this->normalizeVerifiedPhotoCandidate($candidate);
+            if ($normalized !== null) {
+                return $normalized;
+            }
+        }
+
+        return null;
+    }
+
+    public function preferredProfilePhotoUrl(): ?string
+    {
+        return $this->image_url
+            ?: $this->providedEnrollmentPhotoUrl()
+            ?: $this->verifiedNinPhotoUrl();
+    }
+
     public function latestMobilePassportAttachment(): ?MobileEnrollmentAttachment
     {
         $record = $this->resolveMobileEnrollmentRecord();
@@ -402,6 +428,29 @@ protected $guarded = ['id'];
 
         if (Str::startsWith($value, ['/storage/', 'storage/', '/uploads/', 'uploads/'])) {
             return $value;
+        }
+
+        return null;
+    }
+
+    private function normalizeVerifiedPhotoCandidate(mixed $candidate): ?string
+    {
+        $value = trim((string) $candidate);
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('#^data:image/[-\w.+]+;base64,#i', $value) === 1) {
+            return $value;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            $scheme = strtolower((string) parse_url($value, PHP_URL_SCHEME));
+            return in_array($scheme, ['http', 'https'], true) ? $value : null;
+        }
+
+        if (preg_match('/^[A-Za-z0-9+\/=\s]+$/', $value) === 1 && strlen(preg_replace('/\s+/', '', $value)) >= 32) {
+            return 'data:image/jpeg;base64,' . preg_replace('/\s+/', '', $value);
         }
 
         return null;

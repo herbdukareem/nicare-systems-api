@@ -532,7 +532,7 @@ class EnrolleeController extends BaseController
             'insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage',
             'facility', 'lga', 'ward',
         ]);
-        $enrollee->setAttribute('pdf_photo_src', $this->resolvePdfPhotoSource($enrollee->image_url));
+        $enrollee->setAttribute('pdf_photo_src', $this->resolvePdfPhotoSource($enrollee->preferredProfilePhotoUrl()));
 
         // Fetch QR code as base64 so DomPDF can embed it without remote-URL issues
         $qrBase64 = null;
@@ -1361,7 +1361,7 @@ class EnrolleeController extends BaseController
         $enrollees->each(function (Enrollee $enrollee) use ($maxWidth, $maxHeight, $jpegQuality): void {
             $enrollee->setAttribute(
                 'pdf_photo_src',
-                $this->resolvePdfPhotoSource($enrollee->image_url, $maxWidth, $maxHeight, $jpegQuality)
+                $this->resolvePdfPhotoSource($enrollee->preferredProfilePhotoUrl(), $maxWidth, $maxHeight, $jpegQuality)
             );
         });
     }
@@ -1385,6 +1385,24 @@ class EnrolleeController extends BaseController
         if ($publicPath !== '' && str_starts_with($publicPath, 'storage/')) {
             $diskPath = substr($publicPath, strlen('storage/'));
             return $this->buildDiskImageDataUri('public', $diskPath, $maxWidth, $maxHeight, $jpegQuality);
+        }
+
+        if (!preg_match('#^https?://#i', $imageUrl)) {
+            $normalizedPath = ltrim($imageUrl, '/');
+            $passportDisk = (string) config('filesystems.enrollee_passport_disk', config('filesystems.default', 'public'));
+
+            if ($normalizedPath !== '') {
+                $diskCandidates = array_values(array_unique([$passportDisk, 'public']));
+                foreach ($diskCandidates as $disk) {
+                    try {
+                        if (Storage::disk($disk)->exists($normalizedPath)) {
+                            return $this->buildDiskImageDataUri($disk, $normalizedPath, $maxWidth, $maxHeight, $jpegQuality);
+                        }
+                    } catch (\Throwable $e) {
+                        continue;
+                    }
+                }
+            }
         }
 
         $passportDisk = config('filesystems.enrollee_passport_disk', config('filesystems.default', 'public'));
