@@ -13,6 +13,9 @@ class EnrolleeResource extends JsonResource
 {
     public function toArray($request)
     {
+        $normalizedImageUrl = $this->normalizeImageUrl($this->image_url);
+        $normalizedProvidedImageUrl = $this->normalizeImageUrl($this->providedEnrollmentPhotoUrl());
+
         return [
             'id' => $this->id,
             'enrollee_id' => $this->enrollee_id,
@@ -51,17 +54,18 @@ class EnrolleeResource extends JsonResource
             'disability' => $this->disability,
             'occupation' => $this->occupation,
             'educational_status' => $this->educational_status,
-            'image_url' => $this->image_url,
-            'provided_image_url' => $this->providedEnrollmentPhotoUrl(),
-            'provided_live_image_url' => $this->providedEnrollmentPhotoUrl(),
+            'image_url' => $normalizedImageUrl,
+            'provided_image_url' => $normalizedProvidedImageUrl,
+            'provided_live_image_url' => $normalizedProvidedImageUrl,
             'current_mobile_photo_attachment_id' => $this->currentMobilePhotoAttachmentId(),
             'mobile_passport_attachments' => $this->mobilePassportAttachments()->map(fn ($attachment) => [
                 'id' => $attachment->id,
                 'kind' => $attachment->kind,
-                'file_path' => $attachment->file_path,
+                'file_path' => $this->normalizeImageUrl($attachment->file_path),
                 'original_name' => $attachment->original_name,
                 'created_at' => $attachment->created_at,
-                'is_current' => $this->image_url && $attachment->file_path === $this->image_url,
+                'is_current' => $normalizedImageUrl
+                    && $this->normalizeImageUrl($attachment->file_path) === $normalizedImageUrl,
             ])->values(),
             'enrollee_type' => new EnrolleeTypeResource($this->whenLoaded('enrolleeType')),
             'type' => $this->whenLoaded('enrolleeType', function() {
@@ -223,5 +227,38 @@ class EnrolleeResource extends JsonResource
         $current = $items->first(fn ($attachment) => $this->image_url && $attachment->file_path === $this->image_url);
 
         return $current?->id ?: $items->last()?->id;
+    }
+
+    private function normalizeImageUrl(?string $url): ?string
+    {
+        $value = trim((string) $url);
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('#^data:#i', $value) === 1) {
+            return $value;
+        }
+
+        if (preg_match('#^/(storage|uploads)/#i', $value) === 1) {
+            return $value;
+        }
+
+        if (preg_match('#^(storage|uploads)/#i', $value) === 1) {
+            return '/' . ltrim($value, '/');
+        }
+
+        if (!filter_var($value, FILTER_VALIDATE_URL)) {
+            return $value;
+        }
+
+        $path = '/' . ltrim((string) parse_url($value, PHP_URL_PATH), '/');
+        if (!preg_match('#^/(storage|uploads)/#i', $path)) {
+            return $value;
+        }
+
+        $query = (string) parse_url($value, PHP_URL_QUERY);
+
+        return $path . ($query !== '' ? '?' . $query : '');
     }
 }

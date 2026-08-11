@@ -21,6 +21,7 @@ use App\Services\Billing\PaymentCollectionService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -62,6 +63,11 @@ class MobileEnrollmentService
     public function syncRecord(User $officer, OfficerDevice $device, string $batchId, array $recordPayload, array $meta = []): array
     {
         $clientRecordId = (string) ($recordPayload['client_record_id'] ?? Str::uuid());
+        $validated = ['core' => [], 'extra' => []];
+        $capturedLivePhoto = is_string($recordPayload['captured_live_photo_base64'] ?? null)
+            ? trim((string) $recordPayload['captured_live_photo_base64'])
+            : null;
+        $storedPayload = $this->sanitizeRecordPayloadForStorage($recordPayload);
 
         $record = MobileEnrollmentRecord::firstOrNew([
             'officer_device_id' => $device->id,
@@ -75,7 +81,7 @@ class MobileEnrollmentService
         $record->fill([
             'sync_batch_id' => $record->sync_batch_id ?: $batchId,
             'officer_user_id' => $officer->id,
-            'payload' => $recordPayload,
+            'payload' => $storedPayload,
             'status' => MobileEnrollmentRecord::STATUS_RECEIVED,
             'status_reason' => null,
             'duplicate_of_enrollee_id' => null,
@@ -106,12 +112,12 @@ class MobileEnrollmentService
             $data = $this->applyEnrollmentPhasePolicy($data, (array) ($schema->enrollment_phase_policy ?? []));
             $data = $this->resolveLockedVerifiedFieldEdits($data, $recordPayload, $ninPolicy);
             if (isset($recordPayload['data']) && is_array($recordPayload['data'])) {
-                $recordPayload['data'] = array_merge($recordPayload['data'], $data, [
+                $storedPayload['data'] = array_merge((array) ($storedPayload['data'] ?? []), $data, [
                     'lga_id' => $data['lga_id'] ?? null,
                     'ward_id' => $data['ward_id'] ?? null,
                     'facility_id' => $data['facility_id'] ?? null,
                 ]);
-                $record->forceFill(['payload' => $recordPayload])->save();
+                $record->forceFill(['payload' => $storedPayload])->save();
             }
             $this->ensureOfficerCanUseEnrollment($officer, $schema->exists ? $schema->id : null, (int) ($data['lga_id'] ?? 0));
 
@@ -137,32 +143,44 @@ class MobileEnrollmentService
                 $this->audit($record, 'mobile_enrollment_verified_field_edit_reason', 'Officer supplied reasons for editing verified NIN fields.');
             }
 
-            $duplicate = $this->duplicateDetectionService->check($validated['core'] + ['gender' => $validated['core']['sex'] ?? null]);
-            if ($duplicate['is_duplicate'] ?? false) {
-                return $this->markDuplicate($record, $duplicate);
-            }
+            $enrollee = $this->duplicateDetectionService->withinSubmissionLock(
+                $validated['core'] + ['gender' => $validated['core']['sex'] ?? null],
+                function () use ($validated, $record, $officer, $schema, $locationPayload) {
+                    $existingByNin = $this->duplicateDetectionService->findExistingByNin($validated['core']['nin'] ?? null);
+                    if ($existingByNin) {
+                        throw new RuntimeException('Possible duplicate detected: nin_match');
+                    }
 
-            $pin = null;
-            if (!blank($validated['core']['premium_pin'] ?? null)) {
-                $pin = $this->validatePinForEnrollment((string) $validated['core']['premium_pin'], (int) $validated['core']['premium_plan_id']);
-            }
+                    $duplicate = $this->duplicateDetectionService->check($validated['core'] + ['gender' => $validated['core']['sex'] ?? null]);
+                    if ($duplicate['is_duplicate'] ?? false) {
+                        throw new RuntimeException('Possible duplicate detected: ' . ($duplicate['match_type'] ?? 'matched enrollee'));
+                    }
 
-            $enrollee = $this->createPendingEnrollee($record, $officer, $validated['core'], $validated['extra'], $schema, $locationPayload);
+                    $pin = null;
+                    if (!blank($validated['core']['premium_pin'] ?? null)) {
+                        $pin = $this->validatePinForEnrollment((string) $validated['core']['premium_pin'], (int) $validated['core']['premium_plan_id']);
+                    }
 
-            if ($pin) {
-                $enrollee = $this->premiumCoverageService->usePinForPendingEnrollment(
-                    $pin,
-                    $enrollee,
-                    PremiumPlan::findOrFail($validated['core']['premium_plan_id'])
-                );
-            }
+                    $enrollee = $this->createPendingEnrollee($record, $officer, $validated['core'], $validated['extra'], $schema, $locationPayload);
+
+                    if ($pin) {
+                        $enrollee = $this->premiumCoverageService->usePinForPendingEnrollment(
+                            $pin,
+                            $enrollee,
+                            PremiumPlan::findOrFail($validated['core']['premium_plan_id'])
+                        );
+                    }
+
+                    return $enrollee;
+                }
+            );
 
             $record->forceFill([
                 'enrollee_id' => $enrollee->id,
                 'synced_at' => now(),
             ])->save();
 
-            $this->persistCapturedLivePhotoAttachment($record->fresh('enrollee'), $recordPayload, $officer);
+            $this->persistCapturedLivePhotoAttachment($record->fresh('enrollee'), $recordPayload, $officer, $capturedLivePhoto);
 
             if ($this->policyNeedsNinVerification($ninPolicy)) {
                 return $this->processPolicyNinVerification($record->fresh('enrollee'), $officer, $ninPolicy);
@@ -171,6 +189,15 @@ class MobileEnrollmentService
             return $this->transition($record, MobileEnrollmentRecord::STATUS_PENDING_APPROVAL, 'Enrollment received and ready for approval.');
         } catch (ValidationException $exception) {
             return $this->failSync($record, implode('; ', $exception->validator->errors()->all()));
+        } catch (RuntimeException $exception) {
+            if (str_starts_with($exception->getMessage(), 'Possible duplicate detected:')) {
+                $duplicate = $this->duplicateDetectionService->check($validated['core'] + ['gender' => $validated['core']['sex'] ?? null]);
+                if ($duplicate['is_duplicate'] ?? false) {
+                    return $this->markDuplicate($record, $duplicate);
+                }
+            }
+
+            return $this->failSync($record, $exception->getMessage());
         } catch (Throwable $exception) {
             return $this->failSync($record, $exception->getMessage());
         }
@@ -281,12 +308,13 @@ class MobileEnrollmentService
 
         $disk = (string) config('filesystems.enrollee_passport_disk', 'public');
         $path = Storage::disk($disk)->putFile('mobile-enrollments/' . $record->id, $file, 'public');
+        $publicUrl = $this->resolveStoredFileUrl($disk, $path);
 
         $attachment = MobileEnrollmentAttachment::create([
             'mobile_enrollment_record_id' => $record->id,
             'enrollee_id' => $record->enrollee_id,
             'kind' => $kind,
-            'file_path' => Storage::disk($disk)->url($path),
+            'file_path' => $publicUrl,
             'original_name' => $file->getClientOriginalName(),
             'mime_type' => $file->getClientMimeType(),
             'size' => $file->getSize(),
@@ -295,7 +323,7 @@ class MobileEnrollmentService
         ]);
 
         if (in_array($kind, ['passport', 'retake_photo', 'retake-passport', 'retake'], true) && $record->enrollee) {
-            $record->enrollee->update(['image_url' => $attachment->file_path]);
+            $record->enrollee->update(['image_url' => $publicUrl]);
         }
 
         $record->update(['attachment_status' => 'uploaded']);
@@ -303,7 +331,7 @@ class MobileEnrollmentService
         return $attachment;
     }
 
-    private function persistCapturedLivePhotoAttachment(MobileEnrollmentRecord $record, array $recordPayload, User $officer): void
+    private function persistCapturedLivePhotoAttachment(MobileEnrollmentRecord $record, array $recordPayload, User $officer, ?string $inlineCapturedPhoto = null): void
     {
         if (!$record->enrollee_id) {
             return;
@@ -321,7 +349,7 @@ class MobileEnrollmentService
             return;
         }
 
-        $payload = $this->extractPersistableLivePhotoSource($recordPayload);
+        $payload = $this->extractPersistableLivePhotoSource($recordPayload, $inlineCapturedPhoto);
         if ($payload === null) {
             return;
         }
@@ -366,7 +394,7 @@ class MobileEnrollmentService
         $relativePath = 'mobile-enrollments/' . $record->id . '/sync-live-' . Str::lower(Str::random(12)) . '.' . $extension;
         Storage::disk($disk)->put($relativePath, $bytes, 'public');
 
-        $filePath = Storage::disk($disk)->url($relativePath);
+        $filePath = $this->resolveStoredFileUrl($disk, $relativePath);
 
         MobileEnrollmentAttachment::create([
             'mobile_enrollment_record_id' => $record->id,
@@ -385,6 +413,15 @@ class MobileEnrollmentService
         }
 
         $record->update(['attachment_status' => 'uploaded']);
+    }
+
+    private function resolveStoredFileUrl(string $disk, string $path): string
+    {
+        if ($disk === 'public') {
+            return '/storage/' . ltrim(str_replace('\\', '/', $path), '/');
+        }
+
+        return Storage::disk($disk)->url($path);
     }
 
     private function reconcileExistingLivePhotoAttachment(MobileEnrollmentRecord $record): ?MobileEnrollmentAttachment
@@ -415,9 +452,10 @@ class MobileEnrollmentService
         return $existingAttachment->fresh();
     }
 
-    private function extractPersistableLivePhotoSource(array $recordPayload): ?string
+    private function extractPersistableLivePhotoSource(array $recordPayload, ?string $inlineCapturedPhoto = null): ?string
     {
         $candidates = [
+            $inlineCapturedPhoto,
             $recordPayload['captured_live_photo_base64'] ?? null,
             $recordPayload['captured_photo_uri'] ?? null,
             $recordPayload['photo_uri'] ?? null,
@@ -444,6 +482,62 @@ class MobileEnrollmentService
         }
 
         return null;
+    }
+
+    private function sanitizeRecordPayloadForStorage(array $recordPayload): array
+    {
+        if (!empty($recordPayload['captured_live_photo_base64']) && is_string($recordPayload['captured_live_photo_base64'])) {
+            $recordPayload['captured_live_photo_meta'] = [
+                'redacted' => true,
+                'length' => strlen($recordPayload['captured_live_photo_base64']),
+            ];
+            $recordPayload['captured_live_photo_base64'] = null;
+        }
+
+        if (isset($recordPayload['nin_verified_values']) && is_array($recordPayload['nin_verified_values'])) {
+            $recordPayload['nin_verified_values'] = $this->sanitizePhotoFields($recordPayload['nin_verified_values']);
+        }
+
+        foreach ((array) ($recordPayload['attachments'] ?? []) as $index => $attachment) {
+            if (!is_array($attachment)) {
+                continue;
+            }
+
+            if (!empty($attachment['uri']) && is_string($attachment['uri']) && preg_match('#^data:image/[-\w.+]+;base64,#i', $attachment['uri']) === 1) {
+                $recordPayload['attachments'][$index]['uri_meta'] = [
+                    'redacted' => true,
+                    'length' => strlen($attachment['uri']),
+                ];
+                $recordPayload['attachments'][$index]['uri'] = null;
+            }
+        }
+
+        return $recordPayload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function sanitizePhotoFields(array $payload): array
+    {
+        foreach (['photo', 'image', 'passport', 'passportPhoto'] as $field) {
+            if (!isset($payload[$field]) || !is_string($payload[$field])) {
+                continue;
+            }
+
+            if (preg_match('#^data:image/[-\w.+]+;base64,#i', $payload[$field]) !== 1) {
+                continue;
+            }
+
+            $payload[$field . '_meta'] = [
+                'redacted' => true,
+                'length' => strlen($payload[$field]),
+            ];
+            $payload[$field] = null;
+        }
+
+        return $payload;
     }
 
     private function normalizePersistablePhotoSource(mixed $candidate): ?string
@@ -1267,18 +1361,27 @@ class MobileEnrollmentService
 
     private function audit(MobileEnrollmentRecord $record, string $action, string $description): void
     {
-        AuditTrail::create([
-            'auditable_type' => MobileEnrollmentRecord::class,
-            'auditable_id' => $record->id,
-            'action' => $action,
-            'description' => $description,
-            'user_id' => $record->officer_user_id,
-            'new_values' => [
-                'status' => $record->status,
+        try {
+            AuditTrail::create([
+                'auditable_type' => MobileEnrollmentRecord::class,
+                'auditable_id' => $record->id,
+                'action' => $action,
+                'description' => $description,
+                'user_id' => $record->officer_user_id,
+                'new_values' => [
+                    'status' => $record->status,
+                    'client_record_id' => $record->client_record_id,
+                    'device_id' => $record->officer_device_id,
+                ],
+            ]);
+        } catch (Throwable $exception) {
+            Log::warning('mobile_enrollment_audit_failed', [
+                'record_id' => $record->id,
                 'client_record_id' => $record->client_record_id,
-                'device_id' => $record->officer_device_id,
-            ],
-        ]);
+                'action' => $action,
+                'message' => $exception->getMessage(),
+            ]);
+        }
     }
 
     private function uniquePurchaseReference(): string

@@ -3,6 +3,9 @@
 namespace App\Services;
 
 use App\Models\Enrollee;
+use Illuminate\Contracts\Cache\Lock;
+use Illuminate\Support\Facades\Cache;
+use RuntimeException;
 
 class EnrolleeDuplicateDetectionService
 {
@@ -14,6 +17,45 @@ class EnrolleeDuplicateDetectionService
         Enrollee::STATUS_ACTIVE,
         Enrollee::STATUS_REJECTED,
     ];
+
+    /**
+     * @template TReturn
+     * @param  callable():TReturn  $callback
+     * @return TReturn
+     */
+    public function withinSubmissionLock(array $payload, callable $callback, int $seconds = 15)
+    {
+        $lockKey = $this->submissionLockKey($payload);
+        if ($lockKey === null) {
+            return $callback();
+        }
+
+        try {
+            /** @var Lock $lock */
+            $lock = Cache::lock($lockKey, $seconds);
+        } catch (\Throwable) {
+            return $callback();
+        }
+
+        if (!$lock->get()) {
+            throw new RuntimeException('Another enrollment submission for this person is already being processed. Please wait a moment and try again.');
+        }
+
+        try {
+            return $callback();
+        } finally {
+            try {
+                $lock->release();
+            } catch (\Throwable) {
+                // Ignore lock release failures.
+            }
+        }
+    }
+
+    public function findRecentPendingMatch(array $payload, int $minutes = 5, ?int $ignoreEnrolleeId = null): ?Enrollee
+    {
+        return null;
+    }
 
     /**
      * Find an existing enrollee by normalized NIN.
@@ -100,4 +142,13 @@ class EnrolleeDuplicateDetectionService
             'match_type'          => null,
         ];
     }
+
+    private function submissionLockKey(array $payload): ?string
+    {
+        $normalizedNin = Enrollee::normalizeNin($payload['nin'] ?? null);
+        return $normalizedNin !== null
+            ? 'enrollee_submission:nin:' . sha1($normalizedNin)
+            : null;
+    }
+
 }

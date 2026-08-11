@@ -726,7 +726,7 @@ class NinVerificationService
             'field_map' => $config['field_map'] ?? [],
             'request_payload' => $payload,
             'http_status' => $status,
-            'response_body' => $body,
+            'response_body' => $this->sanitizeProviderLogBody($body),
         ]);
     }
 
@@ -747,8 +747,32 @@ class NinVerificationService
             'field_map' => $config['field_map'] ?? [],
             'request_payload' => $payload,
             'http_status' => $status,
-            'response_body' => $body,
+            'response_body' => $this->sanitizeProviderLogBody($body),
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private function sanitizeProviderLogBody(array $body): array
+    {
+        $sanitized = $body;
+
+        foreach (['data.data.image', 'data.data.photo', 'data.image', 'data.photo', 'image', 'photo'] as $path) {
+            $value = data_get($sanitized, $path);
+            if (!is_string($value) || trim($value) === '') {
+                continue;
+            }
+
+            if (!Str::startsWith(trim($value), 'data:image/') && !preg_match('/^[A-Za-z0-9+\/=\r\n]+$/', $value)) {
+                continue;
+            }
+
+            data_set($sanitized, $path, '[redacted photo payload: ' . strlen($value) . ' chars]');
+        }
+
+        return $sanitized;
     }
 
     /**

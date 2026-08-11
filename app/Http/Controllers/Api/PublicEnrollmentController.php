@@ -111,7 +111,17 @@ class PublicEnrollmentController extends BaseController
         }
 
         try {
-            $result = $service->submitApplication($validated);
+            $result = $this->duplicateDetectionService->withinSubmissionLock(
+                $validated + ['gender' => $validated['sex'] ?? null],
+                function () use ($service, $validated) {
+                    $existingByNin = $this->duplicateDetectionService->findExistingByNin($validated['nin'] ?? null);
+                    if ($existingByNin) {
+                        throw new RuntimeException('This NIN already belongs to another enrollee record.');
+                    }
+
+                    return $service->submitApplication($validated);
+                }
+            );
         } catch (RuntimeException $exception) {
             return $this->sendError($exception->getMessage(), [], 422);
         }

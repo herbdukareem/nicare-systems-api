@@ -159,30 +159,45 @@ class EnrolleeController extends BaseController
     public function store(StoreEnrolleeRequest $request)
     {
         $data = $request->validated();
+        $payload = array_merge($data, ['gender' => $data['sex'] ?? null]);
 
-        $dupResult = $this->duplicateService->check(array_merge($data, ['gender' => $data['sex'] ?? null]));
-        if (($dupResult['is_duplicate'] ?? false) && ($dupResult['match_type'] ?? null) === 'nin_match') {
-            return $this->sendError('This NIN already belongs to another enrollee record.', [
-                'nin' => ['This NIN already belongs to another enrollee record.'],
-                'matched_enrollee_id' => [$dupResult['matched_enrollee_id'] ?? null],
-            ], 422);
+        try {
+            return $this->duplicateService->withinSubmissionLock($payload, function () use ($payload, $data) {
+                $existingByNin = $this->duplicateService->findExistingByNin($payload['nin'] ?? null);
+                if ($existingByNin) {
+                    return $this->sendError('This NIN already belongs to another enrollee record.', [
+                        'nin' => ['This NIN already belongs to another enrollee record.'],
+                        'matched_enrollee_id' => [$existingByNin->id],
+                    ], 422);
+                }
+
+                $dupResult = $this->duplicateService->check($payload);
+                if (($dupResult['is_duplicate'] ?? false) && ($dupResult['match_type'] ?? null) === 'nin_match') {
+                    return $this->sendError('This NIN already belongs to another enrollee record.', [
+                        'nin' => ['This NIN already belongs to another enrollee record.'],
+                        'matched_enrollee_id' => [$dupResult['matched_enrollee_id'] ?? null],
+                    ], 422);
+                }
+
+                $enrollee = $this->enrolleeService->create($data);
+
+                if ($dupResult['is_duplicate']) {
+                    // Flag the newly created enrollee
+                    $enrollee->update(['is_possible_duplicate' => true]);
+
+                    EnrolleeDuplicateFlag::create([
+                        'enrollee_id'         => $enrollee->id,
+                        'matched_enrollee_id' => $dupResult['matched_enrollee_id'],
+                        'match_type'          => $dupResult['match_type'],
+                        'flagged_by'          => auth()->id(),
+                    ]);
+                }
+
+                return $this->sendResponse(new EnrolleeResource($enrollee), 'Enrollee created successfully', 201);
+            });
+        } catch (\RuntimeException $exception) {
+            return $this->sendError($exception->getMessage(), [], 409);
         }
-
-        $enrollee = $this->enrolleeService->create($data);
-
-        if ($dupResult['is_duplicate']) {
-            // Flag the newly created enrollee
-            $enrollee->update(['is_possible_duplicate' => true]);
-
-            EnrolleeDuplicateFlag::create([
-                'enrollee_id'         => $enrollee->id,
-                'matched_enrollee_id' => $dupResult['matched_enrollee_id'],
-                'match_type'          => $dupResult['match_type'],
-                'flagged_by'          => auth()->id(),
-            ]);
-        }
-
-        return $this->sendResponse(new EnrolleeResource($enrollee), 'Enrollee created successfully', 201);
     }
 
     /**
