@@ -14,7 +14,7 @@
       <!-- Filter card -->
       <div class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-p-5">
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-3">
-          <v-select
+          <v-autocomplete
             v-model="filters.benefactor_id"
             :items="metadata.benefactors"
             item-title="name"
@@ -24,7 +24,7 @@
             variant="outlined"
             clearable
           />
-          <v-select
+          <v-autocomplete
             v-model="filters.facility_id"
             :items="metadata.facilities"
             item-title="name"
@@ -34,7 +34,7 @@
             variant="outlined"
             clearable
           />
-          <v-select
+          <v-autocomplete
             v-model="filters.insurance_programme_id"
             :items="metadata.insurance_programmes"
             item-title="name"
@@ -44,7 +44,7 @@
             variant="outlined"
             clearable
           />
-          <v-select
+          <v-autocomplete
             v-model="filters.enrollee_category_id"
             :items="metadata.enrollee_categories"
             item-title="name"
@@ -54,7 +54,7 @@
             variant="outlined"
             clearable
           />
-          <v-select
+          <v-autocomplete
             v-model="filters.funding_type_id"
             :items="metadata.funding_types"
             item-title="name"
@@ -64,7 +64,7 @@
             variant="outlined"
             clearable
           />
-          <v-select
+          <v-autocomplete
             v-model="filters.enrollment_phase_id"
             :items="metadata.enrollment_phases"
             item-title="name"
@@ -74,7 +74,7 @@
             variant="outlined"
             clearable
           />
-          <v-select
+          <v-autocomplete
             v-model="filters.approval_status"
             :items="approvalOptions"
             item-title="title"

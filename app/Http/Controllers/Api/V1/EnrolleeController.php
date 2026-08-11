@@ -561,7 +561,7 @@ class EnrolleeController extends BaseController
 
     public function bulkEnrollmentSlip(Request $request)
     {
-        $this->extendPdfExecutionWindow(300);
+        $this->extendPdfExecutionWindow(300, '512M');
 
         $data = $request->validate([
             'benefactor_id' => ['nullable', 'exists:benefactors,id'],
@@ -628,7 +628,7 @@ class EnrolleeController extends BaseController
 
         $generatedAt = now();
         $generatedBy = auth()->user();
-        $syncPdfChunkSize = 100;
+        $syncPdfChunkSize = 40;
 
         if ($enrollees->count() <= $syncPdfChunkSize) {
             return $this->streamBulkEnrollmentSlipPdf($enrollees, $data, $generatedBy, $generatedAt);
@@ -1248,13 +1248,17 @@ class EnrolleeController extends BaseController
         return $this->sendResponse($transfers, 'Transfer history retrieved successfully');
     }
 
-    private function extendPdfExecutionWindow(int $seconds = 120): void
+    private function extendPdfExecutionWindow(int $seconds = 120, ?string $memoryLimit = null): void
     {
         if (function_exists('set_time_limit')) {
             @set_time_limit($seconds);
         }
 
         @ini_set('max_execution_time', (string) $seconds);
+
+        if ($memoryLimit) {
+            @ini_set('memory_limit', $memoryLimit);
+        }
     }
 
     private function streamBulkEnrollmentSlipPdf(
@@ -1265,7 +1269,7 @@ class EnrolleeController extends BaseController
         ?int $partNumber = null,
         ?int $totalParts = null
     ) {
-        $this->hydratePdfPhotoSources($enrollees, 180, 225, 78);
+        $this->hydratePdfPhotoSources($enrollees, 120, 150, 70);
 
         $pdf = $this->makeBulkEnrollmentSlipPdf($enrollees, $filters, $generatedBy, $generatedAt, $partNumber, $totalParts);
         $filename = $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts);
@@ -1302,13 +1306,22 @@ class EnrolleeController extends BaseController
 
         foreach ($chunks as $index => $chunk) {
             $partNumber = $index + 1;
-            $this->hydratePdfPhotoSources($chunk, 180, 225, 78);
+            $this->hydratePdfPhotoSources($chunk, 120, 150, 70);
 
             $pdf = $this->makeBulkEnrollmentSlipPdf($chunk, $filters, $generatedBy, $generatedAt, $partNumber, $totalParts);
             $zip->addFromString(
                 $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts),
                 $pdf->output()
             );
+
+            unset($pdf);
+            $chunk->each(static function (Enrollee $enrollee): void {
+                $enrollee->offsetUnset('pdf_photo_src');
+            });
+
+            if (function_exists('gc_collect_cycles')) {
+                gc_collect_cycles();
+            }
         }
 
         $zip->close();
