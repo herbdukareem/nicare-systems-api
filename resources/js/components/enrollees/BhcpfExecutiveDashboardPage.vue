@@ -94,7 +94,7 @@
         <BarChart
           :data="lgaProgressChartData"
           :options="lgaProgressChartOptions"
-          :height="720"
+          :height="lgaProgressChartHeight"
           @select="handleLgaChartSelect"
         />
       </AppCard>
@@ -357,16 +357,32 @@ const lgaProgressChartData = computed(() => ({
   ],
 }))
 
+const lgaProgressChartHeight = computed(() => {
+  const rowCount = lgaRows.value.length || 0
+
+  return Math.max(420, rowCount * 34)
+})
+
 const lgaProgressChartOptions = {
   indexAxis: 'y',
   plugins: {
     legend: { display: false },
+    tooltip: {
+      callbacks: {
+        label: (context) => `Captured: ${Number(context.raw || 0).toLocaleString()}`,
+      },
+    },
   },
   scales: {
     x: {
       beginAtZero: true,
       ticks: {
         callback: (value) => Number(value).toLocaleString(),
+      },
+    },
+    y: {
+      ticks: {
+        autoSkip: false,
       },
     },
   },

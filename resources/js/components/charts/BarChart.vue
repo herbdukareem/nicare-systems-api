@@ -1,11 +1,11 @@
 <template>
-  <div class="tw-relative">
+  <div class="tw-relative" :style="containerStyle">
     <canvas ref="chartCanvas" @click="handleCanvasClick"></canvas>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch } from 'vue';
+import { computed, ref, onMounted, onUnmounted, watch } from 'vue';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -46,6 +46,10 @@ const emit = defineEmits(['select']);
 
 const chartCanvas = ref(null);
 let chartInstance = null;
+
+const containerStyle = computed(() => ({
+  height: `${props.height}px`,
+}));
 
 const defaultOptions = {
   responsive: true,
@@ -183,6 +187,8 @@ watch(() => props.options, () => {
 
 <style scoped>
 canvas {
-  max-height: v-bind('height + "px"');
+  display: block;
+  width: 100% !important;
+  height: 100% !important;
 }
 </style>
