@@ -300,7 +300,7 @@ class CapitationService
 
         $results = [];
 
-        DB::transaction(function () use ($capitation, $eligibleProviders, $fundingType, $capitationRate, &$results): void {
+        DB::transaction(function () use ($capitation, $eligibleProviders, $fundingType, $capitationRate, $normalizedDuplicateNinPolicy, &$results): void {
             foreach ($eligibleProviders as $provider) {
                 $count = (int) $provider->enrollee_count;
                 $totalAmount = $count * $capitationRate;
