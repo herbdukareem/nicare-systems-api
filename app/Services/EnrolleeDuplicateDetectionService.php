@@ -68,24 +68,12 @@ class EnrolleeDuplicateDetectionService
         }
 
         $baseQuery = Enrollee::query()
-            ->whereNotNull('nin')
             ->whereIn('status', $this->duplicateStatuses)
             ->when($ignoreEnrolleeId, fn ($query) => $query->whereKeyNot($ignoreEnrolleeId));
 
-        $exact = (clone $baseQuery)
+        return $baseQuery
             ->where('nin', $normalizedNin)
             ->first();
-
-        if ($exact) {
-            return $exact;
-        }
-
-        return $baseQuery
-            ->select(['id', 'nin', 'status'])
-            ->get()
-            ->first(function (Enrollee $enrollee) use ($normalizedNin): bool {
-                return Enrollee::normalizeNin($enrollee->nin) === $normalizedNin;
-            });
     }
 
     /**

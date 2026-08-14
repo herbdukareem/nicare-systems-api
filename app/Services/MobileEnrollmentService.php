@@ -146,11 +146,6 @@ class MobileEnrollmentService
             $enrollee = $this->duplicateDetectionService->withinSubmissionLock(
                 $validated['core'] + ['gender' => $validated['core']['sex'] ?? null],
                 function () use ($validated, $record, $officer, $schema, $locationPayload) {
-                    $existingByNin = $this->duplicateDetectionService->findExistingByNin($validated['core']['nin'] ?? null);
-                    if ($existingByNin) {
-                        throw new RuntimeException('Possible duplicate detected: nin_match');
-                    }
-
                     $duplicate = $this->duplicateDetectionService->check($validated['core'] + ['gender' => $validated['core']['sex'] ?? null]);
                     if ($duplicate['is_duplicate'] ?? false) {
                         throw new RuntimeException('Possible duplicate detected: ' . ($duplicate['match_type'] ?? 'matched enrollee'));
