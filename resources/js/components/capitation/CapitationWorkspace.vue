@@ -212,6 +212,7 @@
           </div>
           <v-btn variant="outlined" @click="breakdownDialog = false">Close</v-btn>
           <v-btn color="teal" variant="flat" prepend-icon="mdi-printer" @click="printBreakdownInvoice">Print Invoice</v-btn>
+          <v-btn v-if="canExport" color="success" variant="flat" prepend-icon="mdi-file-excel" :disabled="filteredBreakdown.length === 0" @click="exportBreakdownExcel">Export Excel</v-btn>
           <v-btn v-if="canExportRemita(selectedPeriod)" color="primary" variant="flat" prepend-icon="mdi-file-excel" @click="exportRemitaPeriod(selectedPeriod)">Export Remita Format</v-btn>
         </template>
 
@@ -884,6 +885,29 @@ const exportPeriod = async (period) => {
   URL.revokeObjectURL(url)
 }
 
+const exportBreakdownExcel = async () => {
+  if (!selectedPeriod.value || filteredBreakdown.value.length === 0) return
+
+  try {
+    const response = await capitationAPI.exportBreakdownExcel(selectedPeriod.value.id, {
+      stage: breakdownStage.value,
+      funding_type_id: breakdownFundingTypeId.value || undefined,
+    })
+    const fundingType = breakdownFundingTypes.value.find((item) => Number(item.id) === Number(breakdownFundingTypeId.value))
+    const suffix = fundingType?.name || 'all_funding_types'
+    const url = URL.createObjectURL(new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `capitation_payment_details_${selectedPeriod.value.id}_${String(suffix).replace(/[^a-z0-9]+/gi, '_').replace(/^_|_$/g, '')}.xlsx`
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    error(err?.response?.data?.message || 'Failed to export capitation payment details')
+  }
+}
+
 const exportRemitaPeriod = async (period) => {
   if (!period) return
   try {
@@ -910,6 +934,8 @@ const printInvoice = (period, items, mode, dataSource = 'breakdown') => {
 
   const totalAmount = items.reduce((sum, item) => sum + Number(item.total_amount || item.amount || 0), 0)
   const dateGenerated = now.toLocaleString()
+  const fundingTypeNames = Array.from(new Set(items.map((item) => periodFundingTypeName(item)).filter((name) => name && name !== 'N/A')))
+  const fundingTypeLabel = fundingTypeNames.length === 1 ? fundingTypeNames[0] : (fundingTypeNames.length ? 'Multiple funding types' : 'N/A')
   const statusColHeader = STATUS_COL_HEADERS[mode] || 'Status'
   const captMonth = period?.capitation_month ? (MONTH_NAMES[period.capitation_month - 1] || '—') : '—'
 
@@ -993,17 +1019,18 @@ const printInvoice = (period, items, mode, dataSource = 'breakdown') => {
 <p class="section-title">Capitation Payment Details</p>
 <table style="width:70%">
   <thead>
-    <tr><th style="width:40px">SN</th><th>Capitated Month</th><th>Capitation</th><th>Capitation Amount</th></tr>
+    <tr><th style="width:40px">SN</th><th>Capitated Month</th><th>Capitation</th><th>Funding Type</th><th>Capitation Amount</th></tr>
   </thead>
   <tbody>
     <tr>
       <td style="text-align:center">1</td>
       <td>${captMonth}</td>
       <td>${period?.name || '—'}</td>
+      <td>${fundingTypeLabel}</td>
       <td style="text-align:right">${totalAmount.toLocaleString()}</td>
     </tr>
     <tr class="total-row">
-      <td colspan="3" style="text-align:center">Total</td>
+      <td colspan="4" style="text-align:center">Total</td>
       <td style="text-align:right">₦${totalAmount.toLocaleString()}</td>
     </tr>
   </tbody>

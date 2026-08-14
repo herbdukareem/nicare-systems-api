@@ -3,13 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Exceptions\CapitationComputationException;
+use App\Exports\CapitationBreakdownExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CapitationBatchRequest;
 use App\Models\Capitation;
 use App\Models\Facility;
+use App\Models\FundingType;
 use App\Services\CapitationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Maatwebsite\Excel\Facades\Excel;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class CapitationController extends Controller
@@ -370,6 +373,33 @@ class CapitationController extends Controller
         }, 'capitation_' . $capitation->id . '_' . now()->format('Ymd') . '.csv', [
             'Content-Type' => 'text/csv',
         ]);
+    }
+
+    /**
+     * Export the selected funding type's capitation payment details as Excel.
+     */
+    public function exportBreakdownExcel(Request $request, Capitation $capitation)
+    {
+        $validated = $request->validate([
+            'stage' => ['nullable', 'in:generated,reviewed,approved,paid'],
+            'funding_type_id' => ['nullable', 'integer', 'exists:funding_types,id'],
+        ]);
+
+        $fundingTypeId = isset($validated['funding_type_id']) ? (int) $validated['funding_type_id'] : null;
+        $details = $this->service->getBreakdown(
+            $capitation,
+            $validated['stage'] ?? 'generated',
+            $fundingTypeId,
+        );
+        $fundingTypeLabel = $fundingTypeId
+            ? FundingType::findOrFail($fundingTypeId)->name
+            : 'All Funding Types';
+        $filenameSuffix = $fundingTypeId ? '_funding_type_' . $fundingTypeId : '_all_funding_types';
+
+        return Excel::download(
+            new CapitationBreakdownExport($capitation, $details, $fundingTypeLabel),
+            'capitation_payment_details_' . $capitation->id . $filenameSuffix . '.xlsx'
+        );
     }
 
     /**

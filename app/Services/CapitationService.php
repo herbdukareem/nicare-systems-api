@@ -522,9 +522,13 @@ class CapitationService
         return $capitation->fresh(['capitationDetails', 'capitationPayments']);
     }
 
-    public function getBreakdown(Capitation $capitation, string $stage = 'generated'): Collection
+    public function getBreakdown(Capitation $capitation, string $stage = 'generated', ?int $fundingTypeId = null): Collection
     {
         $query = $capitation->capitationDetails()->with(['facility.accountDetail.bank', 'fundingType']);
+
+        if ($fundingTypeId !== null) {
+            $query->where('funding_type_id', $fundingTypeId);
+        }
 
         match ($stage) {
             'reviewed' => $query->whereNotNull('reviewed_at'),
