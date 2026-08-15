@@ -567,7 +567,7 @@ class CapitationService
                 ];
 
                 foreach ($details as $detail) {
-                    $column = $this->paymentReportFundingColumn($detail->fundingType?->name);
+                    $column = $this->paymentReportFundingColumn($detail->fundingType);
                     if ($column !== null) {
                         $amounts[$column] += (float) ($detail->total_amount ?? $detail->amount ?? 0);
                     }
@@ -587,18 +587,75 @@ class CapitationService
             ->values();
     }
 
-    private function paymentReportFundingColumn(?string $name): ?string
+    private function paymentReportFundingColumn(?FundingType $fundingType): ?string
     {
-        $value = strtolower((string) preg_replace('/[^a-z0-9]+/', '', (string) $name));
+        if (!$fundingType) {
+            return null;
+        }
 
-        if (str_contains($value, 'bhcpf') && str_contains($value, 'cf')) return 'bhcpf_cf';
-        if (str_contains($value, 'formal')) return 'nicare_formal';
-        if (str_contains($value, 'bhcpf')) return 'bhcpf';
-        if (str_contains($value, 'nicare')) return 'nicare';
-        if (str_contains($value, 'gac')) return 'gac';
-        if (str_contains($value, 'unicef')) return 'unicef';
+        $columnsByCanonicalId = [
+            1 => 'bhcpf',
+            2 => 'bhcpf_cf',
+            3 => 'nicare',
+            4 => 'gac',
+            5 => 'unicef',
+            6 => 'nicare_formal',
+        ];
+
+        $canonicalColumn = $columnsByCanonicalId[(int) $fundingType->id] ?? null;
+        if ($canonicalColumn !== null) {
+            return $canonicalColumn;
+        }
+
+        $value = $this->normalizePaymentReportFundingValue(
+            $fundingType->name . ' ' . ($fundingType->description ?? '')
+        );
+
+        if (
+            str_contains($value, 'counterpartfunding') ||
+            str_contains($value, 'bhcpfcf') ||
+            str_contains($value, 'bhcpfcounterpart') ||
+            str_contains($value, 'shortcodecf')
+        ) {
+            return 'bhcpf_cf';
+        }
+
+        if (
+            str_contains($value, 'formalsectordeduction') ||
+            str_contains($value, 'formal') ||
+            str_contains($value, 'nicareformal')
+        ) {
+            return 'nicare_formal';
+        }
+
+        if (
+            str_contains($value, 'basichealthcareprovisionfund') ||
+            str_contains($value, 'bhcpf')
+        ) {
+            return 'bhcpf';
+        }
+
+        if (
+            str_contains($value, 'premium') ||
+            str_contains($value, 'nicare')
+        ) {
+            return 'nicare';
+        }
+
+        if (str_contains($value, 'gac')) {
+            return 'gac';
+        }
+
+        if (str_contains($value, 'unicef')) {
+            return 'unicef';
+        }
 
         return null;
+    }
+
+    private function normalizePaymentReportFundingValue(string $value): string
+    {
+        return strtolower((string) preg_replace('/[^a-z0-9]+/', '', $value));
     }
 
     public function getFacilityHistory(int $facilityId): Collection

@@ -36,7 +36,6 @@
         <div class="tw-mt-5 tw-flex tw-flex-wrap tw-items-center tw-gap-3">
           <AppExportButton
             label="Generate Excel Report"
-            icon="mdi-file-excel"
             :loading="exporting"
             :disabled="!filters.periodId"
             @click="exportReport"
