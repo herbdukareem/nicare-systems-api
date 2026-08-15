@@ -678,6 +678,17 @@ const routes = [
       breadcrumb: 'Capitation Payments',
     },
   },
+  {
+    path: '/capitation/reports',
+    name: 'capitation-payment-report',
+    component: () => import('../components/capitation/CapitationPaymentReportPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['capitation.export'],
+      title: 'Capitation Payment Report',
+      breadcrumb: 'Capitation Payment Report',
+    },
+  },
 
   // ── Payments ───────────────────────────────────────────────────────────────
   {

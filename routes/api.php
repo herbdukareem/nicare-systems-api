@@ -617,6 +617,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('periods/{capitation}/pay', [CapitationController::class, 'pay'])->middleware('permission:capitation.pay');
         Route::get('periods/{capitation}/export', [CapitationController::class, 'export'])->middleware('permission:capitation.export');
         Route::get('periods/{capitation}/export-breakdown-excel', [CapitationController::class, 'exportBreakdownExcel'])->middleware('permission:capitation.export');
+        Route::get('periods/{capitation}/export-payment-report', [CapitationController::class, 'exportPaymentReport'])->middleware('permission:capitation.export');
         Route::get('periods/{capitation}/export-remita', [CapitationController::class, 'exportRemita'])->middleware('permission:capitation.export');
         Route::get('facilities/{facility}/capitation-history', [CapitationController::class, 'facilityHistory'])->middleware('permission:capitation.view');
     });

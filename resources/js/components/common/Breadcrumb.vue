@@ -58,6 +58,7 @@ const breadcrumbMappings = {
   '/devices/config': [{ name: 'Device Management' }, { name: 'Enrollment Configuration' }],
   '/capitation/generate': [{ name: 'Capitation Module' }, { name: 'Generate Capitation' }],
   '/capitation/review': [{ name: 'Capitation Module' }, { name: 'Review Capitation' }],
+  '/capitation/reports': [{ name: 'Capitation Module' }, { name: 'Payment Report' }],
   '/capitation/approval': [{ name: 'Capitation Module' }, { name: 'Capitation Approval' }],
   '/capitation/payments': [{ name: 'Capitation Module' }, { name: 'Capitation Payment/Invoices' }],
   '/pas': [{ name: 'Pre-authorization System', path: '/pas' }, { name: 'PAS Dashboard' }],

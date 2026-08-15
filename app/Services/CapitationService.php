@@ -540,6 +540,66 @@ class CapitationService
         return $query->orderBy('facility_id')->get();
     }
 
+    public function getPaymentReport(Capitation $capitation, string $status): Collection
+    {
+        $query = $capitation->capitationDetails()->with(['facility.lga', 'facility.ward', 'fundingType']);
+
+        match ($status) {
+            'reviewed' => $query->whereNotNull('reviewed_at'),
+            'approved' => $query->whereNotNull('approved_at'),
+            'paid' => $query->whereNotNull('paid_at'),
+            'generated' => $query->whereNull('reviewed_at'),
+            default => null,
+        };
+
+        return $query->orderBy('facility_id')->get()
+            ->groupBy('facility_id')
+            ->map(function (Collection $details): array {
+                $facility = $details->first()?->facility;
+                $amounts = [
+                    'bhcpf' => 0.0,
+                    'nicare' => 0.0,
+                    'bhcpf_cf' => 0.0,
+                    'gac' => 0.0,
+                    'nicare_formal' => 0.0,
+                    'unicef' => 0.0,
+                ];
+
+                foreach ($details as $detail) {
+                    $column = $this->paymentReportFundingColumn($detail->fundingType?->name);
+                    if ($column !== null) {
+                        $amounts[$column] += (float) ($detail->total_amount ?? $detail->amount ?? 0);
+                    }
+                }
+
+                return [
+                    'provider_name' => $facility?->name ?? 'N/A',
+                    'facility_code' => $facility?->hcp_code ?? '',
+                    'lga' => $facility?->lga?->name ?? '',
+                    'ward' => $facility?->ward?->name ?? '',
+                    'total_enrollees' => $details->sum(fn ($detail) => (int) ($detail->total_enrollees ?? $detail->total_enrolled ?? 0)),
+                    ...$amounts,
+                    'total_amount' => $details->sum(fn ($detail) => (float) ($detail->total_amount ?? $detail->amount ?? 0)),
+                ];
+            })
+            ->sortBy('provider_name')
+            ->values();
+    }
+
+    private function paymentReportFundingColumn(?string $name): ?string
+    {
+        $value = strtolower((string) preg_replace('/[^a-z0-9]+/', '', (string) $name));
+
+        if (str_contains($value, 'bhcpf') && str_contains($value, 'cf')) return 'bhcpf_cf';
+        if (str_contains($value, 'formal')) return 'nicare_formal';
+        if (str_contains($value, 'bhcpf')) return 'bhcpf';
+        if (str_contains($value, 'nicare')) return 'nicare';
+        if (str_contains($value, 'gac')) return 'gac';
+        if (str_contains($value, 'unicef')) return 'unicef';
+
+        return null;
+    }
+
     public function getFacilityHistory(int $facilityId): Collection
     {
         return CapitationDetail::where('facility_id', $facilityId)

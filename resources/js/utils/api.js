@@ -192,6 +192,7 @@ export const capitationAPI = {
   pay: (id, payload) => api.post(`/capitation/periods/${id}/pay`, payload),
   export: (id) => api.get(`/capitation/periods/${id}/export`, { responseType: 'blob' }),
   exportBreakdownExcel: (id, params = {}) => api.get(`/capitation/periods/${id}/export-breakdown-excel`, { params, responseType: 'blob' }),
+  exportPaymentReport: (id, params = {}) => api.get(`/capitation/periods/${id}/export-payment-report`, { params, responseType: 'blob' }),
   exportRemita: (id) => api.get(`/capitation/periods/${id}/export-remita`, { responseType: 'blob' }),
 };
 

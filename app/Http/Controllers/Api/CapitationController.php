@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Exceptions\CapitationComputationException;
 use App\Exports\CapitationBreakdownExport;
+use App\Exports\CapitationPaymentReportExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CapitationBatchRequest;
 use App\Models\Capitation;
@@ -399,6 +400,22 @@ class CapitationController extends Controller
         return Excel::download(
             new CapitationBreakdownExport($capitation, $details, $fundingTypeLabel),
             'capitation_payment_details_' . $capitation->id . $filenameSuffix . '.xlsx'
+        );
+    }
+
+    public function exportPaymentReport(Request $request, Capitation $capitation)
+    {
+        $validated = $request->validate([
+            'status' => ['required', 'in:all,generated,reviewed,approved,paid'],
+        ]);
+
+        $status = (string) $validated['status'];
+        $statusLabel = ucfirst($status === 'all' ? 'All statuses' : $status);
+        $rows = $this->service->getPaymentReport($capitation, $status);
+
+        return Excel::download(
+            new CapitationPaymentReportExport($capitation, $rows, $statusLabel),
+            'capitation_payment_report_' . $capitation->id . '_' . $status . '.xlsx'
         );
     }
 
