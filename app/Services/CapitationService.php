@@ -11,6 +11,7 @@ use App\Models\Enrollee;
 use App\Models\FundingType;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Collection as SupportCollection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -540,7 +541,7 @@ class CapitationService
         return $query->orderBy('facility_id')->get();
     }
 
-    public function getPaymentReport(Capitation $capitation, string $status): Collection
+    public function getPaymentReport(Capitation $capitation, string $status): SupportCollection
     {
         $query = $capitation->capitationDetails()->with(['facility.lga', 'facility.ward', 'fundingType']);
 
