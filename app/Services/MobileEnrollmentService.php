@@ -30,6 +30,21 @@ use Throwable;
 
 class MobileEnrollmentService
 {
+    /**
+     * @var array<int, array{assignments: \Illuminate\Support\Collection, has_mobile_role: bool}>
+     */
+    private array $officerEnrollmentScopeCache = [];
+
+    /**
+     * @var array<int, array{lga_id: int|null, ward_id: int|null}|null>
+     */
+    private array $facilityLocationCache = [];
+
+    /**
+     * @var array<int, int|null>
+     */
+    private array $wardLgaCache = [];
+
     public function __construct(
         private EnrollmentFormSchemaService $schemaService,
         private EnrollmentValidationService $validationService,
@@ -588,17 +603,28 @@ class MobileEnrollmentService
     private function normalizeLocationData(array $data): array
     {
         if (!empty($data['facility_id'])) {
-            $facility = Facility::query()
-                ->select(['id', 'lga_id', 'ward_id'])
-                ->find($data['facility_id']);
+            $facilityId = (int) $data['facility_id'];
+            if (!array_key_exists($facilityId, $this->facilityLocationCache)) {
+                $facility = Facility::query()
+                    ->select(['id', 'lga_id', 'ward_id'])
+                    ->find($facilityId);
 
-            if ($facility) {
-                if (!empty($facility->lga_id)) {
-                    $data['lga_id'] = (int) $facility->lga_id;
+                $this->facilityLocationCache[$facilityId] = $facility
+                    ? [
+                        'lga_id' => $facility->lga_id !== null ? (int) $facility->lga_id : null,
+                        'ward_id' => $facility->ward_id !== null ? (int) $facility->ward_id : null,
+                    ]
+                    : null;
+            }
+
+            $facilityLocation = $this->facilityLocationCache[$facilityId];
+            if ($facilityLocation !== null) {
+                if (!empty($facilityLocation['lga_id'])) {
+                    $data['lga_id'] = $facilityLocation['lga_id'];
                 }
 
-                if (!empty($facility->ward_id)) {
-                    $data['ward_id'] = (int) $facility->ward_id;
+                if (!empty($facilityLocation['ward_id'])) {
+                    $data['ward_id'] = $facilityLocation['ward_id'];
                 }
 
                 return $data;
@@ -606,12 +632,17 @@ class MobileEnrollmentService
         }
 
         if (!empty($data['ward_id'])) {
-            $ward = Ward::query()
-                ->select(['id', 'lga_id'])
-                ->find($data['ward_id']);
+            $wardId = (int) $data['ward_id'];
+            if (!array_key_exists($wardId, $this->wardLgaCache)) {
+                $ward = Ward::query()
+                    ->select(['id', 'lga_id'])
+                    ->find($wardId);
 
-            if ($ward && !empty($ward->lga_id)) {
-                $data['lga_id'] = (int) $ward->lga_id;
+                $this->wardLgaCache[$wardId] = $ward && $ward->lga_id !== null ? (int) $ward->lga_id : null;
+            }
+
+            if (!empty($this->wardLgaCache[$wardId])) {
+                $data['lga_id'] = $this->wardLgaCache[$wardId];
             }
         }
 
@@ -659,9 +690,18 @@ class MobileEnrollmentService
             throw new RuntimeException('Mobile enrollment has been disabled for this officer.');
         }
 
-        $assignments = $officer->activeOfficerEnrollmentAssignments()->get();
+        $officerId = (int) $officer->id;
+        if (!isset($this->officerEnrollmentScopeCache[$officerId])) {
+            $this->officerEnrollmentScopeCache[$officerId] = [
+                'assignments' => $officer->activeOfficerEnrollmentAssignments()->get(),
+                'has_mobile_role' => $officer->hasRole('mobile-enrollment-officer'),
+            ];
+        }
+
+        $scope = $this->officerEnrollmentScopeCache[$officerId];
+        $assignments = $scope['assignments'];
         if ($assignments->isEmpty()) {
-            if ($officer->hasRole('mobile-enrollment-officer')) {
+            if ($scope['has_mobile_role']) {
                 throw new RuntimeException('This officer has no active enrollment assignment.');
             }
 

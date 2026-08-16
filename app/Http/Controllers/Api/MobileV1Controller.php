@@ -60,8 +60,13 @@ class MobileV1Controller extends BaseController
     {
         $device = $this->activeDevice($request);
         $scope = $this->officerEnrollmentScope($request);
-        $distinctNinCount = $this->scopedDistinctNinQuery($scope)->distinct('nin')->count('nin');
-        $distinctNinUpdatedAt = $this->scopedDistinctNinUpdatedAt($scope);
+        $includeNinRegistryStats = $request->boolean('include_nin_registry_stats', true);
+        $distinctNinCount = $includeNinRegistryStats
+            ? $this->scopedDistinctNinQuery($scope)->distinct('nin')->count('nin')
+            : null;
+        $distinctNinUpdatedAt = $includeNinRegistryStats
+            ? $this->scopedDistinctNinUpdatedAt($scope)
+            : null;
 
         return $this->sendResponse([
             'server_time' => now()->toIso8601String(),
