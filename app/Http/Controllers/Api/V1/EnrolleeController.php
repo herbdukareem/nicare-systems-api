@@ -447,7 +447,21 @@ class EnrolleeController extends BaseController
 
     public function pendingApproval(Request $request)
     {
+        $validated = $request->validate([
+            'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
+            'programme_id' => ['nullable', 'integer', 'exists:insurance_programmes,id'],
+            'insurance_programme_id' => ['nullable', 'integer', 'exists:insurance_programmes,id'],
+            'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
+            'benefactor_id' => ['nullable', 'integer', 'exists:benefactors,id'],
+            'funding_type_id' => ['nullable', 'integer', 'exists:funding_types,id'],
+            'enrollment_phase_id' => ['nullable', 'integer', 'exists:enrollment_phases,id'],
+            'date_from' => ['nullable', 'date'],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'sort' => ['nullable', 'in:recent,older'],
+        ]);
+
         $limit = min(max((int) $request->get('limit', 50), 1), 100);
+        $sort = $validated['sort'] ?? 'recent';
 
         $query = Enrollee::query()
             ->with([
@@ -467,14 +481,42 @@ class EnrolleeController extends BaseController
             'funding_type_id' => 'funding_type_id',
             'enrollment_phase_id' => 'enrollment_phase_id',
         ] as $param => $column) {
-            if ($request->filled($param)) {
-                $query->where($column, $request->input($param));
+            if (array_key_exists($param, $validated) && filled($validated[$param])) {
+                $query->where($column, $validated[$param]);
             }
         }
 
-        $items = $request->boolean('random', true)
-            ? $query->inRandomOrder()->limit($limit)->get()
-            : $query->latest('created_at')->limit($limit)->get();
+        if (!empty($validated['date_from'])) {
+            $query->where(function ($dateQuery) use ($validated): void {
+                $dateQuery
+                    ->whereDate('enrollment_date', '>=', $validated['date_from'])
+                    ->orWhere(function ($fallbackQuery) use ($validated): void {
+                        $fallbackQuery
+                            ->whereNull('enrollment_date')
+                            ->whereDate('created_at', '>=', $validated['date_from']);
+                    });
+            });
+        }
+
+        if (!empty($validated['date_to'])) {
+            $query->where(function ($dateQuery) use ($validated): void {
+                $dateQuery
+                    ->whereDate('enrollment_date', '<=', $validated['date_to'])
+                    ->orWhere(function ($fallbackQuery) use ($validated): void {
+                        $fallbackQuery
+                            ->whereNull('enrollment_date')
+                            ->whereDate('created_at', '<=', $validated['date_to']);
+                    });
+            });
+        }
+
+        if ($sort === 'older') {
+            $query->orderByRaw('COALESCE(enrollment_date, created_at) asc')->orderBy('id');
+        } else {
+            $query->orderByRaw('COALESCE(enrollment_date, created_at) desc')->orderByDesc('id');
+        }
+
+        $items = $query->limit($limit)->get();
 
         return $this->sendResponse(EnrolleeResource::collection($items), 'Pending approval batch retrieved successfully');
     }

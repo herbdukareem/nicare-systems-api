@@ -29,12 +29,23 @@
       </div>
 
       <AppCard title="Approval Filters" icon="mdi-filter-outline" tone="primary">
-        <div class="tw-grid tw-gap-3 md:tw-grid-cols-5">
+        <div class="tw-grid tw-gap-3 md:tw-grid-cols-2 xl:tw-grid-cols-4">
           <v-select v-model="filters.programme_id" :items="metadata.insurance_programmes" item-title="name" item-value="id" label="Programme" density="compact" variant="outlined" clearable />
           <v-select v-model="filters.facility_id" :items="metadata.facilities" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" clearable />
           <v-select v-model="filters.benefactor_id" :items="metadata.benefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
           <v-select v-model="filters.enrollment_phase_id" :items="metadata.enrollment_phases" item-title="name" item-value="id" label="Phase" density="compact" variant="outlined" clearable />
           <v-select v-model="filters.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding" density="compact" variant="outlined" clearable />
+          <v-text-field v-model="filters.date_from" label="Submitted from" type="date" density="compact" variant="outlined" clearable />
+          <v-text-field v-model="filters.date_to" label="Submitted to" type="date" density="compact" variant="outlined" clearable />
+          <v-select v-model="filters.sort" :items="sortOptions" item-title="label" item-value="value" label="Sort queue" density="compact" variant="outlined" />
+        </div>
+        <div class="tw-mt-3 tw-flex tw-flex-wrap tw-justify-end tw-gap-2">
+          <v-btn variant="text" color="secondary" prepend-icon="mdi-filter-remove-outline" @click="clearFilters">
+            Clear filters
+          </v-btn>
+          <v-btn color="primary" prepend-icon="mdi-filter-check-outline" :loading="loading" @click="loadBatch">
+            Apply filters
+          </v-btn>
         </div>
       </AppCard>
 
@@ -695,7 +706,15 @@ const filters = reactive({
   benefactor_id: null,
   enrollment_phase_id: null,
   funding_type_id: null,
+  date_from: '',
+  date_to: '',
+  sort: 'recent',
 })
+
+const sortOptions = [
+  { label: 'Recent first', value: 'recent' },
+  { label: 'Older first', value: 'older' },
+]
 
 const mergeStrategies = [
   { label: 'Keep provided data', value: 'keep_provided' },
@@ -900,7 +919,7 @@ const loadBatch = async () => {
   loading.value = true
 
   try {
-    const params = { ...filters, limit: limit.value, random: true }
+    const params = { ...filters, limit: limit.value }
     Object.keys(params).forEach((key) => {
       if (params[key] === null || params[key] === '') delete params[key]
     })
@@ -917,6 +936,18 @@ const loadBatch = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const clearFilters = () => {
+  filters.programme_id = null
+  filters.facility_id = null
+  filters.benefactor_id = null
+  filters.enrollment_phase_id = null
+  filters.funding_type_id = null
+  filters.date_from = ''
+  filters.date_to = ''
+  filters.sort = 'recent'
+  loadBatch()
 }
 
 const requiresVerification = (row) => !!row.nin && row.nin_verification_status !== 'verified'
