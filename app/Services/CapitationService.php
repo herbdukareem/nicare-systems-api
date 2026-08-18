@@ -6,12 +6,17 @@ use App\Exceptions\CapitationComputationException;
 use App\Models\AuditTrail;
 use App\Models\Capitation;
 use App\Models\CapitationDetail;
+use App\Models\CapitationDetailEnrollee;
 use App\Models\CapitationPayment;
 use App\Models\Enrollee;
 use App\Models\FundingType;
+use App\Models\Lga;
+use App\Models\Ward;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection as SupportCollection;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
@@ -302,10 +307,9 @@ class CapitationService
         $results = [];
 
         DB::transaction(function () use ($capitation, $eligibleProviders, $fundingType, $capitationRate, $normalizedDuplicateNinPolicy, &$results): void {
-            foreach ($eligibleProviders as $provider) {
-                $count = (int) $provider->enrollee_count;
-                $totalAmount = $count * $capitationRate;
+            $capturedAt = now();
 
+            foreach ($eligibleProviders as $provider) {
                 $exists = CapitationDetail::where('capitation_id', $capitation->id)
                     ->where('facility_id', (int) $provider->facility_id)
                     ->where('funding_type_id', $fundingType->id)
@@ -323,7 +327,17 @@ class CapitationService
                     continue;
                 }
 
-                CapitationDetail::create([
+                $eligibleEnrollees = $this->eligibleEnrolleesForFacility(
+                    $capitation,
+                    $fundingType,
+                    $normalizedDuplicateNinPolicy,
+                    (int) $provider->facility_id
+                );
+
+                $count = $eligibleEnrollees->count();
+                $totalAmount = $count * $capitationRate;
+
+                $detail = CapitationDetail::create([
                     'capitation_id' => $capitation->id,
                     'facility_id' => (int) $provider->facility_id,
                     'funding_type_id' => $fundingType->id,
@@ -340,6 +354,15 @@ class CapitationService
                         'generated_for_funding_type_id' => $fundingType->id,
                     ],
                 ]);
+
+                $this->storeEnrolleeSnapshotsForDetail(
+                    $detail,
+                    $capitation,
+                    $fundingType,
+                    $eligibleEnrollees,
+                    $normalizedDuplicateNinPolicy,
+                    $capturedAt,
+                );
 
                 Log::info("Capitation generated for facility {$provider->facility_id}: {$count} enrollees = {$totalAmount}");
 
@@ -587,6 +610,644 @@ class CapitationService
             ->values();
     }
 
+    public function getEnrolleeSnapshotList(Capitation $capitation, array $filters = []): LengthAwarePaginator
+    {
+        $this->ensureEnrolleeSnapshotsAvailable($capitation, $filters);
+
+        $query = $this->enrolleeSnapshotQuery($capitation, $filters)
+            ->orderBy('facility_name')
+            ->orderBy('full_name')
+            ->orderBy('enrollee_number');
+
+        return $query->paginate(
+            (int) ($filters['per_page'] ?? 25),
+            ['*'],
+            'page',
+            (int) ($filters['page'] ?? 1),
+        );
+    }
+
+    public function getEnrolleeSnapshotExportRows(Capitation $capitation, array $filters = []): SupportCollection
+    {
+        $this->ensureEnrolleeSnapshotsAvailable($capitation, $filters);
+
+        return $this->enrolleeSnapshotQuery($capitation, $filters)
+            ->orderBy('facility_name')
+            ->orderBy('full_name')
+            ->orderBy('enrollee_number')
+            ->get();
+    }
+
+    public function getEnrolleeSnapshotSummary(Capitation $capitation, array $filters = []): array
+    {
+        $this->ensureEnrolleeSnapshotsAvailable($capitation, $filters);
+
+        $query = $this->enrolleeSnapshotQuery($capitation, $filters);
+        $snapshotCount = (clone $query)->count();
+
+        return [
+            'total_enrollees' => $snapshotCount,
+            'facility_count' => (clone $query)->select('facility_id', 'facility_name')->distinct()->get()->count(),
+            'funding_type_count' => (clone $query)->select('funding_type_id', 'funding_type_name')->distinct()->get()->count(),
+            'captured_at' => (clone $query)->min('captured_at'),
+            'has_generated_details' => $capitation->capitationDetails()->exists(),
+            'has_snapshot_rows' => $snapshotCount > 0,
+        ];
+    }
+
+    public function inspectEnrolleeSnapshotBackfill(Capitation $capitation, array $filters = []): array
+    {
+        $detailsInScope = $this->enrolleeSnapshotDetailsInScope($capitation, $filters);
+        $missingDetails = $this->filterMissingEnrolleeSnapshotDetails($detailsInScope);
+        $missingDetailIds = $missingDetails->pluck('id');
+
+        return [
+            'capitation_id' => $capitation->id,
+            'capitation_name' => $capitation->name,
+            'year' => (int) ($capitation->year ?? 0),
+            'detail_count_in_scope' => $detailsInScope->count(),
+            'missing_detail_count' => $missingDetails->count(),
+            'expected_snapshot_row_count' => $missingDetails->sum(
+                fn (CapitationDetail $detail) => max(0, (int) ($detail->total_enrollees ?? $detail->total_enrolled ?? 0))
+            ),
+            'existing_snapshot_row_count' => $missingDetailIds->isEmpty()
+                ? 0
+                : CapitationDetailEnrollee::query()->whereIn('capitation_detail_id', $missingDetailIds->all())->count(),
+            'is_legacy_import' => $this->isLegacyImportedCapitation($capitation),
+        ];
+    }
+
+    public function backfillEnrolleeSnapshots(Capitation $capitation, array $filters = []): array
+    {
+        $report = $this->inspectEnrolleeSnapshotBackfill($capitation, $filters);
+        $missingDetails = $this->missingEnrolleeSnapshotDetails($capitation, $filters);
+
+        if ($missingDetails->isEmpty()) {
+            return $report + [
+                'changed' => false,
+                'stored_snapshot_row_count' => 0,
+            ];
+        }
+
+        if ($this->isLegacyImportedCapitation($capitation)) {
+            $this->backfillLegacyEnrolleeSnapshots($capitation, $missingDetails);
+        } else {
+            $this->backfillCurrentEnrolleeSnapshots($capitation, $missingDetails);
+        }
+
+        return $report + [
+            'changed' => true,
+            'stored_snapshot_row_count' => CapitationDetailEnrollee::query()
+                ->whereIn('capitation_detail_id', $missingDetails->pluck('id')->all())
+                ->count(),
+        ];
+    }
+
+    private function ensureEnrolleeSnapshotsAvailable(Capitation $capitation, array $filters = []): void
+    {
+        $missingDetails = $this->missingEnrolleeSnapshotDetails($capitation, $filters);
+
+        if ($missingDetails->isEmpty()) {
+            return;
+        }
+
+        if ($this->isLegacyImportedCapitation($capitation)) {
+            $this->backfillLegacyEnrolleeSnapshots($capitation, $missingDetails);
+            return;
+        }
+
+        $this->backfillCurrentEnrolleeSnapshots($capitation, $missingDetails);
+    }
+
+    private function missingEnrolleeSnapshotDetails(Capitation $capitation, array $filters = []): Collection
+    {
+        return $this->filterMissingEnrolleeSnapshotDetails(
+            $this->enrolleeSnapshotDetailsInScope($capitation, $filters)
+        );
+    }
+
+    private function enrolleeSnapshotDetailsInScope(Capitation $capitation, array $filters = []): Collection
+    {
+        return $capitation->capitationDetails()
+            ->with(['facility.lga', 'fundingType'])
+            ->withCount('enrolleeSnapshots')
+            ->when(
+                !empty($filters['funding_type_id']),
+                fn ($query) => $query->where('funding_type_id', (int) $filters['funding_type_id'])
+            )
+            ->when(
+                !empty($filters['facility_id']),
+                fn ($query) => $query->where('facility_id', (int) $filters['facility_id'])
+            )
+            ->get()
+            ->values();
+    }
+
+    private function filterMissingEnrolleeSnapshotDetails(Collection $details): Collection
+    {
+        return $details
+            ->filter(function (CapitationDetail $detail): bool {
+                $expectedCount = max(0, (int) ($detail->total_enrollees ?? $detail->total_enrolled ?? 0));
+                return (int) $detail->enrollee_snapshots_count < $expectedCount;
+            })
+            ->values();
+    }
+
+    private function isLegacyImportedCapitation(Capitation $capitation): bool
+    {
+        return data_get($capitation->metadata, 'source_table') === 'capitation_grouping'
+            && (int) data_get($capitation->metadata, 'legacy_id') > 0;
+    }
+
+    private function backfillLegacyEnrolleeSnapshots(Capitation $capitation, Collection $details): void
+    {
+        $legacyGroupId = (int) data_get($capitation->metadata, 'legacy_id');
+        if ($legacyGroupId <= 0) {
+            return;
+        }
+
+        $detailDescriptors = [];
+        $programmeTypesBySource = [];
+
+        foreach ($details as $detail) {
+            if (!$detail instanceof CapitationDetail) {
+                continue;
+            }
+
+            $programmeType = $this->legacyProgrammeTypeForDetail($detail);
+            $legacyProviderId = $this->legacyProviderIdForDetail($detail);
+            if (!$programmeType || !$legacyProviderId) {
+                continue;
+            }
+
+            $sourceTable = $this->legacySourceTableForProgramme($programmeType);
+            $detailDescriptors[] = [
+                'detail' => $detail,
+                'programme_type' => $programmeType,
+                'legacy_provider_id' => $legacyProviderId,
+                'source_table' => $sourceTable,
+                'bucket_key' => $this->legacySnapshotBucketKey($sourceTable, $programmeType, $legacyProviderId),
+            ];
+
+            $programmeTypesBySource[$sourceTable][$programmeType] = true;
+        }
+
+        if ($detailDescriptors === []) {
+            return;
+        }
+
+        $legacyPools = [];
+
+        foreach ($programmeTypesBySource as $sourceTable => $programmeTypes) {
+            $legacyRows = DB::connection('legacy')
+                ->table('capitation_enrollee_list as capitation_roster')
+                ->join($sourceTable . ' as legacy_enrollees', 'legacy_enrollees.id', '=', 'capitation_roster.enrollee_id')
+                ->select(
+                    'capitation_roster.programme_type',
+                    'legacy_enrollees.id as legacy_id',
+                    'legacy_enrollees.enrolment_number',
+                    'legacy_enrollees.surname',
+                    'legacy_enrollees.first_name',
+                    'legacy_enrollees.other_name',
+                    'legacy_enrollees.nin',
+                    'legacy_enrollees.national_identification_number',
+                    'legacy_enrollees.phone_number',
+                    'legacy_enrollees.sex',
+                    'legacy_enrollees.date_of_birth',
+                    'legacy_enrollees.provider_id',
+                    'legacy_enrollees.lga as lga_reference',
+                    'legacy_enrollees.ward as ward_reference',
+                    'legacy_enrollees.cap_date_month',
+                    'legacy_enrollees.date_expired',
+                    'legacy_enrollees.status'
+                )
+                ->where('capitation_roster.group_id', $legacyGroupId)
+                ->whereIn('capitation_roster.programme_type', array_keys($programmeTypes))
+                ->orderBy('capitation_roster.programme_type')
+                ->orderBy('legacy_enrollees.provider_id')
+                ->orderBy('legacy_enrollees.id')
+                ->get();
+
+            foreach ($legacyRows as $legacyRow) {
+                $bucketKey = $this->legacySnapshotBucketKey(
+                    $sourceTable,
+                    (string) $legacyRow->programme_type,
+                    (int) $legacyRow->provider_id
+                );
+
+                $legacyPools[$bucketKey][] = $legacyRow;
+            }
+        }
+
+        $duplicateNinPolicy = $this->normalizeDuplicateNinPolicy($capitation->duplicate_nin_policy ?? null);
+
+        foreach ($detailDescriptors as $descriptor) {
+            /** @var CapitationDetail $detail */
+            $detail = $descriptor['detail'];
+            $expectedCount = max(0, (int) ($detail->total_enrollees ?? $detail->total_enrolled ?? 0));
+            if ($expectedCount === 0) {
+                continue;
+            }
+
+            $bucketKey = $descriptor['bucket_key'];
+            $bucket = $legacyPools[$bucketKey] ?? [];
+            $selectedLegacyRows = $this->takeLegacySnapshotRows($bucket, $expectedCount);
+            $legacyPools[$bucketKey] = $bucket;
+
+            if ($selectedLegacyRows === []) {
+                continue;
+            }
+
+            $sourceTable = $descriptor['source_table'];
+            $legacyIds = array_values(array_unique(array_map(
+                static fn (object $legacyRow): int => (int) $legacyRow->legacy_id,
+                $selectedLegacyRows
+            )));
+
+            $mappedEnrollees = Enrollee::query()
+                ->with(['facility.lga', 'lga', 'ward'])
+                ->where('legacy_source_table', $sourceTable)
+                ->whereIn('legacy_id', $legacyIds)
+                ->get()
+                ->keyBy('legacy_id');
+
+            $capturedAt = $this->legacySnapshotCapturedAt($detail);
+            $rows = [];
+            CapitationDetailEnrollee::query()
+                ->where('capitation_detail_id', $detail->id)
+                ->delete();
+
+            foreach ($selectedLegacyRows as $legacyRow) {
+                /** @var Enrollee|null $mappedEnrollee */
+                $mappedEnrollee = $mappedEnrollees->get((int) $legacyRow->legacy_id);
+                $rows[] = $this->legacySnapshotRow(
+                    $detail,
+                    $capitation,
+                    $mappedEnrollee,
+                    $legacyRow,
+                    $sourceTable,
+                    $duplicateNinPolicy,
+                    $capturedAt,
+                );
+            }
+
+            foreach (array_chunk($rows, 500) as $chunk) {
+                CapitationDetailEnrollee::insert($chunk);
+            }
+
+            if (count($selectedLegacyRows) < $expectedCount) {
+                Log::warning('Legacy capitation enrollee snapshot backfill was short for a detail.', [
+                    'capitation_id' => $capitation->id,
+                    'capitation_detail_id' => $detail->id,
+                    'legacy_group_id' => $legacyGroupId,
+                    'legacy_programme_type' => $descriptor['programme_type'],
+                    'legacy_provider_id' => $descriptor['legacy_provider_id'],
+                    'expected_count' => $expectedCount,
+                    'stored_count' => count($selectedLegacyRows),
+                ]);
+            }
+        }
+    }
+
+    private function backfillCurrentEnrolleeSnapshots(Capitation $capitation, Collection $details): void
+    {
+        foreach ($details as $detail) {
+            if (!$detail instanceof CapitationDetail) {
+                continue;
+            }
+
+            $fundingType = $detail->fundingType;
+            if (!$fundingType instanceof FundingType) {
+                continue;
+            }
+
+            $expectedCount = max(0, (int) ($detail->total_enrollees ?? $detail->total_enrolled ?? 0));
+            if ($expectedCount === 0) {
+                continue;
+            }
+
+            $duplicateNinPolicy = $this->normalizeDuplicateNinPolicy(
+                data_get($detail->metadata, 'duplicate_nin_policy') ?? $capitation->duplicate_nin_policy
+            );
+
+            $eligibleEnrollees = $this->eligibleEnrolleesForFacility(
+                $capitation,
+                $fundingType,
+                $duplicateNinPolicy,
+                (int) $detail->facility_id
+            );
+
+            $availableCount = $eligibleEnrollees->count();
+            $enrolleesToStore = $availableCount > $expectedCount
+                ? $eligibleEnrollees->take($expectedCount)->values()
+                : $eligibleEnrollees;
+
+            $capturedAt = $detail->created_at
+                ?? $capitation->computed_at
+                ?? $capitation->created_at
+                ?? now();
+            CapitationDetailEnrollee::query()
+                ->where('capitation_detail_id', $detail->id)
+                ->delete();
+
+            $this->storeEnrolleeSnapshotsForDetail(
+                $detail,
+                $capitation,
+                $fundingType,
+                $enrolleesToStore,
+                $duplicateNinPolicy,
+                $capturedAt,
+                'capitation_generation_backfill',
+                [
+                    'generated_for_funding_type_id' => $fundingType->id,
+                    'backfill_method' => 'reconstructed_from_current_enrollees',
+                ],
+            );
+
+            if ($availableCount !== $expectedCount) {
+                Log::warning('Current capitation enrollee snapshot backfill count mismatch.', [
+                    'capitation_id' => $capitation->id,
+                    'capitation_detail_id' => $detail->id,
+                    'facility_id' => $detail->facility_id,
+                    'funding_type_id' => $fundingType->id,
+                    'expected_count' => $expectedCount,
+                    'available_count' => $availableCount,
+                    'stored_count' => $enrolleesToStore->count(),
+                ]);
+            }
+        }
+    }
+
+    private function takeLegacySnapshotRows(array &$bucket, int $limit): array
+    {
+        if ($limit <= 0 || $bucket === []) {
+            return [];
+        }
+
+        $taken = [];
+        $seenLegacyIds = [];
+
+        while ($bucket !== [] && count($taken) < $limit) {
+            $legacyRow = array_shift($bucket);
+            $legacyId = (int) data_get($legacyRow, 'legacy_id');
+            if ($legacyId > 0 && isset($seenLegacyIds[$legacyId])) {
+                continue;
+            }
+
+            if ($legacyId > 0) {
+                $seenLegacyIds[$legacyId] = true;
+            }
+
+            $taken[] = $legacyRow;
+        }
+
+        return $taken;
+    }
+
+    private function legacySnapshotRow(
+        CapitationDetail $detail,
+        Capitation $capitation,
+        ?Enrollee $mappedEnrollee,
+        object $legacyRow,
+        string $sourceTable,
+        string $duplicateNinPolicy,
+        Carbon $capturedAt,
+    ): array {
+        $facility = $detail->facility;
+        $fundingType = $detail->fundingType;
+        $fullName = $mappedEnrollee
+            ? trim((string) preg_replace('/\s+/', ' ', $mappedEnrollee->full_name))
+            : $this->legacySnapshotFullName($legacyRow);
+
+        if ($fullName === '') {
+            $fullName = 'Legacy Enrollee #' . (int) $legacyRow->legacy_id;
+        }
+
+        return [
+            'capitation_id' => $capitation->id,
+            'capitation_detail_id' => $detail->id,
+            'enrollee_id' => $mappedEnrollee?->id,
+            'facility_id' => $facility?->id ?? $detail->facility_id,
+            'funding_type_id' => $fundingType?->id ?? $detail->funding_type_id,
+            'enrollee_number' => $mappedEnrollee?->enrollee_id ?: $this->legacyString($legacyRow->enrolment_number),
+            'legacy_id' => (string) (int) $legacyRow->legacy_id,
+            'full_name' => $fullName,
+            'nin' => $mappedEnrollee?->nin
+                ?: Enrollee::normalizeNin(
+                    $this->legacyString($legacyRow->nin) ?: $this->legacyString($legacyRow->national_identification_number)
+                ),
+            'phone' => $mappedEnrollee?->phone ?: $this->legacyString($legacyRow->phone_number),
+            'gender' => $mappedEnrollee
+                ? match ((int) $mappedEnrollee->sex) {
+                    1 => 'Male',
+                    2 => 'Female',
+                    default => 'Other',
+                }
+                : $this->legacySnapshotGender($legacyRow->sex),
+            'date_of_birth' => $mappedEnrollee?->date_of_birth?->toDateString() ?: $this->legacySnapshotDate($legacyRow->date_of_birth),
+            'facility_name' => $facility?->name,
+            'facility_code' => $facility?->hcp_code,
+            'funding_type_name' => $fundingType?->name,
+            'lga_name' => $mappedEnrollee?->lga?->name
+                ?: $this->legacyLgaName($legacyRow->lga_reference)
+                ?: $facility?->lga?->name,
+            'ward_name' => $mappedEnrollee?->ward?->name ?: $this->legacyWardName($legacyRow->ward_reference),
+            'coverage_start_date' => $mappedEnrollee?->coverage_start_date?->toDateString()
+                ?: $this->legacySnapshotDate($legacyRow->cap_date_month),
+            'coverage_end_date' => $mappedEnrollee?->coverage_end_date?->toDateString()
+                ?: $this->legacySnapshotDate($legacyRow->date_expired),
+            'capitation_start_date' => $mappedEnrollee?->capitation_start_date?->toDateString()
+                ?: $this->legacySnapshotDate($legacyRow->cap_date_month),
+            'snapshot_status' => $mappedEnrollee ? (int) $mappedEnrollee->status : $this->legacySnapshotStatus($legacyRow->status),
+            'duplicate_nin_policy' => $duplicateNinPolicy,
+            'has_duplicate_nin' => (bool) ($mappedEnrollee?->has_duplicate_nin ?? false),
+            'captured_at' => $capturedAt,
+            'metadata' => json_encode([
+                'snapshot_source' => 'legacy_capitation_enrollee_list_backfill',
+                'legacy_source_table' => $sourceTable,
+                'legacy_group_id' => (int) data_get($capitation->metadata, 'legacy_id'),
+                'legacy_programme_type' => $this->legacyProgrammeTypeForDetail($detail),
+                'legacy_provider_id' => $this->legacyProviderIdForDetail($detail),
+                'mapped_enrollee_id' => $mappedEnrollee?->id,
+            ], JSON_THROW_ON_ERROR),
+            'created_at' => $capturedAt,
+            'updated_at' => $capturedAt,
+        ];
+    }
+
+    private function legacySnapshotBucketKey(string $sourceTable, string $programmeType, int $providerId): string
+    {
+        return strtolower($sourceTable . '|' . $programmeType . '|' . $providerId);
+    }
+
+    private function legacyProgrammeTypeForDetail(CapitationDetail $detail): ?string
+    {
+        $metadataProgrammeType = $this->legacyString(data_get($detail->metadata, 'legacy_programme_type'));
+        if ($metadataProgrammeType !== null) {
+            return $metadataProgrammeType;
+        }
+
+        $fundingName = strtolower(trim((string) ($detail->fundingType?->name ?? '')));
+        if ($fundingName === '') {
+            return null;
+        }
+
+        return match (true) {
+            str_contains($fundingName, 'formal') => 'NiCare-Formal',
+            str_contains($fundingName, 'counterpart') || str_contains($fundingName, 'cf') => 'BHCPF-CF',
+            str_contains($fundingName, 'bhcpf') => 'BHCPF',
+            str_contains($fundingName, 'nicare') || str_contains($fundingName, 'premium') => 'NiCare',
+            str_contains($fundingName, 'gac') => 'GAC',
+            str_contains($fundingName, 'unicef') => 'UNICEF',
+            default => null,
+        };
+    }
+
+    private function legacyProviderIdForDetail(CapitationDetail $detail): ?int
+    {
+        $legacyProviderId = (int) data_get($detail->metadata, 'legacy_provider_id');
+        if ($legacyProviderId > 0) {
+            return $legacyProviderId;
+        }
+
+        $facilityLegacyId = (int) ($detail->facility?->legacy_id ?? 0);
+        if ($facilityLegacyId > 0) {
+            return $facilityLegacyId;
+        }
+
+        return null;
+    }
+
+    private function legacySourceTableForProgramme(string $programmeType): string
+    {
+        return str_contains(strtolower($programmeType), 'formal')
+            ? 'tbl_enrolee_formal'
+            : 'tbl_enrolee';
+    }
+
+    private function legacySnapshotCapturedAt(CapitationDetail $detail): Carbon
+    {
+        $generatedAt = $this->legacyString(data_get($detail->metadata, 'legacy_generated_at'));
+        if ($generatedAt !== null) {
+            try {
+                return Carbon::parse($generatedAt);
+            } catch (\Throwable) {
+                // Fall back to the detail timestamp if the legacy value is malformed.
+            }
+        }
+
+        return $detail->created_at instanceof Carbon
+            ? $detail->created_at->copy()
+            : Carbon::parse($detail->created_at ?? now());
+    }
+
+    private function legacySnapshotFullName(object $legacyRow): string
+    {
+        return trim((string) preg_replace('/\s+/', ' ', implode(' ', array_filter([
+            $this->legacyString($legacyRow->first_name),
+            $this->legacyString($legacyRow->other_name),
+            $this->legacyString($legacyRow->surname),
+        ]))));
+    }
+
+    private function legacySnapshotGender(mixed $value): ?string
+    {
+        return match (strtolower(trim((string) $value))) {
+            'male', 'm', '1' => 'Male',
+            'female', 'f', '2' => 'Female',
+            default => null,
+        };
+    }
+
+    private function legacySnapshotDate(mixed $value): ?string
+    {
+        $dateValue = $this->legacyString($value);
+        if ($dateValue === null || in_array($dateValue, ['0000-00-00', '0000-00-00 00:00:00'], true)) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($dateValue)->toDateString();
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    private function legacySnapshotStatus(mixed $value): ?int
+    {
+        $statusValue = $this->legacyString($value);
+        if ($statusValue === null || !is_numeric($statusValue)) {
+            return null;
+        }
+
+        $status = (int) $statusValue;
+
+        return $status >= 0 ? $status : null;
+    }
+
+    private function legacyLgaName(mixed $value): ?string
+    {
+        $reference = $this->legacyString($value);
+        if ($reference === null) {
+            return null;
+        }
+
+        if (!ctype_digit($reference)) {
+            return $reference;
+        }
+
+        static $cache = [];
+        $legacyId = (int) $reference;
+
+        if (!array_key_exists($legacyId, $cache)) {
+            $cache[$legacyId] = Lga::query()
+                ->when(
+                    DB::getSchemaBuilder()->hasColumn('lgas', 'legacy_id'),
+                    fn ($query) => $query->where('legacy_id', $legacyId),
+                    fn ($query) => $query->whereKey($legacyId)
+                )
+                ->value('name')
+                ?: Lga::query()->whereKey($legacyId)->value('name');
+        }
+
+        return $cache[$legacyId];
+    }
+
+    private function legacyWardName(mixed $value): ?string
+    {
+        $reference = $this->legacyString($value);
+        if ($reference === null) {
+            return null;
+        }
+
+        if (!ctype_digit($reference)) {
+            return $reference;
+        }
+
+        static $cache = [];
+        $legacyId = (int) $reference;
+
+        if (!array_key_exists($legacyId, $cache)) {
+            $cache[$legacyId] = Ward::query()
+                ->when(
+                    DB::getSchemaBuilder()->hasColumn('wards', 'legacy_id'),
+                    fn ($query) => $query->where('legacy_id', $legacyId),
+                    fn ($query) => $query->whereKey($legacyId)
+                )
+                ->value('name')
+                ?: Ward::query()->whereKey($legacyId)->value('name');
+        }
+
+        return $cache[$legacyId];
+    }
+
+    private function legacyString(mixed $value): ?string
+    {
+        $stringValue = trim((string) ($value ?? ''));
+
+        return $stringValue === '' ? null : $stringValue;
+    }
+
     private function paymentReportFundingColumn(?FundingType $fundingType): ?string
     {
         if (!$fundingType) {
@@ -717,10 +1378,7 @@ class CapitationService
 
     private function eligibleProviderRows(Capitation $capitation, FundingType $fundingType, string $duplicateNinPolicy)
     {
-        $cutoffDate = $capitation->period_start;
-        $duplicateNinPolicy = $this->normalizeDuplicateNinPolicy($duplicateNinPolicy);
-
-        $query = Enrollee::query()
+        return $this->eligibleEnrolleeQuery($capitation, $fundingType, $duplicateNinPolicy)
             ->join('facilities', 'facilities.id', '=', 'enrollees.facility_id')
             ->leftJoin('lgas', 'lgas.id', '=', 'facilities.lga_id')
             ->select(
@@ -730,22 +1388,152 @@ class CapitationService
                 'lgas.name as lga_name',
                 DB::raw('COUNT(DISTINCT enrollees.id) as enrollee_count')
             )
-            ->where('enrollees.funding_type_id', $fundingType->id)
-            ->where('enrollees.status', Enrollee::STATUS_ACTIVE)
-            ->whereNotNull('enrollees.facility_id')
-            ->whereNotNull('enrollees.coverage_start_date')
-            ->whereDate('enrollees.coverage_start_date', '<=', $cutoffDate)
-            ->where(function ($query) use ($cutoffDate): void {
-                $query->whereNull('enrollees.coverage_end_date')
-                    ->orWhereDate('enrollees.coverage_end_date', '>=', $cutoffDate);
-            })
-            ->when(
-                $duplicateNinPolicy === Capitation::DUPLICATE_NIN_POLICY_EXCLUDE,
-                fn ($builder) => $this->duplicateNinService->applyUniqueNinOnly($builder, 'enrollees')
-            )
             ->groupBy('facilities.id', 'facilities.name', 'facilities.hcp_code', 'lgas.name')
             ->orderBy('facilities.name')
             ->get();
+    }
+
+    private function eligibleEnrolleeQuery(Capitation $capitation, FundingType $fundingType, string $duplicateNinPolicy): EloquentBuilder
+    {
+        $cutoffDate = $this->capitationCutoffDate($capitation);
+        $duplicateNinPolicy = $this->normalizeDuplicateNinPolicy($duplicateNinPolicy);
+
+        $query = Enrollee::query()
+            ->where('enrollees.funding_type_id', $fundingType->id)
+            ->where('enrollees.status', Enrollee::STATUS_ACTIVE)
+            ->whereNotNull('enrollees.facility_id')
+            ->whereNotNull('enrollees.coverage_start_date');
+
+        if ($cutoffDate) {
+            $query->whereDate('enrollees.coverage_start_date', '<=', $cutoffDate)
+                ->where(function ($query) use ($cutoffDate): void {
+                $query->whereNull('enrollees.coverage_end_date')
+                    ->orWhereDate('enrollees.coverage_end_date', '>=', $cutoffDate);
+                });
+        }
+
+        return $query
+            ->when(
+                $duplicateNinPolicy === Capitation::DUPLICATE_NIN_POLICY_EXCLUDE,
+                fn (EloquentBuilder $builder) => $this->duplicateNinService->applyUniqueNinOnly($builder, 'enrollees')
+            );
+    }
+
+    private function capitationCutoffDate(Capitation $capitation): ?string
+    {
+        if ($capitation->period_start) {
+            return Carbon::parse($capitation->period_start)->toDateString();
+        }
+
+        $year = (int) ($capitation->year ?? 0);
+        $month = (int) ($capitation->capitation_month ?: $capitation->capitated_month ?: 0);
+
+        if ($year > 0 && $month >= 1 && $month <= 12) {
+            return Carbon::create($year, $month, 20)->toDateString();
+        }
+
+        return $capitation->created_at?->toDateString();
+    }
+
+    private function eligibleEnrolleesForFacility(
+        Capitation $capitation,
+        FundingType $fundingType,
+        string $duplicateNinPolicy,
+        int $facilityId,
+    ): Collection {
+        return $this->eligibleEnrolleeQuery($capitation, $fundingType, $duplicateNinPolicy)
+            ->with(['facility.lga', 'fundingType', 'lga', 'ward'])
+            ->where('enrollees.facility_id', $facilityId)
+            ->orderBy('enrollees.last_name')
+            ->orderBy('enrollees.first_name')
+            ->get();
+    }
+
+    private function storeEnrolleeSnapshotsForDetail(
+        CapitationDetail $detail,
+        Capitation $capitation,
+        FundingType $fundingType,
+        Collection $enrollees,
+        string $duplicateNinPolicy,
+        $capturedAt,
+        string $snapshotSource = 'capitation_generation',
+        array $snapshotMetadata = [],
+    ): void {
+        if ($enrollees->isEmpty()) {
+            return;
+        }
+
+        $rows = $enrollees->map(function (Enrollee $enrollee) use ($detail, $capitation, $fundingType, $duplicateNinPolicy, $capturedAt, $snapshotSource, $snapshotMetadata): array {
+            $facility = $enrollee->facility;
+
+            return [
+                'capitation_id' => $capitation->id,
+                'capitation_detail_id' => $detail->id,
+                'enrollee_id' => $enrollee->id,
+                'facility_id' => $facility?->id ?? $detail->facility_id,
+                'funding_type_id' => $fundingType->id,
+                'enrollee_number' => $enrollee->enrollee_id,
+                'legacy_id' => $enrollee->legacy_id,
+                'full_name' => trim((string) preg_replace('/\s+/', ' ', $enrollee->full_name)),
+                'nin' => $enrollee->nin,
+                'phone' => $enrollee->phone,
+                'gender' => match ((int) $enrollee->sex) {
+                    1 => 'Male',
+                    2 => 'Female',
+                    default => 'Other',
+                },
+                'date_of_birth' => $enrollee->date_of_birth?->toDateString(),
+                'facility_name' => $facility?->name,
+                'facility_code' => $facility?->hcp_code,
+                'funding_type_name' => $fundingType->name,
+                'lga_name' => $enrollee->lga?->name ?? $facility?->lga?->name,
+                'ward_name' => $enrollee->ward?->name,
+                'coverage_start_date' => $enrollee->coverage_start_date?->toDateString(),
+                'coverage_end_date' => $enrollee->coverage_end_date?->toDateString(),
+                'capitation_start_date' => $enrollee->capitation_start_date?->toDateString(),
+                'snapshot_status' => (int) $enrollee->status,
+                'duplicate_nin_policy' => $duplicateNinPolicy,
+                'has_duplicate_nin' => (bool) $enrollee->has_duplicate_nin,
+                'captured_at' => $capturedAt,
+                'metadata' => json_encode(array_merge([
+                    'snapshot_source' => $snapshotSource,
+                    'generated_for_funding_type_id' => $fundingType->id,
+                ], $snapshotMetadata), JSON_THROW_ON_ERROR),
+                'created_at' => $capturedAt,
+                'updated_at' => $capturedAt,
+            ];
+        })->all();
+
+        foreach (array_chunk($rows, 500) as $chunk) {
+            CapitationDetailEnrollee::insert($chunk);
+        }
+    }
+
+    private function enrolleeSnapshotQuery(Capitation $capitation, array $filters = []): EloquentBuilder
+    {
+        $query = CapitationDetailEnrollee::query()
+            ->where('capitation_id', $capitation->id);
+
+        if (!empty($filters['funding_type_id'])) {
+            $query->where('funding_type_id', (int) $filters['funding_type_id']);
+        }
+
+        if (!empty($filters['facility_id'])) {
+            $query->where('facility_id', (int) $filters['facility_id']);
+        }
+
+        $search = trim((string) ($filters['search'] ?? ''));
+        if ($search !== '') {
+            $query->where(function (EloquentBuilder $builder) use ($search): void {
+                $builder->where('full_name', 'like', "%{$search}%")
+                    ->orWhere('enrollee_number', 'like', "%{$search}%")
+                    ->orWhere('legacy_id', 'like', "%{$search}%")
+                    ->orWhere('nin', 'like', "%{$search}%")
+                    ->orWhere('phone', 'like', "%{$search}%")
+                    ->orWhere('facility_name', 'like', "%{$search}%")
+                    ->orWhere('funding_type_name', 'like', "%{$search}%");
+            });
+        }
 
         return $query;
     }

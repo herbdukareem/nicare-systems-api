@@ -689,6 +689,17 @@ const routes = [
       breadcrumb: 'Capitation Payment Report',
     },
   },
+  {
+    path: '/capitation/enrollee-list',
+    name: 'capitation-enrollee-list',
+    component: () => import('../components/capitation/CapitationEnrolleeListPage.vue'),
+    meta: {
+      requiresAuth: true,
+      permissions: ['capitation.export'],
+      title: 'Capitation Enrollee List',
+      breadcrumb: 'Capitation Enrollee List',
+    },
+  },
 
   // ── Payments ───────────────────────────────────────────────────────────────
   {

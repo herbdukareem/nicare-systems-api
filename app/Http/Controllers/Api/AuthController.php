@@ -63,10 +63,6 @@ class AuthController extends Controller
                 ], 401);
             }
 
-            // Delete old tokens for this user
-            Log::info('Deleting old tokens for user: ' . $user->id);
-            $user->tokens()->delete();
-
             // Create new token
             Log::info('Creating new token for user: ' . $user->id);
             $token = $user->createToken('api-token', ['*'], now()->addDays(30))->plainTextToken;

@@ -164,6 +164,13 @@
             show-select
             density="compact"
           >
+            <template #no-data>
+              <AppEmptyState
+                :icon="workflowEmptyState.icon"
+                :title="workflowEmptyState.title"
+                :description="workflowEmptyState.description"
+              />
+            </template>
             <template #item.facility="{ item }">{{ item.facility?.name || 'N/A' }}</template>
             <template #item.funding_type="{ item }">{{ periodFundingTypeName(item) }}</template>
             <template #item.total_amount="{ item }">NGN {{ Number(item.total_amount || item.amount || 0).toLocaleString() }}</template>
@@ -397,12 +404,13 @@ import AdminLayout from '../layout/AdminLayout.vue'
 import AppModal from '../common/AppModal.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
 import AppDataTable from '../common/AppDataTable.vue'
+import AppEmptyState from '../common/AppEmptyState.vue'
 import { capitationAPI, fundingTypeAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
 import { useAuthStore } from '../../stores/auth'
 
 const props = defineProps({ mode: { type: String, default: 'generate' } })
-const { success, error } = useToast()
+const { success, error, info } = useToast()
 const authStore = useAuthStore()
 const loading = ref(false)
 const saving = ref(false)
@@ -566,6 +574,8 @@ const selectedProviderIdValues = computed(() =>
 )
 const selectedProviderCount = computed(() => selectedProviderIdValues.value.length)
 const selectedGenerationFundingType = computed(() => fundingTypes.value.find((item) => Number(item.id) === Number(generationForm.value.funding_type_id)) || null)
+const selectedWorkflowPeriod = computed(() => periods.value.find((item) => Number(item.id) === Number(workflowForm.value.period_id)) || null)
+const selectedWorkflowFundingType = computed(() => fundingTypes.value.find((item) => Number(item.id) === Number(workflowForm.value.funding_type_id)) || null)
 const eligibleProviderTotals = computed(() => ({
   enrollees: eligibleProviders.value.reduce((sum, row) => sum + Number(row.total_enrollees || 0), 0),
   amount: eligibleProviders.value.reduce((sum, row) => sum + Number(row.total_amount || 0), 0),
@@ -581,6 +591,114 @@ const workflowTotals = computed(() => ({
   enrollees: workflowDetails.value.reduce((sum, row) => sum + Number(row.total_enrollees || row.total_enrolled || 0), 0),
   amount: workflowDetails.value.reduce((sum, row) => sum + Number(row.total_amount || row.amount || 0), 0),
 }))
+const workflowEmptyState = computed(() => {
+  const fundingTypeName = selectedWorkflowFundingType.value?.name
+  const filterContext = fundingTypeName ? ` for ${fundingTypeName}` : ''
+  const periodContext = fundingTypeName ? `${fundingTypeName} in this period` : 'this period'
+
+  if (!workflowDetailsLoaded.value || workflowDetails.value.length > 0) {
+    return {
+      icon: 'mdi-table-off',
+      title: 'No capitation details found',
+      description: 'No capitation details matched the selected filters.',
+    }
+  }
+
+  const period = selectedWorkflowPeriod.value
+  if (!period) {
+    return {
+      icon: 'mdi-table-off',
+      title: 'No capitation details found',
+      description: 'No capitation details matched the selected filters.',
+    }
+  }
+
+  const detailCount = Number(period.capitation_details_count || 0)
+  const pendingReviewCount = Number(period.pending_review_count || 0)
+  const reviewedCount = Number(period.reviewed_count || 0)
+  const pendingApprovalCount = Number(period.pending_approval_count || 0)
+  const approvedCount = Number(period.approved_count || 0)
+  const pendingPaymentCount = Number(period.pending_payment_count || 0)
+  const paidCount = Number(period.paid_count || 0)
+
+  if (detailCount === 0) {
+    return {
+      icon: 'mdi-file-document-outline',
+      title: 'No generated capitation yet',
+      description: `This period does not have any generated facility capitation${filterContext}. Generate capitation first before continuing.`,
+    }
+  }
+
+  if (props.mode === 'review') {
+    if (reviewedCount >= detailCount && pendingReviewCount === 0) {
+      return {
+        icon: 'mdi-check-decagram-outline',
+        title: 'All generated details already reviewed',
+        description: `There are no generated facility capitation rows waiting for review in ${periodContext}.`,
+      }
+    }
+
+    return {
+      icon: 'mdi-filter-off-outline',
+      title: 'No review queue for this filter',
+      description: `No generated facility capitation rows are waiting for review in ${periodContext}.`,
+    }
+  }
+
+  if (props.mode === 'approval') {
+    if (approvedCount >= detailCount && pendingApprovalCount === 0) {
+      return {
+        icon: 'mdi-check-decagram-outline',
+        title: 'All reviewed details already approved',
+        description: `There are no reviewed facility capitation rows waiting for approval in ${periodContext}.`,
+      }
+    }
+
+    if (reviewedCount === 0) {
+      return {
+        icon: 'mdi-timer-sand',
+        title: 'Nothing is ready for approval yet',
+        description: `This period does not have any reviewed facility capitation rows ready for approval${filterContext}.`,
+      }
+    }
+
+    return {
+      icon: 'mdi-filter-off-outline',
+      title: 'No approval queue for this filter',
+      description: `No reviewed facility capitation rows are waiting for approval in ${periodContext}.`,
+    }
+  }
+
+  if (props.mode === 'payments') {
+    if (paidCount >= detailCount && pendingPaymentCount === 0) {
+      return {
+        icon: 'mdi-check-decagram-outline',
+        title: 'All capitation details already paid',
+        description: `There are no approved unpaid facility capitation rows left in the payment queue for ${periodContext}.`,
+      }
+    }
+
+    if (approvedCount === 0) {
+      return {
+        icon: 'mdi-timer-sand',
+        title: 'Nothing is ready for payment yet',
+        description: `This period does not have any approved facility capitation rows ready for payment${filterContext}.`,
+      }
+    }
+
+    return {
+      icon: 'mdi-filter-off-outline',
+      title: 'No payment queue for this filter',
+      description: `No approved unpaid facility capitation rows are waiting for payment in ${periodContext}.`,
+    }
+  }
+
+  return {
+    icon: 'mdi-table-off',
+    title: 'No capitation details found',
+    description: 'No capitation details matched the selected filters.',
+  }
+})
 
 const periodStatusLabel = (item) => {
   const detailCount = Number(item.capitation_details_count || 0)
@@ -775,7 +893,7 @@ const generateLoadedFacilities = async () => {
   }
 }
 
-const loadWorkflowDetails = async () => {
+const loadWorkflowDetails = async ({ notifyWhenEmpty = false } = {}) => {
   if (!workflowForm.value.period_id) { error('Select a capitation period first'); return }
   workflowLoading.value = true
   selectedDetailIds.value = []
@@ -787,7 +905,9 @@ const loadWorkflowDetails = async () => {
     workflowDetails.value = response.data?.data || []
     selectedDetailIds.value = workflowDetails.value.map((item) => item.id)
     workflowDetailsLoaded.value = true
-    if (workflowDetails.value.length === 0) error('No capitation details found for this stage and period')
+    if (notifyWhenEmpty && workflowDetails.value.length === 0) {
+      info('No capitation details found for this stage and period')
+    }
   } catch (err) {
     error(err?.response?.data?.message || 'Failed to load capitation details')
   } finally {
@@ -816,7 +936,10 @@ const runWorkflowAction = async () => {
       await capitationAPI.approveDetails(workflowForm.value.period_id, { detail_ids: selectedDetailIds.value })
       success('Selected capitation details approved')
     }
-    await loadWorkflowDetails()
+    await Promise.all([
+      loadWorkflowDetails(),
+      loadPeriods(),
+    ])
   } catch (err) {
     error(err?.response?.data?.message || 'Failed to process selected capitation details')
   } finally {
@@ -841,8 +964,10 @@ const markPaid = async () => {
       await capitationAPI.payDetails(workflowForm.value.period_id, { ...paymentForm.value, detail_ids: selectedDetailIds.value })
       success('Selected capitation details paid')
       paymentDialog.value = false
-      await loadWorkflowDetails()
-      await loadPeriods()
+      await Promise.all([
+        loadWorkflowDetails(),
+        loadPeriods(),
+      ])
     } catch (err) {
       error(err?.response?.data?.message || 'Failed to pay selected capitation details')
     } finally {

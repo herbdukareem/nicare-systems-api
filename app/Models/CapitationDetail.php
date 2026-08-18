@@ -32,4 +32,9 @@ class CapitationDetail extends Model
     public function fundingType(){
         return $this->belongsTo(FundingType::class, 'funding_type_id', 'id');
     }
+
+    public function enrolleeSnapshots()
+    {
+        return $this->hasMany(CapitationDetailEnrollee::class, 'capitation_detail_id', 'id');
+    }
 }

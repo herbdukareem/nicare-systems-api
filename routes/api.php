@@ -618,6 +618,8 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('periods/{capitation}/export', [CapitationController::class, 'export'])->middleware('permission:capitation.export');
         Route::get('periods/{capitation}/export-breakdown-excel', [CapitationController::class, 'exportBreakdownExcel'])->middleware('permission:capitation.export');
         Route::get('periods/{capitation}/export-payment-report', [CapitationController::class, 'exportPaymentReport'])->middleware('permission:capitation.export');
+        Route::get('periods/{capitation}/enrollee-list', [CapitationController::class, 'enrolleeList'])->middleware('permission:capitation.export');
+        Route::get('periods/{capitation}/export-enrollee-list', [CapitationController::class, 'exportEnrolleeList'])->middleware('permission:capitation.export');
         Route::get('periods/{capitation}/export-remita', [CapitationController::class, 'exportRemita'])->middleware('permission:capitation.export');
         Route::get('facilities/{facility}/capitation-history', [CapitationController::class, 'facilityHistory'])->middleware('permission:capitation.view');
     });

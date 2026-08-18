@@ -44,6 +44,11 @@ class Capitation extends Model
         return $this->hasMany(CapitationDetail::class);
     }
 
+    public function enrolleeSnapshots()
+    {
+        return $this->hasMany(CapitationDetailEnrollee::class);
+    }
+
     public function capitationPayments()
     {
         return $this->hasMany(CapitationPayment::class);

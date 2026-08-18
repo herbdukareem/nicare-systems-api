@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Api;
 
 use App\Exceptions\CapitationComputationException;
 use App\Exports\CapitationBreakdownExport;
+use App\Exports\CapitationEnrolleeListExport;
 use App\Exports\CapitationPaymentReportExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CapitationBatchRequest;
 use App\Models\Capitation;
+use App\Models\CapitationDetailEnrollee;
+use App\Models\Enrollee;
 use App\Models\Facility;
 use App\Models\FundingType;
 use App\Services\CapitationService;
@@ -419,6 +422,50 @@ class CapitationController extends Controller
         );
     }
 
+    public function enrolleeList(Request $request, Capitation $capitation): JsonResponse
+    {
+        $validated = $request->validate([
+            'funding_type_id' => ['nullable', 'integer', 'exists:funding_types,id'],
+            'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:200'],
+        ]);
+
+        try {
+            $snapshots = $this->service->getEnrolleeSnapshotList($capitation, $validated);
+            $snapshots->setCollection(
+                $snapshots->getCollection()->map(
+                    fn (CapitationDetailEnrollee $snapshot) => $this->serializeEnrolleeSnapshot($snapshot)
+                )
+            );
+
+            return response()->json([
+                'success' => true,
+                'data' => $snapshots,
+                'summary' => $this->service->getEnrolleeSnapshotSummary($capitation, $validated),
+            ]);
+        } catch (\Throwable $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function exportEnrolleeList(Request $request, Capitation $capitation)
+    {
+        $validated = $request->validate([
+            'funding_type_id' => ['nullable', 'integer', 'exists:funding_types,id'],
+            'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
+            'search' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        $rows = $this->service->getEnrolleeSnapshotExportRows($capitation, $validated);
+
+        return Excel::download(
+            new CapitationEnrolleeListExport($capitation, $rows),
+            'capitation_enrollee_list_' . $capitation->id . '_' . now()->format('Ymd_His') . '.xlsx'
+        );
+    }
+
     /**
      * Export the bank-upload spreadsheet expected by the legacy Remita process.
      */
@@ -492,5 +539,40 @@ class CapitationController extends Controller
     private function error(string $message, int $status = 500): JsonResponse
     {
         return response()->json(['success' => false, 'message' => $message], $status);
+    }
+
+    private function serializeEnrolleeSnapshot(CapitationDetailEnrollee $snapshot): array
+    {
+        return [
+            'id' => $snapshot->id,
+            'enrollee_id' => $snapshot->enrollee_id,
+            'enrollee_number' => $snapshot->enrollee_number,
+            'legacy_id' => $snapshot->legacy_id,
+            'full_name' => $snapshot->full_name,
+            'nin' => $snapshot->nin,
+            'phone' => $snapshot->phone,
+            'gender' => $snapshot->gender,
+            'date_of_birth' => $snapshot->date_of_birth?->toDateString(),
+            'facility_name' => $snapshot->facility_name,
+            'facility_code' => $snapshot->facility_code,
+            'funding_type_name' => $snapshot->funding_type_name,
+            'lga_name' => $snapshot->lga_name,
+            'ward_name' => $snapshot->ward_name,
+            'coverage_start_date' => $snapshot->coverage_start_date?->toDateString(),
+            'coverage_end_date' => $snapshot->coverage_end_date?->toDateString(),
+            'capitation_start_date' => $snapshot->capitation_start_date?->toDateString(),
+            'duplicate_nin_policy' => $snapshot->duplicate_nin_policy,
+            'has_duplicate_nin' => (bool) $snapshot->has_duplicate_nin,
+            'snapshot_status' => $snapshot->snapshot_status,
+            'snapshot_status_label' => match ((int) $snapshot->snapshot_status) {
+                Enrollee::STATUS_PENDING => 'Pending Approval',
+                Enrollee::STATUS_ACTIVE => 'Approved',
+                Enrollee::STATUS_REJECTED => 'Rejected',
+                Enrollee::STATUS_SUSPENDED => 'Suspended',
+                Enrollee::STATUS_EXPIRED => 'Inactive',
+                default => 'Unknown',
+            },
+            'captured_at' => $snapshot->captured_at?->toIso8601String(),
+        ];
     }
 }

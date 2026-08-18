@@ -98,6 +98,7 @@ export const navigationItems = [
       { name: 'Approval', path: '/capitation/approval', icon: 'mdi-check-circle-outline', permissions: ['capitation.approve', 'capitation.finalise'] },
       { name: 'Payments', path: '/capitation/payments', icon: 'mdi-receipt-text-outline', permissions: ['capitation.pay'] },
       { name: 'Payment Report', path: '/capitation/reports', icon: 'mdi-file-chart-outline', permissions: ['capitation.export'] },
+      { name: 'Enrollee List', path: '/capitation/enrollee-list', icon: 'mdi-account-multiple-outline', permissions: ['capitation.export'] },
     ],
   },
   {
