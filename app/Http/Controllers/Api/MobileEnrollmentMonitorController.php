@@ -39,6 +39,7 @@ class MobileEnrollmentMonitorController extends BaseController
         return $this->sendResponse([
             'records' => $records,
             'summary' => $this->summary($summaryQuery),
+            'officer_options' => $this->officerOptions($request),
             'status_options' => [
                 MobileEnrollmentRecord::STATUS_RECEIVED,
                 MobileEnrollmentRecord::STATUS_PENDING_NIN,
@@ -72,7 +73,7 @@ class MobileEnrollmentMonitorController extends BaseController
         ], 'Mobile enrollment sync record retrieved.');
     }
 
-    private function recordsQuery(Request $request, bool $decorate = true): Builder
+    private function recordsQuery(Request $request, bool $decorate = true, array $ignoredFilters = []): Builder
     {
         $query = MobileEnrollmentRecord::query();
 
@@ -85,27 +86,36 @@ class MobileEnrollmentMonitorController extends BaseController
             $query->where('officer_user_id', $request->user()->id);
         }
 
-        return $this->applyFilters($query, $request);
+        return $this->applyFilters($query, $request, $ignoredFilters);
     }
 
-    private function applyFilters(Builder $query, Request $request): Builder
+    private function applyFilters(Builder $query, Request $request, array $ignoredFilters = []): Builder
     {
         $search = trim((string) $request->string('search', ''));
         $status = trim((string) $request->string('status', ''));
+        $officerUserId = (int) $request->integer('officer_user_id');
         $batchId = trim((string) $request->string('batch_id', ''));
         $deviceUuid = trim((string) $request->string('device_uuid', ''));
         $dateFrom = trim((string) $request->string('date_from', ''));
         $dateTo = trim((string) $request->string('date_to', ''));
+        $capturedDateFrom = trim((string) $request->string('captured_date_from', ''));
+        $capturedDateTo = trim((string) $request->string('captured_date_to', ''));
+        $capturedTimeFrom = trim((string) $request->string('captured_time_from', ''));
+        $capturedTimeTo = trim((string) $request->string('captured_time_to', ''));
 
-        if ($status !== '') {
+        if (!in_array('status', $ignoredFilters, true) && $status !== '') {
             $query->where('status', $status);
         }
 
-        if ($batchId !== '') {
+        if (!in_array('officer_user_id', $ignoredFilters, true) && $officerUserId > 0) {
+            $query->where('officer_user_id', $officerUserId);
+        }
+
+        if (!in_array('batch_id', $ignoredFilters, true) && $batchId !== '') {
             $query->where('sync_batch_id', 'like', '%' . $batchId . '%');
         }
 
-        if ($deviceUuid !== '') {
+        if (!in_array('device_uuid', $ignoredFilters, true) && $deviceUuid !== '') {
             $query->whereHas('device', function (Builder $deviceQuery) use ($deviceUuid): void {
                 $deviceQuery
                     ->where('device_uuid', 'like', '%' . $deviceUuid . '%')
@@ -113,15 +123,39 @@ class MobileEnrollmentMonitorController extends BaseController
             });
         }
 
-        if ($dateFrom !== '') {
+        if (!in_array('date_from', $ignoredFilters, true) && $dateFrom !== '') {
             $query->whereDate('received_at', '>=', $dateFrom);
         }
 
-        if ($dateTo !== '') {
+        if (!in_array('date_to', $ignoredFilters, true) && $dateTo !== '') {
             $query->whereDate('received_at', '<=', $dateTo);
         }
 
-        if ($search !== '') {
+        if (!in_array('captured_date_from', $ignoredFilters, true) && $capturedDateFrom !== '') {
+            $query->whereDate('captured_at', '>=', $capturedDateFrom);
+        }
+
+        if (!in_array('captured_date_to', $ignoredFilters, true) && $capturedDateTo !== '') {
+            $query->whereDate('captured_at', '<=', $capturedDateTo);
+        }
+
+        if (
+            !in_array('captured_time_from', $ignoredFilters, true)
+            && $capturedTimeFrom !== ''
+            && $this->isValidTimeValue($capturedTimeFrom)
+        ) {
+            $query->whereTime('captured_at', '>=', $capturedTimeFrom);
+        }
+
+        if (
+            !in_array('captured_time_to', $ignoredFilters, true)
+            && $capturedTimeTo !== ''
+            && $this->isValidTimeValue($capturedTimeTo)
+        ) {
+            $query->whereTime('captured_at', '<=', $capturedTimeTo);
+        }
+
+        if (!in_array('search', $ignoredFilters, true) && $search !== '') {
             $query->where(function (Builder $searchQuery) use ($search): void {
                 $searchQuery
                     ->where('client_record_id', 'like', '%' . $search . '%')
@@ -166,9 +200,41 @@ class MobileEnrollmentMonitorController extends BaseController
             'ready' => (clone $query)->whereIn('status', self::READY_STATUSES)->count(),
             'attention' => (clone $query)->whereIn('status', self::ATTENTION_STATUSES)->count(),
             'batches' => (clone $query)->distinct()->count('sync_batch_id'),
+            'officers' => (clone $query)->distinct()->count('officer_user_id'),
             'devices' => (clone $query)->distinct()->count('officer_device_id'),
             'status_counts' => $statusCounts->all(),
         ];
+    }
+
+    private function officerOptions(Request $request): array
+    {
+        $officerIds = $this->recordsQuery($request, false, ['officer_user_id'])
+            ->whereNotNull('officer_user_id')
+            ->distinct()
+            ->pluck('officer_user_id')
+            ->filter()
+            ->values();
+
+        if ($officerIds->isEmpty()) {
+            return [];
+        }
+
+        return User::query()
+            ->whereIn('id', $officerIds->all())
+            ->orderBy('name')
+            ->get(['id', 'name', 'username', 'email'])
+            ->map(fn (User $officer) => [
+                'id' => $officer->id,
+                'name' => $officer->name,
+                'subtitle' => $officer->email ?: $officer->username,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function isValidTimeValue(string $value): bool
+    {
+        return preg_match('/^\d{2}:\d{2}(:\d{2})?$/', $value) === 1;
     }
 
     private function authorizeRecord(User $user, MobileEnrollmentRecord $record): void

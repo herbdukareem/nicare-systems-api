@@ -12,42 +12,46 @@
         </v-btn>
       </AppPageHeader>
 
-      <div class="tw-grid tw-gap-4 md:tw-grid-cols-2 xl:tw-grid-cols-4">
-        <AppMetricCard
-          title="Total attempts"
+      <div class="tw-grid tw-grid-cols-2 tw-gap-2 md:tw-grid-cols-4">
+        <AppStatCard
+          compact
+          label="Total attempts"
           icon="mdi-database-outline"
-          tone="neutral"
-          :value="formatCount(summary.total)"
-          helper="All records matching the current monitor filters"
+          color="primary"
+          :value="summary.total"
+          :loading="loading"
         />
-        <AppMetricCard
-          title="Received today"
+        <AppStatCard
+          compact
+          label="Received today"
           icon="mdi-calendar-today-outline"
-          tone="info"
-          :value="formatCount(summary.today)"
-          helper="Records the backend accepted today"
+          color="info"
+          :value="summary.today"
+          :loading="loading"
         />
-        <AppMetricCard
-          title="Ready or approved"
+        <AppStatCard
+          compact
+          label="Ready or approved"
           icon="mdi-check-decagram-outline"
-          tone="success"
-          :value="formatCount(summary.ready)"
-          helper="Records that passed sync and are ready for approval or already active"
+          color="success"
+          :value="summary.ready"
+          :loading="loading"
         />
-        <AppMetricCard
-          title="Needs attention"
+        <AppStatCard
+          compact
+          label="Needs attention"
           icon="mdi-alert-decagram-outline"
-          tone="warning"
-          :value="formatCount(summary.attention)"
-          helper="Records blocked by review, duplicate, NIN, rejection, or sync errors"
+          color="warning"
+          :value="summary.attention"
+          :loading="loading"
         />
       </div>
 
-      <AppFilterBar :active-count="activeFiltersCount" :cols="5" @clear="clearFilters">
+      <AppFilterBar :active-count="activeFiltersCount" :cols="5" :advanced-cols="3" @clear="clearFilters">
         <v-text-field
           v-model="filters.search"
           label="Search"
-          placeholder="Batch, client record, officer, device, enrollee, or reason"
+          placeholder="Enrollee, officer, batch, client ref, device, or reason"
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
           density="compact"
@@ -67,51 +71,209 @@
           hide-details
           @update:model-value="loadMonitor({ resetPage: true })"
         />
-        <v-text-field
-          v-model="filters.batch_id"
-          label="Batch ID"
+        <v-select
+          v-model="filters.officer_user_id"
+          label="Enrollment officer"
+          :items="officerSelectItems"
+          item-title="label"
+          item-value="value"
           variant="outlined"
           density="compact"
           clearable
           hide-details
-          @keyup.enter="loadMonitor({ resetPage: true })"
-          @click:clear="loadMonitor({ resetPage: true })"
-        />
-        <v-text-field
-          v-model="filters.device_uuid"
-          label="Device"
-          variant="outlined"
-          density="compact"
-          clearable
-          hide-details
-          @keyup.enter="loadMonitor({ resetPage: true })"
-          @click:clear="loadMonitor({ resetPage: true })"
+          @update:model-value="loadMonitor({ resetPage: true })"
         />
         <div class="tw-grid tw-grid-cols-2 tw-gap-2">
-          <v-text-field
-            v-model="filters.date_from"
-            label="From"
-            type="date"
-            variant="outlined"
-            density="compact"
-            clearable
-            hide-details
-            @update:model-value="loadMonitor({ resetPage: true })"
-          />
-          <v-text-field
-            v-model="filters.date_to"
-            label="To"
-            type="date"
-            variant="outlined"
-            density="compact"
-            clearable
-            hide-details
-            @update:model-value="loadMonitor({ resetPage: true })"
-          />
+          <v-menu
+            v-model="pickerMenus.capturedDateFrom"
+            :close-on-content-click="false"
+            location="bottom"
+          >
+            <template #activator="{ props }">
+              <v-text-field
+                :model-value="displayDateFilter(filters.captured_date_from)"
+                label="Enroll from"
+                placeholder="Select date"
+                prepend-inner-icon="mdi-calendar"
+                variant="outlined"
+                density="compact"
+                clearable
+                readonly
+                hide-details
+                v-bind="props"
+                @click:clear="clearFilterValue('captured_date_from', 'capturedDateFrom')"
+              />
+            </template>
+            <v-date-picker
+              color="primary"
+              :model-value="filters.captured_date_from || null"
+              @update:model-value="setDateFilter('captured_date_from', $event, 'capturedDateFrom')"
+            />
+          </v-menu>
+          <v-menu
+            v-model="pickerMenus.capturedDateTo"
+            :close-on-content-click="false"
+            location="bottom"
+          >
+            <template #activator="{ props }">
+              <v-text-field
+                :model-value="displayDateFilter(filters.captured_date_to)"
+                label="Enroll to"
+                placeholder="Select date"
+                prepend-inner-icon="mdi-calendar"
+                variant="outlined"
+                density="compact"
+                clearable
+                readonly
+                hide-details
+                v-bind="props"
+                @click:clear="clearFilterValue('captured_date_to', 'capturedDateTo')"
+              />
+            </template>
+            <v-date-picker
+              color="primary"
+              :model-value="filters.captured_date_to || null"
+              @update:model-value="setDateFilter('captured_date_to', $event, 'capturedDateTo')"
+            />
+          </v-menu>
         </div>
+        <div class="tw-grid tw-grid-cols-2 tw-gap-2">
+          <v-menu
+            v-model="pickerMenus.capturedTimeFrom"
+            :close-on-content-click="false"
+            location="bottom"
+          >
+            <template #activator="{ props }">
+              <v-text-field
+                :model-value="displayTimeFilter(filters.captured_time_from)"
+                label="Time from"
+                placeholder="Select time"
+                prepend-inner-icon="mdi-clock-outline"
+                variant="outlined"
+                density="compact"
+                clearable
+                readonly
+                hide-details
+                v-bind="props"
+                @click:clear="clearFilterValue('captured_time_from', 'capturedTimeFrom')"
+              />
+            </template>
+            <v-time-picker
+              color="primary"
+              format="24hr"
+              :model-value="filters.captured_time_from || null"
+              @update:model-value="setTimeFilter('captured_time_from', $event, 'capturedTimeFrom')"
+            />
+          </v-menu>
+          <v-menu
+            v-model="pickerMenus.capturedTimeTo"
+            :close-on-content-click="false"
+            location="bottom"
+          >
+            <template #activator="{ props }">
+              <v-text-field
+                :model-value="displayTimeFilter(filters.captured_time_to)"
+                label="Time to"
+                placeholder="Select time"
+                prepend-inner-icon="mdi-clock-outline"
+                variant="outlined"
+                density="compact"
+                clearable
+                readonly
+                hide-details
+                v-bind="props"
+                @click:clear="clearFilterValue('captured_time_to', 'capturedTimeTo')"
+              />
+            </template>
+            <v-time-picker
+              color="primary"
+              format="24hr"
+              :model-value="filters.captured_time_to || null"
+              @update:model-value="setTimeFilter('captured_time_to', $event, 'capturedTimeTo')"
+            />
+          </v-menu>
+        </div>
+
+        <template #advanced>
+          <v-text-field
+            v-model="filters.batch_id"
+            label="Batch ID"
+            variant="outlined"
+            density="compact"
+            clearable
+            hide-details
+            @keyup.enter="loadMonitor({ resetPage: true })"
+            @click:clear="loadMonitor({ resetPage: true })"
+          />
+          <v-text-field
+            v-model="filters.device_uuid"
+            label="Device"
+            variant="outlined"
+            density="compact"
+            clearable
+            hide-details
+            @keyup.enter="loadMonitor({ resetPage: true })"
+            @click:clear="loadMonitor({ resetPage: true })"
+          />
+          <div class="tw-grid tw-grid-cols-2 tw-gap-2">
+            <v-menu
+              v-model="pickerMenus.receivedDateFrom"
+              :close-on-content-click="false"
+              location="bottom"
+            >
+              <template #activator="{ props }">
+                <v-text-field
+                  :model-value="displayDateFilter(filters.date_from)"
+                  label="Received from"
+                  placeholder="Select date"
+                  prepend-inner-icon="mdi-calendar"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                  readonly
+                  hide-details
+                  v-bind="props"
+                  @click:clear="clearFilterValue('date_from', 'receivedDateFrom')"
+                />
+              </template>
+              <v-date-picker
+                color="primary"
+                :model-value="filters.date_from || null"
+                @update:model-value="setDateFilter('date_from', $event, 'receivedDateFrom')"
+              />
+            </v-menu>
+            <v-menu
+              v-model="pickerMenus.receivedDateTo"
+              :close-on-content-click="false"
+              location="bottom"
+            >
+              <template #activator="{ props }">
+                <v-text-field
+                  :model-value="displayDateFilter(filters.date_to)"
+                  label="Received to"
+                  placeholder="Select date"
+                  prepend-inner-icon="mdi-calendar"
+                  variant="outlined"
+                  density="compact"
+                  clearable
+                  readonly
+                  hide-details
+                  v-bind="props"
+                  @click:clear="clearFilterValue('date_to', 'receivedDateTo')"
+                />
+              </template>
+              <v-date-picker
+                color="primary"
+                :model-value="filters.date_to || null"
+                @update:model-value="setDateFilter('date_to', $event, 'receivedDateTo')"
+              />
+            </v-menu>
+          </div>
+        </template>
 
         <template #tags>
           <AppBadge :label="`Batches ${formatCount(summary.batches)}`" tone="info" size="sm" />
+          <AppBadge :label="`Officers ${formatCount(summary.officers)}`" tone="primary" size="sm" />
           <AppBadge :label="`Devices ${formatCount(summary.devices)}`" tone="neutral" size="sm" />
           <AppBadge :label="`Failed ${formatCount(statusCount('sync_failed'))}`" tone="danger" size="sm" />
           <AppBadge :label="`Review ${formatCount(statusCount('requires_review'))}`" tone="warning" size="sm" />
@@ -121,7 +283,7 @@
 
       <AppCard
         title="Synchronization Attempts"
-        subtitle="Each row shows what the server received from mobile, the current workflow status, and the latest reason attached to the record."
+        subtitle="Compact monitor view for quick triage. Open any row to inspect the full backend reasoning, payload, and audit trail."
         icon="mdi-format-list-bulleted"
         tone="primary"
       >
@@ -136,58 +298,34 @@
           @update:page="loadMonitor"
           @update:items-per-page="loadMonitor"
         >
-          <template #item.received="{ item }">
-            <div class="tw-min-w-[12rem] tw-text-xs tw-text-slate-600">
-              <div class="tw-font-medium tw-text-slate-900">
-                <DateDisplay :value="item.received_at || item.created_at" format="medium" />
-              </div>
-              <div>Captured: <DateDisplay :value="item.captured_at" format="short" /></div>
-              <div>Synced: <DateDisplay :value="item.synced_at" format="short" /></div>
+          <template #item.officer="{ item }">
+            <div class="tw-min-w-[11rem] tw-text-sm tw-font-medium tw-text-slate-900">
+              {{ item.officer?.name || 'Unknown officer' }}
             </div>
           </template>
 
-          <template #item.officer="{ item }">
-            <div class="tw-min-w-[12rem] tw-text-sm">
-              <div class="tw-font-medium tw-text-slate-900">{{ item.officer?.name || 'Unknown officer' }}</div>
-              <div class="tw-text-xs tw-text-slate-500">{{ item.officer?.email || item.officer?.username || 'No login metadata' }}</div>
-              <div class="tw-mt-1 tw-text-xs tw-text-slate-500">{{ item.device?.device_name || item.device?.device_uuid || 'Unknown device' }}</div>
+          <template #item.attempt="{ item }">
+            <div class="tw-flex tw-min-w-[12rem] tw-items-center tw-gap-2 tw-text-sm tw-font-medium tw-text-slate-900">
+              <v-icon size="16" color="primary">mdi-calendar-clock-outline</v-icon>
+              <DateDisplay :value="item.received_at || item.created_at" format="medium" />
             </div>
           </template>
 
           <template #item.record="{ item }">
-            <div class="tw-min-w-[13rem]">
+            <div class="tw-min-w-[14rem] tw-space-y-1">
               <div class="tw-font-medium tw-text-slate-900">{{ recordTitle(item) }}</div>
-              <div class="tw-text-xs tw-text-slate-500">{{ recordSubtitle(item) }}</div>
-              <div class="tw-mt-1 tw-text-xs tw-text-slate-500">Client ref: {{ item.client_record_id }}</div>
-            </div>
-          </template>
-
-          <template #item.batch="{ item }">
-            <div class="tw-min-w-[13rem] tw-text-sm tw-text-slate-700">
-              <div class="tw-font-medium">{{ item.sync_batch_id }}</div>
-              <div class="tw-text-xs tw-text-slate-500">
-                {{ item.device?.platform || 'Unknown platform' }} / {{ item.device?.app_version || 'No app version' }}
+              <div class="tw-text-sm tw-text-slate-600">
+                {{ recordNinLabel(item) }}
               </div>
-              <div class="tw-mt-1 tw-flex tw-flex-wrap tw-gap-1.5">
-                <AppBadge :label="item.attachments_count ? `${item.attachments_count} attachment${item.attachments_count === 1 ? '' : 's'}` : 'No attachments'" :tone="item.attachments_count ? 'info' : 'neutral'" size="sm" />
-                <AppBadge v-if="item.device?.revoked_at" label="Device revoked" tone="danger" size="sm" />
+              <div class="tw-text-xs tw-font-medium tw-uppercase tw-tracking-[0.12em] tw-text-slate-500">
+                {{ enrolleeIdLabel(item) }}
               </div>
             </div>
           </template>
 
           <template #item.status="{ item }">
-            <div class="tw-flex tw-flex-col tw-gap-1.5">
-              <AppStatusBadge :status="item.status" :label="statusLabel(item.status)" size="sm" />
-              <AppBadge :label="attentionLabel(item.status)" :tone="attentionTone(item.status)" size="sm" />
-            </div>
-          </template>
-
-          <template #item.reason="{ item }">
-            <div class="tw-min-w-[18rem] tw-text-sm tw-text-slate-600">
-              <p class="tw-line-clamp-3">{{ item.status_reason || defaultReason(item.status) }}</p>
-              <div class="tw-mt-2 tw-text-xs tw-text-slate-500">
-                Schema: {{ item.schema?.name || 'Default resolution' }} v{{ item.schema_version || item.schema?.version || 1 }}
-              </div>
+            <div class="tw-min-w-[12rem]">
+              <AppBadge :label="monitorStatusLabel(item.status)" :tone="monitorStatusTone(item.status)" size="sm" />
             </div>
           </template>
 
@@ -396,9 +534,9 @@ import AppCard from '../common/AppCard.vue'
 import AppDataTable from '../common/AppDataTable.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
 import AppFilterBar from '../common/AppFilterBar.vue'
-import AppMetricCard from '../common/AppMetricCard.vue'
 import AppModal from '../common/AppModal.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
+import AppStatCard from '../common/AppStatCard.vue'
 import AppStatusBadge from '../common/AppStatusBadge.vue'
 import AppTimeline from '../common/AppTimeline.vue'
 import DateDisplay from '../common/DateDisplay.vue'
@@ -420,6 +558,15 @@ const detailDialog = ref(false)
 const selectedRecord = ref(null)
 const selectedAuditTrail = ref([])
 const statusOptions = ref([])
+const officerOptions = ref([])
+const pickerMenus = reactive({
+  capturedDateFrom: false,
+  capturedDateTo: false,
+  capturedTimeFrom: false,
+  capturedTimeTo: false,
+  receivedDateFrom: false,
+  receivedDateTo: false,
+})
 
 const summary = ref({
   total: 0,
@@ -427,6 +574,7 @@ const summary = ref({
   ready: 0,
   attention: 0,
   batches: 0,
+  officers: 0,
   devices: 0,
   status_counts: {},
 })
@@ -434,19 +582,22 @@ const summary = ref({
 const filters = reactive({
   search: '',
   status: null,
+  officer_user_id: null,
   batch_id: '',
   device_uuid: '',
   date_from: '',
   date_to: '',
+  captured_date_from: '',
+  captured_date_to: '',
+  captured_time_from: '',
+  captured_time_to: '',
 })
 
 const headers = [
-  { title: 'Received', key: 'received', sortable: false, minWidth: 170 },
-  { title: 'Officer / Device', key: 'officer', sortable: false, minWidth: 180 },
-  { title: 'Record', key: 'record', sortable: false, minWidth: 190 },
-  { title: 'Batch / App', key: 'batch', sortable: false, minWidth: 200 },
-  { title: 'Status', key: 'status', sortable: false, minWidth: 120 },
-  { title: 'Latest reason', key: 'reason', sortable: false, minWidth: 240 },
+  { title: 'Officer', key: 'officer', sortable: false, minWidth: 180 },
+  { title: 'Attempt', key: 'attempt', sortable: false, minWidth: 200 },
+  { title: 'Enrollee', key: 'record', sortable: false, minWidth: 220 },
+  { title: 'Status', key: 'status', sortable: false, minWidth: 160 },
   { title: '', key: 'actions', sortable: false, align: 'end', minWidth: 140 },
 ]
 
@@ -455,6 +606,11 @@ const activeFiltersCount = computed(() => Object.values(filters).filter((value) 
 const statusSelectItems = computed(() => statusOptions.value.map((status) => ({
   label: statusLabel(status),
   value: status,
+})))
+
+const officerSelectItems = computed(() => officerOptions.value.map((officer) => ({
+  label: officer.subtitle ? `${officer.name} (${officer.subtitle})` : officer.name,
+  value: officer.id,
 })))
 
 const timelineItems = computed(() => selectedAuditTrail.value.map((entry) => ({
@@ -479,10 +635,15 @@ const loadMonitor = async (options = {}) => {
       per_page: perPage.value,
       search: filters.search || undefined,
       status: filters.status || undefined,
+      officer_user_id: filters.officer_user_id || undefined,
       batch_id: filters.batch_id || undefined,
       device_uuid: filters.device_uuid || undefined,
       date_from: filters.date_from || undefined,
       date_to: filters.date_to || undefined,
+      captured_date_from: filters.captured_date_from || undefined,
+      captured_date_to: filters.captured_date_to || undefined,
+      captured_time_from: filters.captured_time_from || undefined,
+      captured_time_to: filters.captured_time_to || undefined,
     })
 
     const payload = response.data?.data || {}
@@ -498,10 +659,12 @@ const loadMonitor = async (options = {}) => {
       ready: payload.summary?.ready || 0,
       attention: payload.summary?.attention || 0,
       batches: payload.summary?.batches || 0,
+      officers: payload.summary?.officers || 0,
       devices: payload.summary?.devices || 0,
       status_counts: payload.summary?.status_counts || {},
     }
     statusOptions.value = payload.status_options || []
+    officerOptions.value = payload.officer_options || []
   } catch (err) {
     error(err?.response?.data?.message || 'Failed to load mobile sync monitor records.')
   } finally {
@@ -516,10 +679,70 @@ const debouncedSearch = debounce(() => {
 const clearFilters = async () => {
   filters.search = ''
   filters.status = null
+  filters.officer_user_id = null
   filters.batch_id = ''
   filters.device_uuid = ''
   filters.date_from = ''
   filters.date_to = ''
+  filters.captured_date_from = ''
+  filters.captured_date_to = ''
+  filters.captured_time_from = ''
+  filters.captured_time_to = ''
+  await loadMonitor({ resetPage: true })
+}
+
+const normalizePickerValue = (value) => Array.isArray(value) ? value[0] : value
+
+const formatPickerDateValue = (value) => {
+  const normalized = normalizePickerValue(value)
+  if (!normalized) return ''
+  if (normalized instanceof Date) {
+    const year = normalized.getFullYear()
+    const month = String(normalized.getMonth() + 1).padStart(2, '0')
+    const day = String(normalized.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  return String(normalized).slice(0, 10)
+}
+
+const displayDateFilter = (value) => {
+  if (!value) return ''
+  const [year, month, day] = String(value).split('-').map(Number)
+  if (!year || !month || !day) return String(value)
+  return new Intl.DateTimeFormat('en-NG', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+  }).format(new Date(year, month - 1, day))
+}
+
+const displayTimeFilter = (value) => {
+  if (!value) return ''
+  return String(value).slice(0, 5)
+}
+
+const clearFilterValue = async (key, menuKey) => {
+  filters[key] = ''
+  if (menuKey && menuKey in pickerMenus) {
+    pickerMenus[menuKey] = false
+  }
+  await loadMonitor({ resetPage: true })
+}
+
+const setDateFilter = async (key, value, menuKey) => {
+  filters[key] = formatPickerDateValue(value)
+  if (menuKey && menuKey in pickerMenus) {
+    pickerMenus[menuKey] = false
+  }
+  await loadMonitor({ resetPage: true })
+}
+
+const setTimeFilter = async (key, value, menuKey) => {
+  const normalized = normalizePickerValue(value)
+  filters[key] = normalized ? String(normalized).slice(0, 5) : ''
+  if (menuKey && menuKey in pickerMenus) {
+    pickerMenus[menuKey] = false
+  }
   await loadMonitor({ resetPage: true })
 }
 
@@ -571,6 +794,50 @@ const recordTitle = (record) => {
 const recordSubtitle = (record) => {
   const nin = record?.enrollee?.nin || record?.core_data?.nin || record?.payload?.data?.nin || record?.payload?.nin
   return nin ? `NIN ${nin}` : 'No NIN submitted'
+}
+
+const recordHasNin = (record) => Boolean(
+  record?.enrollee?.nin || record?.core_data?.nin || record?.payload?.data?.nin || record?.payload?.nin
+)
+
+const recordNinLabel = (record) => recordSubtitle(record)
+
+const enrolleeIdLabel = (record) => {
+  const enrolleeId = record?.enrollee?.enrollee_id
+  return enrolleeId ? `Enrollee ID ${enrolleeId}` : 'Enrollee ID pending'
+}
+
+const shortId = (value, start = 6, end = 4) => {
+  const stringValue = String(value || '').trim()
+  if (!stringValue) return 'N/A'
+  if (stringValue.length <= start + end + 1) return stringValue
+  return `${stringValue.slice(0, start)}...${stringValue.slice(-end)}`
+}
+
+const timeValue = (value) => {
+  if (!value) return 'N/A'
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'N/A'
+  return new Intl.DateTimeFormat('en-NG', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+}
+
+const reasonSnippet = (record) => record?.status_reason || defaultReason(record?.status)
+
+const schemaChip = (record) => record?.schema?.name
+  ? `${record.schema.name} v${record.schema_version || record.schema.version || 1}`
+  : `Schema v${record?.schema_version || 1}`
+
+const deviceLabel = (record) => record?.device?.device_name
+  || shortId(record?.device?.device_uuid, 6, 4)
+  || 'Unknown device'
+
+const platformLabel = (record) => {
+  const platform = record?.device?.platform || 'Unknown platform'
+  const version = record?.device?.app_version
+  return version ? `${platform} / ${version}` : platform
 }
 
 const schemaLabel = (record) => {
@@ -684,6 +951,14 @@ const attentionTone = (status) => {
   if (['pending_nin', 'requires_review', 'duplicate_suspected'].includes(status)) return 'warning'
   return 'danger'
 }
+
+const monitorStatusLabel = (status) => (
+  ['pending_approval', 'approved', 'received'].includes(status)
+    ? 'Operationally healthy'
+    : statusLabel(status)
+)
+
+const monitorStatusTone = (status) => attentionTone(status)
 
 const formatAuditTitle = (action) => {
   if (!action) return 'System event'
