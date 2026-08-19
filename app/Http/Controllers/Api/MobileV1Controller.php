@@ -133,7 +133,13 @@ class MobileV1Controller extends BaseController
             'wards' => $this->changed(Ward::query()->orderBy('name'), $since)
                 ->when($scope['lga_ids'] !== null, fn (Builder $query) => $query->whereIn('lga_id', $scope['lga_ids']))
                 ->get(),
-            'facilities' => $this->changed(Facility::query()->where('status', 1)->orderBy('name'), $since)
+            'facilities' => $this->changed(
+                Facility::query()
+                    ->where('status', 1)
+                    ->where('type', 'Primary')
+                    ->orderBy('name'),
+                $since
+            )
                 ->when($scope['lga_ids'] !== null, fn (Builder $query) => $query->whereIn('lga_id', $scope['lga_ids']))
                 ->get(),
             'schemas' => $schemas,

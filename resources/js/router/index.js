@@ -684,7 +684,7 @@ const routes = [
     component: () => import('../components/capitation/CapitationPaymentReportPage.vue'),
     meta: {
       requiresAuth: true,
-      permissions: ['capitation.export'],
+      permissions: ['capitation.payment-report.view'],
       title: 'Capitation Payment Report',
       breadcrumb: 'Capitation Payment Report',
     },
@@ -695,7 +695,7 @@ const routes = [
     component: () => import('../components/capitation/CapitationEnrolleeListPage.vue'),
     meta: {
       requiresAuth: true,
-      permissions: ['capitation.export'],
+      permissions: ['capitation.enrollee-list.view'],
       title: 'Capitation Enrollee List',
       breadcrumb: 'Capitation Enrollee List',
     },

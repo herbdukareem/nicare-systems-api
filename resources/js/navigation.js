@@ -97,8 +97,8 @@ export const navigationItems = [
       { name: 'Review', path: '/capitation/review', icon: 'mdi-eye-outline', permissions: ['capitation.review'] },
       { name: 'Approval', path: '/capitation/approval', icon: 'mdi-check-circle-outline', permissions: ['capitation.approve', 'capitation.finalise'] },
       { name: 'Payments', path: '/capitation/payments', icon: 'mdi-receipt-text-outline', permissions: ['capitation.pay'] },
-      { name: 'Payment Report', path: '/capitation/reports', icon: 'mdi-file-chart-outline', permissions: ['capitation.export'] },
-      { name: 'Enrollee List', path: '/capitation/enrollee-list', icon: 'mdi-account-multiple-outline', permissions: ['capitation.export'] },
+      { name: 'Payment Report', path: '/capitation/reports', icon: 'mdi-file-chart-outline', permissions: ['capitation.payment-report.view'] },
+      { name: 'Enrollee List', path: '/capitation/enrollee-list', icon: 'mdi-account-multiple-outline', permissions: ['capitation.enrollee-list.view'] },
     ],
   },
   {
