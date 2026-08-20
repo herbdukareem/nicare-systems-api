@@ -713,7 +713,7 @@ class MobileEnrollmentService
         }
 
         $allowed = $assignments->contains(function ($assignment) use ($schemaId, $lgaId): bool {
-            $lgaMatches = $assignment->lga_id === null || (int) $assignment->lga_id === $lgaId;
+            $lgaMatches = $assignment->lga_id !== null && (int) $assignment->lga_id === $lgaId;
             $schemaMatches = $assignment->enrollment_form_schema_id === null
                 || ($schemaId !== null && (int) $assignment->enrollment_form_schema_id === $schemaId);
 

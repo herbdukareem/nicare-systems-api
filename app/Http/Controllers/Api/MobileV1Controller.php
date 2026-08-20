@@ -559,9 +559,12 @@ class MobileV1Controller extends BaseController
             ];
         }
 
-        $lgaIds = $assignments->contains(fn ($assignment) => $assignment->lga_id === null)
-            ? null
-            : $assignments->pluck('lga_id')->filter()->unique()->values()->all();
+        $lgaIds = $assignments->pluck('lga_id')
+            ->filter(fn ($id) => $id !== null)
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values()
+            ->all();
         $schemaIds = $assignments->contains(fn ($assignment) => $assignment->enrollment_form_schema_id === null)
             ? null
             : $assignments->pluck('enrollment_form_schema_id')->filter()->unique()->values()->all();
