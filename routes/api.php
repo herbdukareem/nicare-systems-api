@@ -78,6 +78,7 @@ use App\Http\Controllers\Api\EnrolleeController as EnrolleeApiController;
 use App\Http\Controllers\Api\ExtendedReportingController;
 use App\Http\Controllers\Api\EnrollmentFormSchemaController;
 use App\Http\Controllers\Api\EnrollmentIntelligenceController;
+use App\Http\Controllers\Api\EnrollmentWindowSettingsController;
 use App\Http\Controllers\Api\BhcpfExecutiveDashboardController;
 use App\Http\Controllers\Api\MobileEnrollmentMonitorController;
 use App\Http\Controllers\Api\MobileV1Controller;
@@ -403,6 +404,10 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,settings.organization.manage,settings.edit');
     Route::delete('settings/organization/logo', [OrganizationSettingsController::class, 'removeLogo'])
         ->middleware('permission:any,settings.organization.manage,settings.edit');
+    Route::get('settings/enrollment-window', [EnrollmentWindowSettingsController::class, 'show'])
+        ->middleware('permission:any,settings.edit');
+    Route::put('settings/enrollment-window', [EnrollmentWindowSettingsController::class, 'update'])
+        ->middleware('permission:any,settings.edit');
     Route::get('settings/payment-gateways', [PaymentGatewayConfigurationController::class, 'show'])
         ->middleware('permission:any,settings.payment-gateway.manage,settings.edit');
     Route::put('settings/payment-gateways', [PaymentGatewayConfigurationController::class, 'update'])

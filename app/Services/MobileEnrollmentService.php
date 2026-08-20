@@ -14,6 +14,7 @@ use App\Models\PremiumPlan;
 use App\Models\PremiumPurchase;
 use App\Models\User;
 use App\Models\Ward;
+use App\Services\EnrollmentWindowService;
 use App\Services\Billing\BillingCheckoutService;
 use App\Services\Billing\BillingPaymentVerificationService;
 use App\Services\Billing\PaymentCollectionConfigurationService;
@@ -51,6 +52,7 @@ class MobileEnrollmentService
         private EnrolleeDuplicateDetectionService $duplicateDetectionService,
         private PremiumCoverageService $premiumCoverageService,
         private NinVerificationService $ninVerificationService,
+        private EnrollmentWindowService $enrollmentWindowService,
         private VulnerableGroupAssignmentService $vulnerableGroupAssignmentService,
         private BillingCheckoutService $billingCheckoutService,
         private BillingPaymentVerificationService $billingVerificationService,
@@ -61,6 +63,8 @@ class MobileEnrollmentService
 
     public function syncBatch(User $officer, OfficerDevice $device, array $records, array $meta = []): array
     {
+        $this->enrollmentWindowService->assertOpen();
+
         $batchId = (string) Str::uuid();
         $results = [];
 

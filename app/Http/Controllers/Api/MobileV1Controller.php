@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\EnrollmentWindowClosedException;
 use App\Http\Controllers\Api\V1\BaseController;
 use App\Models\BenefitPackage;
 use App\Models\Benefactor;
@@ -16,6 +17,7 @@ use App\Models\MobileEnrollmentRecord;
 use App\Models\PremiumPlan;
 use App\Models\Ward;
 use App\Services\EnrollmentFormSchemaService;
+use App\Services\EnrollmentWindowService;
 use App\Services\MobileEnrollmentService;
 use App\Services\NinVerificationService;
 use App\Services\OfficerDeviceService;
@@ -31,6 +33,7 @@ class MobileV1Controller extends BaseController
     public function __construct(
         private OfficerDeviceService $deviceService,
         private EnrollmentFormSchemaService $schemaService,
+        private EnrollmentWindowService $enrollmentWindowService,
         private MobileEnrollmentService $mobileEnrollmentService,
         private PremiumCoverageService $premiumCoverageService,
         private NinVerificationService $ninVerificationService
@@ -70,6 +73,7 @@ class MobileV1Controller extends BaseController
 
         return $this->sendResponse([
             'server_time' => now()->toIso8601String(),
+            'enrollment_window' => $this->enrollmentWindowService->currentState(),
             'user' => $request->user()->load(['roles:id,name,label', 'roles.permissions:id,name,label,category']),
             'device' => $device,
             'officer_enrollment' => $scope,
@@ -114,6 +118,7 @@ class MobileV1Controller extends BaseController
 
         return $this->sendResponse([
             'server_time' => now()->toIso8601String(),
+            'enrollment_window' => $this->enrollmentWindowService->currentState(),
             'sync_mode' => $since ? 'incremental' : 'full',
             'officer_enrollment' => $scope,
             'insurance_programmes' => $this->changed(InsuranceProgramme::query()->orderBy('name'), $since)
@@ -323,16 +328,24 @@ class MobileV1Controller extends BaseController
             'gps' => ['nullable', 'array'],
         ]);
 
-        $result = $this->mobileEnrollmentService->syncBatch(
-            $request->user(),
-            $device,
-            $validated['records'],
-            [
-                'app_version' => $validated['app_version'] ?? null,
-                'gps' => $validated['gps'] ?? null,
-                'ip_address' => $request->ip(),
-            ]
-        );
+        try {
+            $result = $this->mobileEnrollmentService->syncBatch(
+                $request->user(),
+                $device,
+                $validated['records'],
+                [
+                    'app_version' => $validated['app_version'] ?? null,
+                    'gps' => $validated['gps'] ?? null,
+                    'ip_address' => $request->ip(),
+                ]
+            );
+        } catch (EnrollmentWindowClosedException $exception) {
+            return $this->sendError(
+                $exception->getMessage(),
+                ['enrollment_window' => $exception->windowState()],
+                422
+            );
+        }
 
         return $this->sendResponse($result, 'Mobile enrollment sync processed.', 202);
     }

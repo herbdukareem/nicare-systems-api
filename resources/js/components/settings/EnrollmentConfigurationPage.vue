@@ -9,6 +9,105 @@
       <v-btn color="primary" prepend-icon="mdi-plus" @click="openCreate">New schema</v-btn>
     </AppPageHeader>
 
+    <AppCard
+      title="Daily Enrollment Window"
+      subtitle="Define when officers can capture and queue mobile enrollments. The mobile form locks outside this window and the backend rejects new enrollment sync submissions too."
+      icon="mdi-clock-time-eight-outline"
+      tone="warning"
+    >
+      <template #actions>
+        <AppBadge :label="enrollmentWindowStatusLabel" :tone="enrollmentWindowStatusTone" size="sm" />
+        <v-btn
+          color="primary"
+          prepend-icon="mdi-content-save-outline"
+          :loading="windowSaving"
+          @click="saveEnrollmentWindow"
+        >
+          Save Window
+        </v-btn>
+      </template>
+
+      <div class="tw-space-y-4">
+        <div class="tw-flex tw-flex-col tw-gap-3 lg:tw-flex-row lg:tw-items-center lg:tw-justify-between">
+          <div class="tw-flex tw-items-start tw-gap-3">
+            <v-switch
+              v-model="enrollmentWindow.enabled"
+              color="primary"
+              hide-details
+              inset
+              label="Enforce daily time restriction"
+            />
+            <div class="tw-space-y-1">
+              <p class="tw-text-sm tw-font-medium tw-text-slate-800">The schedule is evaluated in {{ enrollmentWindow.timezone }}.</p>
+              <p class="tw-text-sm tw-text-slate-500">{{ enrollmentWindow.message }}</p>
+            </div>
+          </div>
+          <AppBadge :label="enrollmentWindow.timezone" tone="info" size="sm" />
+        </div>
+
+        <v-alert v-if="windowError" type="error" variant="tonal" density="compact">
+          {{ windowError }}
+        </v-alert>
+
+        <div class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-slate-50/70 tw-p-3">
+          <div class="tw-hidden tw-grid-cols-[minmax(0,1fr),auto,minmax(0,16rem),auto] tw-gap-3 tw-border-b tw-border-slate-200 tw-pb-2 md:tw-grid">
+            <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.16em] tw-text-slate-500">Day</p>
+            <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.16em] tw-text-slate-500">Open</p>
+            <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.16em] tw-text-slate-500">Window</p>
+            <p class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-[0.16em] tw-text-slate-500">Actions</p>
+          </div>
+
+          <div class="tw-space-y-3 md:tw-space-y-0">
+            <div
+              v-for="day in enrollmentWindowDays"
+              :key="day.key"
+              class="tw-grid tw-gap-3 tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-p-3 md:tw-grid-cols-[minmax(0,1fr),auto,minmax(0,16rem),auto] md:tw-items-center md:tw-rounded-none md:tw-border-0 md:tw-border-b md:tw-border-slate-200 md:tw-bg-transparent md:tw-px-0"
+            >
+              <div>
+                <p class="tw-text-sm tw-font-semibold tw-text-slate-900">{{ day.label }}</p>
+                <p class="tw-text-xs tw-text-slate-500">{{ dayPreviewLabel(day.key) }}</p>
+              </div>
+
+              <v-switch
+                v-model="enrollmentWindow.schedule[day.key].enabled"
+                color="primary"
+                density="compact"
+                hide-details
+                inset
+              />
+
+              <div class="tw-grid tw-grid-cols-2 tw-gap-2">
+                <v-text-field
+                  v-model="enrollmentWindow.schedule[day.key].start_time"
+                  label="Start"
+                  type="time"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  :disabled="!enrollmentWindow.schedule[day.key].enabled"
+                />
+                <v-text-field
+                  v-model="enrollmentWindow.schedule[day.key].end_time"
+                  label="End"
+                  type="time"
+                  variant="outlined"
+                  density="compact"
+                  hide-details
+                  :disabled="!enrollmentWindow.schedule[day.key].enabled"
+                />
+              </div>
+
+              <div class="tw-flex tw-justify-start md:tw-justify-end">
+                <v-btn size="small" variant="text" color="primary" @click="copyWindowToAll(day.key)">
+                  Use For All
+                </v-btn>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </AppCard>
+
     <AppDataTable
       v-model:page="page"
       v-model:items-per-page="perPage"
@@ -220,7 +319,26 @@ import AppCard from '../common/AppCard.vue'
 import AppDataTable from '../common/AppDataTable.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
 import AdminLayout from '../layout/AdminLayout.vue'
-import { enrollmentSchemaAPI, premiumAPI } from '../../utils/api'
+import { enrollmentSchemaAPI, enrollmentWindowSettingsAPI, premiumAPI } from '../../utils/api'
+
+const enrollmentWindowDays = [
+  { key: 'monday', label: 'Monday' },
+  { key: 'tuesday', label: 'Tuesday' },
+  { key: 'wednesday', label: 'Wednesday' },
+  { key: 'thursday', label: 'Thursday' },
+  { key: 'friday', label: 'Friday' },
+  { key: 'saturday', label: 'Saturday' },
+  { key: 'sunday', label: 'Sunday' },
+]
+
+const buildDefaultEnrollmentWindowSchedule = () => enrollmentWindowDays.reduce((schedule, day) => {
+  schedule[day.key] = {
+    enabled: true,
+    start_time: '08:00',
+    end_time: '17:00',
+  }
+  return schedule
+}, {})
 
 const headers = [
   { title: 'Name', key: 'name' },
@@ -247,12 +365,23 @@ const dialog = ref(false)
 const editingId = ref(null)
 const duplicateSourceId = ref(null)
 const formError = ref('')
+const windowSaving = ref(false)
+const windowError = ref('')
 const fieldsJson = ref('[]')
 const uiJson = ref('{}')
 const ninAutofillFieldsJson = ref('{}')
 const defaultNinPolicy = ref(null)
 const defaultLocationPolicy = ref(null)
 const defaultEnrollmentPhasePolicy = ref(null)
+const enrollmentWindow = reactive({
+  enabled: false,
+  timezone: 'Africa/Lagos',
+  schedule: buildDefaultEnrollmentWindowSchedule(),
+  is_open: true,
+  status: 'not_enforced',
+  today: null,
+  message: 'Daily enrollment time restriction is currently disabled.',
+})
 
 const metadata = reactive({
   insurance_programmes: [],
@@ -311,6 +440,19 @@ const dialogTitle = computed(() => {
   if (editingId.value) return 'Edit schema'
   if (duplicateSourceId.value) return 'Copy schema'
   return 'New schema'
+})
+const enrollmentWindowStatusTone = computed(() => {
+  if (!enrollmentWindow.enabled) return 'neutral'
+  return enrollmentWindow.is_open ? 'success' : 'warning'
+})
+const enrollmentWindowStatusLabel = computed(() => {
+  if (!enrollmentWindow.enabled) return 'Restriction disabled'
+  if (enrollmentWindow.is_open) {
+    return enrollmentWindow.today?.end_time
+      ? `Open now • closes ${enrollmentWindow.today.end_time}`
+      : 'Open now'
+  }
+  return 'Closed now'
 })
 const ninEditableFieldOptions = computed(() => {
   try {
@@ -397,6 +539,78 @@ const phasePolicyLabel = (policy = {}) => {
   if (policy?.mode === 'fixed') return 'Fixed phase'
   if (policy?.mode === 'select') return 'Officer selects phase'
   return 'Phase hidden'
+}
+
+const hydrateEnrollmentWindow = (payload = {}) => {
+  enrollmentWindow.enabled = Boolean(payload.enabled)
+  enrollmentWindow.timezone = payload.timezone || 'Africa/Lagos'
+  enrollmentWindowDays.forEach((day) => {
+    const dayPayload = payload.schedule?.[day.key] || {}
+    enrollmentWindow.schedule[day.key] = {
+      enabled: dayPayload.enabled !== false,
+      start_time: dayPayload.start_time || '08:00',
+      end_time: dayPayload.end_time || '17:00',
+    }
+  })
+  enrollmentWindow.is_open = payload.is_open !== false
+  enrollmentWindow.status = payload.status || (enrollmentWindow.enabled ? 'open' : 'not_enforced')
+  enrollmentWindow.today = payload.today || null
+  enrollmentWindow.message = payload.message || 'Daily enrollment time restriction is currently disabled.'
+}
+
+const loadEnrollmentWindow = async () => {
+  windowError.value = ''
+  try {
+    const response = await enrollmentWindowSettingsAPI.getConfig()
+    hydrateEnrollmentWindow(response.data?.data || {})
+  } catch (error) {
+    windowError.value = error.response?.data?.message || error.message || 'Unable to load enrollment window settings.'
+  }
+}
+
+const saveEnrollmentWindow = async () => {
+  windowSaving.value = true
+  windowError.value = ''
+  try {
+    const payload = {
+      enabled: enrollmentWindow.enabled,
+      timezone: enrollmentWindow.timezone,
+      schedule: enrollmentWindowDays.reduce((schedule, day) => {
+        schedule[day.key] = {
+          enabled: Boolean(enrollmentWindow.schedule[day.key]?.enabled),
+          start_time: enrollmentWindow.schedule[day.key]?.start_time || '',
+          end_time: enrollmentWindow.schedule[day.key]?.end_time || '',
+        }
+        return schedule
+      }, {}),
+    }
+
+    const response = await enrollmentWindowSettingsAPI.updateConfig(payload)
+    hydrateEnrollmentWindow(response.data?.data || payload)
+  } catch (error) {
+    windowError.value = error.response?.data?.message || error.message || 'Unable to save enrollment window settings.'
+  } finally {
+    windowSaving.value = false
+  }
+}
+
+const copyWindowToAll = (sourceDayKey) => {
+  const source = enrollmentWindow.schedule[sourceDayKey]
+  if (!source) return
+
+  enrollmentWindowDays.forEach((day) => {
+    enrollmentWindow.schedule[day.key] = {
+      enabled: Boolean(source.enabled),
+      start_time: source.start_time,
+      end_time: source.end_time,
+    }
+  })
+}
+
+const dayPreviewLabel = (dayKey) => {
+  const dayWindow = enrollmentWindow.schedule[dayKey]
+  if (!dayWindow?.enabled) return 'Closed'
+  return `${dayWindow.start_time} - ${dayWindow.end_time}`
 }
 
 const setPolicy = (policy = null, requiresNin = false) => {
@@ -573,7 +787,7 @@ const revokeSchema = async (item) => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadMetadata(), loadSchemas()])
+  await Promise.all([loadMetadata(), loadSchemas(), loadEnrollmentWindow()])
 })
 </script>
 

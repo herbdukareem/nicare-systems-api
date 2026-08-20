@@ -359,6 +359,11 @@ export const organizationSettingsAPI = {
   removeLogo: () => api.delete('/settings/organization/logo'),
 };
 
+export const enrollmentWindowSettingsAPI = {
+  getConfig: () => api.get('/settings/enrollment-window'),
+  updateConfig: (data) => api.put('/settings/enrollment-window', data),
+};
+
 export const enrollmentSchemaAPI = {
   list: (params) => api.get('/enrollment-form-schemas', { params }),
   get: (id) => api.get(`/enrollment-form-schemas/${id}`),
