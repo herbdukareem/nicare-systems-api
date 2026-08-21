@@ -6,18 +6,13 @@ use App\Http\Controllers\Api\V1\BaseController;
 use App\Models\OfficerEnrollmentAssignment;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 
 class OfficerEnrollmentAssignmentController extends BaseController
 {
     public function index(Request $request)
     {
-        $assignments = OfficerEnrollmentAssignment::with([
-            'officer:id,name,username,email,status,mobile_enrollment_disabled_at',
-            'lga:id,name,code',
-            'schema:id,name,version,status,insurance_programme_id,premium_plan_id',
-            'schema.programme:id,name,code',
-            'schema.plan:id,name,code',
-        ])
+        $assignments = OfficerEnrollmentAssignment::with($this->assignmentRelations())
             ->when($request->filled('user_id'), fn ($query) => $query->where('user_id', $request->integer('user_id')))
             ->when($request->filled('enabled'), fn ($query) => $query->where('enabled', $request->boolean('enabled')))
             ->latest()
@@ -65,12 +60,36 @@ class OfficerEnrollmentAssignmentController extends BaseController
     public function update(Request $request, OfficerEnrollmentAssignment $assignment)
     {
         $validated = $request->validate([
+            'user_id' => ['required', 'exists:users,id'],
+            'lga_id' => ['nullable', 'integer', 'exists:lgas,id'],
+            'enrollment_form_schema_id' => ['nullable', 'integer', 'exists:enrollment_form_schemas,id'],
             'enabled' => ['required', 'boolean'],
         ]);
 
-        $assignment->forceFill(['enabled' => $validated['enabled']])->save();
+        if ($this->assignmentExists(
+            (int) $validated['user_id'],
+            $validated['lga_id'] ?? null,
+            $validated['enrollment_form_schema_id'] ?? null,
+            $assignment->id
+        )) {
+            throw ValidationException::withMessages([
+                'assignment' => ['Another officer assignment already exists with this same LGA and enrollment configuration.'],
+            ]);
+        }
 
-        return $this->sendResponse($assignment->fresh(['lga:id,name,code', 'schema:id,name,version,status']), 'Officer enrollment assignment updated.');
+        $assignment->forceFill([
+            'user_id' => (int) $validated['user_id'],
+            'lga_id' => $validated['lga_id'] ?? null,
+            'enrollment_form_schema_id' => $validated['enrollment_form_schema_id'] ?? null,
+            'enabled' => (bool) $validated['enabled'],
+            'assigned_by' => $request->user()?->id,
+            'assigned_at' => now(),
+        ])->save();
+
+        return $this->sendResponse(
+            $assignment->fresh($this->assignmentRelations()),
+            'Officer enrollment assignment updated.'
+        );
     }
 
     public function destroy(OfficerEnrollmentAssignment $assignment)
@@ -97,5 +116,40 @@ class OfficerEnrollmentAssignmentController extends BaseController
         return $this->sendResponse($user->fresh(['roles:id,name,label']), $validated['enabled']
             ? 'Officer enrollment enabled.'
             : 'Officer enrollment disabled and active tokens revoked.');
+    }
+
+    private function assignmentRelations(): array
+    {
+        return [
+            'officer:id,name,username,email,status,mobile_enrollment_disabled_at',
+            'lga:id,name,code',
+            'schema:id,name,version,status,insurance_programme_id,premium_plan_id',
+            'schema.programme:id,name,code',
+            'schema.plan:id,name,code',
+        ];
+    }
+
+    private function assignmentExists(int $userId, mixed $lgaId, mixed $schemaId, int $ignoreId): bool
+    {
+        return OfficerEnrollmentAssignment::query()
+            ->where('id', '!=', $ignoreId)
+            ->where('user_id', $userId)
+            ->where(function ($query) use ($lgaId): void {
+                if ($lgaId === null) {
+                    $query->whereNull('lga_id');
+                    return;
+                }
+
+                $query->where('lga_id', $lgaId);
+            })
+            ->where(function ($query) use ($schemaId): void {
+                if ($schemaId === null) {
+                    $query->whereNull('enrollment_form_schema_id');
+                    return;
+                }
+
+                $query->where('enrollment_form_schema_id', $schemaId);
+            })
+            ->exists();
     }
 }

@@ -627,15 +627,14 @@ class CapitationService
         );
     }
 
-    public function getEnrolleeSnapshotExportRows(Capitation $capitation, array $filters = []): SupportCollection
+    public function getEnrolleeSnapshotExportQuery(Capitation $capitation, array $filters = []): EloquentBuilder
     {
         $this->ensureEnrolleeSnapshotsAvailable($capitation, $filters);
 
         return $this->enrolleeSnapshotQuery($capitation, $filters)
             ->orderBy('facility_name')
             ->orderBy('full_name')
-            ->orderBy('enrollee_number')
-            ->get();
+            ->orderBy('enrollee_number');
     }
 
     public function getEnrolleeSnapshotSummary(Capitation $capitation, array $filters = []): array

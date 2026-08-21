@@ -71,7 +71,7 @@ class EnrolleeController extends BaseController
         $includeDuplicateNin = $request->boolean('include_duplicate_nin', false);
 
         $perPage = (int) $request->get('per_page', 15);
-        $sortBy = $request->get('sort_by', 'created_at');
+        $sortBy = $request->get('sort_by', 'enrollment_date');
         $sortDirection = $request->get('sort_direction', 'desc');
 
         $enrollees = $this->enrolleeService->paginate($filters, $perPage, $sortBy, $sortDirection);

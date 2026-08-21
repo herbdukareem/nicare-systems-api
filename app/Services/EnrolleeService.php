@@ -76,7 +76,7 @@ class EnrolleeService
      * @param  string  $sortDirection
      * @return LengthAwarePaginator
      */
-    public function paginate(array $filters = [], int $perPage = 15, string $sortBy = 'created_at', string $sortDirection = 'desc'): LengthAwarePaginator
+    public function paginate(array $filters = [], int $perPage = 15, string $sortBy = 'enrollment_date', string $sortDirection = 'desc'): LengthAwarePaginator
     {
         $query = $this->query($filters);
 
@@ -143,8 +143,13 @@ class EnrolleeService
                 Facility::select('name')->whereColumn('facilities.id', 'enrollees.facility_id'),
                 $direction
             ),
+            'enrollment_date' => $query
+                ->orderByRaw('COALESCE(enrollment_date, created_at) ' . $direction)
+                ->orderBy('id', $direction),
             'created_at', 'created_date' => $query->orderBy('created_at', $direction),
-            default => $query->orderBy('created_at', 'desc'),
+            default => $query
+                ->orderByRaw('COALESCE(enrollment_date, created_at) desc')
+                ->orderByDesc('id'),
         };
     }
 

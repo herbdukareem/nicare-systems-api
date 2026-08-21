@@ -458,10 +458,10 @@ class CapitationController extends Controller
             'search' => ['nullable', 'string', 'max:255'],
         ]);
 
-        $rows = $this->service->getEnrolleeSnapshotExportRows($capitation, $validated);
+        $query = $this->service->getEnrolleeSnapshotExportQuery($capitation, $validated);
 
         return Excel::download(
-            new CapitationEnrolleeListExport($capitation, $rows),
+            new CapitationEnrolleeListExport($capitation, $query),
             'capitation_enrollee_list_' . $capitation->id . '_' . now()->format('Ymd_His') . '.xlsx'
         );
     }

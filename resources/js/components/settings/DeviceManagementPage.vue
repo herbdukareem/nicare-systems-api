@@ -6,7 +6,7 @@
         subtitle="Assign enrollment officers to LGAs and enrollment configurations, monitor devices, and revoke lost phones."
         icon="mdi-tablet-dashboard"
       >
-        <v-btn color="primary" prepend-icon="mdi-account-plus" @click="openAssignmentForm">Assign officer</v-btn>
+        <v-btn color="primary" prepend-icon="mdi-account-plus" @click="openCreateAssignmentForm">Assign officer</v-btn>
       </AppPageHeader>
 
       <AppTabs v-model="activeTab" :tabs="tabs">
@@ -54,8 +54,10 @@
         <template v-else>
           <div ref="assignmentFormSection">
             <AppCard
-              title="Officer Assignment"
-              subtitle="Choose the officer, allowed local governments, and the enrollment form schemas they can use in EES."
+              :title="isEditingAssignment ? 'Edit Officer Assignment' : 'Officer Assignment'"
+              :subtitle="isEditingAssignment
+                ? 'Update the officer, assigned local government, and enrollment configuration for this single assignment record.'
+                : 'Choose the officer, allowed local governments, and the enrollment form schemas they can use in EES.'"
               icon="mdi-account-check-outline"
             >
             <div class="tw-grid tw-grid-cols-1 tw-gap-3 lg:tw-grid-cols-4">
@@ -71,38 +73,50 @@
                 clearable
               />
               <v-autocomplete
-                v-model="assignmentForm.lga_ids"
+                v-model="assignmentLgaSelection"
                 :items="lgas"
                 item-title="name"
                 item-value="id"
-                label="Assigned LGAs"
+                :label="isEditingAssignment ? 'Assigned LGA' : 'Assigned LGAs'"
                 variant="outlined"
                 density="compact"
-                multiple
-                chips
-                closable-chips
+                :multiple="!isEditingAssignment"
+                :chips="!isEditingAssignment"
+                :closable-chips="!isEditingAssignment"
                 clearable
               />
               <v-autocomplete
-                v-model="assignmentForm.enrollment_form_schema_ids"
+                v-model="assignmentSchemaSelection"
                 :items="publishedSchemas"
                 :item-title="schemaLabel"
                 item-value="id"
-                label="Enrollment configurations"
+                :label="isEditingAssignment ? 'Enrollment configuration' : 'Enrollment configurations'"
                 variant="outlined"
                 density="compact"
-                multiple
-                chips
-                closable-chips
+                :multiple="!isEditingAssignment"
+                :chips="!isEditingAssignment"
+                :closable-chips="!isEditingAssignment"
                 clearable
               />
-              <div class="tw-flex tw-items-center tw-gap-3">
+              <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-3">
                 <v-switch v-model="assignmentForm.enabled" label="Assignment active" color="primary" hide-details />
-                <v-btn color="primary" :loading="savingAssignment" prepend-icon="mdi-content-save" @click="saveAssignment">Save</v-btn>
+                <v-btn color="primary" :loading="savingAssignment" prepend-icon="mdi-content-save" @click="saveAssignment">
+                  {{ isEditingAssignment ? 'Update assignment' : 'Save' }}
+                </v-btn>
+                <v-btn
+                  v-if="isEditingAssignment"
+                  variant="text"
+                  color="default"
+                  prepend-icon="mdi-close-circle-outline"
+                  @click="resetAssignmentForm"
+                >
+                  Cancel edit
+                </v-btn>
               </div>
             </div>
 
             <div class="tw-mt-3 tw-flex tw-flex-wrap tw-items-center tw-gap-2">
+              <AppBadge v-if="isEditingAssignment" label="Editing single assignment record" tone="warning" size="sm" />
               <AppBadge label="Empty LGA = all LGAs" tone="info" size="sm" />
               <AppBadge label="Empty configuration = all published mobile schemas" tone="info" size="sm" />
               <AppBadge v-if="selectedOfficer" :label="selectedOfficer.mobile_enrollment_enabled ? 'Officer enabled' : 'Officer disabled'" :tone="selectedOfficer.mobile_enrollment_enabled ? 'success' : 'danger'" size="sm" />
@@ -158,6 +172,15 @@
                 <v-btn
                   size="small"
                   variant="text"
+                  color="primary"
+                  prepend-icon="mdi-pencil-outline"
+                  @click="editAssignment(item)"
+                >
+                  Edit
+                </v-btn>
+                <v-btn
+                  size="small"
+                  variant="text"
                   :color="item.enabled ? 'warning' : 'primary'"
                   :prepend-icon="item.enabled ? 'mdi-pause-circle-outline' : 'mdi-play-circle-outline'"
                   @click="setAssignmentEnabled(item, !item.enabled)"
@@ -183,6 +206,7 @@
 
 <script setup>
 import { computed, nextTick, onMounted, reactive, ref } from 'vue'
+import { useToast } from '../../composables/useToast'
 import AppBadge from '../common/AppBadge.vue'
 import AppCard from '../common/AppCard.vue'
 import AppDataTable from '../common/AppDataTable.vue'
@@ -191,6 +215,8 @@ import AppPageHeader from '../common/AppPageHeader.vue'
 import AppTabs from '../common/AppTabs.vue'
 import AdminLayout from '../layout/AdminLayout.vue'
 import { enrollmentSchemaAPI, lgaAPI, officerDeviceAPI, userAPI } from '../../utils/api'
+
+const { success, error } = useToast()
 
 const activeTab = ref('devices')
 
@@ -223,6 +249,7 @@ const assignmentPerPage = ref(20)
 const loadingAssignments = ref(false)
 const savingAssignment = ref(false)
 const savingOfficerStatus = ref(false)
+const editingAssignmentId = ref(null)
 
 const officers = ref([])
 const lgas = ref([])
@@ -245,6 +272,36 @@ const tabs = computed(() => [
 const selectedOfficer = computed(() => officers.value.find((officer) => Number(officer.id) === Number(assignmentForm.user_id)) || null)
 const publishedSchemas = computed(() => schemas.value.filter((schema) => schema.status === 'published'))
 const assignableOfficerRoles = new Set(['enrollment-officer', 'mobile-enrollment-officer'])
+const isEditingAssignment = computed(() => editingAssignmentId.value !== null)
+
+const normalizeIdArray = (value) => {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => Number(item))
+      .filter((item) => Number.isFinite(item) && item > 0)
+  }
+
+  const normalized = Number(value)
+  return Number.isFinite(normalized) && normalized > 0 ? [normalized] : []
+}
+
+const assignmentLgaSelection = computed({
+  get: () => (isEditingAssignment.value ? assignmentForm.lga_ids[0] ?? null : assignmentForm.lga_ids),
+  set: (value) => {
+    assignmentForm.lga_ids = isEditingAssignment.value
+      ? normalizeIdArray(value).slice(0, 1)
+      : normalizeIdArray(value)
+  },
+})
+
+const assignmentSchemaSelection = computed({
+  get: () => (isEditingAssignment.value ? assignmentForm.enrollment_form_schema_ids[0] ?? null : assignmentForm.enrollment_form_schema_ids),
+  set: (value) => {
+    assignmentForm.enrollment_form_schema_ids = isEditingAssignment.value
+      ? normalizeIdArray(value).slice(0, 1)
+      : normalizeIdArray(value)
+  },
+})
 
 const pageItems = (response, nestedKey = null) => {
   const payload = response.data?.data
@@ -292,9 +349,29 @@ const schemaLabel = (schema) => {
   return `${schema.name || scope} · v${schema.version || 1}`
 }
 
+const extractErrorMessage = (err, fallback) => {
+  const validationErrors = err?.response?.data?.errors
+  if (validationErrors && typeof validationErrors === 'object') {
+    const firstValidationError = Object.values(validationErrors).flat().find(Boolean)
+    if (firstValidationError) {
+      return String(firstValidationError)
+    }
+  }
+
+  return err?.response?.data?.message || fallback
+}
+
 const focusAssignmentOfficerField = () => {
   assignmentOfficerField.value?.focus?.()
   assignmentOfficerField.value?.$el?.querySelector?.('input')?.focus?.()
+}
+
+const resetAssignmentForm = () => {
+  editingAssignmentId.value = null
+  assignmentForm.user_id = null
+  assignmentForm.lga_ids = []
+  assignmentForm.enrollment_form_schema_ids = []
+  assignmentForm.enabled = true
 }
 
 const openAssignmentForm = async () => {
@@ -302,6 +379,20 @@ const openAssignmentForm = async () => {
   await nextTick()
   assignmentFormSection.value?.scrollIntoView?.({ behavior: 'smooth', block: 'start' })
   focusAssignmentOfficerField()
+}
+
+const openCreateAssignmentForm = async () => {
+  resetAssignmentForm()
+  await openAssignmentForm()
+}
+
+const editAssignment = async (item) => {
+  editingAssignmentId.value = Number(item.id)
+  assignmentForm.user_id = Number(item.user_id || item.officer?.id || 0) || null
+  assignmentForm.lga_ids = item.lga_id ? [Number(item.lga_id)] : []
+  assignmentForm.enrollment_form_schema_ids = item.enrollment_form_schema_id ? [Number(item.enrollment_form_schema_id)] : []
+  assignmentForm.enabled = Boolean(item.enabled)
+  await openAssignmentForm()
 }
 
 const loadDevices = async () => {
@@ -347,37 +438,81 @@ const loadMetadata = async () => {
 }
 
 const revoke = async (item) => {
-  await officerDeviceAPI.revoke(item.id)
-  await loadDevices()
+  try {
+    await officerDeviceAPI.revoke(item.id)
+    success('Device revoked')
+    await loadDevices()
+  } catch (err) {
+    error(extractErrorMessage(err, 'Failed to revoke device'))
+  }
 }
 
 const saveAssignment = async () => {
-  if (!assignmentForm.user_id) return
+  if (!assignmentForm.user_id) {
+    error('Select an enrollment officer before saving.')
+    return
+  }
   savingAssignment.value = true
   try {
-    await officerDeviceAPI.assignEnrollment({
-      user_id: assignmentForm.user_id,
-      lga_ids: assignmentForm.lga_ids,
-      enrollment_form_schema_ids: assignmentForm.enrollment_form_schema_ids,
-      enabled: assignmentForm.enabled,
-    })
-    assignmentForm.lga_ids = []
-    assignmentForm.enrollment_form_schema_ids = []
-    assignmentForm.enabled = true
+    if (isEditingAssignment.value) {
+      await officerDeviceAPI.updateAssignment(editingAssignmentId.value, {
+        user_id: assignmentForm.user_id,
+        lga_id: assignmentForm.lga_ids[0] ?? null,
+        enrollment_form_schema_id: assignmentForm.enrollment_form_schema_ids[0] ?? null,
+        enabled: assignmentForm.enabled,
+      })
+      success('Officer assignment updated')
+      resetAssignmentForm()
+    } else {
+      await officerDeviceAPI.assignEnrollment({
+        user_id: assignmentForm.user_id,
+        lga_ids: assignmentForm.lga_ids,
+        enrollment_form_schema_ids: assignmentForm.enrollment_form_schema_ids,
+        enabled: assignmentForm.enabled,
+      })
+      success('Officer assignment saved')
+      assignmentForm.lga_ids = []
+      assignmentForm.enrollment_form_schema_ids = []
+      assignmentForm.enabled = true
+    }
+
     await loadAssignments()
+  } catch (err) {
+    error(extractErrorMessage(err, isEditingAssignment.value ? 'Failed to update officer assignment' : 'Failed to save officer assignment'))
   } finally {
     savingAssignment.value = false
   }
 }
 
 const setAssignmentEnabled = async (item, enabled) => {
-  await officerDeviceAPI.updateAssignment(item.id, { enabled })
-  await loadAssignments()
+  try {
+    await officerDeviceAPI.updateAssignment(item.id, {
+      user_id: item.user_id || item.officer?.id,
+      lga_id: item.lga_id ?? null,
+      enrollment_form_schema_id: item.enrollment_form_schema_id ?? null,
+      enabled,
+    })
+    if (Number(editingAssignmentId.value) === Number(item.id)) {
+      assignmentForm.enabled = Boolean(enabled)
+    }
+    success(enabled ? 'Assignment activated' : 'Assignment paused')
+    await loadAssignments()
+  } catch (err) {
+    error(extractErrorMessage(err, 'Failed to update assignment status'))
+  }
 }
 
 const removeAssignment = async (item) => {
-  await officerDeviceAPI.removeAssignment(item.id)
-  await loadAssignments()
+  try {
+    await officerDeviceAPI.removeAssignment(item.id)
+    if (Number(editingAssignmentId.value) === Number(item.id)) {
+      resetAssignmentForm()
+    }
+    success('Officer assignment removed')
+    await loadAssignments()
+  } catch (err) {
+    error(extractErrorMessage(err, 'Failed to remove officer assignment'))
+  }
 }
 
 const toggleSelectedOfficerStatus = async () => {
@@ -385,7 +520,10 @@ const toggleSelectedOfficerStatus = async () => {
   savingOfficerStatus.value = true
   try {
     await officerDeviceAPI.setEnrollmentStatus(selectedOfficer.value.id, !selectedOfficer.value.mobile_enrollment_enabled)
+    success(selectedOfficer.value.mobile_enrollment_enabled ? 'Officer disabled' : 'Officer enabled')
     await Promise.all([loadMetadata(), loadAssignments(), loadDevices()])
+  } catch (err) {
+    error(extractErrorMessage(err, 'Failed to update officer enrollment status'))
   } finally {
     savingOfficerStatus.value = false
   }

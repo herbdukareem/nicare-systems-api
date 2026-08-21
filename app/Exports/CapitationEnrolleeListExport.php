@@ -3,24 +3,25 @@
 namespace App\Exports;
 
 use App\Models\Capitation;
-use Illuminate\Support\Collection;
-use Maatwebsite\Excel\Concerns\FromCollection;
-use Maatwebsite\Excel\Concerns\ShouldAutoSize;
+use Illuminate\Database\Eloquent\Builder as EloquentBuilder;
+use Maatwebsite\Excel\Concerns\FromQuery;
+use Maatwebsite\Excel\Concerns\WithColumnWidths;
+use Maatwebsite\Excel\Concerns\WithCustomChunkSize;
 use Maatwebsite\Excel\Concerns\WithHeadings;
 use Maatwebsite\Excel\Concerns\WithMapping;
 use Maatwebsite\Excel\Concerns\WithTitle;
 
-class CapitationEnrolleeListExport implements FromCollection, WithHeadings, WithMapping, ShouldAutoSize, WithTitle
+class CapitationEnrolleeListExport implements FromQuery, WithHeadings, WithMapping, WithTitle, WithColumnWidths, WithCustomChunkSize
 {
     public function __construct(
         private readonly Capitation $capitation,
-        private readonly Collection $rows,
+        private readonly EloquentBuilder $query,
     ) {
     }
 
-    public function collection(): Collection
+    public function query(): EloquentBuilder
     {
-        return $this->rows;
+        return $this->query;
     }
 
     public function headings(): array
@@ -74,5 +75,34 @@ class CapitationEnrolleeListExport implements FromCollection, WithHeadings, With
     public function title(): string
     {
         return 'Enrollee Snapshot List';
+    }
+
+    public function chunkSize(): int
+    {
+        return 1000;
+    }
+
+    public function columnWidths(): array
+    {
+        return [
+            'A' => 28,
+            'B' => 24,
+            'C' => 36,
+            'D' => 18,
+            'E' => 18,
+            'F' => 14,
+            'G' => 32,
+            'H' => 18,
+            'I' => 18,
+            'J' => 12,
+            'K' => 16,
+            'L' => 18,
+            'M' => 18,
+            'N' => 16,
+            'O' => 16,
+            'P' => 16,
+            'Q' => 18,
+            'R' => 20,
+        ];
     }
 }

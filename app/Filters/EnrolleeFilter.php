@@ -161,10 +161,10 @@ class EnrolleeFilter
                     }
                     break;
                 case 'date_from':
-                    $query->whereDate(self::dateField($filters), '>=', $value);
+                    self::applyDateBoundary($query, $filters, '>=', $value);
                     break;
                 case 'date_to':
-                    $query->whereDate(self::dateField($filters), '<=', $value);
+                    self::applyDateBoundary($query, $filters, '<=', $value);
                     break;
                 case 'approval_date_from':
                     $query->whereDate('approval_date', '>=', $value);
@@ -219,6 +219,25 @@ class EnrolleeFilter
     {
         return in_array($filters['date_field'] ?? null, ['created_at', 'enrollment_date'], true)
             ? $filters['date_field']
-            : 'created_at';
+            : 'enrollment_date';
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     */
+    private static function applyDateBoundary(Builder $query, array $filters, string $operator, mixed $value): void
+    {
+        if (self::dateField($filters) !== 'enrollment_date') {
+            $query->whereDate('created_at', $operator, $value);
+            return;
+        }
+
+        $query->where(function (Builder $dateQuery) use ($operator, $value): void {
+            $dateQuery->whereDate('enrollment_date', $operator, $value)
+                ->orWhere(function (Builder $fallbackQuery) use ($operator, $value): void {
+                    $fallbackQuery->whereNull('enrollment_date')
+                        ->whereDate('created_at', $operator, $value);
+                });
+        });
     }
 }

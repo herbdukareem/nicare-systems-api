@@ -56,7 +56,7 @@ class EnrolleesExport implements FromCollection, WithHeadings, WithMapping, Shou
             'Enrollment Phase',
             'Status',
             'Coverage Status',
-            'Created At',
+            'Enrollment Date',
             'Updated At',
         ];
     }
@@ -84,7 +84,7 @@ class EnrolleesExport implements FromCollection, WithHeadings, WithMapping, Shou
             $enrollee->enrollmentPhase ? $enrollee->enrollmentPhase->name : '',
             $this->statusLabel((int) $enrollee->status),
             $this->coverageStatus($enrollee),
-            $enrollee->created_at ? $enrollee->created_at->format('Y-m-d H:i:s') : '',
+            ($enrollee->enrollment_date ?? $enrollee->created_at)?->format('Y-m-d H:i:s') ?? '',
             $enrollee->updated_at ? $enrollee->updated_at->format('Y-m-d H:i:s') : '',
         ];
     }
@@ -95,7 +95,7 @@ class EnrolleesExport implements FromCollection, WithHeadings, WithMapping, Shou
     private function applyFilters($query)
     {
         EnrolleeFilter::apply($query, $this->filters->all());
-        $query->orderBy('created_at', 'desc');
+        $query->orderByRaw('COALESCE(enrollment_date, created_at) desc')->orderByDesc('id');
     }
 
     private function statusLabel(int $status): string

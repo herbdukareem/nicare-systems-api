@@ -263,8 +263,8 @@
               size="sm"
             />
           </template>
-          <template #item.created_at="{ item }">
-            <DateDisplay :value="item.created_at" format="short" />
+          <template #item.enrollment_date="{ item }">
+            <DateDisplay :value="displayEnrollmentDate(item)" format="short" />
           </template>
           <template #item.actions="{ item }">
             <v-menu location="bottom end">
@@ -678,7 +678,7 @@ const filters = reactive({
   enrollment_phase_id: null,
   status: null,
   coverage_status: null,
-  date_field: 'created_at',
+  date_field: 'enrollment_date',
   date_from: '',
   date_to: '',
 })
@@ -714,7 +714,7 @@ const hasLoaded = ref(false)
 const loadError = ref('')
 const page = ref(1)
 const perPage = ref(50)
-const sortBy = ref('created_at')
+const sortBy = ref('enrollment_date')
 const sortDirection = ref('desc')
 
 const meta = reactive({ total: 0, from: null, to: null })
@@ -745,8 +745,8 @@ const manageableStatusOptions = [
 ]
 
 const dateFieldOptions = [
-  { title: 'Created Date', value: 'created_at' },
   { title: 'Enrollment Date', value: 'enrollment_date' },
+  { title: 'Record Created Date', value: 'created_at' },
 ]
 
 const sexOptions = [
@@ -843,7 +843,7 @@ const headers = [
   { title: 'Benefactor', key: 'benefactor', sortable: false },
   { title: 'Enrollment Phase', key: 'phase', sortable: false },
   { title: 'Status', key: 'status', sortable: false },
-  { title: 'Created Date', key: 'created_at', sortable: true },
+  { title: 'Enrollment Date', key: 'enrollment_date', sortable: true },
   { title: 'Actions', key: 'actions', align: 'end', sortable: false },
 ]
 
@@ -877,6 +877,7 @@ const responseSummary = (response) => {
 const formatNumber = (value) => Number(value || 0).toLocaleString()
 const formatDate = (value) => value ? new Date(`${String(value).slice(0, 10)}T00:00:00`).toLocaleDateString() : 'N/A'
 const relationName = (object) => object?.name || object?.full_name || null
+const displayEnrollmentDate = (enrollee) => enrollee?.enrollment_date || enrollee?.created_at || null
 const statusLabel = (status) => ({
   0: 'Pending Approval',
   1: 'Approved',
@@ -980,7 +981,7 @@ const detailGroups = computed(() => {
         { label: 'Enrollment Phase', value: relationName(enrollee.enrollment_phase) },
         { label: 'Status', value: enrollee.status_label || statusLabel(enrollee.status) },
         { label: 'Coverage', value: enrollee.coverage_label },
-        { label: 'Created', value: enrollee.created_at ? new Date(enrollee.created_at).toLocaleString() : null },
+        { label: 'Enrollment Date', value: displayEnrollmentDate(enrollee) ? new Date(displayEnrollmentDate(enrollee)).toLocaleString() : null },
       ],
     },
     {
@@ -1105,7 +1106,7 @@ const resetFilters = () => {
     enrollment_phase_id: null,
     status: null,
     coverage_status: null,
-    date_field: 'created_at',
+    date_field: 'enrollment_date',
     date_from: '',
     date_to: '',
   })
@@ -1118,7 +1119,7 @@ const resetFilters = () => {
 
 const handleSort = (items) => {
   const sort = Array.isArray(items) ? items[0] : null
-  sortBy.value = sort?.key || 'created_at'
+  sortBy.value = sort?.key || 'enrollment_date'
   sortDirection.value = sort?.order || 'desc'
   if (hasLoaded.value) loadPage()
 }
