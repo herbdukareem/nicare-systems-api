@@ -30,11 +30,12 @@
 
       <AppCard title="Approval Filters" icon="mdi-filter-outline" tone="primary">
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-2 xl:tw-grid-cols-4">
-          <v-select v-model="filters.programme_id" :items="metadata.insurance_programmes" item-title="name" item-value="id" label="Programme" density="compact" variant="outlined" clearable />
-          <v-select v-model="filters.facility_id" :items="metadata.facilities" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" clearable />
-          <v-select v-model="filters.benefactor_id" :items="metadata.benefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
-          <v-select v-model="filters.enrollment_phase_id" :items="metadata.enrollment_phases" item-title="name" item-value="id" label="Phase" density="compact" variant="outlined" clearable />
-          <v-select v-model="filters.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.programme_id" :items="metadata.insurance_programmes" item-title="name" item-value="id" label="Programme" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.facility_id" :items="metadata.facilities" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.benefactor_id" :items="metadata.benefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.enrollment_phase_id" :items="metadata.enrollment_phases" item-title="name" item-value="id" label="Phase" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding" density="compact" variant="outlined" clearable />
+          <v-text-field v-model="filters.nin" label="NIN" density="compact" variant="outlined" clearable />
           <v-text-field v-model="filters.date_from" label="Submitted from" type="date" density="compact" variant="outlined" clearable />
           <v-text-field v-model="filters.date_to" label="Submitted to" type="date" density="compact" variant="outlined" clearable />
           <v-select v-model="filters.sort" :items="sortOptions" item-title="label" item-value="value" label="Sort queue" density="compact" variant="outlined" />
@@ -706,6 +707,7 @@ const filters = reactive({
   benefactor_id: null,
   enrollment_phase_id: null,
   funding_type_id: null,
+  nin: '',
   date_from: '',
   date_to: '',
   sort: 'recent',
@@ -944,6 +946,7 @@ const clearFilters = () => {
   filters.benefactor_id = null
   filters.enrollment_phase_id = null
   filters.funding_type_id = null
+  filters.nin = ''
   filters.date_from = ''
   filters.date_to = ''
   filters.sort = 'recent'

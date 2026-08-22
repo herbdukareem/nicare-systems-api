@@ -455,6 +455,7 @@ class EnrolleeController extends BaseController
             'benefactor_id' => ['nullable', 'integer', 'exists:benefactors,id'],
             'funding_type_id' => ['nullable', 'integer', 'exists:funding_types,id'],
             'enrollment_phase_id' => ['nullable', 'integer', 'exists:enrollment_phases,id'],
+            'nin' => ['nullable', 'string'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'sort' => ['nullable', 'in:recent,older'],
@@ -484,6 +485,10 @@ class EnrolleeController extends BaseController
             if (array_key_exists($param, $validated) && filled($validated[$param])) {
                 $query->where($column, $validated[$param]);
             }
+        }
+
+        if (!empty($validated['nin'])) {
+            $query->where('nin', 'like', '%' . trim($validated['nin']) . '%');
         }
 
         if (!empty($validated['date_from'])) {
