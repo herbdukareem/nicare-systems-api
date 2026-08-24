@@ -20,6 +20,8 @@ use Maatwebsite\Excel\Facades\Excel;
 
 class EnrollmentIntelligenceController extends BaseController
 {
+    private const MINIMUM_INTELLIGENCE_DATE = '2026-08-03';
+
     public function __construct(private readonly NinProviderConfigService $ninProviderConfigService)
     {
     }
@@ -65,6 +67,17 @@ class EnrollmentIntelligenceController extends BaseController
             })
             ->count();
         $totalValue = (float) round((float) $this->enrollmentValueQuery($validated, $dateFrom, $dateTo)->sum('premium_plans.amount'), 2);
+        $totalNinValue = $this->ninValueFromCount($totalAttempts, $verificationValueAmount);
+        $summaryValueBreakdown = [
+            'captured' => $this->ninValueFromCount($capturedCount, $verificationValueAmount),
+            'pending_approval' => $this->ninValueFromCount($pendingApprovalCount, $verificationValueAmount),
+            'approved' => $this->ninValueFromCount($approvedCount, $verificationValueAmount),
+            'rejected' => $this->ninValueFromCount($rejectedCount, $verificationValueAmount),
+            'duplicates' => $this->ninValueFromCount($duplicateCount, $verificationValueAmount),
+            'total_attempts' => $this->ninValueFromCount($totalAttempts, $verificationValueAmount),
+            'verified' => $this->ninValueFromCount($verifiedCount, $verificationValueAmount),
+            'failed' => $this->ninValueFromCount($failedCount, $verificationValueAmount),
+        ];
 
         $trendRows = (clone $activityBase)
             ->selectRaw("DATE(nin_verified_at) as verification_date")
@@ -75,42 +88,69 @@ class EnrollmentIntelligenceController extends BaseController
             ->get()
             ->keyBy('verification_date');
 
-        $trendLabels = [];
-        $trendVerified = [];
-        $trendFailed = [];
-        $cursor = $dateFrom->copy();
-        while ($cursor->lte($dateTo)) {
-            $key = $cursor->toDateString();
-            $trendLabels[] = $cursor->format('d M');
-            $trendVerified[] = (int) data_get($trendRows, "{$key}.verified_count", 0);
-            $trendFailed[] = (int) data_get($trendRows, "{$key}.failed_count", 0);
-            $cursor->addDay();
-        }
-
         $enrollmentTrendRows = $this->enrollmentActivityQuery($validated, $dateFrom, $dateTo)
             ->selectRaw($this->captureDateSql() . ' as enrollment_date_key')
             ->selectRaw('COUNT(*) as captured_count')
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending_count', [Enrollee::STATUS_PENDING])
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as approved_count', [Enrollee::STATUS_ACTIVE])
             ->selectRaw('SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as rejected_count', [Enrollee::STATUS_REJECTED])
+            ->selectRaw($this->duplicateAggregateSql() . ' as duplicate_count')
             ->groupBy('enrollment_date_key')
             ->orderBy('enrollment_date_key')
             ->get()
             ->keyBy('enrollment_date_key');
 
+        $trendLabels = [];
+        $trendVerified = [];
+        $trendFailed = [];
         $enrollmentTrendCaptured = [];
         $enrollmentTrendPending = [];
         $enrollmentTrendApproved = [];
         $enrollmentTrendRejected = [];
+        $dailyOverviewRows = [];
+        $dailyOverviewGrandTotal = [
+            'captured' => 0,
+            'verified' => 0,
+            'failed' => 0,
+            'duplicates' => 0,
+            'nin_value' => 0,
+        ];
         $cursor = $dateFrom->copy();
         while ($cursor->lte($dateTo)) {
             $key = $cursor->toDateString();
+            $capturedForDay = (int) data_get($enrollmentTrendRows, "{$key}.captured_count", 0);
+            $verifiedForDay = (int) data_get($trendRows, "{$key}.verified_count", 0);
+            $failedForDay = (int) data_get($trendRows, "{$key}.failed_count", 0);
+            $duplicateForDay = (int) data_get($enrollmentTrendRows, "{$key}.duplicate_count", 0);
+            $ninValueForDay = $this->ninValueFromCount($verifiedForDay + $failedForDay, $verificationValueAmount);
+
+            $trendLabels[] = $cursor->format('d M');
+            $trendVerified[] = $verifiedForDay;
+            $trendFailed[] = $failedForDay;
             $enrollmentTrendCaptured[] = (int) data_get($enrollmentTrendRows, "{$key}.captured_count", 0);
             $enrollmentTrendPending[] = (int) data_get($enrollmentTrendRows, "{$key}.pending_count", 0);
             $enrollmentTrendApproved[] = (int) data_get($enrollmentTrendRows, "{$key}.approved_count", 0);
             $enrollmentTrendRejected[] = (int) data_get($enrollmentTrendRows, "{$key}.rejected_count", 0);
+
+            $dailyOverviewRows[] = [
+                'date' => $key,
+                'day' => $cursor->format('D, d M Y'),
+                'captured' => $capturedForDay,
+                'verified' => $verifiedForDay,
+                'failed' => $failedForDay,
+                'duplicates' => $duplicateForDay,
+                'nin_value' => $ninValueForDay,
+            ];
+
+            $dailyOverviewGrandTotal['captured'] += $capturedForDay;
+            $dailyOverviewGrandTotal['verified'] += $verifiedForDay;
+            $dailyOverviewGrandTotal['failed'] += $failedForDay;
+            $dailyOverviewGrandTotal['duplicates'] += $duplicateForDay;
+            $dailyOverviewGrandTotal['nin_value'] += $ninValueForDay;
             $cursor->addDay();
         }
+
+        $dailyOverviewGrandTotal['nin_value'] = (float) round($dailyOverviewGrandTotal['nin_value'], 2);
 
         $sourceBreakdown = (clone $activityBase)
             ->selectRaw("COALESCE(enrollment_source, 'unknown') as source, COUNT(*) as aggregate")
@@ -294,6 +334,7 @@ class EnrollmentIntelligenceController extends BaseController
                 'rejected' => $rejectedCount,
                 'duplicates' => $duplicateCount,
                 'total_value' => $totalValue,
+                'total_nin_value' => $totalNinValue,
                 'total_attempts' => $totalAttempts,
                 'verified' => $verifiedCount,
                 'failed' => $failedCount,
@@ -301,6 +342,8 @@ class EnrollmentIntelligenceController extends BaseController
                 'pending_backlog' => $pendingBacklog,
                 'distinct_nins' => $distinctNins,
                 'mobile_verified' => $mobileVerifiedCount,
+                'verification_value_amount' => $verificationValueAmount,
+                'value_breakdown' => $summaryValueBreakdown,
             ],
             'charts' => [
                 'trend' => [
@@ -342,6 +385,18 @@ class EnrollmentIntelligenceController extends BaseController
                 ],
             ],
             'tables' => [
+                'daily_overview' => [
+                    'data' => $dailyOverviewRows,
+                    'grand_total' => $dailyOverviewGrandTotal,
+                    'meta' => [
+                        'total' => count($dailyOverviewRows),
+                        'per_page' => count($dailyOverviewRows),
+                        'current_page' => 1,
+                        'last_page' => 1,
+                        'from' => count($dailyOverviewRows) > 0 ? 1 : null,
+                        'to' => count($dailyOverviewRows) > 0 ? count($dailyOverviewRows) : null,
+                    ],
+                ],
                 'recent_verifications' => [
                     'data' => $rows->items(),
                     'meta' => [
@@ -393,6 +448,10 @@ class EnrollmentIntelligenceController extends BaseController
                     ['label' => 'Failed', 'value' => Enrollee::NIN_VERIFICATION_FAILED],
                 ],
                 'providers' => $providerBreakdown,
+            ],
+            'constraints' => [
+                'minimum_date' => self::MINIMUM_INTELLIGENCE_DATE,
+                'maximum_date' => now()->toDateString(),
             ],
         ], 'NIN verification intelligence retrieved successfully.');
     }
@@ -698,6 +757,7 @@ class EnrollmentIntelligenceController extends BaseController
     private function resolveValidatedFilters(Request $request): array
     {
         $validated = $request->validate($this->filterRules());
+        $minimumDate = $this->minimumIntelligenceDate();
 
         $dateTo = !empty($validated['date_to'])
             ? Carbon::parse($validated['date_to'])->endOfDay()
@@ -705,6 +765,7 @@ class EnrollmentIntelligenceController extends BaseController
         $dateFrom = !empty($validated['date_from'])
             ? Carbon::parse($validated['date_from'])->startOfDay()
             : $dateTo->copy()->subDays(29)->startOfDay();
+        $dateFrom = $dateFrom->lt($minimumDate) ? $minimumDate->copy() : $dateFrom;
 
         return [$validated, $dateFrom, $dateTo];
     }
@@ -715,8 +776,8 @@ class EnrollmentIntelligenceController extends BaseController
     private function filterRules(): array
     {
         return [
-            'date_from' => ['nullable', 'date'],
-            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            'date_from' => ['nullable', 'date', 'after_or_equal:' . self::MINIMUM_INTELLIGENCE_DATE],
+            'date_to' => ['nullable', 'date', 'after_or_equal:date_from', 'after_or_equal:' . self::MINIMUM_INTELLIGENCE_DATE],
             'lga_id' => ['nullable', 'exists:lgas,id'],
             'facility_id' => ['nullable', 'exists:facilities,id'],
             'source' => ['nullable', Rule::in(['mobile_officer', 'self_service', 'staff'])],
@@ -744,5 +805,22 @@ class EnrollmentIntelligenceController extends BaseController
         }
 
         return (string) (Facility::query()->whereKey($facilityId)->value('name') ?: 'Selected');
+    }
+
+    private function duplicateAggregateSql(): string
+    {
+        return Schema::hasColumn('enrollees', 'has_duplicate_nin')
+            ? 'SUM(CASE WHEN enrollees.is_possible_duplicate = 1 OR enrollees.has_duplicate_nin = 1 THEN 1 ELSE 0 END)'
+            : 'SUM(CASE WHEN enrollees.is_possible_duplicate = 1 THEN 1 ELSE 0 END)';
+    }
+
+    private function ninValueFromCount(int $count, float $verificationValueAmount): float
+    {
+        return (float) round($count * $verificationValueAmount, 2);
+    }
+
+    private function minimumIntelligenceDate(): Carbon
+    {
+        return Carbon::parse(self::MINIMUM_INTELLIGENCE_DATE)->startOfDay();
     }
 }

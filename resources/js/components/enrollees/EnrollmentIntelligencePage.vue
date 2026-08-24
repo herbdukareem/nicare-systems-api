@@ -14,20 +14,23 @@
       </AppPageHeader>
 
       <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-3 xl:tw-grid-cols-4 2xl:tw-grid-cols-8">
-        <AppStatCard compact label="Captured" icon="mdi-account-plus-outline" color="primary" :value="summary.captured" :loading="loading" />
-        <AppStatCard compact label="Pending Approval" icon="mdi-timer-sand" color="warning" :value="summary.pending_approval" :loading="loading" />
-        <AppStatCard compact label="Approved" icon="mdi-check-decagram-outline" color="success" :value="summary.approved" :loading="loading" />
-        <AppStatCard compact label="Rejected" icon="mdi-close-octagon-outline" color="danger" :value="summary.rejected" :loading="loading" />
-        <AppStatCard compact label="Duplicates" icon="mdi-content-duplicate" color="secondary" :value="summary.duplicates" :loading="loading" />
-        <AppStatCard compact label="NIN Attempts" icon="mdi-timeline-check-outline" color="info" :value="summary.total_attempts" :loading="loading" />
-        <AppStatCard compact label="NIN Verified" icon="mdi-card-account-details-outline" color="success" :value="summary.verified" :loading="loading" />
-        <AppStatCard compact label="Enrollment Value" icon="mdi-cash-multiple" color="secondary" :value="summary.total_value" :loading="loading" currency />
+        <AppStatCard
+          v-for="card in summaryCards"
+          :key="card.key"
+          compact
+          :label="card.label"
+          :icon="card.icon"
+          :color="card.color"
+          :value="card.count"
+          :sub-label="`NIN value ${formatCurrency(card.ninValue)}`"
+          :loading="loading"
+        />
       </div>
 
       <AppCard title="Filters" icon="mdi-filter-variant" tone="primary">
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-2 xl:tw-grid-cols-6">
-          <v-text-field v-model="filters.date_from" label="Date from" type="date" density="compact" variant="outlined" hide-details />
-          <v-text-field v-model="filters.date_to" label="Date to" type="date" density="compact" variant="outlined" hide-details />
+          <v-text-field v-model="filters.date_from" label="Date from" type="date" density="compact" variant="outlined" hide-details :min="dateBounds.minimum" :max="dateBounds.maximum" />
+          <v-text-field v-model="filters.date_to" label="Date to" type="date" density="compact" variant="outlined" hide-details :min="filters.date_from || dateBounds.minimum" :max="dateBounds.maximum" />
           <v-select v-model="filters.lga_id" :items="lookups.lgas" item-title="name" item-value="id" label="LGA" density="compact" variant="outlined" clearable hide-details />
           <v-select v-model="filters.facility_id" :items="facilityOptions" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" clearable hide-details />
           <v-select v-model="filters.source" :items="lookups.sources" item-title="label" item-value="value" label="Enrollment source" density="compact" variant="outlined" clearable hide-details />
@@ -50,13 +53,83 @@
 
         <v-window v-model="activeTab" class="tw-mt-4">
           <v-window-item value="overview">
-            <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.4fr_0.9fr]">
-              <AppCard title="Enrollment Progress Trend" icon="mdi-chart-line" tone="primary">
-                <LineChart :data="enrollmentTrendChartData" :height="300" />
-              </AppCard>
+            <div class="tw-space-y-5">
+              <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.4fr_0.9fr]">
+                <AppCard title="Enrollment Progress Trend" icon="mdi-chart-line" tone="primary">
+                  <LineChart :data="enrollmentTrendChartData" :height="300" />
+                </AppCard>
 
-              <AppCard title="Progress Mix" icon="mdi-chart-donut" tone="success">
-                <DoughnutChart :data="statusChartData" :height="300" />
+                <AppCard title="Progress Mix" icon="mdi-chart-donut" tone="success">
+                  <DoughnutChart :data="statusChartData" :height="300" />
+                </AppCard>
+              </div>
+
+              <AppCard title="Daily Overview Table" icon="mdi-calendar-month-outline" tone="secondary">
+                <AppDataTable
+                  :headers="dailyOverviewHeaders"
+                  :items="dailyOverviewTable.rows"
+                  :items-length="dailyOverviewTable.total"
+                  :loading="loading"
+                  :items-per-page="dailyOverviewTable.perPage"
+                  :per-page-options="[15, 31, 62, 100]"
+                >
+                  <template #toolbar>
+                    <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-text-slate-500">
+                      <span class="tw-rounded-full tw-bg-slate-200 tw-px-2.5 tw-py-1 tw-font-semibold tw-text-slate-700">
+                        {{ dailyOverviewTable.total }} day{{ dailyOverviewTable.total === 1 ? '' : 's' }}
+                      </span>
+                      <span>{{ activeDateRangeLabel }}</span>
+                    </div>
+                  </template>
+
+                  <template #item.captured="{ item }">
+                    <span class="tw-font-medium tw-text-slate-900">{{ Number(item.captured || 0).toLocaleString() }}</span>
+                  </template>
+
+                  <template #item.verified="{ item }">
+                    <span class="tw-font-medium tw-text-emerald-700">{{ Number(item.verified || 0).toLocaleString() }}</span>
+                  </template>
+
+                  <template #item.failed="{ item }">
+                    <span class="tw-font-medium tw-text-rose-700">{{ Number(item.failed || 0).toLocaleString() }}</span>
+                  </template>
+
+                  <template #item.duplicates="{ item }">
+                    <span class="tw-font-medium tw-text-amber-700">{{ Number(item.duplicates || 0).toLocaleString() }}</span>
+                  </template>
+
+                  <template #item.nin_value="{ item }">
+                    <span class="tw-font-medium tw-text-slate-900">{{ formatCurrency(item.nin_value) }}</span>
+                  </template>
+                </AppDataTable>
+
+                <div class="tw-mt-4 tw-overflow-hidden tw-rounded-lg tw-border tw-border-slate-200">
+                  <div class="tw-grid tw-gap-px tw-bg-slate-200 lg:tw-grid-cols-[1.25fr_repeat(5,minmax(0,1fr))]">
+                    <div class="tw-bg-slate-900 tw-px-4 tw-py-3 tw-text-sm tw-font-semibold tw-uppercase tw-tracking-[0.18em] tw-text-white">
+                      Grand Total
+                    </div>
+                    <div class="tw-bg-white tw-px-4 tw-py-3">
+                      <p class="tw-text-[11px] tw-font-medium tw-uppercase tw-tracking-[0.18em] tw-text-slate-500">Captured</p>
+                      <p class="tw-mt-1 tw-text-lg tw-font-semibold tw-text-slate-900">{{ Number(dailyOverviewTable.grandTotal.captured || 0).toLocaleString() }}</p>
+                    </div>
+                    <div class="tw-bg-white tw-px-4 tw-py-3">
+                      <p class="tw-text-[11px] tw-font-medium tw-uppercase tw-tracking-[0.18em] tw-text-slate-500">Verified</p>
+                      <p class="tw-mt-1 tw-text-lg tw-font-semibold tw-text-emerald-700">{{ Number(dailyOverviewTable.grandTotal.verified || 0).toLocaleString() }}</p>
+                    </div>
+                    <div class="tw-bg-white tw-px-4 tw-py-3">
+                      <p class="tw-text-[11px] tw-font-medium tw-uppercase tw-tracking-[0.18em] tw-text-slate-500">Failed</p>
+                      <p class="tw-mt-1 tw-text-lg tw-font-semibold tw-text-rose-700">{{ Number(dailyOverviewTable.grandTotal.failed || 0).toLocaleString() }}</p>
+                    </div>
+                    <div class="tw-bg-white tw-px-4 tw-py-3">
+                      <p class="tw-text-[11px] tw-font-medium tw-uppercase tw-tracking-[0.18em] tw-text-slate-500">Duplicates</p>
+                      <p class="tw-mt-1 tw-text-lg tw-font-semibold tw-text-amber-700">{{ Number(dailyOverviewTable.grandTotal.duplicates || 0).toLocaleString() }}</p>
+                    </div>
+                    <div class="tw-bg-white tw-px-4 tw-py-3">
+                      <p class="tw-text-[11px] tw-font-medium tw-uppercase tw-tracking-[0.18em] tw-text-slate-500">Total NIN Value</p>
+                      <p class="tw-mt-1 tw-text-lg tw-font-semibold tw-text-slate-900">{{ formatCurrency(dailyOverviewTable.grandTotal.nin_value) }}</p>
+                    </div>
+                  </div>
+                </div>
               </AppCard>
             </div>
           </v-window-item>
@@ -238,12 +311,18 @@ const { error } = useToast()
 const loading = ref(false)
 const exporting = ref(false)
 const activeTab = ref('overview')
+const MINIMUM_INTELLIGENCE_DATE = '2026-08-03'
 
 const lookups = reactive({
   lgas: [],
   facilities: [],
   sources: [],
   statuses: [],
+})
+
+const dateBounds = reactive({
+  minimum: MINIMUM_INTELLIGENCE_DATE,
+  maximum: formatDateInput(new Date()),
 })
 
 const filters = reactive(defaultFilters())
@@ -254,6 +333,7 @@ const summary = reactive({
   rejected: 0,
   duplicates: 0,
   total_value: 0,
+  total_nin_value: 0,
   total_attempts: 0,
   verified: 0,
   failed: 0,
@@ -261,6 +341,8 @@ const summary = reactive({
   pending_backlog: 0,
   distinct_nins: 0,
   mobile_verified: 0,
+  verification_value_amount: 0,
+  value_breakdown: defaultValueBreakdown(),
 })
 
 const charts = reactive({
@@ -293,6 +375,19 @@ const officerTable = reactive({
   rows: [],
   total: 0,
   perPage: 25,
+})
+
+const dailyOverviewTable = reactive({
+  rows: [],
+  total: 0,
+  perPage: 31,
+  grandTotal: {
+    captured: 0,
+    verified: 0,
+    failed: 0,
+    duplicates: 0,
+    nin_value: 0,
+  },
 })
 
 const verificationHeaders = [
@@ -331,14 +426,45 @@ const officerHeaders = [
   { title: 'Value', key: 'value', sortable: false },
 ]
 
+const dailyOverviewHeaders = [
+  { title: 'Day', key: 'day', sortable: false },
+  { title: 'Total Captured', key: 'captured', sortable: false },
+  { title: 'Total Verified', key: 'verified', sortable: false },
+  { title: 'Total Failed', key: 'failed', sortable: false },
+  { title: 'Total Duplicate', key: 'duplicates', sortable: false },
+  { title: 'Total NIN Value', key: 'nin_value', sortable: false },
+]
+
+function formatDateInput(date) {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+function defaultValueBreakdown() {
+  return {
+    captured: 0,
+    pending_approval: 0,
+    approved: 0,
+    rejected: 0,
+    duplicates: 0,
+    total_attempts: 0,
+    verified: 0,
+    failed: 0,
+  }
+}
+
 function defaultFilters() {
   const today = new Date()
-  const end = today.toISOString().slice(0, 10)
+  const end = formatDateInput(today)
+  const minimumDate = new Date(`${MINIMUM_INTELLIGENCE_DATE}T00:00:00`)
   const startDate = new Date(today)
   startDate.setDate(startDate.getDate() - 29)
+  const effectiveStart = startDate < minimumDate ? minimumDate : startDate
 
   return {
-    date_from: startDate.toISOString().slice(0, 10),
+    date_from: formatDateInput(effectiveStart),
     date_to: end,
     lga_id: null,
     facility_id: null,
@@ -354,6 +480,16 @@ const facilityOptions = computed(() => {
 })
 
 const activeDateRangeLabel = computed(() => `Showing intelligence from ${filters.date_from} to ${filters.date_to}`)
+const summaryCards = computed(() => [
+  { key: 'captured', label: 'Captured', icon: 'mdi-account-plus-outline', color: 'primary', count: summary.captured, ninValue: summary.value_breakdown?.captured ?? 0 },
+  { key: 'pending_approval', label: 'Pending Approval', icon: 'mdi-timer-sand', color: 'warning', count: summary.pending_approval, ninValue: summary.value_breakdown?.pending_approval ?? 0 },
+  { key: 'approved', label: 'Approved', icon: 'mdi-check-decagram-outline', color: 'success', count: summary.approved, ninValue: summary.value_breakdown?.approved ?? 0 },
+  { key: 'rejected', label: 'Rejected', icon: 'mdi-close-octagon-outline', color: 'danger', count: summary.rejected, ninValue: summary.value_breakdown?.rejected ?? 0 },
+  { key: 'duplicates', label: 'Duplicates', icon: 'mdi-content-duplicate', color: 'secondary', count: summary.duplicates, ninValue: summary.value_breakdown?.duplicates ?? 0 },
+  { key: 'total_attempts', label: 'NIN Attempts', icon: 'mdi-timeline-check-outline', color: 'info', count: summary.total_attempts, ninValue: summary.value_breakdown?.total_attempts ?? 0 },
+  { key: 'verified', label: 'NIN Verified', icon: 'mdi-card-account-details-outline', color: 'success', count: summary.verified, ninValue: summary.value_breakdown?.verified ?? 0 },
+  { key: 'failed', label: 'Total Failed', icon: 'mdi-alert-circle-outline', color: 'danger', count: summary.failed, ninValue: summary.value_breakdown?.failed ?? 0 },
+])
 
 const enrollmentTrendChartData = computed(() => ({
   labels: charts.enrollment_trend.labels || [],
@@ -493,11 +629,31 @@ const formatCurrency = (value) => {
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
     currency: 'NGN',
-    maximumFractionDigits: 0,
+    maximumFractionDigits: 2,
   }).format(Number(value || 0))
 }
 
+const normalizeDateFilters = () => {
+  if (filters.date_from && filters.date_from < dateBounds.minimum) {
+    filters.date_from = dateBounds.minimum
+  }
+
+  if (filters.date_from && filters.date_from > dateBounds.maximum) {
+    filters.date_from = dateBounds.maximum
+  }
+
+  if (filters.date_to && filters.date_to > dateBounds.maximum) {
+    filters.date_to = dateBounds.maximum
+  }
+
+  if (filters.date_to && filters.date_to < (filters.date_from || dateBounds.minimum)) {
+    filters.date_to = filters.date_from || dateBounds.minimum
+  }
+}
+
 const buildParams = () => {
+  normalizeDateFilters()
+
   const params = {
     ...filters,
     page: verificationTable.page,
@@ -514,9 +670,28 @@ const buildParams = () => {
 }
 
 const applyResponse = (payload = {}) => {
+  if (payload.constraints?.minimum_date) {
+    dateBounds.minimum = payload.constraints.minimum_date
+  }
+  if (payload.constraints?.maximum_date) {
+    dateBounds.maximum = payload.constraints.maximum_date
+  }
+
   Object.assign(summary, payload.summary || {})
   Object.assign(charts, payload.charts || {})
   Object.assign(lookups, payload.lookups || {})
+
+  const dailyOverviewPayload = payload.tables?.daily_overview || {}
+  dailyOverviewTable.rows = dailyOverviewPayload.data || []
+  dailyOverviewTable.total = Number(dailyOverviewPayload.meta?.total || dailyOverviewTable.rows.length || 0)
+  dailyOverviewTable.perPage = Number(dailyOverviewPayload.meta?.per_page || dailyOverviewTable.perPage)
+  Object.assign(dailyOverviewTable.grandTotal, {
+    captured: 0,
+    verified: 0,
+    failed: 0,
+    duplicates: 0,
+    nin_value: 0,
+  }, dailyOverviewPayload.grand_total || {})
 
   const verificationPayload = payload.tables?.recent_verifications || payload.table || {}
   verificationTable.rows = verificationPayload.data || []
