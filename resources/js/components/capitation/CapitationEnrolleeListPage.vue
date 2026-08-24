@@ -63,7 +63,7 @@
             Load Enrollee List
           </v-btn>
           <AppExportButton
-            label="Export Excel"
+            label="Export CSV"
             :loading="exporting"
             :disabled="!canExport"
             @click="exportSnapshots"
@@ -315,17 +315,20 @@ const exportSnapshots = async () => {
       search: filters.search || undefined,
     })
 
-    const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const contentType = response.headers?.['content-type'] || 'text/csv;charset=utf-8'
+    const blob = response.data instanceof Blob
+      ? response.data
+      : new Blob([response.data], { type: contentType })
     const url = URL.createObjectURL(blob)
     const disposition = response.headers?.['content-disposition'] || ''
-    const filename = disposition.match(/filename=\"?([^\"]+)\"?/i)?.[1] || `capitation_enrollee_list_${filters.periodId}.xlsx`
+    const filename = disposition.match(/filename=\"?([^\"]+)\"?/i)?.[1] || `capitation_enrollee_list_${filters.periodId}.csv`
     const link = document.createElement('a')
     link.href = url
     link.download = filename
     link.click()
     URL.revokeObjectURL(url)
   } catch (err) {
-    error('Unable to export the capitation enrollee snapshot.')
+    error(err?.response?.data?.message || 'Unable to export the capitation enrollee snapshot.')
   } finally {
     exporting.value = false
   }

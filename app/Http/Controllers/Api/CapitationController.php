@@ -459,11 +459,38 @@ class CapitationController extends Controller
         ]);
 
         $query = $this->service->getEnrolleeSnapshotExportQuery($capitation, $validated);
+        $export = new CapitationEnrolleeListExport($capitation, $query);
+        $filename = 'capitation_enrollee_list_' . $capitation->id . '_' . now()->format('Ymd_His') . '.csv';
 
-        return Excel::download(
-            new CapitationEnrolleeListExport($capitation, $query),
-            'capitation_enrollee_list_' . $capitation->id . '_' . now()->format('Ymd_His') . '.xlsx'
-        );
+        return response()->streamDownload(function () use ($query, $export): void {
+            if (function_exists('set_time_limit')) {
+                @set_time_limit(0);
+            }
+
+            ignore_user_abort(true);
+
+            $handle = fopen('php://output', 'wb');
+            if ($handle === false) {
+                throw new \RuntimeException('Unable to open export output stream.');
+            }
+
+            // Excel opens UTF-8 CSV cleanly when the BOM is present.
+            fwrite($handle, "\xEF\xBB\xBF");
+            fputcsv($handle, $export->headings());
+
+            foreach ($query->cursor() as $row) {
+                fputcsv($handle, $export->map($row));
+            }
+
+            fclose($handle);
+        }, $filename, [
+            'Content-Type' => 'text/csv; charset=UTF-8',
+            'Cache-Control' => 'no-store, no-cache, must-revalidate, max-age=0',
+            'Pragma' => 'no-cache',
+            'Expires' => '0',
+            'X-Accel-Buffering' => 'no',
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
     }
 
     /**
