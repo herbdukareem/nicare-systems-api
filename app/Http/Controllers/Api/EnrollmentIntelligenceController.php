@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\V1\BaseController;
 use App\Models\Enrollee;
 use App\Models\Facility;
 use App\Models\Lga;
+use App\Models\MobileEnrollmentRecord;
 use App\Models\User;
 use App\Models\Ward;
 use App\Services\NinProviderConfigService;
@@ -66,6 +67,8 @@ class EnrollmentIntelligenceController extends BaseController
                 }
             })
             ->count();
+        $mobileDuplicateCount = (clone $this->mobileDuplicateRecordsQuery($validated, $dateFrom, $dateTo))->count();
+        $duplicateCount += $mobileDuplicateCount;
         $totalValue = (float) round((float) $this->enrollmentValueQuery($validated, $dateFrom, $dateTo)->sum('premium_plans.amount'), 2);
         $totalNinValue = $this->ninValueFromCount($totalAttempts, $verificationValueAmount);
         $summaryValueBreakdown = [
@@ -100,6 +103,14 @@ class EnrollmentIntelligenceController extends BaseController
             ->get()
             ->keyBy('enrollment_date_key');
 
+        $mobileDuplicateRows = $this->mobileDuplicateRecordsQuery($validated, $dateFrom, $dateTo)
+            ->selectRaw("DATE(COALESCE(captured_at, received_at)) as duplicate_date_key")
+            ->selectRaw('COUNT(*) as duplicate_count')
+            ->groupBy('duplicate_date_key')
+            ->orderBy('duplicate_date_key')
+            ->get()
+            ->keyBy('duplicate_date_key');
+
         $trendLabels = [];
         $trendVerified = [];
         $trendFailed = [];
@@ -121,7 +132,8 @@ class EnrollmentIntelligenceController extends BaseController
             $capturedForDay = (int) data_get($enrollmentTrendRows, "{$key}.captured_count", 0);
             $verifiedForDay = (int) data_get($trendRows, "{$key}.verified_count", 0);
             $failedForDay = (int) data_get($trendRows, "{$key}.failed_count", 0);
-            $duplicateForDay = (int) data_get($enrollmentTrendRows, "{$key}.duplicate_count", 0);
+            $duplicateForDay = (int) data_get($enrollmentTrendRows, "{$key}.duplicate_count", 0)
+                + (int) data_get($mobileDuplicateRows, "{$key}.duplicate_count", 0);
             $ninValueForDay = $this->ninValueFromCount($verifiedForDay + $failedForDay, $verificationValueAmount);
 
             $trendLabels[] = $cursor->format('d M');
@@ -493,6 +505,7 @@ class EnrollmentIntelligenceController extends BaseController
                 }
             })
             ->count();
+        $duplicateCount += (clone $this->mobileDuplicateRecordsQuery($validated, $dateFrom, $dateTo))->count();
         $totalValue = (float) round((float) $this->enrollmentValueQuery($validated, $dateFrom, $dateTo)->sum('premium_plans.amount'), 2);
 
         $summaryRows = [
@@ -664,6 +677,48 @@ class EnrollmentIntelligenceController extends BaseController
     {
         return $this->enrollmentActivityQuery($filters, $dateFrom, $dateTo)
             ->leftJoin('premium_plans', 'premium_plans.id', '=', 'enrollees.premium_plan_id');
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     */
+    private function mobileDuplicateRecordsQuery(array $filters, Carbon $dateFrom, Carbon $dateTo): Builder
+    {
+        $query = MobileEnrollmentRecord::query()
+            ->where('status', MobileEnrollmentRecord::STATUS_DUPLICATE_SUSPECTED)
+            ->where(function (Builder $dateQuery) use ($dateFrom, $dateTo): void {
+                $dateQuery->whereBetween('captured_at', [$dateFrom, $dateTo])
+                    ->orWhere(function (Builder $fallbackQuery) use ($dateFrom, $dateTo): void {
+                        $fallbackQuery->whereNull('captured_at')
+                            ->whereBetween('received_at', [$dateFrom, $dateTo]);
+                    });
+            });
+
+        if (!empty($filters['source']) && $filters['source'] !== 'mobile_officer') {
+            return $query->whereKey(-1);
+        }
+
+        if (!empty($filters['provider'])) {
+            return $query->whereKey(-1);
+        }
+
+        if (!empty($filters['lga_id'])) {
+            $lgaId = (int) $filters['lga_id'];
+            $query->where(function (Builder $lgaQuery) use ($lgaId): void {
+                $lgaQuery->where('core_data->lga_id', $lgaId)
+                    ->orWhere('payload->data->lga_id', $lgaId);
+            });
+        }
+
+        if (!empty($filters['facility_id'])) {
+            $facilityId = (int) $filters['facility_id'];
+            $query->where(function (Builder $facilityQuery) use ($facilityId): void {
+                $facilityQuery->where('core_data->facility_id', $facilityId)
+                    ->orWhere('payload->data->facility_id', $facilityId);
+            });
+        }
+
+        return $query;
     }
 
     /**
