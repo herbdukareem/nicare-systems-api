@@ -5,9 +5,11 @@ namespace App\Http\Controllers\Api;
 use App\Exceptions\CapitationComputationException;
 use App\Exports\CapitationBreakdownExport;
 use App\Exports\CapitationEnrolleeListExport;
+use App\Exports\CapitationHistoricalPaymentReportExport;
 use App\Exports\CapitationPaymentReportExport;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\CapitationBatchRequest;
+use App\Http\Requests\CapitationHistoryReportRequest;
 use App\Models\Capitation;
 use App\Models\CapitationDetailEnrollee;
 use App\Models\Enrollee;
@@ -420,6 +422,52 @@ class CapitationController extends Controller
             new CapitationPaymentReportExport($capitation, $rows, $statusLabel),
             'capitation_payment_report_' . $capitation->id . '_' . $status . '.xlsx'
         );
+    }
+
+    public function paymentHistoryReport(CapitationHistoryReportRequest $request): JsonResponse
+    {
+        try {
+            $report = $this->service->getHistoricalPaymentReportPreview($request->validated());
+
+            return response()->json([
+                'success' => true,
+                'data' => $report['data'],
+                'summary' => $report['summary'],
+            ]);
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return $this->error($e->getMessage());
+        }
+    }
+
+    public function exportPaymentHistoryReport(CapitationHistoryReportRequest $request)
+    {
+        try {
+            $validated = $request->validated();
+            $report = $this->service->getHistoricalPaymentReportExport($validated);
+            $summary = $report['summary'];
+            $scope = ($summary['scope'] ?? null) === 'facility_history'
+                ? 'facility_history'
+                : 'facilities_summary';
+            $scopeKey = strtolower((string) preg_replace('/[^a-z0-9]+/i', '_', $scope));
+            $statusKey = strtolower((string) ($summary['status'] ?? 'all'));
+
+            return Excel::download(
+                new CapitationHistoricalPaymentReportExport($report['rows'], $summary),
+                'capitation_' . $scopeKey . '_report_' . $statusKey . '.xlsx'
+            );
+        } catch (\InvalidArgumentException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage(),
+            ], 422);
+        } catch (\Throwable $e) {
+            return $this->error($e->getMessage());
+        }
     }
 
     public function enrolleeList(Request $request, Capitation $capitation): JsonResponse

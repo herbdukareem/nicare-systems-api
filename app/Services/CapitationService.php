@@ -9,6 +9,7 @@ use App\Models\CapitationDetail;
 use App\Models\CapitationDetailEnrollee;
 use App\Models\CapitationPayment;
 use App\Models\Enrollee;
+use App\Models\Facility;
 use App\Models\FundingType;
 use App\Models\Lga;
 use App\Models\Ward;
@@ -567,27 +568,13 @@ class CapitationService
     public function getPaymentReport(Capitation $capitation, string $status): SupportCollection
     {
         $query = $capitation->capitationDetails()->with(['facility.lga', 'facility.ward', 'fundingType']);
-
-        match ($status) {
-            'reviewed' => $query->whereNotNull('reviewed_at'),
-            'approved' => $query->whereNotNull('approved_at'),
-            'paid' => $query->whereNotNull('paid_at'),
-            'generated' => $query->whereNull('reviewed_at'),
-            default => null,
-        };
+        $this->applyPaymentReportStatusFilter($query, $status);
 
         return $query->orderBy('facility_id')->get()
             ->groupBy('facility_id')
             ->map(function (Collection $details): array {
                 $facility = $details->first()?->facility;
-                $amounts = [
-                    'bhcpf' => 0.0,
-                    'nicare' => 0.0,
-                    'bhcpf_cf' => 0.0,
-                    'gac' => 0.0,
-                    'nicare_formal' => 0.0,
-                    'unicef' => 0.0,
-                ];
+                $amounts = $this->emptyPaymentReportAmounts();
 
                 foreach ($details as $detail) {
                     $column = $this->paymentReportFundingColumn($detail->fundingType);
@@ -608,6 +595,44 @@ class CapitationService
             })
             ->sortBy('provider_name')
             ->values();
+    }
+
+    public function getHistoricalPaymentReportPreview(array $filters = []): array
+    {
+        $normalizedFilters = $this->normalizeHistoricalPaymentReportFilters($filters);
+        $details = $this->historicalPaymentReportDetails($normalizedFilters);
+        $rows = $this->historicalPaymentReportRows($details, $normalizedFilters['scope']);
+        $summary = $this->historicalPaymentReportSummary($details, $rows, $normalizedFilters);
+
+        $page = max(1, (int) ($filters['page'] ?? 1));
+        $perPage = max(1, min(200, (int) ($filters['per_page'] ?? 25)));
+        $paginator = new LengthAwarePaginator(
+            $rows->forPage($page, $perPage)->values(),
+            $rows->count(),
+            $perPage,
+            $page,
+            [
+                'path' => LengthAwarePaginator::resolveCurrentPath(),
+                'pageName' => 'page',
+            ],
+        );
+
+        return [
+            'data' => $paginator,
+            'summary' => $summary,
+        ];
+    }
+
+    public function getHistoricalPaymentReportExport(array $filters = []): array
+    {
+        $normalizedFilters = $this->normalizeHistoricalPaymentReportFilters($filters);
+        $details = $this->historicalPaymentReportDetails($normalizedFilters);
+        $rows = $this->historicalPaymentReportRows($details, $normalizedFilters['scope']);
+
+        return [
+            'rows' => $rows,
+            'summary' => $this->historicalPaymentReportSummary($details, $rows, $normalizedFilters),
+        ];
     }
 
     public function getEnrolleeSnapshotList(Capitation $capitation, array $filters = []): LengthAwarePaginator
@@ -1316,6 +1341,364 @@ class CapitationService
     private function normalizePaymentReportFundingValue(string $value): string
     {
         return strtolower((string) preg_replace('/[^a-z0-9]+/', '', $value));
+    }
+
+    private function applyPaymentReportStatusFilter($query, string $status): void
+    {
+        match ($status) {
+            'reviewed' => $query->whereNotNull('reviewed_at'),
+            'approved' => $query->whereNotNull('approved_at'),
+            'paid' => $query->whereNotNull('paid_at'),
+            'generated' => $query->whereNull('reviewed_at'),
+            default => null,
+        };
+    }
+
+    private function emptyPaymentReportAmounts(): array
+    {
+        return [
+            'bhcpf' => 0.0,
+            'nicare' => 0.0,
+            'bhcpf_cf' => 0.0,
+            'gac' => 0.0,
+            'nicare_formal' => 0.0,
+            'unicef' => 0.0,
+        ];
+    }
+
+    private function normalizeHistoricalPaymentReportFilters(array $filters): array
+    {
+        $status = (string) ($filters['status'] ?? 'all');
+        if (!in_array($status, ['all', 'generated', 'reviewed', 'approved', 'paid'], true)) {
+            $status = 'all';
+        }
+
+        $rangeMode = (string) ($filters['range_mode'] ?? 'all_time');
+        $rangeMode = $rangeMode === 'custom' ? 'custom' : 'all_time';
+
+        $facilityId = filled($filters['facility_id'] ?? null) ? (int) $filters['facility_id'] : null;
+        $fundingTypeId = filled($filters['funding_type_id'] ?? null) ? (int) $filters['funding_type_id'] : null;
+        $facility = $facilityId ? Facility::query()->select(['id', 'name', 'hcp_code'])->find($facilityId) : null;
+        $fundingType = $fundingTypeId ? FundingType::query()->select(['id', 'name'])->find($fundingTypeId) : null;
+
+        $fromPeriod = null;
+        $toPeriod = null;
+
+        if ($rangeMode === 'custom') {
+            $fromPeriod = Capitation::query()
+                ->select(['id', 'name', 'year', 'capitation_month', 'capitated_month', 'period_start'])
+                ->find((int) ($filters['from_period_id'] ?? 0));
+            $toPeriod = Capitation::query()
+                ->select(['id', 'name', 'year', 'capitation_month', 'capitated_month', 'period_start'])
+                ->find((int) ($filters['to_period_id'] ?? 0));
+
+            if (!$fromPeriod || !$toPeriod) {
+                throw new \InvalidArgumentException('Select a valid capitation period range for the historical report.');
+            }
+
+            if ($this->periodSequenceKey($fromPeriod) > $this->periodSequenceKey($toPeriod)) {
+                throw new \InvalidArgumentException('The starting capitation period must not be later than the ending period.');
+            }
+        }
+
+        return [
+            'status' => $status,
+            'status_label' => $this->paymentReportStatusLabel($status),
+            'range_mode' => $rangeMode,
+            'facility_id' => $facilityId,
+            'facility_name' => $facility?->name,
+            'facility_code' => $facility?->hcp_code,
+            'funding_type_id' => $fundingTypeId,
+            'funding_type_name' => $fundingType?->name,
+            'scope' => $facilityId ? 'facility_history' : 'facility_summary',
+            'scope_label' => $facilityId ? 'Facility History' : 'Facilities Summary',
+            'from_period' => $fromPeriod,
+            'to_period' => $toPeriod,
+        ];
+    }
+
+    private function historicalPaymentReportDetails(array $filters): Collection
+    {
+        $query = CapitationDetail::query()->with([
+            'capitation',
+            'facility.lga',
+            'facility.ward',
+            'fundingType',
+        ]);
+
+        if ($filters['facility_id']) {
+            $query->where('facility_id', $filters['facility_id']);
+        }
+
+        if ($filters['funding_type_id']) {
+            $query->where('funding_type_id', $filters['funding_type_id']);
+        }
+
+        $this->applyPaymentReportStatusFilter($query, $filters['status']);
+
+        if ($filters['range_mode'] === 'custom') {
+            $fromKey = $this->periodSequenceKey($filters['from_period']);
+            $toKey = $this->periodSequenceKey($filters['to_period']);
+
+            $query->whereHas('capitation', function (EloquentBuilder $capitationQuery) use ($fromKey, $toKey): void {
+                $capitationQuery
+                    ->whereRaw('((year * 100) + capitation_month) >= ?', [$fromKey])
+                    ->whereRaw('((year * 100) + capitation_month) <= ?', [$toKey]);
+            });
+        }
+
+        return $query->get();
+    }
+
+    private function historicalPaymentReportRows(Collection $details, string $scope): SupportCollection
+    {
+        if ($details->isEmpty()) {
+            return collect();
+        }
+
+        $grouped = $scope === 'facility_history'
+            ? $details->groupBy(fn (CapitationDetail $detail) => $detail->capitation_id . ':' . $detail->facility_id)
+            : $details->groupBy(fn (CapitationDetail $detail) => (string) $detail->facility_id);
+
+        $rows = $grouped
+            ->map(fn (SupportCollection $group) => $this->historicalPaymentReportRow($group, $scope))
+            ->values();
+
+        if ($scope === 'facility_history') {
+            return $rows->sortByDesc('period_sequence')->values();
+        }
+
+        return $rows
+            ->sortBy(fn (array $row) => strtolower((string) ($row['provider_name'] ?? '')))
+            ->values();
+    }
+
+    private function historicalPaymentReportRow(SupportCollection $details, string $scope): array
+    {
+        $firstDetail = $details->first();
+        $facility = $firstDetail?->facility;
+        $capitations = $details->map(fn (CapitationDetail $detail) => $detail->capitation)
+            ->filter(fn ($capitation) => $capitation instanceof Capitation)
+            ->unique('id')
+            ->sortBy(fn (Capitation $capitation) => $this->periodSequenceKey($capitation))
+            ->values();
+        $firstCapitation = $capitations->first();
+        $lastCapitation = $capitations->last();
+        $amounts = $this->emptyPaymentReportAmounts();
+        $fundingTypeNames = [];
+
+        foreach ($details as $detail) {
+            $column = $this->paymentReportFundingColumn($detail->fundingType);
+            if ($column !== null) {
+                $amounts[$column] += (float) ($detail->total_amount ?? $detail->amount ?? 0);
+            }
+
+            if ($detail->fundingType?->name) {
+                $fundingTypeNames[] = $detail->fundingType->name;
+            }
+        }
+
+        $fundingTypeSummary = collect($fundingTypeNames)
+            ->filter()
+            ->unique()
+            ->sort()
+            ->values();
+
+        $baseRow = [
+            'provider_name' => $facility?->name ?? 'N/A',
+            'facility_id' => (int) ($facility?->id ?? $firstDetail?->facility_id ?? 0),
+            'facility_code' => $facility?->hcp_code ?? '',
+            'lga' => $facility?->lga?->name ?? '',
+            'ward' => $facility?->ward?->name ?? '',
+            'processing_status' => $this->historicalPaymentReportProcessingStatus($details),
+            'processing_status_tone' => $this->historicalPaymentReportProcessingTone(
+                $this->historicalPaymentReportProcessingStatus($details)
+            ),
+            'funding_type_summary' => $fundingTypeSummary->isNotEmpty() ? $fundingTypeSummary->implode(', ') : 'N/A',
+            'funding_types' => $fundingTypeSummary->all(),
+            'detail_count' => $details->count(),
+            'total_enrollees' => $details->sum(
+                fn (CapitationDetail $detail) => (int) ($detail->total_enrollees ?? $detail->total_enrolled ?? 0)
+            ),
+            ...$amounts,
+            'total_amount' => (float) $details->sum(
+                fn (CapitationDetail $detail) => (float) ($detail->total_amount ?? $detail->amount ?? 0)
+            ),
+        ];
+
+        if ($scope === 'facility_history') {
+            $capitation = $firstDetail?->capitation;
+
+            return array_merge($baseRow, [
+                'id' => 'capitation-' . (int) ($capitation?->id ?? 0) . '-facility-' . (int) ($facility?->id ?? 0),
+                'scope' => 'facility_history',
+                'capitation_id' => (int) ($capitation?->id ?? 0),
+                'capitation_period' => $capitation?->name ?? 'N/A',
+                'cutoff_date' => $capitation ? $this->capitationCutoffDate($capitation) : null,
+                'year' => (int) ($capitation?->year ?? 0),
+                'capitation_month' => (int) ($capitation?->capitation_month ?: $capitation?->capitated_month ?: 0),
+                'period_sequence' => $capitation ? $this->periodSequenceKey($capitation) : 0,
+                'period_count' => 1,
+                'first_capitation_period' => $capitation?->name ?? null,
+                'last_capitation_period' => $capitation?->name ?? null,
+            ]);
+        }
+
+        return array_merge($baseRow, [
+            'id' => 'facility-' . (int) ($facility?->id ?? $firstDetail?->facility_id ?? 0),
+            'scope' => 'facility_summary',
+            'capitation_id' => null,
+            'capitation_period' => null,
+            'cutoff_date' => null,
+            'year' => (int) ($lastCapitation?->year ?? 0),
+            'capitation_month' => (int) ($lastCapitation?->capitation_month ?: $lastCapitation?->capitated_month ?: 0),
+            'period_sequence' => $lastCapitation ? $this->periodSequenceKey($lastCapitation) : 0,
+            'period_count' => $capitations->count(),
+            'first_capitation_period' => $firstCapitation?->name ?? null,
+            'last_capitation_period' => $lastCapitation?->name ?? null,
+        ]);
+    }
+
+    private function historicalPaymentReportSummary(
+        Collection $details,
+        SupportCollection $rows,
+        array $filters
+    ): array {
+        $periods = $details->map(fn (CapitationDetail $detail) => $detail->capitation)
+            ->filter(fn ($capitation) => $capitation instanceof Capitation)
+            ->unique('id')
+            ->sortBy(fn (Capitation $capitation) => $this->periodSequenceKey($capitation))
+            ->values();
+
+        return [
+            'scope' => $filters['scope'],
+            'scope_label' => $filters['scope_label'],
+            'status' => $filters['status'],
+            'status_label' => $filters['status_label'],
+            'range_mode' => $filters['range_mode'],
+            'range_label' => $this->historicalPaymentReportRangeLabel($filters, $periods),
+            'facility_id' => $filters['facility_id'],
+            'facility_name' => $filters['facility_name'],
+            'facility_code' => $filters['facility_code'],
+            'funding_type_id' => $filters['funding_type_id'],
+            'funding_type_name' => $filters['funding_type_name'],
+            'row_count' => $rows->count(),
+            'facility_count' => $details->pluck('facility_id')->filter()->unique()->count(),
+            'period_count' => $periods->count(),
+            'total_enrollees' => (int) $rows->sum(fn (array $row) => (int) ($row['total_enrollees'] ?? 0)),
+            'total_amount' => (float) $rows->sum(fn (array $row) => (float) ($row['total_amount'] ?? 0)),
+            'from_period' => $filters['from_period']
+                ? [
+                    'id' => (int) $filters['from_period']->id,
+                    'label' => $this->historicalPaymentReportPeriodLabel($filters['from_period']),
+                ]
+                : null,
+            'to_period' => $filters['to_period']
+                ? [
+                    'id' => (int) $filters['to_period']->id,
+                    'label' => $this->historicalPaymentReportPeriodLabel($filters['to_period']),
+                ]
+                : null,
+        ];
+    }
+
+    private function historicalPaymentReportRangeLabel(array $filters, SupportCollection $periods): string
+    {
+        if ($filters['range_mode'] === 'custom') {
+            return $this->historicalPaymentReportPeriodLabel($filters['from_period'])
+                . ' to '
+                . $this->historicalPaymentReportPeriodLabel($filters['to_period']);
+        }
+
+        if ($periods->isEmpty()) {
+            return 'All time';
+        }
+
+        $first = $periods->first();
+        $last = $periods->last();
+
+        if (!$first || !$last) {
+            return 'All time';
+        }
+
+        $firstLabel = $this->historicalPaymentReportPeriodLabel($first);
+        $lastLabel = $this->historicalPaymentReportPeriodLabel($last);
+
+        return $firstLabel === $lastLabel ? $firstLabel : $firstLabel . ' to ' . $lastLabel;
+    }
+
+    private function historicalPaymentReportPeriodLabel(?Capitation $capitation): string
+    {
+        if (!$capitation) {
+            return 'Unknown period';
+        }
+
+        if (filled($capitation->name)) {
+            return (string) $capitation->name;
+        }
+
+        $month = (int) ($capitation->capitation_month ?: $capitation->capitated_month ?: 0);
+        $year = (int) ($capitation->year ?? 0);
+
+        if ($year > 0 && $month >= 1 && $month <= 12) {
+            return Carbon::create($year, $month, 1)->format('F Y');
+        }
+
+        return 'Capitation #' . (int) $capitation->id;
+    }
+
+    private function paymentReportStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'generated' => 'Generated',
+            'reviewed' => 'Reviewed',
+            'approved' => 'Approved',
+            'paid' => 'Paid',
+            default => 'All statuses',
+        };
+    }
+
+    private function historicalPaymentReportProcessingStatus(SupportCollection $details): string
+    {
+        if ($details->every(fn (CapitationDetail $detail) => filled($detail->paid_at))) {
+            return 'Paid';
+        }
+
+        if ($details->every(fn (CapitationDetail $detail) => filled($detail->approved_at))) {
+            return 'Approved';
+        }
+
+        if ($details->every(fn (CapitationDetail $detail) => filled($detail->reviewed_at))) {
+            return 'Reviewed';
+        }
+
+        if ($details->every(fn (CapitationDetail $detail) => blank($detail->reviewed_at))) {
+            return 'Generated';
+        }
+
+        return 'Mixed';
+    }
+
+    private function historicalPaymentReportProcessingTone(string $status): string
+    {
+        return match ($status) {
+            'Paid' => 'success',
+            'Approved' => 'info',
+            'Reviewed' => 'warning',
+            'Generated' => 'neutral',
+            default => 'warning',
+        };
+    }
+
+    private function periodSequenceKey(?Capitation $capitation): int
+    {
+        if (!$capitation) {
+            return 0;
+        }
+
+        $month = (int) ($capitation->capitation_month ?: $capitation->capitated_month ?: 0);
+
+        return ((int) ($capitation->year ?? 0) * 100) + $month;
     }
 
     public function getFacilityHistory(int $facilityId): Collection

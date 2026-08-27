@@ -193,6 +193,8 @@ export const capitationAPI = {
   export: (id) => api.get(`/capitation/periods/${id}/export`, { responseType: 'blob' }),
   exportBreakdownExcel: (id, params = {}) => api.get(`/capitation/periods/${id}/export-breakdown-excel`, { params, responseType: 'blob' }),
   exportPaymentReport: (id, params = {}) => api.get(`/capitation/periods/${id}/export-payment-report`, { params, responseType: 'blob' }),
+  paymentHistoryReport: (params = {}) => api.get('/capitation/reports/history', { params }),
+  exportPaymentHistoryReport: (params = {}) => api.get('/capitation/reports/history/export', { params, responseType: 'blob' }),
   enrolleeList: (id, params = {}) => api.get(`/capitation/periods/${id}/enrollee-list`, { params }),
   exportEnrolleeList: (id, params = {}) => api.get(`/capitation/periods/${id}/export-enrollee-list`, { params, responseType: 'blob' }),
   exportRemita: (id) => api.get(`/capitation/periods/${id}/export-remita`, { responseType: 'blob' }),
