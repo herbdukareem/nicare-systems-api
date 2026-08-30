@@ -616,7 +616,12 @@ const changePassword = async () => {
   }
 
   try {
-    const response = await userAPI.updatePassword(userId.value, passwordForm.value);
+    const response = await userAPI.updatePassword(userId.value, {
+      current_password: passwordForm.value.current_password,
+      password: passwordForm.value.new_password,
+      password_confirmation: passwordForm.value.new_password_confirmation,
+      self: true,
+    });
     if (response?.data?.success) {
       success('Password changed successfully');
       showPasswordDialog.value = false;

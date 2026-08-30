@@ -296,30 +296,31 @@ Route::middleware('auth:sanctum')->group(function () {
     // User routes
     Route::middleware('permission:users.view,users.create')->group(function () {
         Route::apiResource('users', UserController::class);
-    Route::get('users-with-roles', [UserController::class, 'withRoles']);
-    Route::post('users/{user}/roles', [UserController::class, 'syncRoles']);
-    Route::post('users/{user}/switch-role', [UserController::class, 'switchRole']);
-    Route::get('users/available-modules', [UserController::class, 'getAvailableModules']);
-    Route::get('users/{user}/profile', [UserController::class, 'profile']);
-    Route::patch('users/{user}/password', [UserController::class, 'updatePassword']);
-    Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
-    Route::post('users/bulk-update-status', [UserController::class, 'bulkUpdateStatus']);
-    Route::delete('users/bulk-delete', [UserController::class, 'bulkDelete']);
-    // User permissions routes
-    Route::post('users/{user}/permissions', [UserController::class, 'syncPermissions']);
-    Route::get('users/{user}/permissions', [UserController::class, 'getPermissions']);
-    // Profile management routes
-    Route::get('users/{user}/activities', [UserController::class, 'activities']);
-    Route::post('users/{user}/avatar', [UserController::class, 'uploadAvatar']);
-    Route::patch('users/{user}/toggle-2fa', [UserController::class, 'toggle2FA']);
-    Route::post('users/{user}/revoke-sessions', [UserController::class, 'revokeAllSessions']);
-    // Advanced user features
-    Route::post('users/{user}/impersonate', [UserController::class, 'impersonate']);
-    Route::post('users/stop-impersonation', [UserController::class, 'stopImpersonation']);
-    Route::get('users/export', [UserController::class, 'export']);
-    Route::post('users/import', [UserController::class, 'import']);
-    Route::get('users/{user}/activity-stats', [UserController::class, 'activityStats']);
+        Route::get('users-with-roles', [UserController::class, 'withRoles']);
+        Route::post('users/{user}/roles', [UserController::class, 'syncRoles']);
+        Route::post('users/{user}/switch-role', [UserController::class, 'switchRole']);
+        Route::get('users/available-modules', [UserController::class, 'getAvailableModules']);
+        Route::get('users/{user}/profile', [UserController::class, 'profile']);
+        Route::patch('users/{user}/toggle-status', [UserController::class, 'toggleStatus']);
+        Route::post('users/bulk-update-status', [UserController::class, 'bulkUpdateStatus']);
+        Route::delete('users/bulk-delete', [UserController::class, 'bulkDelete']);
+        // User permissions routes
+        Route::post('users/{user}/permissions', [UserController::class, 'syncPermissions']);
+        Route::get('users/{user}/permissions', [UserController::class, 'getPermissions']);
+        // Profile management routes
+        Route::get('users/{user}/activities', [UserController::class, 'activities']);
+        Route::post('users/{user}/avatar', [UserController::class, 'uploadAvatar']);
+        Route::patch('users/{user}/toggle-2fa', [UserController::class, 'toggle2FA']);
+        Route::post('users/{user}/revoke-sessions', [UserController::class, 'revokeAllSessions']);
+        // Advanced user features
+        Route::post('users/{user}/impersonate', [UserController::class, 'impersonate']);
+        Route::post('users/stop-impersonation', [UserController::class, 'stopImpersonation']);
+        Route::get('users/export', [UserController::class, 'export']);
+        Route::post('users/import', [UserController::class, 'import']);
+        Route::get('users/{user}/activity-stats', [UserController::class, 'activityStats']);
     }); // end users group
+
+    Route::patch('users/{user}/password', [UserController::class, 'updatePassword']);
 
     Route::apiResource('enrollee-types', EnrolleeTypeController::class);
     Route::apiResource('banks', BankController::class);

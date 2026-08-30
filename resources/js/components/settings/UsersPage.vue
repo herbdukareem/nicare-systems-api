@@ -253,6 +253,14 @@
                 </template>
               </v-tooltip>
 
+              <v-tooltip v-if="canResetPasswordFor(item)" text="Reset User Password">
+                <template #activator="{ props }">
+                  <v-btn v-bind="props" icon size="small" variant="text" color="secondary" @click="openResetPasswordDialog(item)">
+                    <v-icon size="16">mdi-lock-reset</v-icon>
+                  </v-btn>
+                </template>
+              </v-tooltip>
+
               <v-tooltip :text="item.status === 1 ? 'Suspend User' : 'Activate User'">
                 <template #activator="{ props }">
                   <v-btn
@@ -485,6 +493,51 @@
       </template>
     </AppModal>
 
+    <AppModal
+      v-model="showResetPasswordDialog"
+      :title="passwordTarget ? `Reset Password - ${passwordTarget.name}` : 'Reset User Password'"
+      size="md"
+      persistent
+      :loading="passwordSaving"
+    >
+      <div class="tw-space-y-4">
+        <div v-if="passwordTarget" class="tw-rounded-xl tw-border tw-border-slate-200 tw-bg-slate-50 tw-p-4">
+          <p class="tw-text-xs tw-uppercase tw-tracking-[0.24em] tw-text-slate-500">User account</p>
+          <div class="tw-mt-2">
+            <p class="tw-font-semibold tw-text-slate-900">{{ passwordTarget.name }}</p>
+            <p class="tw-text-sm tw-text-slate-500">{{ passwordTarget.username || passwordTarget.email || 'No username' }}</p>
+          </div>
+        </div>
+
+        <v-text-field
+          v-model="passwordForm.password"
+          label="Temporary password"
+          :type="showTemporaryPassword ? 'text' : 'password'"
+          variant="outlined"
+          :append-inner-icon="showTemporaryPassword ? 'mdi-eye-off' : 'mdi-eye'"
+          @click:append-inner="showTemporaryPassword = !showTemporaryPassword"
+        />
+        <v-text-field
+          v-model="passwordForm.password_confirmation"
+          label="Confirm temporary password"
+          :type="showTemporaryPasswordConfirmation ? 'text' : 'password'"
+          variant="outlined"
+          :append-inner-icon="showTemporaryPasswordConfirmation ? 'mdi-eye-off' : 'mdi-eye'"
+          @click:append-inner="showTemporaryPasswordConfirmation = !showTemporaryPasswordConfirmation"
+        />
+
+        <p class="tw-text-sm tw-text-slate-500">
+          This resets the selected user's password and signs them out of their active API sessions.
+        </p>
+      </div>
+      <template #actions>
+        <v-btn variant="outlined" :disabled="passwordSaving" @click="closeResetPasswordDialog">Cancel</v-btn>
+        <v-btn color="secondary" variant="flat" :loading="passwordSaving" prepend-icon="mdi-content-save" @click="saveUserPasswordReset">
+          Reset Password
+        </v-btn>
+      </template>
+    </AppModal>
+
     <!-- Manage Roles -->
     <AppModal v-model="showRolesDialog" :title="managingUser ? `Manage Roles — ${managingUser.name}` : 'Manage Roles'" size="lg" persistent>
       <div v-if="managingUser" class="tw-space-y-4">
@@ -681,19 +734,23 @@ import AppModal from '../common/AppModal.vue'
 import AppDataTable from '../common/AppDataTable.vue'
 import { useToast } from '../../composables/useToast'
 import { userAPI, roleAPI, departmentAPI, designationAPI, permissionAPI } from '../../utils/api'
+import { useAuthStore } from '../../stores/auth'
 
 const { success, error } = useToast()
+const auth = useAuthStore()
 
 /** ===== state ===== */
 const loading = ref(false)
 const searchQuery = ref('')
 const showCreateUserDialog = ref(false)
+const showResetPasswordDialog = ref(false)
 const showRolesDialog = ref(false)
 const showPermissionsDialog = ref(false)
 const showBulkActionsDialog = ref(false)
 const showImportDialog = ref(false)
 const editingUser = ref(null)
 const managingUser = ref(null)
+const passwordTarget = ref(null)
 const selectedRoles = ref([])
 const selectedPermissions = ref([])
 const selectedUsers = ref([]) // array of IDs
@@ -712,6 +769,9 @@ const permissionSearch = ref('')
 const validationErrors = ref({})
 const importFile = ref(null)
 const importing = ref(false)
+const passwordSaving = ref(false)
+const showTemporaryPassword = ref(false)
+const showTemporaryPasswordConfirmation = ref(false)
 const stats = ref({
   total: 0,
   active: 0,
@@ -737,6 +797,10 @@ const userForm = ref({
   status: 1, roles: [], password: '', password_confirmation: '',
   userable_type: 'Staff', first_name: '', last_name: '', middle_name: '',
   date_of_birth: '', gender: '', department_id: '', designation_id: '', address: ''
+})
+const passwordForm = ref({
+  password: '',
+  password_confirmation: '',
 })
 const bulkAction = ref('')
 const bulkActionData = ref({})
@@ -767,13 +831,14 @@ const headers = [
   { title: 'Roles', key: 'roles', sortable: false, minWidth: 220 },
   { title: 'Status', key: 'status', sortable: true, width: 130, align: 'start' },
   { title: 'Created', key: 'created_at', sortable: true, width: 140 },
-  { title: 'Actions', key: 'actions', sortable: false, width: 400, align: 'start' }
+  { title: 'Actions', key: 'actions', sortable: false, width: 460, align: 'start' }
 ]
 
 /** derived */
 const roleOptions = computed(() => roles.value.map(r => ({ title: r.label || r.name, value: r.id })))
 const departmentOptions = computed(() => departments.value.map(d => ({ name: d.name, id: d.id })))
 const designationOptions = computed(() => designations.value.map(d => ({ title: d.title, id: d.id })))
+const canResetUserPassword = computed(() => auth.hasPermission('users.password.reset'))
 
 // Permission categories for the permissions dialog
 const permissionCategories = computed(() => {
@@ -1037,6 +1102,27 @@ const editUser = (user) => {
   })
   showCreateUserDialog.value = true
 }
+const openResetPasswordDialog = (user) => {
+  if (!canResetUserPassword.value) {
+    error('You do not have permission to reset user passwords.')
+    return
+  }
+
+  passwordTarget.value = user
+  passwordForm.value.password = ''
+  passwordForm.value.password_confirmation = ''
+  showTemporaryPassword.value = false
+  showTemporaryPasswordConfirmation.value = false
+  showResetPasswordDialog.value = true
+}
+const closeResetPasswordDialog = () => {
+  showResetPasswordDialog.value = false
+  passwordTarget.value = null
+  passwordForm.value.password = ''
+  passwordForm.value.password_confirmation = ''
+  showTemporaryPassword.value = false
+  showTemporaryPasswordConfirmation.value = false
+}
 const manageRoles = (user) => {
   managingUser.value = user
   selectedRoles.value = user.roles?.map(r => r.id) || []
@@ -1145,6 +1231,37 @@ const closeUserDialog = () => {
   })
 }
 
+const saveUserPasswordReset = async () => {
+  if (!passwordTarget.value) return
+  if (!passwordForm.value.password) {
+    error('Enter a temporary password before saving.')
+    return
+  }
+  if (passwordForm.value.password.length < 8) {
+    error('Password must be at least 8 characters.')
+    return
+  }
+  if (passwordForm.value.password !== passwordForm.value.password_confirmation) {
+    error('Password confirmation does not match.')
+    return
+  }
+
+  passwordSaving.value = true
+  try {
+    await userAPI.updatePassword(passwordTarget.value.id, {
+      password: passwordForm.value.password,
+      password_confirmation: passwordForm.value.password_confirmation,
+    })
+    success(`Password reset successfully for ${passwordTarget.value.name}.`)
+    closeResetPasswordDialog()
+  } catch (e) {
+    error(e.response?.data?.message || 'Failed to reset user password')
+    console.error(e)
+  } finally {
+    passwordSaving.value = false
+  }
+}
+
 /** export/import */
 const exportUsers = async () => {
   try {
@@ -1215,6 +1332,8 @@ const importUsers = async () => {
 const currentUser = computed(() => {
   try { return JSON.parse(localStorage.getItem('user') || '{}') } catch { return {} }
 })
+const canResetPasswordFor = (user) =>
+  canResetUserPassword.value && user?.id && Number(user.id) !== Number(currentUser.value?.id)
 const canImpersonate = (user) => user?.id && user.id !== currentUser.value?.id
 const impersonateUser = async (user) => {
   if (!confirm(`Impersonate ${user.name}?`)) return

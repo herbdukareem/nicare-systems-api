@@ -378,21 +378,40 @@ class UserController extends BaseController
      */
     public function updatePassword(Request $request, User $user)
     {
+        $request->merge([
+            'password' => $request->input('password', $request->input('new_password')),
+            'password_confirmation' => $request->input('password_confirmation', $request->input('new_password_confirmation')),
+        ]);
+
+        $isSelfService = $request->boolean('self') && (int) $request->user()->getKey() === (int) $user->getKey();
+
+        if (!$isSelfService && !$this->canResetOtherUsersPassword($request->user())) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Forbidden: you do not have the required permission.',
+                'required_permissions' => ['users.password.reset'],
+                'match_mode' => 'any',
+            ], 403);
+        }
+
         $validated = $request->validate([
-            'current_password' => 'required_if:self,true',
-            'password' => ['required', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
-            'password_confirmation' => 'required|same:password',
+            'current_password' => [$isSelfService ? 'required' : 'nullable', 'string'],
+            'password' => ['required', 'confirmed', Password::min(8)->letters()->mixedCase()->numbers()->symbols()],
             'self' => 'boolean',
         ]);
 
         // If user is updating their own password, verify current password
-        if ($validated['self'] ?? false) {
+        if ($isSelfService) {
             if (!Hash::check($validated['current_password'], $user->password)) {
                 return $this->sendError('Current password is incorrect', [], 422);
             }
         }
 
-        $user->update(['password' => bcrypt($validated['password'])]);
+        $user->update(['password' => Hash::make($validated['password'])]);
+
+        if (!$isSelfService) {
+            $user->tokens()->delete();
+        }
 
         return $this->sendResponse([], 'Password updated successfully');
     }
@@ -510,6 +529,12 @@ class UserController extends BaseController
             [],
             'All sessions revoked successfully'
         );
+    }
+
+    private function canResetOtherUsersPassword(User $user): bool
+    {
+        return $user->hasAnyRole(['Super Admin', 'admin'])
+            || $user->hasPermission('users.password.reset');
     }
 
     /**

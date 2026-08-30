@@ -12,9 +12,42 @@ class OfficerEnrollmentAssignmentController extends BaseController
 {
     public function index(Request $request)
     {
+        $search = trim((string) $request->input('search', ''));
+
         $assignments = OfficerEnrollmentAssignment::with($this->assignmentRelations())
             ->when($request->filled('user_id'), fn ($query) => $query->where('user_id', $request->integer('user_id')))
             ->when($request->filled('enabled'), fn ($query) => $query->where('enabled', $request->boolean('enabled')))
+            ->when($search !== '', function ($query) use ($search) {
+                $like = "%{$search}%";
+
+                $query->where(function ($searchQuery) use ($like) {
+                    $searchQuery
+                        ->whereHas('officer', function ($officerQuery) use ($like) {
+                            $officerQuery
+                                ->where('name', 'like', $like)
+                                ->orWhere('username', 'like', $like)
+                                ->orWhere('email', 'like', $like);
+                        })
+                        ->orWhereHas('lga', function ($lgaQuery) use ($like) {
+                            $lgaQuery
+                                ->where('name', 'like', $like)
+                                ->orWhere('code', 'like', $like);
+                        })
+                        ->orWhereHas('schema', function ($schemaQuery) use ($like) {
+                            $schemaQuery
+                                ->where('name', 'like', $like)
+                                ->orWhere('version', 'like', $like)
+                                ->orWhereHas('programme', function ($programmeQuery) use ($like) {
+                                    $programmeQuery->where('name', 'like', $like)
+                                        ->orWhere('code', 'like', $like);
+                                })
+                                ->orWhereHas('plan', function ($planQuery) use ($like) {
+                                    $planQuery->where('name', 'like', $like)
+                                        ->orWhere('code', 'like', $like);
+                                });
+                        });
+                });
+            })
             ->latest()
             ->paginate($request->integer('per_page', 20));
 

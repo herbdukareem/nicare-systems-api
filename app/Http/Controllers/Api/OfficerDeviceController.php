@@ -15,8 +15,27 @@ class OfficerDeviceController extends BaseController
 
     public function index(Request $request)
     {
+        $search = trim((string) $request->input('search', ''));
+
         $devices = OfficerDevice::with('user:id,name,username,email')
             ->when($request->filled('user_id'), fn ($query) => $query->where('user_id', $request->integer('user_id')))
+            ->when($search !== '', function ($query) use ($search) {
+                $like = "%{$search}%";
+
+                $query->where(function ($searchQuery) use ($like) {
+                    $searchQuery
+                        ->where('device_name', 'like', $like)
+                        ->orWhere('device_uuid', 'like', $like)
+                        ->orWhere('platform', 'like', $like)
+                        ->orWhere('app_version', 'like', $like)
+                        ->orWhereHas('user', function ($userQuery) use ($like) {
+                            $userQuery
+                                ->where('name', 'like', $like)
+                                ->orWhere('username', 'like', $like)
+                                ->orWhere('email', 'like', $like);
+                        });
+                });
+            })
             ->latest('last_seen_at')
             ->paginate($request->integer('per_page', 20));
 

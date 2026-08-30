@@ -14,12 +14,16 @@
           <AppDataTable
             v-model:page="devicePage"
             v-model:items-per-page="devicePerPage"
+            v-model:search="deviceSearch"
             :headers="deviceHeaders"
             :items="devices"
             :items-length="deviceTotal"
             :loading="loadingDevices"
+            searchable
+            search-placeholder="Search officers, usernames, emails, or devices"
             @update:page="loadDevices"
             @update:items-per-page="loadDevices"
+            @search="handleDeviceSearch"
           >
             <template #item.officer="{ item }">
               <div class="tw-text-sm">
@@ -138,12 +142,16 @@
           <AppDataTable
             v-model:page="assignmentPage"
             v-model:items-per-page="assignmentPerPage"
+            v-model:search="assignmentSearch"
             :headers="assignmentHeaders"
             :items="assignments"
             :items-length="assignmentTotal"
             :loading="loadingAssignments"
+            searchable
+            search-placeholder="Search officers, usernames, emails, LGAs, or configurations"
             @update:page="loadAssignments"
             @update:items-per-page="loadAssignments"
+            @search="handleAssignmentSearch"
           >
             <template #item.officer="{ item }">
               <div class="tw-text-sm">
@@ -240,12 +248,14 @@ const devices = ref([])
 const deviceTotal = ref(0)
 const devicePage = ref(1)
 const devicePerPage = ref(20)
+const deviceSearch = ref('')
 const loadingDevices = ref(false)
 
 const assignments = ref([])
 const assignmentTotal = ref(0)
 const assignmentPage = ref(1)
 const assignmentPerPage = ref(20)
+const assignmentSearch = ref('')
 const loadingAssignments = ref(false)
 const savingAssignment = ref(false)
 const savingOfficerStatus = ref(false)
@@ -398,7 +408,11 @@ const editAssignment = async (item) => {
 const loadDevices = async () => {
   loadingDevices.value = true
   try {
-    const response = await officerDeviceAPI.list({ page: devicePage.value, per_page: devicePerPage.value })
+    const response = await officerDeviceAPI.list({
+      page: devicePage.value,
+      per_page: devicePerPage.value,
+      search: deviceSearch.value || undefined,
+    })
     const payload = pageItems(response)
     devices.value = payload.items
     deviceTotal.value = payload.total
@@ -410,13 +424,27 @@ const loadDevices = async () => {
 const loadAssignments = async () => {
   loadingAssignments.value = true
   try {
-    const response = await officerDeviceAPI.assignments({ page: assignmentPage.value, per_page: assignmentPerPage.value })
+    const response = await officerDeviceAPI.assignments({
+      page: assignmentPage.value,
+      per_page: assignmentPerPage.value,
+      search: assignmentSearch.value || undefined,
+    })
     const payload = pageItems(response)
     assignments.value = payload.items
     assignmentTotal.value = payload.total
   } finally {
     loadingAssignments.value = false
   }
+}
+
+const handleDeviceSearch = async () => {
+  devicePage.value = 1
+  await loadDevices()
+}
+
+const handleAssignmentSearch = async () => {
+  assignmentPage.value = 1
+  await loadAssignments()
 }
 
 const loadMetadata = async () => {

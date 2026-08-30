@@ -72,13 +72,15 @@
             <v-text-field
               id="password"
               v-model="form.password"
-              type="password"
+              :type="showPassword ? 'text' : 'password'"
               placeholder="Enter your password"
               required
               variant="outlined"
               :error-messages="errors.password"
               density="compact"
               prepend-inner-icon="mdi-lock-outline"
+              :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+              @click:append-inner="showPassword = !showPassword"
               @keyup.enter="handleLogin"
             />
           </div>
@@ -175,6 +177,7 @@ const errors = reactive({
 });
 
 const loading = ref(false);
+const showPassword = ref(false);
 const showForgotPassword = ref(false);
 const showFallbackImage = ref(false);
 const forgotUsername = ref('');

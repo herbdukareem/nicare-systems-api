@@ -234,6 +234,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'users.view',
                 'users.create',
                 'users.edit',
+                'users.password.reset',
                 'users.delete',
                 'roles.view',
                 'roles.create',

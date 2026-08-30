@@ -162,6 +162,12 @@
             :padded="false"
           >
             <template #actions>
+              <AppExportButton
+                label="Export Result"
+                :loading="exportingHistory"
+                :disabled="!canExportHistory"
+                @click="exportHistoryReport"
+              />
               <AppBadge :label="historyScopeLabel" :tone="isFacilityHistoryScope ? 'info' : 'primary'" size="sm" />
               <AppBadge :label="historySummary.status_label || 'All statuses'" tone="neutral" size="sm" />
               <AppBadge :label="historySummary.range_label || 'All time'" tone="success" size="sm" />
