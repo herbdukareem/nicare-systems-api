@@ -748,6 +748,16 @@ const periodStatusColor = (item) => {
   return 'default'
 }
 
+const buildPeriodParams = () => {
+  const params = { per_page: 100 }
+
+  if (workflowMode.value && workflowForm.value.funding_type_id) {
+    params.funding_type_id = workflowForm.value.funding_type_id
+  }
+
+  return params
+}
+
 const loadFundingTypes = async () => {
   try {
     const response = await fundingTypeAPI.getAll({ per_page: 500 })
@@ -761,7 +771,7 @@ const loadFundingTypes = async () => {
 const loadPeriods = async () => {
   loading.value = true
   try {
-    const response = await capitationAPI.periods({ per_page: 100 })
+    const response = await capitationAPI.periods(buildPeriodParams())
     const payload = response.data.data
     periods.value = payload.data || payload || []
   } catch {
@@ -1224,6 +1234,14 @@ onMounted(async () => {
   await loadPeriods()
 })
 watch(() => props.mode, async () => {
+  workflowDetails.value = []
+  selectedDetailIds.value = []
+  workflowDetailsLoaded.value = false
+  await loadPeriods()
+})
+watch(() => workflowForm.value.funding_type_id, async (value, previous) => {
+  if (!workflowMode.value || value === previous) return
+
   workflowDetails.value = []
   selectedDetailIds.value = []
   workflowDetailsLoaded.value = false

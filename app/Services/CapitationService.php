@@ -30,7 +30,10 @@ class CapitationService
 
     public function getAll(array $filters = []): LengthAwarePaginator
     {
-        $query = $this->capitationPeriodQuery();
+        $detailFundingTypeId = filled($filters['funding_type_id'] ?? null)
+            ? (int) $filters['funding_type_id']
+            : null;
+        $query = $this->capitationPeriodQuery($detailFundingTypeId);
 
         if (!empty($filters['search'])) {
             $search = $filters['search'];
@@ -53,8 +56,15 @@ class CapitationService
             $query->where('capitation_month', $filters['month']);
         }
 
-        if (!empty($filters['funding_type_id'])) {
-            $query->where('funding_type_id', $filters['funding_type_id']);
+        if ($detailFundingTypeId !== null) {
+            $query->where(function (EloquentBuilder $builder) use ($detailFundingTypeId): void {
+                $builder
+                    ->where('funding_type_id', $detailFundingTypeId)
+                    ->orWhereHas(
+                        'capitationDetails',
+                        fn (EloquentBuilder $detailQuery) => $this->applyCapitationDetailFundingTypeFilter($detailQuery, $detailFundingTypeId)
+                    );
+            });
         }
 
         if (!empty($filters['user_id'])) {
@@ -1927,18 +1937,26 @@ class CapitationService
             : Capitation::DUPLICATE_NIN_POLICY_EXCLUDE;
     }
 
-    private function capitationPeriodQuery()
+    private function capitationPeriodQuery(?int $detailFundingTypeId = null)
     {
         return Capitation::with(['user:id,name', 'fundingType:id,name'])
             ->withCount([
-                'capitationDetails',
-                'capitationDetails as pending_review_count' => fn ($query) => $query->whereNull('reviewed_at'),
-                'capitationDetails as reviewed_count' => fn ($query) => $query->whereNotNull('reviewed_at'),
-                'capitationDetails as pending_approval_count' => fn ($query) => $query->whereNotNull('reviewed_at')->whereNull('approved_at'),
-                'capitationDetails as approved_count' => fn ($query) => $query->whereNotNull('approved_at'),
-                'capitationDetails as pending_payment_count' => fn ($query) => $query->whereNotNull('approved_at')->whereNull('paid_at'),
-                'capitationDetails as paid_count' => fn ($query) => $query->whereNotNull('paid_at'),
+                'capitationDetails' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId),
+                'capitationDetails as pending_review_count' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNull('reviewed_at'),
+                'capitationDetails as reviewed_count' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNotNull('reviewed_at'),
+                'capitationDetails as pending_approval_count' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNotNull('reviewed_at')->whereNull('approved_at'),
+                'capitationDetails as approved_count' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNotNull('approved_at'),
+                'capitationDetails as pending_payment_count' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNotNull('approved_at')->whereNull('paid_at'),
+                'capitationDetails as paid_count' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNotNull('paid_at'),
             ]);
+    }
+
+    private function applyCapitationDetailFundingTypeFilter(EloquentBuilder $query, ?int $fundingTypeId): EloquentBuilder
+    {
+        return $query->when(
+            $fundingTypeId !== null,
+            fn (EloquentBuilder $detailQuery) => $detailQuery->where('funding_type_id', $fundingTypeId)
+        );
     }
 
     private function decorateCapitationPeriods(iterable $periods): void

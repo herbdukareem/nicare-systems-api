@@ -3,8 +3,10 @@
 namespace Tests\Feature;
 
 use App\Models\Capitation;
+use App\Models\CapitationDetail;
 use App\Models\Enrollee;
 use App\Models\Facility;
+use App\Models\FundingType;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -54,6 +56,101 @@ class CapitationTest extends TestCase
         $response = $this->getJson('/api/capitation/periods');
 
         $response->assertOk()->assertJsonPath('success', true);
+    }
+
+    public function test_period_counts_can_be_scoped_to_a_selected_funding_type(): void
+    {
+        $bhcpf = FundingType::create([
+            'name' => 'Basic Healthcare Provision Fund',
+            'description' => 'BHCPF',
+            'capitation_rate' => 570,
+            'status' => 1,
+        ]);
+        $gac = FundingType::create([
+            'name' => 'GAC',
+            'description' => 'GAC',
+            'capitation_rate' => 570,
+            'status' => 1,
+        ]);
+
+        $capitation = Capitation::create([
+            'name' => 'August Capitation',
+            'period_start' => '2026-08-01',
+            'period_end' => '2026-08-31',
+            'capitation_rate' => 570.00,
+            'capitated_month' => 8,
+            'capitation_month' => 8,
+            'year' => 2026,
+            'funding_type_id' => $bhcpf->id,
+            'user_id' => $this->user->id,
+            'created_by' => $this->user->id,
+            'status' => 1,
+        ]);
+
+        CapitationDetail::create([
+            'capitation_id' => $capitation->id,
+            'facility_id' => $this->facility->id,
+            'funding_type_id' => $bhcpf->id,
+            'capitated_month' => 8,
+            'total_enrollees' => 10,
+            'capitation_rate' => 570.00,
+            'total_amount' => 5700.00,
+            'total_enrolled' => 10,
+            'rate' => 570.00,
+            'amount' => 5700.00,
+            'reviewed_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+            'paid_by' => $this->user->id,
+            'reviewed_at' => '2026-08-25',
+            'approved_at' => '2026-08-25',
+            'paid_at' => '2026-09-03',
+            'status' => 4,
+        ]);
+
+        CapitationDetail::create([
+            'capitation_id' => $capitation->id,
+            'facility_id' => Facility::factory()->create(['accreditation_status' => 'active'])->id,
+            'funding_type_id' => $gac->id,
+            'capitated_month' => 8,
+            'total_enrollees' => 12,
+            'capitation_rate' => 570.00,
+            'total_amount' => 6840.00,
+            'total_enrolled' => 12,
+            'rate' => 570.00,
+            'amount' => 6840.00,
+            'reviewed_by' => $this->user->id,
+            'approved_by' => $this->user->id,
+            'reviewed_at' => '2026-08-25',
+            'approved_at' => '2026-08-25',
+            'paid_at' => null,
+            'status' => 3,
+        ]);
+
+        $overall = $this->getJson('/api/capitation/periods?per_page=100');
+
+        $overall->assertOk()
+            ->assertJsonCount(1, 'data.data')
+            ->assertJsonPath('data.data.0.capitation_details_count', 2)
+            ->assertJsonPath('data.data.0.pending_payment_count', 1)
+            ->assertJsonPath('data.data.0.paid_count', 1);
+
+        $paidSlice = $this->getJson('/api/capitation/periods?per_page=100&funding_type_id=' . $bhcpf->id);
+
+        $paidSlice->assertOk()
+            ->assertJsonCount(1, 'data.data')
+            ->assertJsonPath('data.data.0.id', $capitation->id)
+            ->assertJsonPath('data.data.0.capitation_details_count', 1)
+            ->assertJsonPath('data.data.0.pending_payment_count', 0)
+            ->assertJsonPath('data.data.0.paid_count', 1);
+
+        $pendingSlice = $this->getJson('/api/capitation/periods?per_page=100&funding_type_id=' . $gac->id);
+
+        $pendingSlice->assertOk()
+            ->assertJsonCount(1, 'data.data')
+            ->assertJsonPath('data.data.0.id', $capitation->id)
+            ->assertJsonPath('data.data.0.capitation_details_count', 1)
+            ->assertJsonPath('data.data.0.pending_payment_count', 1)
+            ->assertJsonPath('data.data.0.paid_count', 0);
     }
 
     public function test_br07_compute_counts_only_full_period_enrollees(): void
