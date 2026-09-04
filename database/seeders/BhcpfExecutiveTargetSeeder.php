@@ -3,6 +3,8 @@
 namespace Database\Seeders;
 
 use App\Models\BhcpfExecutiveTarget;
+use App\Models\Benefactor;
+use App\Models\EnrollmentPhase;
 use App\Models\Lga;
 use Illuminate\Database\Seeder;
 use RuntimeException;
@@ -11,6 +13,8 @@ class BhcpfExecutiveTargetSeeder extends Seeder
 {
     public function run(): void
     {
+        $phase = $this->bhcpfEnrollmentPhase();
+
         foreach ($this->rows() as $row) {
             $normalizedLga = $this->normalizeLgaName($row['lga']);
             $lga = Lga::query()
@@ -22,7 +26,7 @@ class BhcpfExecutiveTargetSeeder extends Seeder
             }
 
             BhcpfExecutiveTarget::updateOrCreate(
-                ['lga_id' => $lga->id],
+                ['enrollment_phase_id' => $phase->id, 'lga_id' => $lga->id],
                 [
                     'ward_count' => $row['ward_count'],
                     'current_enrollee_count' => $row['current_enrollee_count'],
@@ -43,6 +47,24 @@ class BhcpfExecutiveTargetSeeder extends Seeder
                 ]
             );
         }
+    }
+
+    private function bhcpfEnrollmentPhase(): EnrollmentPhase
+    {
+        $benefactor = Benefactor::query()
+            ->whereRaw('UPPER(name) = ?', ['BHCPF'])
+            ->firstOrFail();
+
+        return EnrollmentPhase::query()->firstOrCreate(
+            ['name' => '65K BHCPF Enrollment'],
+            [
+                'benefactor_id' => $benefactor->id,
+                'status' => 1,
+                'is_current' => true,
+                'start_date' => '2026-08-03',
+                'end_date' => '2026-12-31',
+            ]
+        );
     }
 
     /**

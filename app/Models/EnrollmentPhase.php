@@ -10,6 +10,13 @@ class EnrollmentPhase extends Model
     protected $primaryKey = 'id';
     protected $guarded = ['id'];
 
+    protected $casts = [
+        'start_date' => 'date',
+        'end_date' => 'date',
+        'status' => 'integer',
+        'is_current' => 'boolean',
+    ];
+
     // enrollees
     public function enrollees(){
         return $this->hasMany(Enrollee::class, 'enrollment_phase_id', 'id');
@@ -18,5 +25,10 @@ class EnrollmentPhase extends Model
     // benefactors
     public function benefactor(){
         return $this->belongsTo(Benefactor::class, 'benefactor_id', 'id');
+    }
+
+    public function bhcpfExecutiveTargets()
+    {
+        return $this->hasMany(BhcpfExecutiveTarget::class);
     }
 }

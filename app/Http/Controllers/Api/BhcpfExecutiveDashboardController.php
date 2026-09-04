@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\V1\BaseController;
 use App\Models\Benefactor;
 use App\Models\BhcpfExecutiveTarget;
 use App\Models\Enrollee;
+use App\Models\EnrollmentPhase;
 use App\Models\FundingType;
 use App\Models\InsuranceProgramme;
 use Carbon\Carbon;
@@ -21,11 +22,22 @@ class BhcpfExecutiveDashboardController extends BaseController
     public function overview(Request $request)
     {
         $validated = $request->validate([
+            'enrollment_phase_id' => ['nullable', 'integer', 'exists:enrollment_phases,id'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
         ]);
 
-        $campaignStart = Carbon::parse(self::CAMPAIGN_START_DATE)->startOfDay();
+        $availablePhases = EnrollmentPhase::query()
+            ->whereHas('bhcpfExecutiveTargets')
+            ->orderByDesc('is_current')
+            ->orderByDesc('start_date')
+            ->get(['id', 'name', 'start_date', 'end_date', 'is_current']);
+        $phase = $availablePhases->firstWhere('id', (int) ($validated['enrollment_phase_id'] ?? 0))
+            ?? $availablePhases->firstWhere('is_current', true)
+            ?? $availablePhases->first();
+
+        $campaignStart = $phase?->start_date?->copy()->startOfDay()
+            ?? Carbon::parse(self::CAMPAIGN_START_DATE)->startOfDay();
         $rangeEndDefault = now()->lt($campaignStart)
             ? $campaignStart->copy()->endOfDay()
             : now()->endOfDay();
@@ -45,11 +57,12 @@ class BhcpfExecutiveDashboardController extends BaseController
         }
 
         $targets = BhcpfExecutiveTarget::query()
+            ->when($phase, fn (Builder $query) => $query->where('enrollment_phase_id', $phase->id))
             ->with('lga:id,name')
             ->orderBy('final_target')
             ->get();
 
-        $captureCounts = $this->campaignCaptureQuery($dateFrom, $dateTo)
+        $captureCounts = $this->campaignCaptureQuery($dateFrom, $dateTo, $phase?->id)
             ->selectRaw('lga_id, COUNT(*) as aggregate')
             ->groupBy('lga_id')
             ->pluck('aggregate', 'lga_id');
@@ -60,7 +73,7 @@ class BhcpfExecutiveDashboardController extends BaseController
         $todayEnd = now()->endOfDay();
         $enrolledToday = now()->lt($campaignStart)
             ? 0
-            : (int) $this->campaignCaptureQuery($todayStart, $todayEnd)->count();
+            : (int) $this->campaignCaptureQuery($todayStart, $todayEnd, $phase?->id)->count();
 
         $lgaRows = $targets
             ->map(function (BhcpfExecutiveTarget $target) use ($captureCounts): array {
@@ -100,17 +113,20 @@ class BhcpfExecutiveDashboardController extends BaseController
         $topPerformers = collect($lgaRows)->sortByDesc('progress_percent')->take(5)->values();
         $supportList = collect($lgaRows)->sortBy('progress_percent')->take(5)->values();
 
-        $dailyRows = $this->buildDailyRows($dateFrom, $dateTo);
-        $demographics = $this->demographicBreakdowns($dateFrom, $dateTo, $targets, collect($lgaRows));
+        $dailyRows = $this->buildDailyRows($dateFrom, $dateTo, $phase?->id);
+        $demographics = $this->demographicBreakdowns($dateFrom, $dateTo, $targets, collect($lgaRows), $phase?->id);
 
         return $this->sendResponse([
             'campaign' => [
-                'name' => 'BHCPF Vulnerable Group Enrollment Drive',
+                'id' => $phase?->id,
+                'name' => $phase?->name ?? 'BHCPF Vulnerable Group Enrollment Drive',
                 'start_date' => $campaignStart->toDateString(),
+                'end_date' => $phase?->end_date?->toDateString(),
                 'today' => now()->toDateString(),
                 'campaign_started' => !now()->lt($campaignStart),
             ],
             'filters' => [
+                'enrollment_phase_id' => $phase?->id,
                 'date_from' => $dateFrom->toDateString(),
                 'date_to' => $dateTo->toDateString(),
             ],
@@ -143,10 +159,16 @@ class BhcpfExecutiveDashboardController extends BaseController
                 'needs_support' => $supportList,
                 'daily_performance' => $dailyRows->all(),
             ],
+            'enrollment_phases' => $availablePhases->map(fn (EnrollmentPhase $item) => [
+                'id' => $item->id,
+                'name' => $item->name,
+                'start_date' => $item->start_date?->toDateString(),
+                'end_date' => $item->end_date?->toDateString(),
+            ])->values(),
         ], 'BHCPF executive dashboard retrieved successfully.');
     }
 
-    private function campaignCaptureQuery(Carbon $dateFrom, Carbon $dateTo): Builder
+    private function campaignCaptureQuery(Carbon $dateFrom, Carbon $dateTo, ?int $enrollmentPhaseId = null): Builder
     {
         $programmeIds = InsuranceProgramme::query()
             ->where(function (Builder $query): void {
@@ -167,6 +189,7 @@ class BhcpfExecutiveDashboardController extends BaseController
             ->pluck('id');
 
         return Enrollee::query()
+            ->when($enrollmentPhaseId, fn (Builder $query) => $query->where('enrollment_phase_id', $enrollmentPhaseId))
             ->when($programmeIds->isNotEmpty(), fn (Builder $query) => $query->whereIn('insurance_programme_id', $programmeIds))
             ->when($benefactorIds->isNotEmpty() || $fundingTypeIds->isNotEmpty(), function (Builder $query) use ($benefactorIds, $fundingTypeIds): void {
                 $query->where(function (Builder $nested) use ($benefactorIds, $fundingTypeIds): void {
@@ -184,9 +207,9 @@ class BhcpfExecutiveDashboardController extends BaseController
             ]);
     }
 
-    private function buildDailyRows(Carbon $dateFrom, Carbon $dateTo): Collection
+    private function buildDailyRows(Carbon $dateFrom, Carbon $dateTo, ?int $enrollmentPhaseId): Collection
     {
-        $rows = $this->campaignCaptureQuery($dateFrom, $dateTo)
+        $rows = $this->campaignCaptureQuery($dateFrom, $dateTo, $enrollmentPhaseId)
             ->selectRaw("DATE(COALESCE(enrollees.enrollment_date, enrollees.created_at)) as capture_date")
             ->selectRaw('COUNT(*) as captured_count')
             ->selectRaw('SUM(CASE WHEN enrollees.status = ? THEN 1 ELSE 0 END) as approved_count', [Enrollee::STATUS_ACTIVE])
@@ -220,11 +243,12 @@ class BhcpfExecutiveDashboardController extends BaseController
         Carbon $dateFrom,
         Carbon $dateTo,
         Collection $targets,
-        Collection $lgaRows
+        Collection $lgaRows,
+        ?int $enrollmentPhaseId
     ): array
     {
         $referenceDate = now()->startOfDay();
-        $records = $this->campaignCaptureQuery($dateFrom, $dateTo)
+        $records = $this->campaignCaptureQuery($dateFrom, $dateTo, $enrollmentPhaseId)
             ->leftJoin('vulnerable_groups as vg', 'vg.id', '=', 'enrollees.vulnerable_group_id')
             ->get([
                 'enrollees.lga_id',

@@ -196,6 +196,14 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,enrollee.nin.verify,reports.view');
     Route::get('dashboard/executive/bhcpf-vulnerable', [BhcpfExecutiveDashboardController::class, 'overview'])
         ->middleware('permission:dashboard.bhcpf_executive.view');
+    Route::apiResource('enrollment-phases', \App\Http\Controllers\Api\EnrollmentPhaseController::class)
+        ->only(['index', 'store', 'update', 'destroy'])
+        ->parameters(['enrollment-phases' => 'enrollmentPhase'])
+        ->middleware('permission:any,enrollment-phase.manage,settings.edit');
+    Route::get('enrollment-phases/{enrollmentPhase}/bhcpf-targets', [\App\Http\Controllers\Api\EnrollmentPhaseController::class, 'targets'])
+        ->middleware('permission:any,enrollment-phase.manage,settings.edit');
+    Route::put('enrollment-phases/{enrollmentPhase}/bhcpf-targets', [\App\Http\Controllers\Api\EnrollmentPhaseController::class, 'updateTargets'])
+        ->middleware('permission:any,enrollment-phase.manage,settings.edit');
     Route::get('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip'])
         ->middleware('permission:any,enrollees.view,enrollee.print-bulk-slip');
     Route::get('enrollees/bulk-id-card', [EnrolleeController::class, 'bulkIdCard'])

@@ -25,6 +25,7 @@ export const navigationItems = [
       { name: 'Bulk ID Cards', path: '/enrollees/bulk-id-card', icon: 'mdi-card-account-details-star-outline', permissions: ['enrollee.print-id-card'] },
       { name: 'Mobile Sync', path: '/enrollment/mobile-sync', icon: 'mdi-cellphone-sync', permissions: ['mobile-sync.push', 'mobile-sync.status'] },
       { name: 'Change Facility', path: '/enrollment/change-facility', icon: 'mdi-hospital-marker', permissions: ['enrollees.update'] },
+      { name: 'Enrollment Phases', path: '/enrollment/phases', icon: 'mdi-calendar-range-outline', permissions: ['enrollment-phase.manage', 'settings.edit'] },
     ],
   },
   {

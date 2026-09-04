@@ -16,6 +16,7 @@ const PendingEnrolleesPage = () => import('../components/enrollees/PendingEnroll
 const EnrollmentApprovalPage = () => import('../components/enrollees/EnrollmentApprovalPage.vue');
 const EnrolleeIntegrityPage = () => import('../components/enrollees/EnrolleeIntegrityPage.vue');
 const EnrollmentIntelligencePage = () => import('../components/enrollees/EnrollmentIntelligencePage.vue');
+const EnrollmentPhasesPage = () => import('../components/enrollees/EnrollmentPhasesPage.vue');
 const BhcpfExecutiveDashboardPage = () => import('../components/enrollees/BhcpfExecutiveDashboardPage.vue');
 const BulkEnrollmentSlipPage = () => import('../components/enrollees/BulkEnrollmentSlipPage.vue');
 const SetupWorkspace = () => import('../components/setup/SetupWorkspace.vue');
@@ -130,6 +131,17 @@ const routes = [
       permissions: ['enrollee.nin.verify', 'reports.view'],
       title: 'Enrollment Intelligence',
       breadcrumb: 'Enrollment Intelligence',
+    },
+  },
+  {
+    path: '/enrollment/phases',
+    name: 'enrollment-phases',
+    component: EnrollmentPhasesPage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollment-phase.manage', 'settings.edit'],
+      title: 'Enrollment Phases',
+      breadcrumb: 'Enrollment Phases',
     },
   },
   {

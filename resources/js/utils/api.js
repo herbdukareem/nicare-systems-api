@@ -177,6 +177,15 @@ export const dashboardAPI = {
   getBhcpfExecutiveOverview: (params) => api.get('/dashboard/executive/bhcpf-vulnerable', { params }),
 };
 
+export const enrollmentPhaseAPI = {
+  getAll: () => api.get('/enrollment-phases'),
+  create: (payload) => api.post('/enrollment-phases', payload),
+  update: (id, payload) => api.put(`/enrollment-phases/${id}`, payload),
+  remove: (id) => api.delete(`/enrollment-phases/${id}`),
+  targets: (id) => api.get(`/enrollment-phases/${id}/bhcpf-targets`),
+  updateTargets: (id, payload) => api.put(`/enrollment-phases/${id}/bhcpf-targets`, payload),
+};
+
 export const capitationAPI = {
   periods: (params) => api.get('/capitation/periods', { params }),
   createPeriod: (data) => api.post('/capitation/periods', data),

@@ -46,6 +46,7 @@ class RolesAndPermissionsSeeder extends Seeder
                 'mobile-sync.status',
                 'mobile-device.register',
                 'mobile-enrollment.sync',
+                'enrollment-phase.manage',
             ],
             'Setup' => [
                 'setup.lga.view',

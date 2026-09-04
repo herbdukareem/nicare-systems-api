@@ -12,4 +12,9 @@ class BhcpfExecutiveTarget extends Model
     {
         return $this->belongsTo(Lga::class);
     }
+
+    public function enrollmentPhase()
+    {
+        return $this->belongsTo(EnrollmentPhase::class);
+    }
 }

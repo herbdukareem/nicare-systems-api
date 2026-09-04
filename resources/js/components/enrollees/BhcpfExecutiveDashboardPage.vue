@@ -8,7 +8,7 @@
       }"
     >
       <AppPageHeader
-        title="BHCPF 65,000 Executive Dashboard"
+        :title="`${campaign.name || 'BHCPF'} Executive Dashboard`"
         subtitle="Monitor captured vulnerable-group enrollments across Niger State against the official BHCPF campaign allocation."
         kicker="Executive Monitoring"
         icon="mdi-chart-box-multiple-outline"
@@ -66,9 +66,10 @@
 
       <AppCard v-if="showFilters" title="Report Window" icon="mdi-calendar-range" tone="primary">
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-3">
+          <v-select v-model="localFilters.enrollment_phase_id" :items="enrollmentPhases" item-title="name" item-value="id" label="Enrollment phase" density="compact" variant="outlined" hide-details />
           <v-text-field v-model="localFilters.date_from" label="Date from" type="date" density="compact" variant="outlined" hide-details />
           <v-text-field v-model="localFilters.date_to" label="Date to" type="date" density="compact" variant="outlined" hide-details />
-          <div class="tw-flex tw-items-end tw-gap-2">
+          <div class="tw-flex tw-items-end tw-gap-2 md:tw-col-span-3">
             <v-btn color="primary" prepend-icon="mdi-magnify" :loading="loading" @click="applyFilters">Load Dashboard</v-btn>
             <v-btn variant="outlined" prepend-icon="mdi-filter-off-outline" @click="resetFilters">Reset</v-btn>
           </div>
@@ -279,18 +280,22 @@ const dashboardRoot = ref(null)
 const isFullscreen = ref(false)
 const showFilters = ref(false)
 const campaign = reactive({
+  id: null,
   name: '',
   start_date: '',
+  end_date: '',
   today: '',
   campaign_started: false,
 })
 
 const filters = reactive({
+  enrollment_phase_id: null,
   date_from: '',
   date_to: '',
 })
 
 const localFilters = reactive({
+  enrollment_phase_id: null,
   date_from: '',
   date_to: '',
 })
@@ -314,6 +319,7 @@ const demographicRowsByLga = ref({})
 const topPerformers = ref([])
 const supportList = ref([])
 const selectedLgaId = ref(null)
+const enrollmentPhases = ref([])
 
 const statusLegend = [
   { label: 'Completed', range: '100%+', color: '#2563eb' },
@@ -520,6 +526,7 @@ const loadDashboard = async () => {
 
   try {
     const { data } = await dashboardAPI.getBhcpfExecutiveOverview({
+      enrollment_phase_id: localFilters.enrollment_phase_id || undefined,
       date_from: localFilters.date_from || undefined,
       date_to: localFilters.date_to || undefined,
     })
@@ -528,6 +535,7 @@ const loadDashboard = async () => {
     Object.assign(campaign, payload.campaign || {})
     Object.assign(filters, payload.filters || {})
     Object.assign(localFilters, payload.filters || {})
+    enrollmentPhases.value = payload.enrollment_phases || []
     Object.assign(summary, payload.summary || {})
     lgaRows.value = payload.tables?.lga_progress || []
     dailyRows.value = payload.tables?.daily_performance || []
@@ -548,6 +556,7 @@ const applyFilters = () => {
 }
 
 const resetFilters = () => {
+  localFilters.enrollment_phase_id = campaign.id || null
   localFilters.date_from = campaign.start_date || ''
   localFilters.date_to = campaign.today || ''
   loadDashboard()
