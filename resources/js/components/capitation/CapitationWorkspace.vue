@@ -14,6 +14,7 @@
         </v-btn>
       </AppPageHeader>
 
+      
       <!-- Generate: create period -->
       <div v-if="mode === 'generate'" class="qds-card qds-card-padding tw-space-y-4">
         <div>
