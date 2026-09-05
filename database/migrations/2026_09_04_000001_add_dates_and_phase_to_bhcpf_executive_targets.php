@@ -21,6 +21,8 @@ return new class extends Migration
 
         Schema::table('bhcpf_executive_targets', function (Blueprint $table): void {
             // Targets are now unique within a phase, not globally per LGA.
+            // MySQL needs a non-unique LGA index to keep its existing foreign key valid.
+            $table->index('lga_id', 'bhcpf_targets_lga_lookup_index');
             $table->dropUnique('bhcpf_executive_targets_lga_id_unique');
 
             if (!Schema::hasColumn('bhcpf_executive_targets', 'enrollment_phase_id')) {
@@ -46,6 +48,7 @@ return new class extends Migration
         Schema::table('bhcpf_executive_targets', function (Blueprint $table): void {
             $table->dropUnique('bhcpf_targets_phase_lga_unique');
             $table->dropConstrainedForeignId('enrollment_phase_id');
+            $table->dropIndex('bhcpf_targets_lga_lookup_index');
             $table->unique('lga_id');
         });
 

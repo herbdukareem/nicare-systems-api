@@ -206,7 +206,7 @@ export const capitationAPI = {
   exportPaymentHistoryReport: (params = {}) => api.get('/capitation/reports/history/export', { params, responseType: 'blob' }),
   enrolleeList: (id, params = {}) => api.get(`/capitation/periods/${id}/enrollee-list`, { params }),
   exportEnrolleeList: (id, params = {}) => api.get(`/capitation/periods/${id}/export-enrollee-list`, { params, responseType: 'blob' }),
-  exportRemita: (id) => api.get(`/capitation/periods/${id}/export-remita`, { responseType: 'blob' }),
+  exportRemita: (id, params = {}) => api.get(`/capitation/periods/${id}/export-remita`, { params, responseType: 'blob' }),
 };
 
 export const facilityAPI = {

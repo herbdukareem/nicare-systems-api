@@ -132,7 +132,9 @@ class CapitationTest extends TestCase
             ->assertJsonCount(1, 'data.data')
             ->assertJsonPath('data.data.0.capitation_details_count', 2)
             ->assertJsonPath('data.data.0.pending_payment_count', 1)
-            ->assertJsonPath('data.data.0.paid_count', 1);
+            ->assertJsonPath('data.data.0.paid_count', 1)
+            ->assertJsonPath('data.data.0.approved_value', 12540)
+            ->assertJsonPath('data.data.0.paid_value', 5700);
 
         $paidSlice = $this->getJson('/api/capitation/periods?per_page=100&funding_type_id=' . $bhcpf->id);
 
@@ -141,7 +143,9 @@ class CapitationTest extends TestCase
             ->assertJsonPath('data.data.0.id', $capitation->id)
             ->assertJsonPath('data.data.0.capitation_details_count', 1)
             ->assertJsonPath('data.data.0.pending_payment_count', 0)
-            ->assertJsonPath('data.data.0.paid_count', 1);
+            ->assertJsonPath('data.data.0.paid_count', 1)
+            ->assertJsonPath('data.data.0.approved_value', 5700)
+            ->assertJsonPath('data.data.0.paid_value', 5700);
 
         $pendingSlice = $this->getJson('/api/capitation/periods?per_page=100&funding_type_id=' . $gac->id);
 
@@ -150,7 +154,9 @@ class CapitationTest extends TestCase
             ->assertJsonPath('data.data.0.id', $capitation->id)
             ->assertJsonPath('data.data.0.capitation_details_count', 1)
             ->assertJsonPath('data.data.0.pending_payment_count', 1)
-            ->assertJsonPath('data.data.0.paid_count', 0);
+            ->assertJsonPath('data.data.0.paid_count', 0)
+            ->assertJsonPath('data.data.0.approved_value', 6840)
+            ->assertJsonPath('data.data.0.paid_value', 0);
     }
 
     public function test_br07_compute_counts_only_full_period_enrollees(): void

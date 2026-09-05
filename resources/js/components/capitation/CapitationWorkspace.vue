@@ -118,6 +118,10 @@
           <h2 class="tw-text-sm tw-font-semibold tw-text-gray-900">{{ workflowTitle }}</h2>
           <p class="tw-text-xs tw-text-gray-500">{{ workflowDescription }}</p>
         </div>
+        <div v-if="mode === 'approval'" class="tw-flex tw-items-start tw-gap-2 tw-border tw-border-cyan-200 tw-bg-cyan-50 tw-p-3 tw-text-sm tw-text-cyan-900">
+          <v-icon size="18" class="tw-mt-0.5">mdi-information-outline</v-icon>
+          <p>Select a funding type to view approval and payment figures for that funding type only. The period list below updates to match your selection; click <strong>Load Details</strong> to inspect the reviewed records awaiting approval.</p>
+        </div>
         <div class="tw-grid tw-grid-cols-1 tw-gap-4 md:tw-grid-cols-3">
           <v-select v-model="workflowForm.period_id" :items="periodOptions" item-title="label" item-value="id" label="Capitation period" density="comfortable" variant="outlined" />
           <v-select v-model="workflowForm.funding_type_id" :items="fundingTypes" item-title="name" item-value="id" label="Funding type" density="comfortable" variant="outlined" clearable />
@@ -196,6 +200,18 @@
             {{ periodStatusLabel(item) }}
           </v-chip>
         </template>
+        <template #item.approval_status="{ item }">
+          <v-chip size="small" :color="approvalStatusColor(item)" variant="flat">
+            {{ approvalStatusLabel(item) }}
+          </v-chip>
+        </template>
+        <template #item.payment_status="{ item }">
+          <v-chip size="small" :color="paymentStatusColor(item)" variant="flat">
+            {{ paymentStatusLabel(item) }}
+          </v-chip>
+        </template>
+        <template #item.approved_value="{ item }">NGN {{ formatAmount(item.approved_value) }}</template>
+        <template #item.paid_value="{ item }">NGN {{ formatAmount(item.paid_value) }}</template>
         <template #item.actions="{ item }">
           <div class="tw-flex tw-gap-1">
             <v-btn icon="mdi-eye" size="small" variant="text" color="primary" title="View breakdown" @click="openBreakdown(item)" />
@@ -521,13 +537,30 @@ const STATUS_COL_HEADERS = {
   payments: 'Payment Status',
 }
 
-const periodHeaders = [
-  { title: 'Name', key: 'name' },
-  { title: 'Capitation Year', key: 'year' },
-  { title: 'Generated Facilities', key: 'capitation_details_count' },
-  { title: 'Status', key: 'status' },
-  { title: '', key: 'actions', sortable: false, align: 'end' },
-]
+const periodHeaders = computed(() => {
+  const headers = [
+    { title: 'Name', key: 'name' },
+    { title: 'Capitation Year', key: 'year' },
+    { title: 'Generated Facilities', key: 'capitation_details_count' },
+  ]
+
+  if (props.mode === 'approval') {
+    headers.push(
+      { title: 'Approval Status', key: 'approval_status' },
+      { title: 'Approved No.', key: 'approved_count' },
+      { title: 'Approved Value', key: 'approved_value' },
+      { title: 'Payment Status', key: 'payment_status' },
+      { title: 'Paid No.', key: 'paid_count' },
+      { title: 'Paid Value', key: 'paid_value' },
+    )
+  } else {
+    headers.push({ title: 'Status', key: 'status' })
+  }
+
+  headers.push({ title: '', key: 'actions', sortable: false, align: 'end' })
+
+  return headers
+})
 const providerHeaders = [
   { title: 'Provider', key: 'facility_name' },
   { title: 'HCP Code', key: 'hcp_code' },
@@ -717,11 +750,7 @@ const periodStatusLabel = (item) => {
   }
 
   if (props.mode === 'approval') {
-    if (detailCount === 0) return 'Not Generated'
-    if (pendingApprovalCount > 0) return 'Pending Approval'
-    if (approvedCount > 0) return 'Approved'
-    if (reviewedCount > 0) return 'Awaiting Approval'
-    return 'Awaiting Review'
+    return approvalStatusLabel(item)
   }
 
   if (props.mode === 'payments') {
@@ -738,6 +767,57 @@ const periodStatusLabel = (item) => {
   if (item.computed_at) return 'Computed'
   return 'Draft'
 }
+
+const approvalStatusLabel = (item) => {
+  const detailCount = Number(item.capitation_details_count || 0)
+  const pendingReviewCount = Number(item.pending_review_count || 0)
+  const pendingApprovalCount = Number(item.pending_approval_count || 0)
+  const approvedCount = Number(item.approved_count || 0)
+
+  if (detailCount === 0) return 'Not Generated'
+  if (pendingReviewCount > 0) return 'Pending Review'
+  if (pendingApprovalCount > 0) return 'Pending Approval'
+  if (approvedCount >= detailCount) return 'Approved'
+  if (approvedCount > 0) return 'Partially Approved'
+  return 'Awaiting Review'
+}
+
+const approvalStatusColor = (item) => {
+  const label = approvalStatusLabel(item)
+
+  if (label === 'Approved') return 'success'
+  if (['Pending Review', 'Pending Approval'].includes(label)) return 'warning'
+  if (['Partially Approved', 'Awaiting Review'].includes(label)) return 'info'
+  return 'default'
+}
+
+const paymentStatusLabel = (item) => {
+  const detailCount = Number(item.capitation_details_count || 0)
+  const approvedCount = Number(item.approved_count || 0)
+  const pendingPaymentCount = Number(item.pending_payment_count || 0)
+  const paidCount = Number(item.paid_count || 0)
+
+  if (detailCount === 0) return 'Not Generated'
+  if (paidCount >= detailCount) return 'Paid'
+  if (paidCount > 0) return 'Partially Paid'
+  if (pendingPaymentCount > 0) return 'Pending Payment'
+  if (approvedCount > 0) return 'Awaiting Payment'
+  return 'Awaiting Approval'
+}
+
+const paymentStatusColor = (item) => {
+  const label = paymentStatusLabel(item)
+
+  if (label === 'Paid') return 'success'
+  if (label === 'Partially Paid') return 'info'
+  if (label === 'Pending Payment') return 'warning'
+  return 'default'
+}
+
+const formatAmount = (value) => Number(value || 0).toLocaleString(undefined, {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
 
 const periodStatusColor = (item) => {
   const label = periodStatusLabel(item)
@@ -1046,7 +1126,9 @@ const exportBreakdownExcel = async () => {
 const exportRemitaPeriod = async (period) => {
   if (!period) return
   try {
-    const response = await capitationAPI.exportRemita(period.id)
+    const response = await capitationAPI.exportRemita(period.id, {
+      funding_type_id: props.mode === 'payments' ? workflowForm.value.funding_type_id || undefined : undefined,
+    })
     const url = URL.createObjectURL(new Blob([response.data], { type: 'application/vnd.ms-excel' }))
     const link = document.createElement('a')
     link.href = url

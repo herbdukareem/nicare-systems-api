@@ -114,8 +114,10 @@ class CapitationController extends Controller
             'reviewed_count' => (int) ($period->reviewed_count ?? 0),
             'pending_approval_count' => (int) ($period->pending_approval_count ?? 0),
             'approved_count' => (int) ($period->approved_count ?? 0),
+            'approved_value' => (float) ($period->approved_value ?? 0),
             'pending_payment_count' => (int) ($period->pending_payment_count ?? 0),
             'paid_count' => (int) ($period->paid_count ?? 0),
+            'paid_value' => (float) ($period->paid_value ?? 0),
             'computed_at' => $period->computed_at,
             'finalised_at' => $period->finalised_at,
             'created_at' => $period->created_at,
@@ -544,13 +546,21 @@ class CapitationController extends Controller
     /**
      * Export the bank-upload spreadsheet expected by the legacy Remita process.
      */
-    public function exportRemita(Capitation $capitation): StreamedResponse
+    public function exportRemita(Request $request, Capitation $capitation): StreamedResponse
     {
-        $totalDetails = $capitation->capitationDetails()->count();
-        $details = $this->service->getBreakdown($capitation, 'paid');
+        $validated = $request->validate([
+            'funding_type_id' => ['nullable', 'integer', 'exists:funding_types,id'],
+        ]);
+        $fundingTypeId = isset($validated['funding_type_id']) ? (int) $validated['funding_type_id'] : null;
+        $totalDetails = $capitation->capitationDetails()
+            ->when($fundingTypeId, fn ($query) => $query->where('funding_type_id', $fundingTypeId))
+            ->count();
+        $details = $this->service->getBreakdown($capitation, 'paid', $fundingTypeId);
 
         if ($totalDetails === 0 || $details->count() !== $totalDetails) {
-            abort(422, 'The Remita payment format is available only after all capitation details have been marked paid.');
+            abort(422, $fundingTypeId
+                ? 'The Remita payment format is available only after all capitation details for the selected funding type have been marked paid.'
+                : 'The Remita payment format is available only after all capitation details have been marked paid.');
         }
 
         $year = (string) ($capitation->year ?: substr((string) $capitation->period_start, 0, 4));

@@ -1948,7 +1948,11 @@ class CapitationService
                 'capitationDetails as approved_count' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNotNull('approved_at'),
                 'capitationDetails as pending_payment_count' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNotNull('approved_at')->whereNull('paid_at'),
                 'capitationDetails as paid_count' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNotNull('paid_at'),
-            ]);
+            ])
+            ->withSum([
+                'capitationDetails as approved_value' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNotNull('approved_at'),
+                'capitationDetails as paid_value' => fn ($query) => $this->applyCapitationDetailFundingTypeFilter($query, $detailFundingTypeId)->whereNotNull('paid_at'),
+            ], 'total_amount');
     }
 
     private function applyCapitationDetailFundingTypeFilter(EloquentBuilder $query, ?int $fundingTypeId): EloquentBuilder
