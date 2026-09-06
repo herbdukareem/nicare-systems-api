@@ -13,7 +13,7 @@
         </v-btn>
       </AppPageHeader>
 
-      <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-3 xl:tw-grid-cols-4 2xl:tw-grid-cols-8">
+      <div class="tw-grid tw-gap-2 tw-grid-cols-2 md:tw-grid-cols-3 xl:tw-grid-cols-5">
         <AppStatCard
           v-for="card in summaryCards"
           :key="card.key"
@@ -521,9 +521,6 @@ const summaryCards = computed(() => [
   { key: 'approved', label: 'Approved', icon: 'mdi-check-decagram-outline', color: 'success', count: summary.approved, ninValue: summary.value_breakdown?.approved ?? 0 },
   { key: 'rejected', label: 'Rejected', icon: 'mdi-close-octagon-outline', color: 'danger', count: summary.rejected, ninValue: summary.value_breakdown?.rejected ?? 0 },
   { key: 'duplicates', label: 'Duplicates', icon: 'mdi-content-duplicate', color: 'secondary', count: summary.duplicates, ninValue: summary.value_breakdown?.duplicates ?? 0 },
-  { key: 'total_attempts', label: 'NIN Attempts', icon: 'mdi-timeline-check-outline', color: 'info', count: summary.total_attempts, ninValue: summary.value_breakdown?.total_attempts ?? 0 },
-  { key: 'verified', label: 'NIN Verified', icon: 'mdi-card-account-details-outline', color: 'success', count: summary.verified, ninValue: summary.value_breakdown?.verified ?? 0 },
-  { key: 'failed', label: 'Total Failed', icon: 'mdi-alert-circle-outline', color: 'danger', count: summary.failed, ninValue: summary.value_breakdown?.failed ?? 0 },
 ])
 const enrollmentTrendChartData = computed(() => ({
   labels: charts.enrollment_trend.labels || [],
