@@ -135,6 +135,29 @@
           </v-window-item>
 
           <v-window-item value="nin">
+            <AppCard
+              title="Provider Reconciliation"
+              subtitle="Uses the current date and location filters. All recorded provider activity is included; cache reuse is shown separately."
+              icon="mdi-compare-horizontal"
+              tone="secondary"
+              class="tw-mb-5"
+            >
+              <div v-if="providerReconciliation.ledger_available" class="tw-grid tw-gap-3 sm:tw-grid-cols-2 xl:tw-grid-cols-4">
+                <AppStatCard compact label="Provider Requests" icon="mdi-cloud-sync-outline" color="primary" :value="providerReconciliation.provider_requests" :loading="loading" />
+                <AppStatCard compact label="Successful Verifications" icon="mdi-check-decagram-outline" color="success" :value="providerReconciliation.successful_verifications" :loading="loading" />
+                <AppStatCard compact label="Failed Verifications" icon="mdi-alert-circle-outline" color="danger" :value="providerReconciliation.failed_verifications" :loading="loading" />
+                <AppStatCard compact label="Cache Reuses" icon="mdi-database-arrow-right-outline" color="info" :value="providerReconciliation.cache_reuses" :loading="loading" />
+              </div>
+
+              <p v-else class="tw-text-sm tw-text-slate-600">
+                Provider reconciliation will become available after the NIN attempt ledger migration is applied.
+              </p>
+
+              <p v-if="providerReconciliation.ledger_available" class="tw-mt-4 tw-text-sm tw-text-slate-600">
+                Provider requests include imported verification records and new provider calls. Cache reuses verify an enrollee from data already held by the system, so they do not make another provider request.
+              </p>
+            </AppCard>
+
             <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.35fr_0.95fr]">
               <AppCard title="NIN Verification Trend" icon="mdi-chart-line" tone="primary">
                 <LineChart :data="ninTrendChartData" :height="300" />
@@ -345,6 +368,8 @@ const summary = reactive({
   value_breakdown: defaultValueBreakdown(),
 })
 
+const providerReconciliation = reactive(defaultProviderReconciliation())
+
 const charts = reactive({
   trend: { labels: [], verified: [], failed: [] },
   enrollment_trend: { labels: [], captured: [], pending_approval: [], approved: [], rejected: [] },
@@ -455,6 +480,16 @@ function defaultValueBreakdown() {
   }
 }
 
+function defaultProviderReconciliation() {
+  return {
+    ledger_available: false,
+    provider_requests: 0,
+    successful_verifications: 0,
+    failed_verifications: 0,
+    cache_reuses: 0,
+  }
+}
+
 function defaultFilters() {
   const today = new Date()
   const end = formatDateInput(today)
@@ -490,7 +525,6 @@ const summaryCards = computed(() => [
   { key: 'verified', label: 'NIN Verified', icon: 'mdi-card-account-details-outline', color: 'success', count: summary.verified, ninValue: summary.value_breakdown?.verified ?? 0 },
   { key: 'failed', label: 'Total Failed', icon: 'mdi-alert-circle-outline', color: 'danger', count: summary.failed, ninValue: summary.value_breakdown?.failed ?? 0 },
 ])
-
 const enrollmentTrendChartData = computed(() => ({
   labels: charts.enrollment_trend.labels || [],
   datasets: [
@@ -678,6 +712,7 @@ const applyResponse = (payload = {}) => {
   }
 
   Object.assign(summary, payload.summary || {})
+  Object.assign(providerReconciliation, defaultProviderReconciliation(), payload.nin_reconciliation || {})
   Object.assign(charts, payload.charts || {})
   Object.assign(lookups, payload.lookups || {})
 

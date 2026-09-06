@@ -8,6 +8,7 @@ use App\Models\Enrollee;
 use App\Models\Facility;
 use App\Models\Lga;
 use App\Models\MobileEnrollmentRecord;
+use App\Models\NinVerificationAttempt;
 use App\Models\User;
 use App\Models\Ward;
 use App\Services\NinProviderConfigService;
@@ -35,6 +36,7 @@ class EnrollmentIntelligenceController extends BaseController
         $eligibleBase = $this->eligibleVerificationQuery($validated);
         $enrollmentBase = $this->enrollmentActivityQuery($validated, $dateFrom, $dateTo);
         $verificationValueAmount = round((float) ($this->ninProviderConfigService->getConfig()['verification_value_amount'] ?? 0), 2);
+        $ninReconciliation = $this->ninReconciliation($validated, $dateFrom, $dateTo);
 
         $verifiedCount = (clone $activityBase)
             ->where('nin_verification_status', Enrollee::NIN_VERIFICATION_VERIFIED)
@@ -357,6 +359,7 @@ class EnrollmentIntelligenceController extends BaseController
                 'verification_value_amount' => $verificationValueAmount,
                 'value_breakdown' => $summaryValueBreakdown,
             ],
+            'nin_reconciliation' => $ninReconciliation,
             'charts' => [
                 'trend' => [
                     'labels' => $trendLabels,
@@ -872,6 +875,45 @@ class EnrollmentIntelligenceController extends BaseController
     private function ninValueFromCount(int $count, float $verificationValueAmount): float
     {
         return (float) round($count * $verificationValueAmount, 2);
+    }
+
+    /**
+     * Provider-call metrics are deliberately separate from enrollee outcomes.
+     * Cache reuse verifies an enrollee without creating another provider charge.
+     *
+     * @param array<string, mixed> $filters
+     * @return array<string, int|bool>
+     */
+    private function ninReconciliation(array $filters, Carbon $dateFrom, Carbon $dateTo): array
+    {
+        if (!Schema::hasTable('nin_verification_attempts')) {
+            return [
+                'ledger_available' => false,
+                'provider_requests' => 0,
+                'successful_verifications' => 0,
+                'failed_verifications' => 0,
+                'cache_reuses' => 0,
+            ];
+        }
+
+        $base = NinVerificationAttempt::query()
+            ->whereBetween('attempted_at', [$dateFrom, $dateTo])
+            ->when(!empty($filters['provider']), fn (Builder $query) => $query->where('provider_name', $filters['provider']))
+            ->when(!empty($filters['lga_id']), fn (Builder $query) => $query->whereHas('enrollee', fn (Builder $enrolleeQuery) => $enrolleeQuery->where('lga_id', $filters['lga_id'])))
+            ->when(!empty($filters['facility_id']), fn (Builder $query) => $query->whereHas('enrollee', fn (Builder $enrolleeQuery) => $enrolleeQuery->where('facility_id', $filters['facility_id'])))
+            ->when(!empty($filters['source']), fn (Builder $query) => $query->whereHas('enrollee', fn (Builder $enrolleeQuery) => $enrolleeQuery->where('enrollment_source', $filters['source'])));
+
+        $providerRequests = (clone $base)->where('is_provider_request', true);
+
+        return [
+            'ledger_available' => true,
+            'provider_requests' => (clone $providerRequests)->count(),
+            'successful_verifications' => (clone $providerRequests)->where('status', NinVerificationAttempt::STATUS_SUCCEEDED)->count(),
+            'failed_verifications' => (clone $providerRequests)->where('status', NinVerificationAttempt::STATUS_FAILED)->count(),
+            'cache_reuses' => (clone $base)
+                ->where('status', NinVerificationAttempt::STATUS_CACHE_HIT)
+                ->count(),
+        ];
     }
 
     private function minimumIntelligenceDate(): Carbon

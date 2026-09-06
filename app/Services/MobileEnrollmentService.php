@@ -868,9 +868,9 @@ class MobileEnrollmentService
         $enrollee = $record->enrollee;
         $providerData = (array) $cache->provider_data;
         $providerName = $cache->provider_name ?: data_get($record->payload, 'nin_verification_provider') ?: 'server_cache';
-        $verifiedAt = optional($cache->verified_at)->toIso8601String()
-            ?: data_get($record->payload, 'nin_verified_at')
-            ?: now()->toIso8601String();
+        $verifiedAt = now()->toIso8601String();
+        $providerVerifiedAt = optional($cache->verified_at)->toIso8601String()
+            ?: data_get($record->payload, 'nin_verified_at');
         $comparison = $enrollee
             ? $this->ninVerificationService->comparisonFor($enrollee, $providerData)
             : [];
@@ -891,11 +891,14 @@ class MobileEnrollmentService
                 'nin_verification_meta' => [
                     'provider_name' => $providerName,
                     'verified_at' => $verifiedAt,
+                    'provider_verified_at' => $providerVerifiedAt,
                     'source' => 'server_cache_after_mobile_live_verification',
                     'cache_id' => $cache->id,
                     'cache_hit_count' => $cache->hit_count,
                 ],
             ])->save();
+
+            $this->ninVerificationService->recordCacheReuse($enrollee, $officer, (string) $enrollee->nin, $cache, 'mobile_sync');
         }
 
         $autofill = $this->applyNinAutofill($record->fresh('enrollee')->enrollee, $providerData, $policy);

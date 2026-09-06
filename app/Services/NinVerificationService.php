@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\AuditTrail;
 use App\Models\Enrollee;
 use App\Models\NinVerificationCache;
+use App\Models\NinVerificationAttempt;
 use App\Models\User;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -53,6 +54,8 @@ class NinVerificationService
             return $this->applyCachedVerification($enrollee, $verifiedBy, $cached, $config);
         }
 
+        $attempt = $this->startProviderAttempt($enrollee, $verifiedBy, (string) $enrollee->nin, $config, 'enrollee');
+
         $payload = [
             $config['request_nin_field'] => $enrollee->nin,
             $config['request_consent_field'] => $consent,
@@ -72,6 +75,7 @@ class NinVerificationService
                 ? $request->get(ltrim((string) $config['verify_endpoint'], '/'), $payload)
                 : $request->post(ltrim((string) $config['verify_endpoint'], '/'), $payload);
         } catch (Throwable $exception) {
+            $this->completeAttempt($attempt, NinVerificationAttempt::STATUS_FAILED, null, [], 'The NIN verification request could not be completed.');
             $this->markFailed($enrollee, $verifiedBy, $config, [
                 'message' => 'The NIN verification request could not be completed.',
                 'http_status' => method_exists($exception, 'response') ? $exception->response()?->status() : null,
@@ -88,6 +92,8 @@ class NinVerificationService
 
         if (!$response->successful() || !$success || !is_array($providerData)) {
             $message = $this->providerErrorMessage($body, 'The NIN provider did not return a successful verification response.');
+
+            $this->completeAttempt($attempt, NinVerificationAttempt::STATUS_FAILED, $response->status(), $body, $message);
 
             $this->markFailed($enrollee, $verifiedBy, $config, [
                 'message' => $message,
@@ -109,6 +115,7 @@ class NinVerificationService
         }
 
         if ($normalized === []) {
+            $this->completeAttempt($attempt, NinVerificationAttempt::STATUS_FAILED, $response->status(), $body, 'The NIN provider returned a successful response, but no usable enrollee fields were found.');
             $this->markFailed($enrollee, $verifiedBy, $config, [
                 'message' => 'The NIN provider returned a successful response, but no usable enrollee fields were found.',
                 'http_status' => $response->status(),
@@ -119,6 +126,7 @@ class NinVerificationService
         }
 
         $this->rememberVerification((string) $enrollee->nin, $config, $normalized, $body);
+        $this->completeAttempt($attempt, NinVerificationAttempt::STATUS_SUCCEEDED, $response->status(), $body);
 
         $comparison = $this->buildComparison($enrollee, $normalized);
 
@@ -184,6 +192,7 @@ class NinVerificationService
         }
 
         if ($cached = $this->cachedVerification($nin, $config)) {
+            $this->recordCacheReuse(null, $verifiedBy, $nin, $cached, 'mobile');
             AuditTrail::create([
                 'auditable_type' => User::class,
                 'auditable_id' => $verifiedBy->id,
@@ -206,6 +215,8 @@ class NinVerificationService
             ];
         }
 
+        $attempt = $this->startProviderAttempt(null, $verifiedBy, $nin, $config, 'mobile');
+
         $payload = [
             $config['request_nin_field'] => $nin,
             $config['request_consent_field'] => $consent,
@@ -225,6 +236,7 @@ class NinVerificationService
                 ? $request->get(ltrim((string) $config['verify_endpoint'], '/'), $payload)
                 : $request->post(ltrim((string) $config['verify_endpoint'], '/'), $payload);
         } catch (Throwable) {
+            $this->completeAttempt($attempt, NinVerificationAttempt::STATUS_FAILED, null, [], 'The NIN verification request could not be completed.');
             throw new RuntimeException('The NIN verification provider could not be reached. Try again later.');
         }
 
@@ -235,7 +247,10 @@ class NinVerificationService
         $providerData = $this->extractProviderData($body, $config);
 
         if (!$response->successful() || !$success || !is_array($providerData)) {
-            throw new RuntimeException($this->providerErrorMessage($body, 'Unable to verify NIN with the configured provider.'));
+            $message = $this->providerErrorMessage($body, 'Unable to verify NIN with the configured provider.');
+            $this->completeAttempt($attempt, NinVerificationAttempt::STATUS_FAILED, $response->status(), $body, $message);
+
+            throw new RuntimeException($message);
         }
 
         $normalized = $this->normalizeProviderData($providerData, (array) $config['field_map']);
@@ -249,10 +264,12 @@ class NinVerificationService
         }
 
         if ($normalized === []) {
+            $this->completeAttempt($attempt, NinVerificationAttempt::STATUS_FAILED, $response->status(), $body, 'The NIN provider response did not contain the expected enrollee fields.');
             throw new RuntimeException('The NIN provider response did not contain the expected enrollee fields. Review the provider configuration and logs.');
         }
 
         $this->rememberVerification($nin, $config, $normalized, $body);
+        $this->completeAttempt($attempt, NinVerificationAttempt::STATUS_SUCCEEDED, $response->status(), $body);
 
         AuditTrail::create([
             'auditable_type' => User::class,
@@ -274,6 +291,76 @@ class NinVerificationService
             'verified_nin' => $normalized['nin'] ?? $nin,
             'cached' => false,
         ];
+    }
+
+    public function recordCacheReuse(?Enrollee $enrollee, User $user, string $nin, NinVerificationCache $cache, string $channel): NinVerificationAttempt
+    {
+        return NinVerificationAttempt::query()->create([
+            'enrollee_id' => $enrollee?->id,
+            'user_id' => $user->id,
+            'nin_hash' => $this->ninHash($nin),
+            'provider_name' => $cache->provider_name,
+            'channel' => $channel,
+            'status' => NinVerificationAttempt::STATUS_CACHE_HIT,
+            'is_provider_request' => false,
+            'is_reconstructed' => false,
+            'metadata' => [
+                'cache_id' => $cache->id,
+                'cache_hit_count' => $cache->hit_count,
+                'provider_verified_at' => optional($cache->verified_at)->toIso8601String(),
+            ],
+            'attempted_at' => now(),
+            'completed_at' => now(),
+        ]);
+    }
+
+    private function startProviderAttempt(?Enrollee $enrollee, User $user, string $nin, array $config, string $channel): NinVerificationAttempt
+    {
+        return NinVerificationAttempt::query()->create([
+            'enrollee_id' => $enrollee?->id,
+            'user_id' => $user->id,
+            'nin_hash' => $this->ninHash($nin),
+            'provider_name' => $config['provider_name'] ?? null,
+            'channel' => $channel,
+            'status' => 'pending',
+            'is_provider_request' => true,
+            'is_reconstructed' => false,
+            'metadata' => [
+                'request_method' => strtoupper((string) ($config['request_method'] ?? 'POST')),
+                'verify_endpoint' => (string) ($config['verify_endpoint'] ?? ''),
+            ],
+            'attempted_at' => now(),
+        ]);
+    }
+
+    private function completeAttempt(NinVerificationAttempt $attempt, string $status, ?int $httpStatus, array $response, ?string $failureMessage = null): void
+    {
+        $attempt->forceFill([
+            'status' => $status,
+            'http_status' => $httpStatus,
+            'provider_reference' => $this->providerReference($response),
+            'failure_message' => $failureMessage,
+            'completed_at' => now(),
+        ])->save();
+    }
+
+    private function ninHash(string $nin): string
+    {
+        $normalized = preg_replace('/\D+/', '', $nin) ?: $nin;
+
+        return hash('sha256', $normalized);
+    }
+
+    private function providerReference(array $response): ?string
+    {
+        foreach (['request_id', 'requestId', 'reference', 'transaction_id', 'transactionId', 'data.request_id', 'data.reference', 'data.transaction_id', 'data.id'] as $path) {
+            $value = data_get($response, $path);
+            if (is_scalar($value) && trim((string) $value) !== '') {
+                return substr(trim((string) $value), 0, 255);
+            }
+        }
+
+        return null;
     }
 
     private function cachedVerification(string $nin, array $config): ?NinVerificationCache
@@ -319,10 +406,11 @@ class NinVerificationService
     {
         $providerData = (array) $cache->provider_data;
         $comparison = $this->buildComparison($enrollee, $providerData);
+        $appliedAt = now();
 
         $enrollee->forceFill([
             'nin_verification_status' => Enrollee::NIN_VERIFICATION_VERIFIED,
-            'nin_verified_at' => $cache->verified_at ?? now(),
+            'nin_verified_at' => $appliedAt,
             'nin_verified_by' => $verifiedBy->id,
             'nin_verification_provider' => $cache->provider_name ?: $config['provider_name'],
             'nin_verification_data' => [
@@ -333,11 +421,14 @@ class NinVerificationService
             ],
             'nin_verification_meta' => [
                 'provider_name' => $cache->provider_name ?: $config['provider_name'],
-                'verified_at' => optional($cache->verified_at)->toIso8601String() ?: now()->toIso8601String(),
+                'verified_at' => $appliedAt->toIso8601String(),
+                'provider_verified_at' => optional($cache->verified_at)->toIso8601String(),
                 'cache_id' => $cache->id,
                 'cache_hit_count' => $cache->hit_count,
             ],
         ])->save();
+
+        $this->recordCacheReuse($enrollee, $verifiedBy, (string) $enrollee->nin, $cache, 'enrollee');
 
         AuditTrail::create([
             'auditable_type' => Enrollee::class,
