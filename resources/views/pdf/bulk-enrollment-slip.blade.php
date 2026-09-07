@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: A4 landscape; margin: 8mm; }
+  @page { size: A4 landscape; margin: 6mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
     font-family: DejaVu Sans, Arial, sans-serif;
@@ -14,16 +14,21 @@
 
   .slip-grid {
     width: 100%;
-    border-collapse: separate;
-    border-spacing: 2mm 2mm;
+    border-collapse: collapse;
     table-layout: fixed;
+    page-break-inside: avoid;
   }
-  .slip-grid-cell { width: 50%; vertical-align: top; }
+  .slip-grid-cell {
+    width: 50%;
+    vertical-align: top;
+  }
   .slip {
-    width: 100%;
-    height: 93mm;
+    width: auto;
+    /* DomPDF adds padding to fixed heights even with border-box. */
+    height: 86mm;
+    margin: 1mm;
     border: 0.75pt solid #565c62;
-    padding: 2mm 2.4mm 1.5mm;
+    padding: 2mm 2.4mm 7.5mm;
     page-break-inside: avoid;
     overflow: hidden;
     position: relative;
@@ -86,6 +91,8 @@
     height: 5.4mm;
     vertical-align: middle;
     font-size: 6.3pt;
+    white-space: nowrap;
+    overflow: hidden;
   }
   .details-tbl tr:last-child td { border-bottom: none; }
   .details-tbl td:last-child { border-right: none; }
@@ -95,20 +102,32 @@
   .two-col-right { width: 50%; }
 
   .coverage-line {
-    padding: 0.9mm 0.2mm 0.7mm;
+    position: absolute;
+    right: 2.4mm;
+    bottom: 4.7mm;
+    left: 2.4mm;
+    padding: 0;
     color: #4e555c;
     font-size: 5.5pt;
-    line-height: 1.5;
+    line-height: 1.25;
+    white-space: nowrap;
+    overflow: hidden;
   }
   .coverage-line strong { color: #30353a; }
   .status-approved { color: #15743c; font-weight: bold; }
   .status-pending { color: #a15c00; font-weight: bold; }
 
   .slip-foot {
+    position: absolute;
+    right: 2.4mm;
+    bottom: 1.2mm;
+    left: 2.4mm;
     border-top: 0.55pt solid #a8adb3;
-    padding-top: 0.6mm;
+    padding-top: 0.45mm;
     color: #555b61;
     font-size: 4.9pt;
+    white-space: nowrap;
+    overflow: hidden;
   }
   .foot-left { width: 27%; }
   .foot-right { width: 73%; text-align: right; }
@@ -144,7 +163,7 @@
 @foreach($enrollees->chunk(4) as $pageChunk)
   <table class="slip-grid">
     @foreach($pageChunk->chunk(2) as $rowChunk)
-      <tr>
+      <tr class="slip-grid-row">
       @foreach($rowChunk as $enrollee)
       @php
         $isApproved = !empty($enrollee->approval_date);

@@ -20,14 +20,16 @@ use App\Services\NinVerificationService;
 use App\Services\VulnerableGroupAssignmentService;
 use App\Support\PdfQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
+use Illuminate\Contracts\Encryption\DecryptException;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
-use ZipArchive;
 
 /**
  * Class EnrolleeController
@@ -36,6 +38,10 @@ use ZipArchive;
  */
 class EnrolleeController extends BaseController
 {
+    private const BULK_ENROLLMENT_SLIP_CHUNK_SIZE = 40;
+
+    private const BULK_ENROLLMENT_SLIP_TOKEN_TTL_MINUTES = 120;
+
     /**
      * @var EnrolleeService
      */
@@ -660,88 +666,151 @@ class EnrolleeController extends BaseController
             return $this->sendError('Enter an Enrollment Number or NIN, or select at least a Benefactor or Provider/Facility.', [], 422);
         }
 
-        $query = Enrollee::query()
-            ->with([
-                'insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage',
-                'fundingType', 'vulnerableGroup', 'facility', 'lga', 'ward',
-            ]);
+        if ($facilityId) {
+            $data['facility_id'] = $facilityId;
+        }
+        unset($data['provider_id']);
+
+        $query = $this->buildEnrollmentSlipQuery($data, $identifier);
 
         if ($identifier !== '') {
-            $normalizedNin = preg_match('/^[\d\s-]+$/', $identifier) === 1
-                ? Enrollee::normalizeNin($identifier)
-                : null;
+            $enrollees = $query->limit(2)->get();
 
-            $query->where(function ($identifierQuery) use ($identifier, $normalizedNin): void {
-                $identifierQuery
-                    ->where('enrollee_id', $identifier)
-                    ->orWhere('legacy_enrollee_id', $identifier);
+            if ($enrollees->isEmpty()) {
+                return $this->sendError('No enrollee was found with that Enrollment Number or NIN.', [], 404);
+            }
 
-                if ($normalizedNin !== null) {
-                    $identifierQuery->orWhere('nin', $normalizedNin);
-                }
-            });
+            if ($enrollees->count() > 1) {
+                return $this->sendError('More than one enrollee matches that identifier. Use the unique Enrollment Number instead.', [], 422);
+            }
+
+            $singleFilename = 'enrollment_slip_'
+                . preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) $enrollees->first()->enrollee_id)
+                . '.pdf';
+
+            return $this->streamBulkEnrollmentSlipPdf($enrollees, $data, auth()->user(), now(), null, null, $singleFilename);
         }
 
-        if ($identifier === '') {
-            foreach ([
-                'benefactor_id' => 'benefactor_id',
-                'insurance_programme_id' => 'insurance_programme_id',
-                'enrollee_category_id' => 'enrollee_category_id',
-                'funding_type_id' => 'funding_type_id',
-                'enrollment_phase_id' => 'enrollment_phase_id',
-                'status' => 'status',
-            ] as $key => $column) {
-                if (array_key_exists($key, $data) && $data[$key] !== null && $data[$key] !== '') {
-                    $query->where($column, $data[$key]);
-                }
-            }
-
-            if ($facilityId) {
-                $query->where('facility_id', $facilityId);
-            }
-
-            if (($data['approval_status'] ?? null) === 'pending') {
-                $query->where('status', Enrollee::STATUS_PENDING);
-            } elseif (($data['approval_status'] ?? null) === 'approved') {
-                $query->whereNotNull('approval_date')->where('status', Enrollee::STATUS_ACTIVE);
-            }
-
-            if (!empty($data['date_from'])) {
-                $query->where('created_at', '>=', Carbon::parse($data['date_from'])->startOfDay());
-            }
-            if (!empty($data['date_to'])) {
-                $query->where('created_at', '<=', Carbon::parse($data['date_to'])->endOfDay());
-            }
+        // Freeze the upper ID boundary and use keyset pagination for every part.
+        // This includes all matches without placing thousands of IDs in the token.
+        $snapshotMaxId = (int) (clone $query)->reorder()->max('id');
+        if ($snapshotMaxId < 1) {
+            return $this->sendError('No enrollees match the selected filters.', [], 404);
         }
 
-        $enrollees = $query
-            ->orderBy('facility_id')
-            ->orderBy('benefactor_id')
-            ->orderBy('last_name')
-            ->limit($identifier !== '' ? 2 : 500)
-            ->get();
-
-        if ($identifier !== '' && $enrollees->isEmpty()) {
-            return $this->sendError('No enrollee was found with that Enrollment Number or NIN.', [], 404);
-        }
-
-        if ($identifier !== '' && $enrollees->count() > 1) {
-            return $this->sendError('More than one enrollee matches that identifier. Use the unique Enrollment Number instead.', [], 422);
+        $matchingCount = (int) (clone $query)
+            ->where('id', '<=', $snapshotMaxId)
+            ->reorder()
+            ->count();
+        if ($matchingCount < 1) {
+            return $this->sendError('No enrollees match the selected filters.', [], 404);
         }
 
         $generatedAt = now();
-        $generatedBy = auth()->user();
-        $syncPdfChunkSize = 80;
+        $expiresAt = $generatedAt->copy()->addMinutes(self::BULK_ENROLLMENT_SLIP_TOKEN_TTL_MINUTES);
+        $totalParts = (int) ceil($matchingCount / self::BULK_ENROLLMENT_SLIP_CHUNK_SIZE);
+        $token = Crypt::encryptString(json_encode([
+            'requested_by' => (int) auth()->id(),
+            'filters' => $data,
+            'snapshot_max_id' => $snapshotMaxId,
+            'enrollee_count' => $matchingCount,
+            'generated_at' => $generatedAt->timestamp,
+            'expires_at' => $expiresAt->timestamp,
+        ], JSON_THROW_ON_ERROR));
 
-        if ($enrollees->count() <= $syncPdfChunkSize) {
-            $singleFilename = $identifier !== ''
-                ? 'enrollment_slip_' . preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) $enrollees->first()->enrollee_id) . '.pdf'
-                : null;
+        return $this->sendResponse(
+            [
+                'token' => $token,
+                'enrollee_count' => $matchingCount,
+                'chunk_size' => self::BULK_ENROLLMENT_SLIP_CHUNK_SIZE,
+                'total_parts' => $totalParts,
+                'processed_count' => 0,
+                'progress' => 0,
+                'expires_at' => $expiresAt->toIso8601String(),
+                'file_name' => 'bulk_enrollment_slips_' . $generatedAt->format('Ymd_His') . '.zip',
+            ],
+            "Preparing all {$matchingCount} matching enrollment slips in smaller parts."
+        );
+    }
 
-            return $this->streamBulkEnrollmentSlipPdf($enrollees, $data, $generatedBy, $generatedAt, null, null, $singleFilename);
+    public function bulkEnrollmentSlipPart(Request $request)
+    {
+        $this->extendPdfExecutionWindow(120, '512M');
+
+        $data = $request->validate([
+            'token' => ['required', 'string', 'max:50000'],
+            'part' => ['required', 'integer', 'min:1'],
+            'cursor' => ['nullable', 'integer', 'min:0'],
+        ]);
+
+        try {
+            $payload = json_decode(Crypt::decryptString($data['token']), true, 512, JSON_THROW_ON_ERROR);
+        } catch (DecryptException|\JsonException) {
+            return $this->sendError('The enrollment slip export token is invalid. Please start the export again.', [], 422);
         }
 
-        return $this->downloadBulkEnrollmentSlipZip($enrollees, $data, $generatedBy, $generatedAt, $syncPdfChunkSize);
+        if (!is_array($payload) || !is_array($payload['filters'] ?? null)) {
+            return $this->sendError('The enrollment slip export token is invalid. Please start the export again.', [], 422);
+        }
+
+        if ((int) ($payload['requested_by'] ?? 0) !== (int) auth()->id()) {
+            return $this->sendError('You are not authorized to download this enrollment slip export.', [], 403);
+        }
+
+        if ((int) ($payload['expires_at'] ?? 0) < now()->timestamp) {
+            return $this->sendError('The enrollment slip export has expired. Please start it again.', [], 410);
+        }
+
+        $snapshotMaxId = (int) ($payload['snapshot_max_id'] ?? 0);
+        $matchingCount = (int) ($payload['enrollee_count'] ?? 0);
+        if ($snapshotMaxId < 1 || $matchingCount < 1) {
+            return $this->sendError('The enrollment slip export token is invalid. Please start the export again.', [], 422);
+        }
+
+        $partNumber = (int) $data['part'];
+        $totalParts = (int) ceil($matchingCount / self::BULK_ENROLLMENT_SLIP_CHUNK_SIZE);
+        if ($partNumber > $totalParts) {
+            return $this->sendError('The requested enrollment slip part does not exist.', [], 422);
+        }
+
+        $cursor = (int) ($data['cursor'] ?? 0);
+        if ($cursor > $snapshotMaxId || ($partNumber > 1 && $cursor < 1)) {
+            return $this->sendError('The enrollment slip export cursor is invalid. Please start the export again.', [], 422);
+        }
+
+        $filters = $payload['filters'];
+        $enrollees = $this->buildEnrollmentSlipQuery($filters)
+            ->where('id', '>', $cursor)
+            ->where('id', '<=', $snapshotMaxId)
+            ->reorder()
+            ->orderBy('id')
+            ->limit(self::BULK_ENROLLMENT_SLIP_CHUNK_SIZE)
+            ->get()
+            ->values();
+
+        if ($enrollees->isEmpty()) {
+            return $this->sendError('No enrollees remain available for this export part.', [], 404);
+        }
+
+        $generatedAt = Carbon::createFromTimestamp((int) ($payload['generated_at'] ?? now()->timestamp));
+        $filename = $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts);
+        $response = $this->streamBulkEnrollmentSlipPdf(
+            $enrollees,
+            $filters,
+            auth()->user(),
+            $generatedAt,
+            $partNumber,
+            $totalParts,
+            $filename
+        );
+
+        $response->headers->set('Cache-Control', 'no-store, private');
+        $response->headers->set('X-Enrollment-Slip-Count', (string) $enrollees->count());
+        $response->headers->set('X-Enrollment-Slip-Part', (string) $partNumber);
+        $response->headers->set('X-Enrollment-Slip-Total-Parts', (string) $totalParts);
+        $response->headers->set('X-Enrollment-Slip-Next-Cursor', (string) $enrollees->last()->id);
+
+        return $response;
     }
 
     /**
@@ -1386,60 +1455,65 @@ class EnrolleeController extends BaseController
         return $pdf->stream($filename);
     }
 
-    private function downloadBulkEnrollmentSlipZip(
-        Collection $enrollees,
-        array $filters,
-        $generatedBy,
-        Carbon $generatedAt,
-        int $chunkSize
-    ) {
-        $tempDir = storage_path('app/temp/bulk-enrollment-slip');
-        if (!is_dir($tempDir)) {
-            mkdir($tempDir, 0777, true);
-        }
+    private function buildEnrollmentSlipQuery(array $filters, string $identifier = ''): Builder
+    {
+        $query = Enrollee::query()
+            ->with([
+                'insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage',
+                'fundingType', 'vulnerableGroup', 'facility', 'lga', 'ward',
+            ]);
 
-        $zipFileName = 'bulk_enrollment_slips_' . $generatedAt->format('Ymd_His') . '.zip';
-        $zipPath = $tempDir . DIRECTORY_SEPARATOR . $zipFileName;
+        if ($identifier !== '') {
+            $normalizedNin = preg_match('/^[\d\s-]+$/', $identifier) === 1
+                ? Enrollee::normalizeNin($identifier)
+                : null;
 
-        if (file_exists($zipPath)) {
-            @unlink($zipPath);
-        }
+            $query->where(function (Builder $identifierQuery) use ($identifier, $normalizedNin): void {
+                $identifierQuery
+                    ->where('enrollee_id', $identifier)
+                    ->orWhere('legacy_enrollee_id', $identifier);
 
-        $zip = new ZipArchive();
-        if ($zip->open($zipPath, ZipArchive::CREATE | ZipArchive::OVERWRITE) !== true) {
-            return $this->sendError('Could not prepare the bulk enrollment slip package.', [], 500);
-        }
-
-        $chunks = $enrollees->chunk($chunkSize)->values();
-        $totalParts = $chunks->count();
-
-        foreach ($chunks as $index => $chunk) {
-            $partNumber = $index + 1;
-            $this->hydratePdfPhotoSources($chunk, 120, 150, 70, false);
-            $this->hydratePdfQrSources($chunk);
-
-            $pdf = $this->makeBulkEnrollmentSlipPdf($chunk, $filters, $generatedBy, $generatedAt, $partNumber, $totalParts);
-            $zip->addFromString(
-                $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts),
-                $pdf->output()
-            );
-
-            unset($pdf);
-            $chunk->each(static function (Enrollee $enrollee): void {
-                $enrollee->offsetUnset('pdf_photo_src');
-                $enrollee->offsetUnset('pdf_qr_src');
+                if ($normalizedNin !== null) {
+                    $identifierQuery->orWhere('nin', $normalizedNin);
+                }
             });
+        } else {
+            foreach ([
+                'benefactor_id',
+                'insurance_programme_id',
+                'enrollee_category_id',
+                'funding_type_id',
+                'enrollment_phase_id',
+                'status',
+            ] as $column) {
+                if (array_key_exists($column, $filters) && $filters[$column] !== null && $filters[$column] !== '') {
+                    $query->where($column, $filters[$column]);
+                }
+            }
 
-            if (function_exists('gc_collect_cycles')) {
-                gc_collect_cycles();
+            if (!empty($filters['facility_id'])) {
+                $query->where('facility_id', $filters['facility_id']);
+            }
+
+            if (($filters['approval_status'] ?? null) === 'pending') {
+                $query->where('status', Enrollee::STATUS_PENDING);
+            } elseif (($filters['approval_status'] ?? null) === 'approved') {
+                $query->whereNotNull('approval_date')->where('status', Enrollee::STATUS_ACTIVE);
+            }
+
+            if (!empty($filters['date_from'])) {
+                $query->where('created_at', '>=', Carbon::parse($filters['date_from'])->startOfDay());
+            }
+            if (!empty($filters['date_to'])) {
+                $query->where('created_at', '<=', Carbon::parse($filters['date_to'])->endOfDay());
             }
         }
 
-        $zip->close();
-
-        return response()->download($zipPath, $zipFileName, [
-            'Content-Type' => 'application/zip',
-        ])->deleteFileAfterSend(true);
+        return $query
+            ->orderBy('facility_id')
+            ->orderBy('benefactor_id')
+            ->orderBy('last_name')
+            ->orderBy('id');
     }
 
     private function makeBulkEnrollmentSlipPdf(

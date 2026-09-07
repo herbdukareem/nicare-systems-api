@@ -206,6 +206,10 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,enrollment-phase.manage,settings.edit');
     Route::get('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip'])
         ->middleware('permission:any,enrollees.view,enrollee.print-bulk-slip');
+    Route::post('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip'])
+        ->middleware('permission:any,enrollees.view,enrollee.print-bulk-slip');
+    Route::post('enrollees/bulk-enrollment-slip/part', [EnrolleeController::class, 'bulkEnrollmentSlipPart'])
+        ->middleware('permission:any,enrollees.view,enrollee.print-bulk-slip');
     Route::get('enrollees/bulk-id-card', [EnrolleeController::class, 'bulkIdCard'])
         ->middleware('permission:any,enrollees.view,enrollee.print-id-card');
     Route::post('enrollees/{enrollee}/verify-nin', [EnrolleeController::class, 'verifyNin'])

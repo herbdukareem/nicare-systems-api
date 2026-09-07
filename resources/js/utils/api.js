@@ -149,6 +149,15 @@ export const enrolleeAPI = {
     responseType: 'blob',
     timeout: 120000,
   }),
+  prepareBulkEnrollmentSlip: (params) => api.post('/enrollees/bulk-enrollment-slip', params, {
+    showGlobalLoader: false,
+  }),
+  bulkEnrollmentSlipPart: (data, config = {}) => api.post('/enrollees/bulk-enrollment-slip/part', data, {
+    ...config,
+    responseType: 'blob',
+    timeout: 120000,
+    showGlobalLoader: false,
+  }),
   bulkIdCard: (params) => api.get('/enrollees/bulk-id-card', { params, responseType: 'blob', timeout: 120000 }),
   getStatsByFacility: (facilityId) => api.get(`/enrollees/stats/facility/${facilityId}`),
   getActivity: (id) => api.get(`/enrollees/${id}/activity`),
