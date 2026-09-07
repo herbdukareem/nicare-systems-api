@@ -3,138 +3,129 @@
 <head>
 <meta charset="utf-8">
 <style>
-  @page { size: A4; margin: 12mm 12mm 12mm 12mm; }
+  @page { size: A4 landscape; margin: 8mm; }
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: Helvetica, Arial, sans-serif; color: #111; font-size: 9pt; line-height: 1.4; }
-
-  .letterhead { width: 100%; border-bottom: 2pt solid #0d3b6e; padding-bottom: 4mm; margin-bottom: 4mm; }
-  .lh-tbl { width: 100%; border-collapse: collapse; }
-  .lh-logo { width: 18mm; text-align: center; vertical-align: middle; }
-  .lh-logo img { width: 16mm; height: 16mm; }
-  .lh-center { vertical-align: middle; text-align: center; padding: 0 3mm; }
-  .lh-state { font-size: 15pt; font-weight: bold; color: #0d3b6e; letter-spacing: 1px; text-transform: uppercase; line-height: 1.1; }
-  .lh-agency { font-size: 8.5pt; color: #c62828; font-weight: bold; letter-spacing: 0.3px; margin-top: 1mm; }
-  .lh-unit { font-size: 7pt; color: #555; margin-top: 0.5mm; }
-
-  .cover-title-box {
-    text-align: center;
-    border: 2pt solid #0d3b6e;
-    padding: 5mm 6mm;
-    margin: 6mm 0;
-    background: #eef2ff;
+  body {
+    font-family: DejaVu Sans, Arial, sans-serif;
+    color: #20252b;
+    font-size: 7.2pt;
+    line-height: 1.28;
   }
-  .cover-title { font-size: 13pt; font-weight: bold; color: #0d3b6e; text-transform: uppercase; letter-spacing: 0.8px; }
-  .cover-subtitle { font-size: 8.5pt; color: #444; margin-top: 1.5mm; }
 
-  .stats-tbl { width: 100%; border-collapse: collapse; margin: 5mm 0; }
-  .stats-tbl td { border: 1pt solid #c8d3e8; padding: 4mm 3mm; text-align: center; }
-  .stat-n { font-size: 18pt; font-weight: bold; color: #0d3b6e; line-height: 1; }
-  .stat-n-green { color: #16a34a; }
-  .stat-n-amber { color: #d97706; }
-  .stat-l { font-size: 6.5pt; text-transform: uppercase; letter-spacing: 0.3px; color: #666; margin-top: 1mm; }
+  .slip-grid {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 2mm 2mm;
+    table-layout: fixed;
+  }
+  .slip-grid-cell { width: 50%; vertical-align: top; }
+  .slip {
+    width: 100%;
+    height: 93mm;
+    border: 0.75pt solid #565c62;
+    padding: 2mm 2.4mm 1.5mm;
+    page-break-inside: avoid;
+    overflow: hidden;
+    position: relative;
+  }
 
-  .meta-tbl { width: 100%; border-collapse: collapse; margin: 4mm 0; }
-  .meta-tbl td { padding: 2.5mm 2mm; border-bottom: 0.5pt solid #d0d8e8; font-size: 8.5pt; }
-  .meta-lbl { color: #555; width: 40%; text-transform: uppercase; font-size: 7.5pt; letter-spacing: 0.2px; }
-  .meta-val { font-weight: bold; color: #0d3b6e; }
+  .hero-tbl,
+  .summary-tbl,
+  .details-tbl,
+  .foot-tbl { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
-  .notice-box {
-    border-left: 3pt solid #0d3b6e;
-    background: #f4f6ff;
-    padding: 3mm 4mm;
-    font-size: 7.5pt;
-    color: #333;
-    margin: 5mm 0;
+  .hero-spacer { width: 20mm; }
+  .hero-main { text-align: center; vertical-align: top; }
+  .hero-photo { width: 22mm; text-align: right; vertical-align: top; }
+  .agency-logo { width: 10mm; height: 10mm; object-fit: contain; display: inline-block; }
+  .agency-name {
+    color: #1684dc;
+    font-size: 6.6pt;
+    font-weight: bold;
+    line-height: 1.15;
+    margin-top: 0.4mm;
+    white-space: nowrap;
+  }
+  .slip-title {
+    display: inline-block;
+    margin-top: 1mm;
+    padding: 0.9mm 1.6mm 1mm;
+    background: #238fe9;
+    border-radius: 3pt;
+    color: #fff;
+    font-size: 6.3pt;
+    font-weight: bold;
+    line-height: 1;
+    white-space: nowrap;
+  }
+  .passport,
+  .passport-ph {
+    width: 18mm;
+    height: 20mm;
+    border: 0.6pt solid #c7ccd1;
+    display: inline-block;
+  }
+  .passport { object-fit: cover; }
+  .passport-ph { background: #f1f3f5; text-align: center; color: #98a1aa; padding-top: 7.4mm; font-size: 4.5pt; }
+
+  .summary-tbl { margin-top: 0.8mm; margin-bottom: 0.8mm; }
+  .summary-info { width: 58%; vertical-align: middle; padding-left: 0.2mm; }
+  .summary-qr { width: 19%; text-align: center; vertical-align: middle; }
+  .summary-space { width: 23%; }
+  .summary-line { margin-bottom: 0.45mm; }
+  .summary-line:last-child { margin-bottom: 0; }
+  .summary-label { font-weight: bold; color: #20252b; }
+  .summary-value { font-weight: bold; color: #2f3439; }
+  .qr-img { width: 14mm; height: 14mm; display: inline-block; }
+
+  .details-tbl { border: 0.65pt solid #747b82; }
+  .details-tbl td {
+    border-right: 0.55pt solid #92989e;
+    border-bottom: 0.55pt solid #92989e;
+    padding: 0.65mm 1mm;
+    height: 5.4mm;
+    vertical-align: middle;
+    font-size: 6.3pt;
+  }
+  .details-tbl tr:last-child td { border-bottom: none; }
+  .details-tbl td:last-child { border-right: none; }
+  .details-label { font-weight: bold; color: #30353a; }
+  .details-value { color: #343a40; }
+  .two-col-left { width: 50%; }
+  .two-col-right { width: 50%; }
+
+  .coverage-line {
+    padding: 0.9mm 0.2mm 0.7mm;
+    color: #4e555c;
+    font-size: 5.5pt;
     line-height: 1.5;
   }
+  .coverage-line strong { color: #30353a; }
+  .status-approved { color: #15743c; font-weight: bold; }
+  .status-pending { color: #a15c00; font-weight: bold; }
 
-  .sign-tbl { width: 100%; border-collapse: collapse; margin-top: 12mm; }
-  .sign-tbl td { padding: 0 4mm; }
-  .sign-line { border-bottom: 1pt solid #444; height: 10mm; }
-  .sign-lbl { font-size: 7pt; color: #444; margin-top: 1mm; }
-  .sign-sub { font-size: 6pt; color: #888; margin-top: 0.5mm; }
-
-  .cover-foot {
-    border-top: 1pt solid #0d3b6e;
-    margin-top: 8mm;
-    padding-top: 2.5mm;
-    font-size: 7pt;
-    color: #555;
+  .slip-foot {
+    border-top: 0.55pt solid #a8adb3;
+    padding-top: 0.6mm;
+    color: #555b61;
+    font-size: 4.9pt;
   }
-  .cf-tbl { width: 100%; border-collapse: collapse; }
+  .foot-left { width: 27%; }
+  .foot-right { width: 73%; text-align: right; }
 
   .page-break { page-break-after: always; }
-
-  .slip-grid { width: 100%; border-collapse: separate; border-spacing: 3mm 3mm; table-layout: fixed; }
-  .slip-grid-cell { width: 50%; vertical-align: top; }
-  .slip { border: 1pt solid #0d3b6e; page-break-inside: avoid; }
-
-  .slip-hdr { background: #0d3b6e; color: white; padding: 1.6mm 2.2mm; }
-  .slip-hdr-tbl { width: 100%; border-collapse: collapse; }
-  .slip-hdr-logo-cell { width: 12mm; vertical-align: middle; }
-  .slip-hdr-logo {
-    width: 10mm;
-    height: 10mm;
-    display: block;
-    object-fit: contain;
-  }
-  .slip-hdr-main { vertical-align: middle; padding: 0 1.4mm; }
-  .slip-hdr-meta { width: 1mm; vertical-align: middle; text-align: right; }
-  .slip-hdr-title { font-size: 6.8pt; font-weight: bold; letter-spacing: 0.15px; text-transform: uppercase; }
-  .slip-hdr-sub { font-size: 5.3pt; color: rgba(255,255,255,0.78); margin-top: 0.3mm; }
-
-  .slip-body-tbl { width: 100%; border-collapse: collapse; }
-  .slip-fields-td { vertical-align: top; padding: 1.8mm 2.2mm 1.5mm; }
-  .slip-photo-td { width: 22mm; vertical-align: top; padding: 1.8mm 2mm; border-left: 0.5pt solid #d8e0ec; text-align: center; }
-
-  .photo-box { width: 17mm; height: 22mm; border: 1pt solid #b0bcc8; background: #edf1f7; display: block; margin: 0 auto; }
-  .photo-lbl { font-size: 4.8pt; color: #888; margin-top: 1mm; text-align: center; }
-
-  .nicare-badge {
-    margin-top: 1.8mm;
-    border: 1pt solid #0d3b6e;
-    padding: 1.2mm;
-    text-align: center;
-  }
-  .nicare-badge-lbl { font-size: 4.5pt; color: #666; text-transform: uppercase; letter-spacing: 0.2px; }
-  .nicare-badge-val { font-size: 6.6pt; font-weight: bold; color: #0d3b6e; margin-top: 0.35mm; }
-
-  .field-tbl { width: 100%; border-collapse: collapse; }
-  .field-tbl tr td { padding: 0.95mm 0.7mm; border-bottom: 0.5pt solid #e8ecf4; vertical-align: top; }
-  .field-tbl tr:last-child td { border-bottom: none; }
-  .f-lbl { font-size: 5.8pt; color: #555; text-transform: uppercase; letter-spacing: 0.1px; width: 37%; white-space: nowrap; }
-  .f-val { font-size: 6.5pt; font-weight: bold; color: #111; }
-  .f-val-id { font-size: 7.6pt; font-weight: bold; color: #0d3b6e; }
-  .f-approved { color: #15803d; font-weight: bold; }
-  .f-pending { color: #b45309; font-weight: bold; }
-
-  .slip-cert {
-    border-top: 0.5pt solid #d0d8e8;
-    background: #f7f9ff;
-    padding: 1.4mm 2.2mm;
-    font-size: 5.7pt;
-    color: #333;
-    font-style: italic;
-    line-height: 1.25;
-  }
-
-  .slip-foot { background: #0d3b6e; color: rgba(255,255,255,0.85); padding: 1mm 2.2mm; font-size: 5.2pt; }
-  .sf-tbl { width: 100%; border-collapse: collapse; }
-  .sf-right { text-align: right; }
 </style>
 </head>
 <body>
 
 @php
   $batchRef = 'NGSCHA-BATCH-' . $generatedAt->format('Ymd-His');
-  $total = $enrollees->count();
-  $approved = $enrollees->filter(fn ($e) => !empty($e->approval_date))->count();
-  $pending = $total - $approved;
   $agencyLogoPath = null;
   $logoCandidates = [
     [public_path('logo-slip.jpg'), 'image/jpeg'],
     [public_path('logo.png'), 'image/png'],
   ];
+
   foreach ($logoCandidates as [$logoFilePath, $logoMimeType]) {
     if (!file_exists($logoFilePath)) {
       continue;
@@ -148,244 +139,134 @@
     $agencyLogoPath = 'data:' . $logoMimeType . ';base64,' . base64_encode($logoBytes);
     break;
   }
-  $slipLogoPath = $agencyLogoPath;
 @endphp
-
-<div class="letterhead">
-  <table class="lh-tbl">
-    <tr>
-      <td class="lh-logo"></td>
-      <td class="lh-center">
-        <div class="lh-state">Niger State</div>
-        <div class="lh-agency">Contributory Health Agency (NGSCHA)</div>
-        <div class="lh-unit">Health Insurance Management System - NiCare</div>
-      </td>
-      <td class="lh-logo">
-        @if($agencyLogoPath)
-          <img src="{{ $agencyLogoPath }}" alt="NGSCHA Logo">
-        @endif
-      </td>
-    </tr>
-  </table>
-</div>
-
-<div class="cover-title-box">
-  <div class="cover-title">Health Insurance Enrollment Batch Slip</div>
-  <div class="cover-subtitle">Official Record of Enrolled Beneficiaries - For Administrative Use Only</div>
-</div>
-
-<table class="stats-tbl">
-  <tr>
-    <td>
-      <div class="stat-n">{{ $total }}</div>
-      <div class="stat-l">Total Enrollees</div>
-    </td>
-    <td>
-      <div class="stat-n stat-n-green">{{ $approved }}</div>
-      <div class="stat-l">Approved</div>
-    </td>
-    <td>
-      <div class="stat-n stat-n-amber">{{ $pending }}</div>
-      <div class="stat-l">Pending</div>
-    </td>
-    <td>
-      <div class="stat-n" style="font-size:11pt">{{ $generatedAt->format('d M Y') }}</div>
-      <div class="stat-l">Date Generated</div>
-    </td>
-  </tr>
-</table>
-
-<table class="meta-tbl">
-  <tr>
-    <td class="meta-lbl">Batch Reference</td>
-    <td class="meta-val">{{ $batchRef }}</td>
-  </tr>
-  <tr>
-    <td class="meta-lbl">Date and Time Generated</td>
-    <td class="meta-val">{{ $generatedAt->format('l, d F Y \a\t H:i') }}</td>
-  </tr>
-  <tr>
-    <td class="meta-lbl">Prepared By</td>
-    <td class="meta-val">{{ $generatedBy->name ?? 'System' }}</td>
-  </tr>
-  <tr>
-    <td class="meta-lbl">Approval Status Filter</td>
-    <td class="meta-val">{{ ucfirst($filters['approval_status'] ?? 'All') }}</td>
-  </tr>
-  @if(!empty($filters['date_from']) || !empty($filters['date_to']))
-    <tr>
-      <td class="meta-lbl">Date Range Applied</td>
-      <td class="meta-val">{{ $filters['date_from'] ?? '-' }} to {{ $filters['date_to'] ?? '-' }}</td>
-    </tr>
-  @endif
-</table>
-
-<div class="notice-box">
-  This document is an official record generated by the Niger State Contributory Health Agency (NGSCHA)
-  Health Insurance Management System. It contains personally identifiable information and must be handled
-  in accordance with the NGSCHA data protection policy. Unauthorised disclosure, reproduction, or
-  alteration of this document is strictly prohibited and may attract legal sanctions.
-</div>
-
-<table class="sign-tbl">
-  <tr>
-    <td style="width:44%">
-      <div class="sign-line"></div>
-      <div class="sign-lbl">Authorised Officer - Signature and Designation</div>
-      <div class="sign-sub">Niger State Contributory Health Agency</div>
-    </td>
-    <td style="width:12%"></td>
-    <td style="width:44%">
-      <div class="sign-line"></div>
-      <div class="sign-lbl">Official Stamp and Date</div>
-      <div class="sign-sub">NGSCHA Official Seal</div>
-    </td>
-  </tr>
-</table>
-
-<div class="cover-foot">
-  <table class="cf-tbl">
-    <tr>
-      <td>Niger State Contributory Health Agency (NGSCHA) - NiCare Health Insurance System</td>
-      <td style="text-align:right">Ref: {{ $batchRef }} | Total: {{ $total }} enrollees</td>
-    </tr>
-  </table>
-</div>
-
-<div class="page-break"></div>
 
 @foreach($enrollees->chunk(4) as $pageChunk)
   <table class="slip-grid">
     @foreach($pageChunk->chunk(2) as $rowChunk)
       <tr>
-        @foreach($rowChunk as $enrollee)
-          @php
-            $isApproved = !empty($enrollee->approval_date);
-            $statusText = $isApproved
-              ? 'APPROVED - ' . optional($enrollee->approval_date)->format('d M Y')
-              : strtoupper($enrollee->status_label ?? 'PENDING');
-            $statusClass = $isApproved ? 'f-approved' : 'f-pending';
-            $coverageStart = optional($enrollee->coverage_start_date)->format('d M Y') ?: 'Pending';
-            $coverageEnd = $enrollee->coverage_end_date
-              ? optional($enrollee->coverage_end_date)->format('d M Y')
-              : 'No Expiry';
-            $photoSrc = $enrollee->pdf_photo_src ?? null;
-          @endphp
-          <td class="slip-grid-cell">
-            <div class="slip">
-              <div class="slip-hdr">
-                <table class="slip-hdr-tbl">
-                  <tr>
-                    <td class="slip-hdr-logo-cell">
-                      @if($slipLogoPath)
-                        <img src="{{ $slipLogoPath }}" alt="NGSCHA Logo" class="slip-hdr-logo">
-                      @endif
-                    </td>
-                    <td class="slip-hdr-main">
-                      <div class="slip-hdr-title">Niger State Contributory Health Agency (NGSCHA)</div>
-                      <div class="slip-hdr-sub">NiCare Health Insurance Enrollment Confirmation Slip</div>
-                    </td>
-                    <td class="slip-hdr-meta"></td>
-                  </tr>
-                </table>
-              </div>
+      @foreach($rowChunk as $enrollee)
+      @php
+        $isApproved = !empty($enrollee->approval_date);
+        $statusText = $isApproved
+          ? 'Approved ' . optional($enrollee->approval_date)->format('d M Y')
+          : ucfirst(strtolower($enrollee->status_label ?? 'Pending'));
+        $statusClass = $isApproved ? 'status-approved' : 'status-pending';
+        $coverageStart = optional($enrollee->coverage_start_date)->format('d M Y') ?: 'Pending';
+        $coverageEnd = $enrollee->coverage_end_date
+          ? optional($enrollee->coverage_end_date)->format('d M Y')
+          : 'No Expiry';
+        $photoSrc = $enrollee->pdf_photo_src ?? null;
+        $sex = (int) $enrollee->sex === 1 ? 'Male' : ((int) $enrollee->sex === 2 ? 'Female' : 'N/A');
+        $enrolledAt = $enrollee->enrollment_date ?: $enrollee->created_at;
+        $programmeSearch = strtolower(trim(implode(' ', [
+          $enrollee->fundingType->name ?? '',
+          $enrollee->insuranceProgramme->code ?? '',
+          $enrollee->insuranceProgramme->name ?? '',
+        ])));
+        $isBhcpf = str_contains($programmeSearch, 'bhcpf')
+          || str_contains($programmeSearch, 'basic healthcare provision fund');
+        $programmeLabel = $isBhcpf
+          ? 'BHCPF'
+          : ($enrollee->insuranceProgramme->name ?? 'NiCare');
+        $schemeId = $enrollee->cno
+          ?: (($enrollee->legacy_enrollee_id ?? null) !== ($enrollee->enrollee_id ?? null)
+            ? $enrollee->legacy_enrollee_id
+            : null);
+        $category = $enrollee->vulnerableGroup->name
+          ?? $enrollee->enrolleeCategory->name
+          ?? 'N/A';
+        $plan = $enrollee->premiumPlan->name
+          ?? $enrollee->benefitPackage->name
+          ?? 'N/A';
+        $qrData = urlencode($enrollee->enrollee_id ?: "ID-{$enrollee->id}");
+        $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&format=jpg&qzone=1&data={$qrData}";
+      @endphp
 
-              <table class="slip-body-tbl">
-                <tr>
-                  <td class="slip-fields-td">
-                    <table class="field-tbl">
-                      <tr>
-                        <td class="f-lbl">NiCare No.</td>
-                        <td class="f-val-id">{{ $enrollee->enrollee_id ?: 'N/A' }}</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">Full Name</td>
-                        <td class="f-val">{{ strtoupper($enrollee->full_name ?: 'N/A') }}</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">NIN</td>
-                        <td class="f-val">{{ $enrollee->nin ?: 'N/A' }}</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">Sex / Date of Birth</td>
-                        <td class="f-val">
-                          {{ (int) $enrollee->sex === 1 ? 'Male' : ((int) $enrollee->sex === 2 ? 'Female' : 'N/A') }}
-                          / {{ optional($enrollee->date_of_birth)->format('d M Y') ?: 'N/A' }}
-                        </td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">Phone</td>
-                        <td class="f-val">{{ $enrollee->phone ?: 'N/A' }}</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">Programme</td>
-                        <td class="f-val">{{ $enrollee->insuranceProgramme->name ?? 'N/A' }}</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">Category / Plan</td>
-                        <td class="f-val">{{ $enrollee->enrolleeCategory->name ?? 'N/A' }} / {{ $enrollee->premiumPlan->name ?? 'N/A' }}</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">Facility (HCP Code)</td>
-                        <td class="f-val">{{ $enrollee->facility->name ?? 'N/A' }} ({{ $enrollee->facility->hcp_code ?? 'N/A' }})</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">LGA / Ward</td>
-                        <td class="f-val">{{ $enrollee->lga->name ?? 'N/A' }} / {{ $enrollee->ward->name ?? 'N/A' }}</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">Funding / Benefactor</td>
-                        <td class="f-val">{{ $enrollee->fundingType->name ?? 'N/A' }} / {{ $enrollee->benefactor->name ?? 'N/A' }}</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">Enrollment Phase</td>
-                        <td class="f-val">{{ $enrollee->enrollmentPhase->name ?? 'N/A' }}</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">Coverage Period</td>
-                        <td class="f-val">{{ $coverageStart }} - {{ $coverageEnd }}</td>
-                      </tr>
-                      <tr>
-                        <td class="f-lbl">Enrollment Status</td>
-                        <td class="f-val {{ $statusClass }}">{{ $statusText }}</td>
-                      </tr>
-                    </table>
-                  </td>
+      <td class="slip-grid-cell">
+      <div class="slip">
+        <table class="hero-tbl">
+          <tr>
+            <td class="hero-spacer"></td>
+            <td class="hero-main">
+              @if($agencyLogoPath)
+                <img src="{{ $agencyLogoPath }}" alt="NGSCHA Logo" class="agency-logo">
+              @endif
+              <div class="agency-name">Niger State Contributory Health Agency - NiCare</div>
+              <div class="slip-title">{{ $programmeLabel }} - Enrolment Slip</div>
+            </td>
+            <td class="hero-photo">
+              @if($photoSrc)
+                <img src="{{ $photoSrc }}" alt="Passport photograph" class="passport">
+              @else
+                <div class="passport-ph">PASSPORT</div>
+              @endif
+            </td>
+          </tr>
+        </table>
 
-                  <td class="slip-photo-td">
-                    @if($photoSrc)
-                      <img src="{{ $photoSrc }}" alt="Photo" style="width:17mm; height:22mm; object-fit:cover; border:1pt solid #b0bcc8;">
-                    @else
-                      <div class="photo-box"></div>
-                    @endif
-                    <div class="photo-lbl">Passport Photo</div>
+        <table class="summary-tbl">
+          <tr>
+            <td class="summary-info">
+              <div class="summary-line"><span class="summary-label">NiCare Number:</span> <span class="summary-value">{{ $enrollee->enrollee_id ?: 'N/A' }}</span></div>
+              @if($isBhcpf && $schemeId)
+                <div class="summary-line"><span class="summary-label">BHCPF ID:</span> <span class="summary-value">{{ $schemeId }}</span></div>
+              @endif
+              <div class="summary-line"><span class="summary-label">Date Enrolled:</span> <span class="summary-value">{{ optional($enrolledAt)->format('D d M, Y') ?: 'N/A' }}</span></div>
+              <div class="summary-line"><span class="summary-label">Category:</span> <span class="summary-value">{{ $category }}</span></div>
+            </td>
+            <td class="summary-qr">
+              <img src="{{ $qrUrl }}" alt="" title="QR code for {{ $enrollee->enrollee_id }}" class="qr-img">
+            </td>
+            <td class="summary-space"></td>
+          </tr>
+        </table>
 
-                    <div class="nicare-badge">
-                      <div class="nicare-badge-lbl">NiCare No.</div>
-                      <div class="nicare-badge-val">{{ $enrollee->enrollee_id ?: 'N/A' }}</div>
-                    </div>
-                  </td>
-                </tr>
-              </table>
+        <table class="details-tbl">
+          <tr>
+            <td class="two-col-left"><span class="details-label">Name:</span> <span class="details-value">{{ $enrollee->full_name ?: 'N/A' }}</span></td>
+            <td class="two-col-right"><span class="details-label">Sex:</span> <span class="details-value">{{ $sex }}</span></td>
+          </tr>
+          <tr>
+            <td colspan="2"><span class="details-label">Provider/Hospital:</span> <span class="details-value">{{ $enrollee->facility->name ?? 'N/A' }}</span></td>
+          </tr>
+          <tr>
+            <td><span class="details-label">Date of Birth:</span> <span class="details-value">{{ optional($enrollee->date_of_birth)->format('d/m/Y') ?: 'N/A' }}</span></td>
+            <td><span class="details-label">Phone No.:</span> <span class="details-value">{{ $enrollee->phone ?: 'N/A' }}</span></td>
+          </tr>
+          <tr>
+            <td><span class="details-label">LGA:</span> <span class="details-value">{{ strtoupper($enrollee->lga->name ?? 'N/A') }}</span></td>
+            <td><span class="details-label">Ward:</span> <span class="details-value">{{ strtoupper($enrollee->ward->name ?? 'N/A') }}</span></td>
+          </tr>
+          <tr>
+            <td colspan="2"><span class="details-label">Address:</span> <span class="details-value">{{ $enrollee->address ?: ($enrollee->village ?: 'N/A') }}</span></td>
+          </tr>
+          <tr>
+            <td><span class="details-label">NOK Name:</span> <span class="details-value">{{ $enrollee->nok_name ?: 'N/A' }}</span></td>
+            <td><span class="details-label">NOK Phone:</span> <span class="details-value">{{ $enrollee->nok_phone_number ?: 'N/A' }}</span></td>
+          </tr>
+        </table>
 
-              <div class="slip-cert">
-                This certifies that the above-named individual has been duly enrolled under the NGSCHA Health Insurance Scheme.
-              </div>
+        <div class="coverage-line">
+          <strong>Plan:</strong> {{ $plan }} &nbsp; | &nbsp;
+          <strong>Coverage:</strong> {{ $coverageStart }} - {{ $coverageEnd }} &nbsp; | &nbsp;
+          <strong>Status:</strong> <span class="{{ $statusClass }}">{{ $statusText }}</span>
+        </div>
 
-              <div class="slip-foot">
-                <table class="sf-tbl">
-                  <tr>
-                    <td>Batch: {{ $batchRef }}</td>
-                    <td class="sf-right">{{ $generatedAt->format('d M Y H:i') }} | {{ $generatedBy->name ?? 'System' }}</td>
-                  </tr>
-                </table>
-              </div>
-            </div>
-          </td>
-        @endforeach
-        @if($rowChunk->count() === 1)
-          <td class="slip-grid-cell"></td>
-        @endif
+        <div class="slip-foot">
+          <table class="foot-tbl">
+            <tr>
+              <td class="foot-left">For enquiries: call 08162653801</td>
+              <td class="foot-right">Generated on {{ $generatedAt->format('d/m/Y h:i A') }} | By: {{ $generatedBy->name ?? 'NiCare Health ICT Dept.' }} | {{ $batchRef }}</td>
+            </tr>
+          </table>
+        </div>
+      </div>
+      </td>
+      @endforeach
+      @if($rowChunk->count() === 1)
+        <td class="slip-grid-cell"></td>
+      @endif
       </tr>
     @endforeach
   </table>

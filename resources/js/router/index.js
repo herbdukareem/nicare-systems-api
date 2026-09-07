@@ -162,8 +162,8 @@ const routes = [
     meta: {
       requiresAuth: true,
       permissions: ['enrollee.print-bulk-slip'],
-      title: 'Bulk Enrollment Slip',
-      breadcrumb: 'Bulk Enrollment Slip',
+      title: 'Enrollment Slips',
+      breadcrumb: 'Enrollment Slips',
     },
   },
   {

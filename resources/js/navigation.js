@@ -21,7 +21,7 @@ export const navigationItems = [
       { name: 'NIN & Duplicates', path: '/enrollees/integrity', icon: 'mdi-shield-account-outline', permissions: ['enrollees.update', 'enrollee.approve', 'enrollee.nin.verify', 'enrollee.status.change'] },
       { name: 'Enrollment Intelligence', path: '/enrollment/intelligence', icon: 'mdi-chart-box-outline', permissions: ['enrollee.nin.verify', 'reports.view'] },
       { name: 'Demo Enrollment', path: '/enrollees/demo-enrollment', icon: 'mdi-account-plus-outline', permissions: ['enrollees.create'] },
-      { name: 'Bulk Enrollment Slip', path: '/enrollees/bulk-enrollment-slip', icon: 'mdi-file-document-multiple-outline', permissions: ['enrollee.print-bulk-slip'] },
+      { name: 'Enrollment Slips', path: '/enrollees/bulk-enrollment-slip', icon: 'mdi-file-document-multiple-outline', permissions: ['enrollee.print-bulk-slip'] },
       { name: 'Bulk ID Cards', path: '/enrollees/bulk-id-card', icon: 'mdi-card-account-details-star-outline', permissions: ['enrollee.print-id-card'] },
       { name: 'Mobile Sync', path: '/enrollment/mobile-sync', icon: 'mdi-cellphone-sync', permissions: ['mobile-sync.push', 'mobile-sync.status'] },
       { name: 'Change Facility', path: '/enrollment/change-facility', icon: 'mdi-hospital-marker', permissions: ['enrollees.update'] },

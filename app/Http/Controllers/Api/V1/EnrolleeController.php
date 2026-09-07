@@ -631,75 +631,114 @@ class EnrolleeController extends BaseController
     {
         $this->extendPdfExecutionWindow(300, '512M');
 
-        $data = $request->validate([
-            'benefactor_id' => ['nullable', 'exists:benefactors,id'],
-            'facility_id' => ['nullable', 'exists:facilities,id'],
-            'provider_id' => ['nullable', 'exists:facilities,id'],
-            'insurance_programme_id' => ['nullable', 'exists:insurance_programmes,id'],
-            'enrollee_category_id' => ['nullable', 'exists:enrollee_categories,id'],
-            'funding_type_id' => ['nullable', 'exists:funding_types,id'],
-            'enrollment_phase_id' => ['nullable', 'exists:enrollment_phases,id'],
-            'status' => ['nullable', 'integer', 'in:0,1,2,3,4'],
-            'approval_status' => ['nullable', 'in:pending,approved,all'],
-            'date_from' => ['nullable', 'date'],
-            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-        ]);
+        $identifier = trim((string) $request->input('identifier', ''));
+        $rules = [
+            'identifier' => ['nullable', 'string', 'max:50'],
+        ];
+
+        if ($identifier === '') {
+            $rules += [
+                'benefactor_id' => ['nullable', 'exists:benefactors,id'],
+                'facility_id' => ['nullable', 'exists:facilities,id'],
+                'provider_id' => ['nullable', 'exists:facilities,id'],
+                'insurance_programme_id' => ['nullable', 'exists:insurance_programmes,id'],
+                'enrollee_category_id' => ['nullable', 'exists:enrollee_categories,id'],
+                'funding_type_id' => ['nullable', 'exists:funding_types,id'],
+                'enrollment_phase_id' => ['nullable', 'exists:enrollment_phases,id'],
+                'status' => ['nullable', 'integer', 'in:0,1,2,3,4'],
+                'approval_status' => ['nullable', 'in:pending,approved,all'],
+                'date_from' => ['nullable', 'date'],
+                'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
+            ];
+        }
+
+        $data = $request->validate($rules);
 
         $facilityId = $data['facility_id'] ?? $data['provider_id'] ?? null;
-        if (empty($data['benefactor_id']) && empty($facilityId)) {
-            return $this->sendError('Please select at least a Benefactor or Provider/Facility before generating bulk slips.', [], 422);
+        if ($identifier === '' && empty($data['benefactor_id']) && empty($facilityId)) {
+            return $this->sendError('Enter an Enrollment Number or NIN, or select at least a Benefactor or Provider/Facility.', [], 422);
         }
 
         $query = Enrollee::query()
             ->with([
                 'insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage',
-                'fundingType', 'benefactor', 'enrollmentPhase', 'facility', 'lga', 'ward',
+                'fundingType', 'benefactor', 'vulnerableGroup', 'enrollmentPhase', 'facility', 'lga', 'ward',
                 'createdBy', 'approvedBy',
             ]);
 
-        foreach ([
-            'benefactor_id' => 'benefactor_id',
-            'insurance_programme_id' => 'insurance_programme_id',
-            'enrollee_category_id' => 'enrollee_category_id',
-            'funding_type_id' => 'funding_type_id',
-            'enrollment_phase_id' => 'enrollment_phase_id',
-            'status' => 'status',
-        ] as $key => $column) {
-            if (array_key_exists($key, $data) && $data[$key] !== null && $data[$key] !== '') {
-                $query->where($column, $data[$key]);
+        if ($identifier !== '') {
+            $normalizedNin = preg_match('/^[\d\s-]+$/', $identifier) === 1
+                ? Enrollee::normalizeNin($identifier)
+                : null;
+
+            $query->where(function ($identifierQuery) use ($identifier, $normalizedNin): void {
+                $identifierQuery
+                    ->where('enrollee_id', $identifier)
+                    ->orWhere('legacy_enrollee_id', $identifier);
+
+                if ($normalizedNin !== null) {
+                    $identifierQuery->orWhere('nin', $normalizedNin);
+                }
+            });
+        }
+
+        if ($identifier === '') {
+            foreach ([
+                'benefactor_id' => 'benefactor_id',
+                'insurance_programme_id' => 'insurance_programme_id',
+                'enrollee_category_id' => 'enrollee_category_id',
+                'funding_type_id' => 'funding_type_id',
+                'enrollment_phase_id' => 'enrollment_phase_id',
+                'status' => 'status',
+            ] as $key => $column) {
+                if (array_key_exists($key, $data) && $data[$key] !== null && $data[$key] !== '') {
+                    $query->where($column, $data[$key]);
+                }
             }
-        }
 
-        if ($facilityId) {
-            $query->where('facility_id', $facilityId);
-        }
+            if ($facilityId) {
+                $query->where('facility_id', $facilityId);
+            }
 
-        if (($data['approval_status'] ?? null) === 'pending') {
-            $query->where('status', Enrollee::STATUS_PENDING);
-        } elseif (($data['approval_status'] ?? null) === 'approved') {
-            $query->whereNotNull('approval_date')->where('status', Enrollee::STATUS_ACTIVE);
-        }
+            if (($data['approval_status'] ?? null) === 'pending') {
+                $query->where('status', Enrollee::STATUS_PENDING);
+            } elseif (($data['approval_status'] ?? null) === 'approved') {
+                $query->whereNotNull('approval_date')->where('status', Enrollee::STATUS_ACTIVE);
+            }
 
-        if (!empty($data['date_from'])) {
-            $query->whereDate('created_at', '>=', $data['date_from']);
-        }
-        if (!empty($data['date_to'])) {
-            $query->whereDate('created_at', '<=', $data['date_to']);
+            if (!empty($data['date_from'])) {
+                $query->whereDate('created_at', '>=', $data['date_from']);
+            }
+            if (!empty($data['date_to'])) {
+                $query->whereDate('created_at', '<=', $data['date_to']);
+            }
         }
 
         $enrollees = $query
             ->orderBy('facility_id')
             ->orderBy('benefactor_id')
             ->orderBy('last_name')
-            ->limit(500)
+            ->limit($identifier !== '' ? 2 : 500)
             ->get();
+
+        if ($identifier !== '' && $enrollees->isEmpty()) {
+            return $this->sendError('No enrollee was found with that Enrollment Number or NIN.', [], 404);
+        }
+
+        if ($identifier !== '' && $enrollees->count() > 1) {
+            return $this->sendError('More than one enrollee matches that identifier. Use the unique Enrollment Number instead.', [], 422);
+        }
 
         $generatedAt = now();
         $generatedBy = auth()->user();
         $syncPdfChunkSize = 40;
 
         if ($enrollees->count() <= $syncPdfChunkSize) {
-            return $this->streamBulkEnrollmentSlipPdf($enrollees, $data, $generatedBy, $generatedAt);
+            $singleFilename = $identifier !== ''
+                ? 'enrollment_slip_' . preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) $enrollees->first()->enrollee_id) . '.pdf'
+                : null;
+
+            return $this->streamBulkEnrollmentSlipPdf($enrollees, $data, $generatedBy, $generatedAt, null, null, $singleFilename);
         }
 
         return $this->downloadBulkEnrollmentSlipZip($enrollees, $data, $generatedBy, $generatedAt, $syncPdfChunkSize);
@@ -1335,12 +1374,13 @@ class EnrolleeController extends BaseController
         $generatedBy,
         Carbon $generatedAt,
         ?int $partNumber = null,
-        ?int $totalParts = null
+        ?int $totalParts = null,
+        ?string $filename = null
     ) {
         $this->hydratePdfPhotoSources($enrollees, 120, 150, 70);
 
         $pdf = $this->makeBulkEnrollmentSlipPdf($enrollees, $filters, $generatedBy, $generatedAt, $partNumber, $totalParts);
-        $filename = $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts);
+        $filename ??= $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts);
 
         return $pdf->stream($filename);
     }
@@ -1408,14 +1448,14 @@ class EnrolleeController extends BaseController
         ?int $totalParts = null
     )
     {
-        return Pdf::setOptions(['isRemoteEnabled' => false])->loadView('pdf.bulk-enrollment-slip', [
+        return Pdf::setOptions(['isRemoteEnabled' => true])->loadView('pdf.bulk-enrollment-slip', [
             'enrollees' => $enrollees,
             'filters' => $filters,
             'generatedBy' => $generatedBy,
             'generatedAt' => $generatedAt,
             'partNumber' => $partNumber,
             'totalParts' => $totalParts,
-        ])->setPaper('a4');
+        ])->setPaper('a4', 'landscape');
     }
 
     private function bulkEnrollmentSlipFileName(
