@@ -18,6 +18,7 @@ use App\Services\EnrolleeService;
 use App\Services\EnrolleePortalRenewalService;
 use App\Services\NinVerificationService;
 use App\Services\VulnerableGroupAssignmentService;
+use App\Support\PdfQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -662,8 +663,7 @@ class EnrolleeController extends BaseController
         $query = Enrollee::query()
             ->with([
                 'insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'benefitPackage',
-                'fundingType', 'benefactor', 'vulnerableGroup', 'enrollmentPhase', 'facility', 'lga', 'ward',
-                'createdBy', 'approvedBy',
+                'fundingType', 'vulnerableGroup', 'facility', 'lga', 'ward',
             ]);
 
         if ($identifier !== '') {
@@ -707,10 +707,10 @@ class EnrolleeController extends BaseController
             }
 
             if (!empty($data['date_from'])) {
-                $query->whereDate('created_at', '>=', $data['date_from']);
+                $query->where('created_at', '>=', Carbon::parse($data['date_from'])->startOfDay());
             }
             if (!empty($data['date_to'])) {
-                $query->whereDate('created_at', '<=', $data['date_to']);
+                $query->where('created_at', '<=', Carbon::parse($data['date_to'])->endOfDay());
             }
         }
 
@@ -731,7 +731,7 @@ class EnrolleeController extends BaseController
 
         $generatedAt = now();
         $generatedBy = auth()->user();
-        $syncPdfChunkSize = 40;
+        $syncPdfChunkSize = 80;
 
         if ($enrollees->count() <= $syncPdfChunkSize) {
             $singleFilename = $identifier !== ''
@@ -1377,7 +1377,8 @@ class EnrolleeController extends BaseController
         ?int $totalParts = null,
         ?string $filename = null
     ) {
-        $this->hydratePdfPhotoSources($enrollees, 120, 150, 70);
+        $this->hydratePdfPhotoSources($enrollees, 120, 150, 70, false);
+        $this->hydratePdfQrSources($enrollees);
 
         $pdf = $this->makeBulkEnrollmentSlipPdf($enrollees, $filters, $generatedBy, $generatedAt, $partNumber, $totalParts);
         $filename ??= $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts);
@@ -1414,7 +1415,8 @@ class EnrolleeController extends BaseController
 
         foreach ($chunks as $index => $chunk) {
             $partNumber = $index + 1;
-            $this->hydratePdfPhotoSources($chunk, 120, 150, 70);
+            $this->hydratePdfPhotoSources($chunk, 120, 150, 70, false);
+            $this->hydratePdfQrSources($chunk);
 
             $pdf = $this->makeBulkEnrollmentSlipPdf($chunk, $filters, $generatedBy, $generatedAt, $partNumber, $totalParts);
             $zip->addFromString(
@@ -1425,6 +1427,7 @@ class EnrolleeController extends BaseController
             unset($pdf);
             $chunk->each(static function (Enrollee $enrollee): void {
                 $enrollee->offsetUnset('pdf_photo_src');
+                $enrollee->offsetUnset('pdf_qr_src');
             });
 
             if (function_exists('gc_collect_cycles')) {
@@ -1448,7 +1451,7 @@ class EnrolleeController extends BaseController
         ?int $totalParts = null
     )
     {
-        return Pdf::setOptions(['isRemoteEnabled' => true])->loadView('pdf.bulk-enrollment-slip', [
+        return Pdf::setOptions(['isRemoteEnabled' => false])->loadView('pdf.bulk-enrollment-slip', [
             'enrollees' => $enrollees,
             'filters' => $filters,
             'generatedBy' => $generatedBy,
@@ -1476,14 +1479,36 @@ class EnrolleeController extends BaseController
         Collection $enrollees,
         ?int $maxWidth = null,
         ?int $maxHeight = null,
-        int $jpegQuality = 82
+        int $jpegQuality = 82,
+        bool $allowRemoteFetch = true
     ): void
     {
-        $enrollees->each(function (Enrollee $enrollee) use ($maxWidth, $maxHeight, $jpegQuality): void {
+        $enrollees->each(function (Enrollee $enrollee) use ($maxWidth, $maxHeight, $jpegQuality, $allowRemoteFetch): void {
             $enrollee->setAttribute(
                 'pdf_photo_src',
-                $this->resolvePdfPhotoSource($enrollee->preferredProfilePhotoUrl(), $maxWidth, $maxHeight, $jpegQuality)
+                $this->resolvePdfPhotoSource(
+                    $enrollee->preferredProfilePhotoUrl(),
+                    $maxWidth,
+                    $maxHeight,
+                    $jpegQuality,
+                    $allowRemoteFetch
+                )
             );
+        });
+    }
+
+    private function hydratePdfQrSources(Collection $enrollees): void
+    {
+        $dataUris = [];
+
+        $enrollees->each(function (Enrollee $enrollee) use (&$dataUris): void {
+            $value = (string) ($enrollee->enrollee_id ?: "ID-{$enrollee->id}");
+
+            if (!array_key_exists($value, $dataUris)) {
+                $dataUris[$value] = PdfQrCode::dataUri($value);
+            }
+
+            $enrollee->setAttribute('pdf_qr_src', $dataUris[$value]);
         });
     }
 
@@ -1491,7 +1516,8 @@ class EnrolleeController extends BaseController
         ?string $imageUrl,
         ?int $maxWidth = null,
         ?int $maxHeight = null,
-        int $jpegQuality = 82
+        int $jpegQuality = 82,
+        bool $allowRemoteFetch = true
     ): ?string
     {
         if (!$imageUrl) {
@@ -1533,7 +1559,7 @@ class EnrolleeController extends BaseController
             return $this->buildDiskImageDataUri($passportDisk, $diskPath, $maxWidth, $maxHeight, $jpegQuality);
         }
 
-        if (!preg_match('#^https?://#i', $imageUrl)) {
+        if (!$allowRemoteFetch || !preg_match('#^https?://#i', $imageUrl)) {
             return null;
         }
 

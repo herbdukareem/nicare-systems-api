@@ -179,8 +179,7 @@
         $plan = $enrollee->premiumPlan->name
           ?? $enrollee->benefitPackage->name
           ?? 'N/A';
-        $qrData = urlencode($enrollee->enrollee_id ?: "ID-{$enrollee->id}");
-        $qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=160x160&format=jpg&qzone=1&data={$qrData}";
+        $qrSrc = $enrollee->pdf_qr_src ?? null;
       @endphp
 
       <td class="slip-grid-cell">
@@ -216,7 +215,9 @@
               <div class="summary-line"><span class="summary-label">Category:</span> <span class="summary-value">{{ $category }}</span></div>
             </td>
             <td class="summary-qr">
-              <img src="{{ $qrUrl }}" alt="" title="QR code for {{ $enrollee->enrollee_id }}" class="qr-img">
+              @if($qrSrc)
+                <img src="{{ $qrSrc }}" alt="" title="QR code for {{ $enrollee->enrollee_id }}" class="qr-img">
+              @endif
             </td>
             <td class="summary-space"></td>
           </tr>
