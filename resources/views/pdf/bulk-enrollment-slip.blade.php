@@ -198,6 +198,19 @@
         $plan = $enrollee->premiumPlan->name
           ?? $enrollee->benefitPackage->name
           ?? 'N/A';
+        $extraFields = $enrollee->enrollment_extra_fields;
+        if (is_string($extraFields)) {
+          $extraFields = json_decode($extraFields, true) ?: [];
+        }
+        $extraFields = is_array($extraFields) ? $extraFields : [];
+        $nokName = trim((string) ($enrollee->nok_name ?? ''));
+        $nokPhone = trim((string) ($enrollee->nok_phone_number ?? ''));
+        if ($nokName === '') {
+          $nokName = trim((string) ($extraFields['nok_name'] ?? ''));
+        }
+        if ($nokPhone === '') {
+          $nokPhone = trim((string) ($extraFields['nok_phone_number'] ?? ''));
+        }
         $qrSrc = $enrollee->pdf_qr_src ?? null;
       @endphp
 
@@ -262,8 +275,8 @@
             <td colspan="2"><span class="details-label">Address:</span> <span class="details-value">{{ $enrollee->address ?: ($enrollee->village ?: 'N/A') }}</span></td>
           </tr>
           <tr>
-            <td><span class="details-label">NOK Name:</span> <span class="details-value">{{ $enrollee->nok_name ?: 'N/A' }}</span></td>
-            <td><span class="details-label">NOK Phone:</span> <span class="details-value">{{ $enrollee->nok_phone_number ?: 'N/A' }}</span></td>
+            <td><span class="details-label">NOK Name:</span> <span class="details-value">{{ $nokName !== '' ? $nokName : 'N/A' }}</span></td>
+            <td><span class="details-label">NOK Phone:</span> <span class="details-value">{{ $nokPhone !== '' ? $nokPhone : 'N/A' }}</span></td>
           </tr>
         </table>
 
