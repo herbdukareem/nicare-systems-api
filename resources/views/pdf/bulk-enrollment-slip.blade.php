@@ -81,7 +81,7 @@
   .summary-line:last-child { margin-bottom: 0; }
   .summary-label { font-weight: bold; color: #20252b; }
   .summary-value { font-weight: bold; color: #2f3439; }
-  .qr-img { width: 14mm; height: 14mm; display: inline-block; }
+  .qr-img { width: 14mm; height: 14mm; display: block; margin: 0 auto; }
 
   .details-tbl { border: 0.65pt solid #747b82; }
   .details-tbl td {
@@ -248,7 +248,7 @@
             </td>
             <td class="summary-qr">
               @if($qrSrc)
-                <img src="{{ $qrSrc }}" alt="" title="QR code for {{ $enrollee->enrollee_id }}" class="qr-img">
+                <img src="{{ $qrSrc }}" alt="Verify {{ $enrollee->enrollee_id }}" title="Scan to verify {{ $enrollee->enrollee_id }}" class="qr-img">
               @endif
             </td>
             <td class="summary-space"></td>

@@ -20,7 +20,7 @@ final class PdfQrCode
         }
 
         try {
-            $qrCode = QrCode::create($value)->setSize(160)->setMargin(4);
+            $qrCode = QrCode::create($value)->setSize(240)->setMargin(8);
 
             if (function_exists('imagecreatetruecolor')) {
                 self::$pngWriter ??= new PngWriter();

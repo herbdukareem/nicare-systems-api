@@ -18,6 +18,7 @@ use App\Services\EnrolleeService;
 use App\Services\EnrolleePortalRenewalService;
 use App\Services\NinVerificationService;
 use App\Services\VulnerableGroupAssignmentService;
+use App\Support\EnrollmentSlipVerificationUrl;
 use App\Support\PdfQrCode;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\Encryption\DecryptException;
@@ -1576,13 +1577,18 @@ class EnrolleeController extends BaseController
         $dataUris = [];
 
         $enrollees->each(function (Enrollee $enrollee) use (&$dataUris): void {
-            $value = (string) ($enrollee->enrollee_id ?: "ID-{$enrollee->id}");
+            $verificationUrl = EnrollmentSlipVerificationUrl::for($enrollee);
 
-            if (!array_key_exists($value, $dataUris)) {
-                $dataUris[$value] = PdfQrCode::dataUri($value);
+            if (!array_key_exists($verificationUrl, $dataUris)) {
+                $dataUris[$verificationUrl] = PdfQrCode::dataUri($verificationUrl);
             }
 
-            $enrollee->setAttribute('pdf_qr_src', $dataUris[$value]);
+            if (!$dataUris[$verificationUrl]) {
+                throw new \RuntimeException('Could not generate the enrollment slip verification QR code.');
+            }
+
+            $enrollee->setAttribute('pdf_qr_src', $dataUris[$verificationUrl]);
+            $enrollee->setAttribute('pdf_verification_url', $verificationUrl);
         });
     }
 
