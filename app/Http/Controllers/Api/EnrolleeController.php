@@ -381,7 +381,7 @@ class EnrolleeController extends Controller
         if ($plan?->requiresPayment() && !$this->hasSatisfiedRequiredPayment($enrollee)) {
             return response()->json([
                 'success' => false,
-                'message' => 'This premium plan requires payment. Approve only after a paid invoice or used Premium PIN is linked to this enrollee.',
+                'message' => 'This premium plan requires payment. Approve only after a confirmed coverage payment or used Premium PIN is linked to this enrollee.',
             ], 422);
         }
 
@@ -756,6 +756,10 @@ class EnrolleeController extends Controller
             ->exists();
 
         if ($hasPaidInvoice) {
+            return true;
+        }
+
+        if ($enrollee->coveragePaymentPurchases()->where('payment_status', 'confirmed')->exists()) {
             return true;
         }
 

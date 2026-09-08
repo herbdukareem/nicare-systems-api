@@ -94,6 +94,7 @@ import AppErrorState from '../common/AppErrorState.vue';
 import AppPageHeader from '../common/AppPageHeader.vue';
 import AppSkeleton from '../common/AppSkeleton.vue';
 import EnrolleeStatusBadge from '../common/EnrolleeStatusBadge.vue';
+import { coverageEndDisplay, coverageStartDisplay } from '../../utils/coverageDisplay';
 
 const enrolleeAuth = useEnrolleeAuthStore();
 const loading = ref(false);
@@ -121,8 +122,8 @@ const enrollmentSection = computed(() => [
   { label: 'Plan',            value: enrollee.value?.premium_plan?.name || enrollee.value?.benefit_package?.name },
   { label: 'Enrolled On',     value: fmt(enrollee.value?.enrollment_date || enrollee.value?.created_at) },
   { label: 'Approved On',     value: fmt(enrollee.value?.approval_date) },
-  { label: 'Coverage Start',  value: fmt(enrollee.value?.coverage_start_date) },
-  { label: 'Coverage End',    value: enrollee.value?.coverage_end_date ? fmt(enrollee.value.coverage_end_date) : 'No Expiry' },
+  { label: 'Coverage Start',  value: coverageStartDisplay(enrollee.value, fmt) },
+  { label: 'Coverage End',    value: coverageEndDisplay(enrollee.value, fmt) },
 ]);
 
 const locationSection = computed(() => [

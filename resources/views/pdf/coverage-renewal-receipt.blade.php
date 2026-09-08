@@ -15,12 +15,12 @@
 </head>
 <body>
     <div class="header">
-        <h1>Coverage Renewal Receipt</h1>
+        <h1>Coverage Payment Receipt</h1>
         <div class="muted">Niger State Contributory Health Scheme</div>
     </div>
     <p><strong>Enrollee:</strong> {{ $enrollee->full_name ?: $enrollee->name }}</p>
     <p><strong>Enrollee ID:</strong> {{ $enrollee->enrollee_id }}</p>
-    <p><strong>Plan:</strong> {{ $purchase->plan?->name ?: 'Coverage renewal' }}</p>
+    <p><strong>Plan:</strong> {{ $purchase->plan?->name ?: 'Coverage payment' }}</p>
     <p><strong>Reference:</strong> {{ $purchase->payment_reference }}</p>
     <p><strong>Payment status:</strong> <span class="status">Confirmed</span></p>
     <p><strong>Confirmed:</strong> {{ optional($purchase->confirmed_at)->format('d M Y, h:i A') }}</p>

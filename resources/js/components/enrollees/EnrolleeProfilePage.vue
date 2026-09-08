@@ -224,7 +224,7 @@
         </v-alert>
       </AppCard>
 
-      <AppCard v-if="canRenewCoverage" title="Coverage renewal payments" subtitle="Recent payment attempts and confirmed renewal receipts" icon="mdi-receipt-text-outline" tone="success">
+      <AppCard v-if="canViewCoveragePayments" title="Coverage payments" subtitle="Initial enrollment, Premium PIN, and renewal payment history" icon="mdi-receipt-text-outline" tone="success">
         <AppDataTable
           :headers="renewalTransactionHeaders"
           :items="renewalTransactions"
@@ -237,8 +237,11 @@
           <template #item.reference="{ item }">
             <span class="tw-font-mono tw-text-xs tw-font-medium tw-text-slate-800">{{ item.payment_reference }}</span>
           </template>
+          <template #item.payment_type="{ item }">
+            <AppBadge :label="item.coverage_payment_type || 'Coverage payment'" tone="info" size="sm" />
+          </template>
           <template #item.amount="{ item }">
-            <span class="tw-font-semibold">{{ formatMoney(item.customer_total || item.amount) }}</span>
+            <span class="tw-font-semibold">{{ formatMoney(item.coverage_payment_amount ?? item.customer_total ?? item.amount) }}</span>
           </template>
           <template #item.status="{ item }">
             <AppBadge :label="paymentStatusLabel(item.payment_status)" :tone="paymentStatusTone(item.payment_status)" size="sm" />
@@ -249,7 +252,7 @@
               <v-tooltip text="Check payment status">
                 <template #activator="{ props }">
                   <v-btn
-                    v-if="item.payment_status === 'pending'"
+                    v-if="item.payment_status === 'pending' && canCheckCoveragePayments"
                     v-bind="props"
                     icon="mdi-refresh"
                     variant="text"
@@ -531,6 +534,8 @@ const activeCoverage = ref(null)
 const canChangeStatus = auth.hasPermission('enrollee.status.change') || auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve')
 const canResetPassword = auth.hasPermission('enrollee.password.reset')
 const canRenewCoverage = computed(() => auth.hasPermission('coverage.renew'))
+const canViewCoveragePayments = computed(() => canRenewCoverage.value || auth.hasPermission('enrollees.view') || auth.hasPermission('enrollee.approve'))
+const canCheckCoveragePayments = computed(() => canRenewCoverage.value || auth.hasPermission('enrollee.approve'))
 const manageableStatusOptions = [
   { title: 'Pending Approval', value: 0 },
   { title: 'Approved', value: 1 },
@@ -540,6 +545,7 @@ const manageableStatusOptions = [
 ]
 const renewalTransactionHeaders = [
   { title: 'Reference', key: 'reference', sortable: false },
+  { title: 'Payment type', key: 'payment_type', sortable: false },
   { title: 'Plan', key: 'plan.name', sortable: false },
   { title: 'Total paid', key: 'amount', align: 'end', sortable: false },
   { title: 'Status', key: 'status', sortable: false },
@@ -635,17 +641,17 @@ const loadStatistics = async () => {
 }
 
 const loadRenewalTransactions = async (page = renewalTransactionsPage.value) => {
-  if (!enrollee.value || !canRenewCoverage.value) return
+  if (!enrollee.value || !canViewCoveragePayments.value) return
 
   renewalTransactionsLoading.value = true
   try {
-    const response = await enrolleeAPI.getCoverageRenewalTransactions(enrollee.value.id, { page, per_page: 10 })
+    const response = await enrolleeAPI.getCoveragePayments(enrollee.value.id, { page, per_page: 10 })
     const payload = response.data?.data || {}
     renewalTransactions.value = payload.data || []
     renewalTransactionsPage.value = payload.current_page || page
     renewalTransactionsTotal.value = payload.total || renewalTransactions.value.length
   } catch (err) {
-    error(err.response?.data?.message || 'Unable to load coverage renewal payments.')
+    error(err.response?.data?.message || 'Unable to load coverage payments.')
   } finally {
     renewalTransactionsLoading.value = false
   }
@@ -660,15 +666,24 @@ const checkRenewalTransaction = async (transaction) => {
 
   renewalTransactionCheckingId.value = transaction.id
   try {
-    const response = await enrolleeAPI.verifyCoverageRenewal(enrollee.value.id, transaction.payment_reference)
+    const response = await enrolleeAPI.verifyCoveragePayment(enrollee.value.id, transaction.id)
     const payload = response.data?.data || {}
-    if (payload.renewed && payload.enrollee) {
+    const paymentConfirmed = payload.renewed
+      || payload.verification?.paid
+      || payload.purchase?.payment_status === 'confirmed'
+
+    if (paymentConfirmed) {
+      if (payload.enrollee) {
+        enrollee.value = payload.enrollee
+        activeCoverage.value = buildActiveCoverage(enrollee.value)
+      }
+      success('Payment confirmed successfully.')
+    } else if (payload.enrollee) {
       enrollee.value = payload.enrollee
       activeCoverage.value = buildActiveCoverage(enrollee.value)
-      success('Payment confirmed and coverage activated.')
-    } else {
-      error(payload.verification?.message || 'Payment is still pending confirmation.')
     }
+
+    if (!paymentConfirmed) error(payload.verification?.message || 'Payment is still pending confirmation.')
     loadRenewalTransactions()
   } catch (err) {
     error(err.response?.data?.message || 'Unable to check this payment status.')
@@ -684,7 +699,7 @@ const downloadRenewalReceipt = async (transaction) => {
     const url = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }))
     const link = document.createElement('a')
     link.href = url
-    link.download = `coverage-renewal-receipt-${transaction.payment_reference}.pdf`
+    link.download = `coverage-payment-receipt-${transaction.payment_reference}.pdf`
     link.click()
     window.URL.revokeObjectURL(url)
   } catch (err) {

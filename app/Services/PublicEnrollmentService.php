@@ -59,7 +59,16 @@ class PublicEnrollmentService
             throw new RuntimeException('The selected premium plan does not currently support direct bank transfer.');
         }
 
-        $facility = Facility::findOrFail($data['facility_id']);
+        $facility = Facility::query()
+            ->whereKey($data['facility_id'])
+            ->where('type', 'Primary')
+            ->where('status', 1)
+            ->first();
+
+        if (!$facility) {
+            throw new RuntimeException('Please select an active primary healthcare facility for self-enrollment.');
+        }
+
         $data = $this->locationResolver->resolve($data);
 
         if (empty($data['lga_id']) || empty($data['ward_id'])) {

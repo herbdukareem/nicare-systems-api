@@ -131,7 +131,7 @@
                 <v-select v-model="form.sex" label="Sex" variant="outlined" density="compact" :items="sexOptions" item-title="label" item-value="value" :error-messages="errors.sex" />
                 <v-select v-model="form.marital_status" label="Marital status" variant="outlined" density="compact" :items="maritalStatusOptions" item-title="label" item-value="value" :error-messages="errors.marital_status" />
                 <v-select v-model="form.lga_id" label="LGA" variant="outlined" density="compact" :items="metadata.lgas" item-title="name" item-value="id" :error-messages="errors.lga_id" />
-                <v-select v-model="form.facility_id" label="Preferred facility" variant="outlined" density="compact" :items="metadata.facilities" item-title="name" item-value="id" :error-messages="errors.facility_id" />
+                <v-select v-model="form.facility_id" label="Preferred primary facility" variant="outlined" density="compact" :items="metadata.facilities" item-title="name" item-value="id" :error-messages="errors.facility_id" />
               </div>
 
               <div class="tw-mt-4 tw-grid tw-gap-3 lg:tw-grid-cols-[minmax(0,1fr)_220px]">
@@ -186,19 +186,23 @@
                 <v-text-field
                   v-model="form.password"
                   label="Portal password"
-                  type="password"
+                  :type="showPassword ? 'text' : 'password'"
                   variant="outlined"
                   density="compact"
+                  :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+                  @click:append-inner="showPassword = !showPassword"
                   :error-messages="errors.password"
-                  hint="At least 8 characters — used to sign in after approval"
+                  hint="At least 8 characters — used for future enrollee portal sign-ins"
                   persistent-hint
                 />
                 <v-text-field
                   v-model="form.password_confirmation"
                   label="Confirm password"
-                  type="password"
+                  :type="showPasswordConfirmation ? 'text' : 'password'"
                   variant="outlined"
                   density="compact"
+                  :append-inner-icon="showPasswordConfirmation ? 'mdi-eye-off' : 'mdi-eye'"
+                  @click:append-inner="showPasswordConfirmation = !showPasswordConfirmation"
                 />
               </div>
 
@@ -292,7 +296,7 @@
             <AppEmptyState
               v-if="!selectedFacility"
               title="No facility selected"
-              description="Select an LGA and facility in the form."
+              description="Select an LGA and primary healthcare facility in the form."
               icon="mdi-map-marker-outline"
             />
             <dl v-else class="enroll__summary">
@@ -313,7 +317,7 @@
               <li><span>1</span>Your application and documents are received and queued for review.</li>
               <li><span>2</span>If your plan requires payment, a secure hosted payment page opens using the configured gateway.</li>
               <li><span>3</span>An enrollment officer verifies your NIN and reviews your details.</li>
-              <li><span>4</span>Once approved, sign in to the enrollee portal with your chosen password.</li>
+              <li><span>4</span>You will be signed in automatically. For future visits, use your Enrollee ID and chosen password.</li>
             </ol>
           </section>
         </div>
@@ -329,15 +333,17 @@
       size="sm"
     >
       <div class="tw-space-y-4">
-        <div class="tw-flex tw-items-center tw-gap-3 tw-bg-emerald-50 tw-p-4 tw-text-emerald-950">
-          <v-icon color="success" size="28">mdi-check-decagram</v-icon>
-          <div>
-            <div class="tw-text-xs tw-font-semibold tw-uppercase tw-tracking-wide tw-text-emerald-700">Enrollee reference</div>
-            <div class="tw-mt-1 tw-text-xl tw-font-extrabold">{{ submittedEnrolleeId }}</div>
-          </div>
-        </div>
+        <AppCard title="Your Enrollee ID" subtitle="Keep this ID safe for future portal access" icon="mdi-card-account-details-outline" tone="success" muted>
+          <div class="tw-text-center tw-text-2xl tw-font-extrabold tw-tracking-wide tw-text-emerald-900">{{ submittedEnrolleeId }}</div>
+        </AppCard>
 
         <p class="tw-text-sm tw-leading-6 tw-text-slate-600">{{ successSummary }}</p>
+
+        <AppAlert
+          tone="info"
+          title="Enrollee portal login"
+          :message="portalLoginGuide"
+        />
 
         <PaymentCollectionInstructions v-if="paymentCollection?.provider" :collection="paymentCollection" class="tw-mt-4" />
         <div v-else-if="paymentCollection" class="enroll__transfer-card enroll__transfer-card--active">
@@ -362,7 +368,10 @@
       </div>
 
       <template #actions>
-        <v-btn color="success" variant="flat" @click="successDialog = false">Close</v-btn>
+        <v-btn variant="text" @click="successDialog = false">Close</v-btn>
+        <v-btn color="success" variant="flat" prepend-icon="mdi-arrow-right-circle-outline" @click="continueToPortal">
+          {{ enrolleeAuth.isAuthenticated ? 'Continue to portal' : 'Go to portal login' }}
+        </v-btn>
       </template>
     </AppModal>
   </div>
@@ -371,11 +380,13 @@
 <script setup>
 import PaymentCollectionInstructions from '../common/PaymentCollectionInstructions.vue'
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useToast } from '../../composables/useToast'
 import { publicEnrollmentAPI } from '../../utils/enrolleeApi'
+import { useEnrolleeAuthStore } from '../../stores/enrolleeAuth'
 import AppAlert from '../common/AppAlert.vue'
 import AppBadge from '../common/AppBadge.vue'
+import AppCard from '../common/AppCard.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
 import AppModal from '../common/AppModal.vue'
 import FacilityBadge from '../common/FacilityBadge.vue'
@@ -386,6 +397,8 @@ import { openHostedCheckout } from '../../utils/hostedCheckout'
 const { error } = useToast()
 const { settings: org, fetchSettings } = useOrganizationSettings()
 const route = useRoute()
+const router = useRouter()
+const enrolleeAuth = useEnrolleeAuthStore()
 
 const logoErr = ref(false)
 const loading = ref(false)
@@ -421,6 +434,9 @@ const errorArea = ref(null)
 const submissionError = ref('')
 const paymentSummary = ref('')
 const paymentCollection = ref(null)
+const autoLoginState = ref('')
+const showPassword = ref(false)
+const showPasswordConfirmation = ref(false)
 
 const form = reactive({
   premium_plan_id: null,
@@ -496,6 +512,9 @@ const activePaymentGatewayLabel = computed(() => {
   const code = selectedPlan.value?.payment_gateway || metadata.value.active_payment_gateway
   return (metadata.value.payment_gateways || []).find((gateway) => gateway.code === code)?.name || code || 'configured online gateway'
 })
+const portalLoginGuide = computed(() => autoLoginState.value === 'signed_in'
+  ? `You have been signed in automatically. Your application will remain pending until it is approved. For future visits, use Enrollee ID ${submittedEnrolleeId.value} and the portal password you created during enrollment.`
+  : `Use Enrollee ID ${submittedEnrolleeId.value} and the portal password you created during enrollment to sign in. Keep both details safe.`)
 const paymentInstruction = computed(() => {
   if (form.enrollment_method === 'bank_transfer' && selectedTransferAccount.value) {
     return `After you submit this form, we will show the dedicated ${selectedTransferAccount.value.bank_name} account for ${selectedPlan.value?.name} and generate a transfer reference for reconciliation.`
@@ -577,12 +596,36 @@ const resetForm = () => {
   successNextSteps.value = []
   paymentSummary.value = ''
   paymentCollection.value = null
+  autoLoginState.value = ''
   clearApplicationFields()
+}
+
+const continueToPortal = () => {
+  successDialog.value = false
+  router.push(enrolleeAuth.isAuthenticated ? '/enroll/dashboard' : '/enroll/login')
+}
+
+const automaticallySignIn = async (enrolleeId, password) => {
+  if (!enrolleeId || !password) {
+    autoLoginState.value = 'failed'
+    return false
+  }
+
+  try {
+    await enrolleeAuth.login({ enrollee_id: enrolleeId, password })
+    autoLoginState.value = 'signed_in'
+    return true
+  } catch {
+    autoLoginState.value = 'failed'
+    return false
+  }
 }
 
 const clearApplicationFields = () => {
   passportFile.value = null
   setPassportPreview('')
+  showPassword.value = false
+  showPasswordConfirmation.value = false
   Object.assign(form, {
     premium_plan_id: null,
     nin: '',
@@ -634,11 +677,19 @@ const verifyReturnedPayment = async (reference) => {
     const warnings = payload.warnings || []
 
     if (verification.paid) {
+      const enrolleeId = payload.enrollee?.enrollee_id || enrolleeAuth.enrolleeId
       const ninNote = ninVerification?.verified
         ? ' Live NIN verification has also been completed.'
         : (ninVerification?.message ? ` ${ninVerification.message}` : '')
       const warningNote = warnings.length ? ` Follow-up: ${warnings.join(' ')}` : ''
       paymentSummary.value = `Payment ${purchase?.payment_reference || reference} was verified successfully through ${verification.provider || activePaymentGatewayLabel.value}.${ninNote}${warningNote} Your enrollment application remains pending approval.`
+      submittedEnrolleeId.value = enrolleeId || ''
+      submittedPaymentReference.value = purchase?.payment_reference || reference
+      successNextSteps.value = payload.next_steps || []
+      autoLoginState.value = enrolleeAuth.isAuthenticated ? 'signed_in' : 'failed'
+      successSummary.value = `Enrollment ${enrolleeId || ''} was completed successfully and is now awaiting approval.`
+      successDialog.value = true
+      scrollToSuccess()
     } else {
       paymentSummary.value = `Payment ${purchase?.payment_reference || reference} is still ${verification.status || 'pending'}. Complete the checkout and return to this page if you have not finished payment.`
     }
@@ -676,6 +727,7 @@ const submitApplication = async () => {
     const enrolleeId = responseData?.enrollee?.enrollee_id
     const paymentRef = responseData?.purchase?.payment_reference
     const checkout = responseData?.payment_checkout
+    const portalPassword = form.password
     paymentCollection.value = responseData?.payment_collection || null
 
     const ninVerification = responseData?.nin_verification
@@ -692,6 +744,7 @@ const submitApplication = async () => {
     submittedEnrolleeId.value = enrolleeId || ''
     submittedPaymentReference.value = paymentRef || ''
     successNextSteps.value = responseData?.next_steps || []
+    await automaticallySignIn(enrolleeId, portalPassword)
     successDialog.value = true
     clearApplicationFields()
     scrollToSuccess()

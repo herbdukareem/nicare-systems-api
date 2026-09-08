@@ -1059,7 +1059,11 @@ router.beforeEach(async (to, _from, next) => {
     if (!enrolleeAuthStore.isAuthenticated && !enrolleeAuthStore._initializing) {
       await enrolleeAuthStore.initializeAuth();
     }
-    if (enrolleeAuthStore.isAuthenticated) {
+    const isEnrollmentPaymentReturn = to.name === 'enroll-start'
+      && ['checkout_return', 'payment_reference', 'reference', 'trxref']
+        .some((key) => Boolean(to.query[key]));
+
+    if (enrolleeAuthStore.isAuthenticated && !isEnrollmentPaymentReturn) {
       next({ path: '/enroll/dashboard', replace: true });
       return;
     }

@@ -83,6 +83,42 @@ class PremiumCoverageFlowTest extends TestCase
         $service->usePinForCoverage($pin->fresh(), $enrollee, $this->facility->id);
     }
 
+    public function test_enrollee_coverage_payments_include_initial_renewal_and_used_pin_purchases(): void
+    {
+        $initialPurchase = $this->confirmedPurchase();
+        $enrollee = Enrollee::factory()->create([
+            'facility_id' => $this->facility->id,
+            'premium_purchase_id' => $initialPurchase->id,
+        ]);
+
+        $renewalPurchase = $this->confirmedPurchase([
+            'payer_details' => [
+                'channel' => 'enrollee_portal_renewal',
+                'enrollee_id' => $enrollee->id,
+            ],
+        ]);
+        $pinPurchase = $this->confirmedPurchase();
+        PremiumPin::create([
+            'premium_plan_id' => $this->plan->id,
+            'premium_purchase_id' => $pinPurchase->id,
+            'batch_code' => 'PAYMENTS',
+            'pin' => '423456789012',
+            'serial_number' => 'SN-PAYMENTS',
+            'amount' => $this->plan->amount,
+            'status' => PremiumPin::STATUS_USED,
+            'used_at' => now(),
+            'used_by_enrollee_id' => $enrollee->id,
+        ]);
+        $unrelatedPurchase = $this->confirmedPurchase();
+
+        $paymentIds = $enrollee->coveragePaymentPurchases()->pluck('id');
+
+        $this->assertTrue($paymentIds->contains($initialPurchase->id));
+        $this->assertTrue($paymentIds->contains($renewalPurchase->id));
+        $this->assertTrue($paymentIds->contains($pinPurchase->id));
+        $this->assertFalse($paymentIds->contains($unrelatedPurchase->id));
+    }
+
     public function test_expired_pin_cannot_be_used(): void
     {
         $pin = PremiumPin::create([
@@ -256,9 +292,13 @@ class PremiumCoverageFlowTest extends TestCase
         $this->assertSame($coverage->id, $renewal->metadata['renewed_from_coverage_id']);
     }
 
-    private function confirmedPurchase(): PremiumPurchase
+    private function confirmedPurchase(array $overrides = []): PremiumPurchase
     {
-        return $this->pendingPurchase(['payment_status' => 'confirmed', 'confirmed_by' => $this->user->id, 'confirmed_at' => now()]);
+        return $this->pendingPurchase(array_merge([
+            'payment_status' => 'confirmed',
+            'confirmed_by' => $this->user->id,
+            'confirmed_at' => now(),
+        ], $overrides));
     }
 
     private function pendingPurchase(array $overrides = []): PremiumPurchase

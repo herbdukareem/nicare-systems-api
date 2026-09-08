@@ -20,15 +20,11 @@
     <AppCard v-if="currentPlan" class="tw-mb-6" title="Your Current Plan" icon="mdi-shield-check" tone="success" muted>
       <div class="tw-flex tw-items-center tw-gap-3 tw-mb-1">
         <v-icon color="success" size="20">mdi-shield-check</v-icon>
-        <span class="tw-font-bold tw-text-slate-900">Current coverage</span>
+        <span class="tw-font-bold tw-text-slate-900">{{ currentCoverageHeading }}</span>
       </div>
       <div class="tw-text-lg tw-font-bold tw-text-slate-950">{{ currentPlan.name }}</div>
       <div class="tw-mt-1 tw-text-sm tw-text-slate-600">
-        Coverage: {{ formatDate(enrolleeAuth.enrollee?.coverage_start_date) }}
-        <template v-if="enrolleeAuth.enrollee?.coverage_end_date">
-          -> {{ formatDate(enrolleeAuth.enrollee.coverage_end_date) }}
-        </template>
-        <template v-else>· No Expiry</template>
+        Coverage: {{ currentCoverageSummary }}
       </div>
     </AppCard>
 
@@ -169,6 +165,7 @@ import AppEmptyState from '../common/AppEmptyState.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
 import AppSkeleton from '../common/AppSkeleton.vue'
 import PaymentCollectionInstructions from '../common/PaymentCollectionInstructions.vue'
+import { coverageSummaryDisplay } from '../../utils/coverageDisplay'
 
 const route = useRoute()
 const enrolleeAuth = useEnrolleeAuthStore()
@@ -186,9 +183,13 @@ const renewalReady = ref(false)
 const paymentCollection = ref(null)
 
 const currentPlan = computed(() => enrolleeAuth.enrollee?.premium_plan || null)
+const currentCoverageHeading = computed(() => enrolleeAuth.enrollee?.coverage_start_date
+  ? 'Current coverage'
+  : 'Coverage pending activation')
 
 const formatAmount = (amount) => Number(amount || 0).toLocaleString('en-NG')
 const formatDate = (date) => (date ? new Date(date).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' }) : '—')
+const currentCoverageSummary = computed(() => coverageSummaryDisplay(enrolleeAuth.enrollee, formatDate))
 
 const durationLabel = (plan) => {
   if (plan?.duration_label) return plan.duration_label

@@ -21,16 +21,19 @@ export const useEnrolleeAuthStore = defineStore('enrolleeAuth', {
     async login(credentials) {
       const response = await enrolleePortalAPI.login(credentials);
       if (response.data.success) {
-        const { enrollee, token, has_custom_password } = response.data.data;
-        this.enrollee = enrollee;
-        this.token = token;
-        this.isAuthenticated = true;
-        this.hasCustomPassword = has_custom_password;
-        localStorage.setItem('enrollee_token', token);
-        localStorage.setItem('enrollee', JSON.stringify(enrollee));
+        this.establishSession(response.data.data);
         return response.data;
       }
       throw new Error(response.data.message || 'Login failed');
+    },
+
+    establishSession({ enrollee, token, has_custom_password = true }) {
+      this.enrollee = enrollee;
+      this.token = token;
+      this.isAuthenticated = true;
+      this.hasCustomPassword = has_custom_password;
+      localStorage.setItem('enrollee_token', token);
+      localStorage.setItem('enrollee', JSON.stringify(enrollee));
     },
 
     async logout() {

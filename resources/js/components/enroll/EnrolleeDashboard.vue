@@ -102,6 +102,7 @@ import AppPageHeader from '../common/AppPageHeader.vue';
 import AppSkeleton from '../common/AppSkeleton.vue';
 import EnrolleeStatusBadge from '../common/EnrolleeStatusBadge.vue';
 import { useToast } from '../../composables/useToast';
+import { coverageEndDisplay, coverageStartDisplay } from '../../utils/coverageDisplay';
 
 const router = useRouter();
 const enrolleeAuth = useEnrolleeAuthStore();
@@ -191,8 +192,8 @@ const personalFields = computed(() => [
 const coverageFields = computed(() => [
   { label: 'Plan',            value: enrollee.value?.premium_plan?.name || enrollee.value?.benefit_package?.name },
   { label: 'Programme',       value: enrollee.value?.insurance_programme?.name },
-  { label: 'Coverage Start',  value: formatDate(enrollee.value?.coverage_start_date) },
-  { label: 'Coverage End',    value: enrollee.value?.coverage_end_date ? formatDate(enrollee.value.coverage_end_date) : 'No Expiry' },
+  { label: 'Coverage Start',  value: coverageStartDisplay(enrollee.value, formatDate) },
+  { label: 'Coverage End',    value: coverageEndDisplay(enrollee.value, formatDate) },
   { label: 'Approved On',     value: formatDate(enrollee.value?.approval_date) },
   { label: 'Facility',        value: enrollee.value?.facility?.name },
 ]);

@@ -68,6 +68,7 @@ class PublicEnrollmentController extends BaseController
             'facilities' => Facility::query()
                 ->when($lgaId, fn ($query) => $query->where('lga_id', $lgaId))
                 ->when($wardId, fn ($query) => $query->where('ward_id', $wardId))
+                ->where('type', 'Primary')
                 ->where('status', 1)
                 ->orderBy('name')
                 ->get(),
@@ -94,7 +95,12 @@ class PublicEnrollmentController extends BaseController
             'sex' => ['required', 'integer', Rule::in([1, 2])],
             'marital_status' => ['nullable', 'integer', Rule::in(array_keys(Enrollee::MARITAL_STATUS_OPTIONS))],
             'address' => ['nullable', 'string'],
-            'facility_id' => ['required', 'exists:facilities,id'],
+            'facility_id' => [
+                'required',
+                Rule::exists('facilities', 'id')->where(fn ($query) => $query
+                    ->where('type', 'Primary')
+                    ->where('status', 1)),
+            ],
             'lga_id' => ['required', 'exists:lgas,id'],
             'ward_id' => ['nullable', 'exists:wards,id'],
             'password' => ['required', 'string', 'min:8', 'confirmed'],

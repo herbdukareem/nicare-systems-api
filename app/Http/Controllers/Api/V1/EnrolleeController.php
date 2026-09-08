@@ -13,10 +13,12 @@ use App\Models\Facility;
 use App\Models\MobileEnrollmentRecord;
 use App\Models\PremiumPin;
 use App\Models\PremiumPurchase;
+use App\Services\Billing\BillingPaymentVerificationService;
 use App\Services\EnrolleeDuplicateDetectionService;
 use App\Services\EnrolleeService;
 use App\Services\EnrolleePortalRenewalService;
 use App\Services\NinVerificationService;
+use App\Services\PublicEnrollmentService;
 use App\Services\VulnerableGroupAssignmentService;
 use App\Support\EnrollmentSlipVerificationUrl;
 use App\Support\PdfQrCode;
@@ -246,22 +248,39 @@ class EnrolleeController extends BaseController
 
     public function coverageRenewalTransactions(Enrollee $enrollee, Request $request)
     {
-        $transactions = PremiumPurchase::query()
-            ->with('plan:id,name')
-            ->where('payer_details->channel', 'enrollee_portal_renewal')
-            ->where('payer_details->enrollee_id', $enrollee->id)
+        $transactions = $enrollee->coveragePaymentPurchases()
+            ->with([
+                'plan:id,name',
+                'pins' => fn ($query) => $query
+                    ->where('used_by_enrollee_id', $enrollee->id)
+                    ->select(['id', 'premium_purchase_id', 'amount']),
+            ])
             ->latest()
             ->paginate(min(25, max(5, $request->integer('per_page', 10))));
 
-        return $this->sendResponse($transactions, 'Coverage renewal payment transactions retrieved.');
+        $transactions->getCollection()->each(function (PremiumPurchase $purchase) {
+            $channel = (string) data_get($purchase->payer_details, 'channel');
+            $purchase->setAttribute('payment_channel', $channel ?: 'coverage_payment');
+            $purchase->setAttribute('coverage_payment_type', match ($channel) {
+                'self_service_enrollment' => 'Initial enrollment',
+                'enrollee_portal_renewal' => 'Renewal',
+                'public_premium_pin_purchase', 'mobile_officer_pin_purchase' => 'Premium PIN',
+                default => 'Coverage payment',
+            });
+            $purchase->setAttribute(
+                'coverage_payment_amount',
+                $purchase->pins->isNotEmpty()
+                    ? $purchase->pins->sum(fn (PremiumPin $pin) => (float) $pin->amount)
+                    : (float) ($purchase->customer_total ?? $purchase->amount)
+            );
+        });
+
+        return $this->sendResponse($transactions, 'Coverage payment transactions retrieved.');
     }
 
     public function downloadCoverageRenewalReceipt(Enrollee $enrollee, PremiumPurchase $premiumPurchase)
     {
-        if (
-            data_get($premiumPurchase->payer_details, 'channel') !== 'enrollee_portal_renewal'
-            || (int) data_get($premiumPurchase->payer_details, 'enrollee_id') !== (int) $enrollee->id
-        ) {
+        if (!$enrollee->coveragePaymentPurchases()->whereKey($premiumPurchase->id)->exists()) {
             abort(404);
         }
 
@@ -272,7 +291,38 @@ class EnrolleeController extends BaseController
         return Pdf::loadView('pdf.coverage-renewal-receipt', [
             'enrollee' => $enrollee,
             'purchase' => $premiumPurchase->load('plan'),
-        ])->download("coverage-renewal-receipt-{$premiumPurchase->payment_reference}.pdf");
+        ])->download("coverage-payment-receipt-{$premiumPurchase->payment_reference}.pdf");
+    }
+
+    public function verifyCoveragePayment(
+        Enrollee $enrollee,
+        PremiumPurchase $premiumPurchase,
+        BillingPaymentVerificationService $verificationService,
+        EnrolleePortalRenewalService $renewals,
+        PublicEnrollmentService $publicEnrollmentService
+    ) {
+        if (!$enrollee->coveragePaymentPurchases()->whereKey($premiumPurchase->id)->exists()) {
+            abort(404);
+        }
+
+        if (data_get($premiumPurchase->payer_details, 'channel') === 'enrollee_portal_renewal') {
+            $result = $renewals->verifyForEnrollee($enrollee, (string) $premiumPurchase->payment_reference);
+
+            return $this->sendResponse($result, $result['renewed'] ? 'Coverage payment confirmed.' : 'Payment is still pending.');
+        }
+
+        $result = $verificationService->verifyPurchase($premiumPurchase);
+        if (data_get($premiumPurchase->payer_details, 'channel') === 'self_service_enrollment') {
+            $publicEnrollmentService->finalizePaymentVerification($result['purchase']);
+        }
+
+        return $this->sendResponse([
+            ...$result,
+            'enrollee' => new EnrolleeResource($enrollee->fresh([
+                'insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'premiumPurchase',
+                'benefitPackage', 'fundingType', 'benefactor', 'facility', 'lga', 'ward',
+            ])),
+        ], ($result['verification']['paid'] ?? false) ? 'Coverage payment confirmed.' : 'Payment is still pending.');
     }
 
     public function renewCoverage(Enrollee $enrollee, Request $request, EnrolleePortalRenewalService $renewals)
@@ -343,7 +393,7 @@ class EnrolleeController extends BaseController
 
         $plan = $enrollee->premiumPlan;
         if ($plan?->requiresPayment() && !$this->hasSatisfiedRequiredPayment($enrollee)) {
-            return $this->sendError('This premium plan requires payment. Approve only after a paid invoice or used Premium PIN is linked to this enrollee.', [], 422);
+            return $this->sendError('This premium plan requires payment. Approve only after a confirmed coverage payment or used Premium PIN is linked to this enrollee.', [], 422);
         }
 
         $validated = $request->validate([
@@ -1796,7 +1846,7 @@ class EnrolleeController extends BaseController
             return true;
         }
 
-        if ($enrollee->premiumPurchase && $enrollee->premiumPurchase->payment_status === 'confirmed') {
+        if ($enrollee->coveragePaymentPurchases()->where('payment_status', 'confirmed')->exists()) {
             return true;
         }
 

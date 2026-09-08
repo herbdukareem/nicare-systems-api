@@ -237,9 +237,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('enrollees/{enrollee}/renew-coverage/pending', [EnrolleeController::class, 'pendingCoverageRenewalCollection'])
         ->middleware('permission:coverage.renew');
     Route::get('enrollees/{enrollee}/renew-coverage/transactions', [EnrolleeController::class, 'coverageRenewalTransactions'])
-        ->middleware('permission:coverage.renew');
+        ->middleware('permission:any,coverage.renew,enrollees.view,enrollee.approve');
     Route::get('enrollees/{enrollee}/renew-coverage/transactions/{premiumPurchase}/receipt', [EnrolleeController::class, 'downloadCoverageRenewalReceipt'])
-        ->middleware('permission:coverage.renew');
+        ->middleware('permission:any,coverage.renew,enrollees.view,enrollee.approve');
+    Route::post('enrollees/{enrollee}/coverage-payments/{premiumPurchase}/verify', [EnrolleeController::class, 'verifyCoveragePayment'])
+        ->middleware('permission:any,coverage.renew,enrollee.approve');
     Route::post('enrollees/{enrollee}/renew-coverage', [EnrolleeController::class, 'renewCoverage'])
         ->middleware('permission:coverage.renew');
     Route::post('enrollees/{enrollee}/renew-coverage/verify', [EnrolleeController::class, 'verifyCoverageRenewal'])

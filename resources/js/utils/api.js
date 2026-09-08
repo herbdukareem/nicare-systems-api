@@ -124,6 +124,8 @@ export const enrolleeAPI = {
   getCoverageRenewalQuote: (id) => api.get(`/enrollees/${id}/renew-coverage/quote`),
   getPendingCoverageRenewalCollection: (id) => api.get(`/enrollees/${id}/renew-coverage/pending`),
   getCoverageRenewalTransactions: (id, params = {}) => api.get(`/enrollees/${id}/renew-coverage/transactions`, { params }),
+  getCoveragePayments: (id, params = {}) => api.get(`/enrollees/${id}/renew-coverage/transactions`, { params }),
+  verifyCoveragePayment: (id, purchaseId) => api.post(`/enrollees/${id}/coverage-payments/${purchaseId}/verify`),
   downloadCoverageRenewalReceipt: (id, purchaseId) => api.get(`/enrollees/${id}/renew-coverage/transactions/${purchaseId}/receipt`, { responseType: 'blob' }),
   verifyCoverageRenewal: (id, paymentReference) => api.post(`/enrollees/${id}/renew-coverage/verify`, { payment_reference: paymentReference }),
   create: (data) => api.post('/enrollees', data),

@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Services\EnrolleeIdGenerator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Support\Str;
@@ -269,6 +270,27 @@ protected $guarded = ['id'];
     public function premiumPurchase()
     {
         return $this->belongsTo(PremiumPurchase::class, 'premium_purchase_id');
+    }
+
+    /**
+     * All premium purchases explicitly linked to this enrollee's coverage.
+     */
+    public function coveragePaymentPurchases(): Builder
+    {
+        $usedPinPurchaseIds = PremiumPin::query()
+            ->select('premium_purchase_id')
+            ->where('used_by_enrollee_id', $this->getKey())
+            ->whereNotNull('premium_purchase_id');
+
+        return PremiumPurchase::query()
+            ->where(function (Builder $query) use ($usedPinPurchaseIds) {
+                $query->where('payer_details->enrollee_id', $this->getKey())
+                    ->orWhereIn('id', $usedPinPurchaseIds);
+
+                if ($this->premium_purchase_id) {
+                    $query->orWhere('id', $this->premium_purchase_id);
+                }
+            });
     }
 
     public function benefitPackage()
