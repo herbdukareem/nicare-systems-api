@@ -161,6 +161,9 @@ class MobileEnrollmentMonitorController extends BaseController
                     ->where('client_record_id', 'like', '%' . $search . '%')
                     ->orWhere('sync_batch_id', 'like', '%' . $search . '%')
                     ->orWhere('status_reason', 'like', '%' . $search . '%')
+                    ->orWhere('core_data->nin', 'like', '%' . $search . '%')
+                    ->orWhere('payload->data->nin', 'like', '%' . $search . '%')
+                    ->orWhere('payload->nin', 'like', '%' . $search . '%')
                     ->orWhereHas('officer', function (Builder $officerQuery) use ($search): void {
                         $officerQuery
                             ->where('name', 'like', '%' . $search . '%')

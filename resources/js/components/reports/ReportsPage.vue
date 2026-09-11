@@ -80,7 +80,7 @@
               </div>
               <div class="tw-flex tw-flex-wrap tw-gap-2">
                 <AppExportButton
-                  :label="`Download ${reportForm.format.toUpperCase()}`"
+                  :label="`Download ${reportFormat(report).toUpperCase()}`"
                   :loading="generating && activeReportKey === report.key"
                   @click="generateReport(report)"
                 />
@@ -166,7 +166,7 @@
         <template #actions>
           <v-btn variant="outlined" @click="reportDialog = false">Close</v-btn>
           <AppExportButton
-            :label="`Download ${reportForm.format.toUpperCase()}`"
+            :label="`Download ${reportFormat(selectedReport).toUpperCase()}`"
             :loading="generating && activeReportKey === selectedReport?.key"
             @click="selectedReport && generateReport(selectedReport)"
           />
@@ -208,8 +208,10 @@ import AppPageHeader from '../common/AppPageHeader.vue'
 import { dashboardAPI } from '../../utils/api'
 import api from '../../utils/api'
 import { useToast } from '../../composables/useToast'
+import { useAuthStore } from '../../stores/auth'
 
 const { success, error } = useToast()
+const auth = useAuthStore()
 
 const loading = ref(false)
 const generating = ref(false)
@@ -232,7 +234,8 @@ const reportForm = ref({
 
 const formatOptions = ['pdf', 'excel', 'csv']
 
-const availableReports = [
+const reportDefinitions = [
+  { key: 'bhcpf-mande', title: 'M&E BHCPF Enrollees', description: 'Approved BHCPF enrollees in the legacy 25-column M&E Excel template.', icon: 'mdi-microsoft-excel', tone: 'success', formats: ['xls'], permission: 'enrollees.export', notes: 'Uses the exact legacy BHCPF Enrollees template, including its column order, blank fields, borders, and date format. Date filters apply to enrollment dates.' },
   { key: 'executive-summary', title: 'Executive Summary', description: 'High-level enrollee, facility, claims, and referral KPI overview.', icon: 'mdi-chart-box-outline', tone: 'primary', formats: ['pdf'], notes: 'PDF-only by backend rule.' },
   { key: 'enrollment-summary', title: 'Enrollment Summary', description: 'Grouped enrollee counts across geography, gender, type, and status.', icon: 'mdi-account-group-outline', tone: 'success', formats: ['pdf', 'excel', 'csv'] },
   { key: 'mobile-enrollment-activity', title: 'Mobile Enrollment Activity', description: 'Operational feed for mobile enrollment and officer activity.', icon: 'mdi-cellphone-arrow-down', tone: 'info', formats: ['pdf', 'excel', 'csv'] },
@@ -256,6 +259,9 @@ const todoReports = [
   { key: 'service-entitlement', title: 'Benefit Package Service Entitlement', description: 'Package-level allowed service utilization and exceptions.', icon: 'mdi-shield-plus-outline', todo: 'Requires backend entitlement modeling before a trustworthy report can be generated.' },
   { key: 'claims-tat', title: 'Claims Turnaround Time', description: 'Submission-to-review and review-to-payment turnaround metrics.', icon: 'mdi-timeline-clock-outline', todo: 'No dedicated turnaround-time reporting endpoint exists yet.' },
 ]
+
+const availableReports = computed(() => reportDefinitions.filter(report => !report.permission || auth.hasPermission(report.permission)))
+const reportFormat = (report) => report?.formats.includes(reportForm.value.format) ? reportForm.value.format : (report?.formats[0] || reportForm.value.format)
 
 const activeFilterCount = computed(() => [reportForm.value.from_date, reportForm.value.to_date, reportForm.value.format].filter(Boolean).length)
 
@@ -306,8 +312,10 @@ async function generateReport(report) {
     const response = await api.get(`/reports/${report.key}`, {
       params: {
         ...reportForm.value,
+        format: reportFormat(report),
       },
       responseType: 'blob',
+      timeout: 300000,
       showGlobalLoader: true,
       loaderTitle: 'Generating report',
       loaderSubtitle: `Preparing ${report.title.toLowerCase()}`,
@@ -318,9 +326,10 @@ async function generateReport(report) {
     })
     const downloadUrl = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
-    const extension = reportForm.value.format.toLowerCase()
+    const extension = reportFormat(report) === 'excel' ? 'xlsx' : reportFormat(report)
     link.href = downloadUrl
-    link.download = `${report.key}-${new Date().toISOString().slice(0, 10)}.${extension}`
+    const disposition = response.headers['content-disposition'] || ''
+    link.download = disposition.match(/filename="?([^";]+)"?/i)?.[1] || `${report.key}-${new Date().toISOString().slice(0, 10)}.${extension}`
     document.body.appendChild(link)
     link.click()
     link.remove()
@@ -328,7 +337,11 @@ async function generateReport(report) {
     success(`${report.title} downloaded successfully`)
     reportDialog.value = false
   } catch (err) {
-    error(err?.response?.data?.message || `Failed to generate ${report.title}`)
+    let details = err?.response?.data
+    if (details instanceof Blob) {
+      try { details = JSON.parse(await details.text()) } catch { /* Use the fallback message. */ }
+    }
+    error(details?.message || `Failed to generate ${report.title}`)
   } finally {
     generating.value = false
     activeReportKey.value = ''

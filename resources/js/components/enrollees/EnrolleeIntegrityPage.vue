@@ -2,6 +2,7 @@
   <AdminLayout>
     <div class="tw-space-y-4">
       <AppPageHeader title="NIN & Duplicates" icon="mdi-shield-account-outline">
+        <AppButton v-if="canUpdateNin" prepend-icon="mdi-upload" @click="bulkNinDialog = true">Bulk NIN Update</AppButton>
         <v-btn size="small" variant="outlined" prepend-icon="mdi-refresh" :loading="loading" @click="loadAll">
           Refresh
         </v-btn>
@@ -335,6 +336,7 @@
         </AppDataTable>
       </AppCard>
     </div>
+    <BulkNinUpdateModal v-if="canUpdateNin" v-model="bulkNinDialog" @completed="loadAll" />
   </AdminLayout>
 </template>
 
@@ -345,6 +347,8 @@ import AdminLayout from '../layout/AdminLayout.vue'
 import AppAlert from '../common/AppAlert.vue'
 import AppBadge from '../common/AppBadge.vue'
 import AppBulkActions from '../common/AppBulkActions.vue'
+import AppButton from '../common/AppButton.vue'
+import BulkNinUpdateModal from './BulkNinUpdateModal.vue'
 import AppCard from '../common/AppCard.vue'
 import AppDataTable from '../common/AppDataTable.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
@@ -366,6 +370,7 @@ const auth = useAuthStore()
 const loading = ref(false)
 const duplicateFlagsLoading = ref(false)
 const bulkSaving = ref(false)
+const bulkNinDialog = ref(false)
 const resolvingFlagId = ref(null)
 const hasLoaded = ref(false)
 const loadError = ref('')
@@ -409,6 +414,7 @@ const bulkForm = reactive({
 })
 
 const canVerifyNin = computed(() => auth.hasPermission('enrollee.nin.verify') || auth.hasPermission('enrollee.approve'))
+const canUpdateNin = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit'))
 const canChangeStatuses = computed(() => auth.hasPermission('enrollee.status.change') || auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve'))
 const canResolveDuplicates = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.approve') || canVerifyNin.value)
 

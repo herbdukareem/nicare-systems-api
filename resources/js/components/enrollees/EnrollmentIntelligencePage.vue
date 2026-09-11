@@ -153,9 +153,7 @@
                 Provider reconciliation will become available after the NIN attempt ledger migration is applied.
               </p>
 
-              <p v-if="providerReconciliation.ledger_available" class="tw-mt-4 tw-text-sm tw-text-slate-600">
-                Provider requests include imported verification records and new provider calls. Cache reuses verify an enrollee from data already held by the system, so they do not make another provider request.
-              </p>
+              
             </AppCard>
 
             <div class="tw-grid tw-gap-5 xl:tw-grid-cols-[1.35fr_0.95fr]">

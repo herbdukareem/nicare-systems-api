@@ -36,6 +36,13 @@ class NinVerificationService
      */
     public function verify(Enrollee $enrollee, User $verifiedBy, bool $consent = true): array
     {
+        return app(EnrolleeNinLock::class)->run($enrollee->id, function () use ($enrollee, $verifiedBy, $consent): array {
+            return $this->verifyEnrollee($enrollee->refresh(), $verifiedBy, $consent);
+        });
+    }
+
+    private function verifyEnrollee(Enrollee $enrollee, User $verifiedBy, bool $consent): array
+    {
         if (blank($enrollee->nin)) {
             throw new RuntimeException('This enrollee does not have a NIN to verify.');
         }

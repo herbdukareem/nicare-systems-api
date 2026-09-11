@@ -144,6 +144,11 @@ export const enrolleeAPI = {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
   bulkUpdateStatus: (data) => api.post('/enrollees/bulk-update-status', data),
+  bulkUpdateNin: (data) => api.post('/enrollees/integrity/bulk-update-nin', data, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 300000,
+    showGlobalLoader: false,
+  }),
   delete: (id) => api.delete(`/enrollees/${id}`),
   idCard: (id) => api.get(`/enrollees/${id}/id-card`, { responseType: 'blob' }),
   bulkEnrollmentSlip: (params) => api.get('/enrollees/bulk-enrollment-slip', {

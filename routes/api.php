@@ -228,6 +228,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,enrollees.update,enrollees.edit,enrollee.approve,enrollee.nin.verify');
     Route::post('enrollees/bulk-update-status', [EnrolleeController::class, 'bulkUpdateStatus'])
         ->middleware('permission:any,enrollees.update,enrollees.edit,enrollee.approve,enrollee.status.change');
+    Route::post('enrollees/integrity/bulk-update-nin', \App\Http\Controllers\Api\BulkEnrolleeNinUpdateController::class)
+        ->middleware('permission:any,enrollees.update,enrollees.edit');
     Route::post('enrollees', [EnrolleeController::class, 'store'])
         ->middleware('permission:enrollees.create');
     Route::get('enrollees/{enrollee}', [EnrolleeController::class, 'show'])
@@ -668,6 +670,8 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('enrollees/{enrollee}/transfers', [EnrolleeApiController::class, 'getTransferHistory']);
 
     // ─── Phase 2: Extended Reports (unified endpoint) ────────────────────────────
+    Route::get('reports/bhcpf-mande', \App\Http\Controllers\Api\BhcpfMandeReportController::class)
+        ->middleware('permission:enrollees.export');
     Route::get('reports/{type}', [ExtendedReportingController::class, '__invoke']);
 
     // Feedback Management

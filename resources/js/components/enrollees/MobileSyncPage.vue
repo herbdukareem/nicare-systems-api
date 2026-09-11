@@ -51,7 +51,7 @@
         <v-text-field
           v-model="filters.search"
           label="Search"
-          placeholder="Enrollee, officer, batch, client ref, device, or reason"
+          placeholder="NIN, enrollee, officer, batch, client ref, device, or reason"
           prepend-inner-icon="mdi-magnify"
           variant="outlined"
           density="compact"

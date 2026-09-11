@@ -22,4 +22,8 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
-/tests
+/tests/*
+!/tests/Feature/
+/tests/Feature/*
+!/tests/Feature/BhcpfMandeReportTest.php
+!/tests/Feature/BulkEnrolleeNinUpdateTest.php
