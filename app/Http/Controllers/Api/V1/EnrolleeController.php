@@ -29,6 +29,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
@@ -1628,17 +1629,25 @@ class EnrolleeController extends BaseController
 
         $enrollees->each(function (Enrollee $enrollee) use (&$dataUris): void {
             $verificationUrl = EnrollmentSlipVerificationUrl::for($enrollee);
+            $enrollee->setAttribute('pdf_verification_url', $verificationUrl);
 
             if (!array_key_exists($verificationUrl, $dataUris)) {
                 $dataUris[$verificationUrl] = PdfQrCode::dataUri($verificationUrl);
             }
 
             if (!$dataUris[$verificationUrl]) {
-                throw new \RuntimeException('Could not generate the enrollment slip verification QR code.');
+                Log::warning('Enrollment slip QR code was unavailable; continuing without QR image.', [
+                    'enrollee_id' => $enrollee->id,
+                    'enrollee_number' => $enrollee->enrollee_id,
+                    'verification_url' => $verificationUrl,
+                ]);
+
+                $enrollee->setAttribute('pdf_qr_src', null);
+
+                return;
             }
 
             $enrollee->setAttribute('pdf_qr_src', $dataUris[$verificationUrl]);
-            $enrollee->setAttribute('pdf_verification_url', $verificationUrl);
         });
     }
 

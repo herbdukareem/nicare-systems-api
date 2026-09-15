@@ -122,40 +122,6 @@
         </div>
       </AppCard>
 
-      <AppCard
-        title="Recent System Activity"
-        icon="mdi-history"
-        tone="secondary"
-      >
-        <div v-if="loading" class="tw-py-12 tw-flex tw-justify-center">
-          <v-progress-circular indeterminate color="primary" />
-        </div>
-        <AppEmptyState
-          v-else-if="activities.length === 0"
-          icon="mdi-history"
-          title="No recent activity"
-          description="No activity records are currently available from the dashboard feed."
-        />
-        <div v-else class="tw-space-y-3">
-          <div
-            v-for="activity in activities.slice(0, 10)"
-            :key="activity.id"
-            class="tw-flex tw-items-start tw-justify-between tw-gap-3 tw-border tw-border-slate-200 tw-bg-slate-50/70 tw-px-3 tw-py-2"
-          >
-            <div class="tw-flex tw-items-start tw-gap-3">
-              <div class="qds-icon-shell qds-tone-secondary">
-                <v-icon size="18">{{ activity.icon || 'mdi-history' }}</v-icon>
-              </div>
-              <div>
-                <p class="tw-text-sm tw-font-semibold tw-text-slate-900">{{ activity.title || activity.description }}</p>
-                <p class="tw-text-xs tw-text-slate-500">{{ activity.subtitle || 'System activity event' }}</p>
-              </div>
-            </div>
-            <span class="tw-text-xs tw-text-slate-400">{{ formatRelative(activity.created_at || activity.time) }}</span>
-          </div>
-        </div>
-      </AppCard>
-
       <AppModal
         v-model="reportDialog"
         :title="selectedReport?.title || 'Report details'"
@@ -199,7 +165,6 @@ import AdminLayout from '../layout/AdminLayout.vue'
 import AppAlert from '../common/AppAlert.vue'
 import AppBadge from '../common/AppBadge.vue'
 import AppCard from '../common/AppCard.vue'
-import AppEmptyState from '../common/AppEmptyState.vue'
 import AppExportButton from '../common/AppExportButton.vue'
 import AppFilterBar from '../common/AppFilterBar.vue'
 import AppModal from '../common/AppModal.vue'
@@ -218,7 +183,6 @@ const generating = ref(false)
 const reportDialog = ref(false)
 const selectedReport = ref(null)
 const activeReportKey = ref('')
-const activities = ref([])
 const stats = ref({
   total_enrollees: 0,
   active_facilities: 0,
@@ -229,26 +193,13 @@ const stats = ref({
 const reportForm = ref({
   from_date: '',
   to_date: '',
-  format: 'pdf',
+  format: 'xls',
 })
 
-const formatOptions = ['pdf', 'excel', 'csv']
+const formatOptions = [{ title: 'Excel (XLS)', value: 'xls' }]
 
 const reportDefinitions = [
   { key: 'bhcpf-mande', title: 'M&E BHCPF Enrollees', description: 'Approved BHCPF enrollees in the legacy 25-column M&E Excel template.', icon: 'mdi-microsoft-excel', tone: 'success', formats: ['xls'], permission: 'enrollees.export', notes: 'Uses the exact legacy BHCPF Enrollees template, including its column order, blank fields, borders, and date format. Date filters apply to enrollment dates.' },
-  { key: 'executive-summary', title: 'Executive Summary', description: 'High-level enrollee, facility, claims, and referral KPI overview.', icon: 'mdi-chart-box-outline', tone: 'primary', formats: ['pdf'], notes: 'PDF-only by backend rule.' },
-  { key: 'enrollment-summary', title: 'Enrollment Summary', description: 'Grouped enrollee counts across geography, gender, type, and status.', icon: 'mdi-account-group-outline', tone: 'success', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'mobile-enrollment-activity', title: 'Mobile Enrollment Activity', description: 'Operational feed for mobile enrollment and officer activity.', icon: 'mdi-cellphone-arrow-down', tone: 'info', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'offline-sync-summary', title: 'Offline Sync Summary', description: 'Sync throughput, duplicates, failures, and processing time metrics.', icon: 'mdi-sync-alert', tone: 'warning', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'facility-utilization', title: 'Facility Utilization', description: 'Provider usage, referral/admission/claim counts, and claim amounts.', icon: 'mdi-hospital-box-outline', tone: 'secondary', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'referral-preauth', title: 'Referral Pre-Auth', description: 'Referral status breakdown and approval turnaround analytics.', icon: 'mdi-file-send-outline', tone: 'warning', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'admission', title: 'Admission Report', description: 'Admissions, discharge counts, and ward-day averages by facility.', icon: 'mdi-bed-outline', tone: 'info', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'capitation', title: 'Capitation Report', description: 'Computed capitation, paid amounts, and outstanding balances by period.', icon: 'mdi-cash-sync', tone: 'success', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'financial-liability', title: 'Financial Liability', description: 'Outstanding approved claims broken into aging buckets.', icon: 'mdi-scale-balance', tone: 'danger', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'payment', title: 'Payment Report', description: 'Claim payment batch status and total amount tracking.', icon: 'mdi-bank-transfer-out', tone: 'primary', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'rejected-claims', title: 'Rejected Claims', description: 'Rejected claim counts grouped by facility and rejection reason.', icon: 'mdi-close-circle-outline', tone: 'danger', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'audit-activity', title: 'Audit Activity', description: 'Action-level audit aggregation for governance and compliance review.', icon: 'mdi-clipboard-text-clock-outline', tone: 'secondary', formats: ['pdf', 'excel', 'csv'] },
-  { key: 'user-activity', title: 'User Activity', description: 'Aggregated user actions grouped from the audit trail.', icon: 'mdi-account-clock-outline', tone: 'info', formats: ['pdf', 'excel', 'csv'] },
 ]
 
 const todoReports = [
@@ -268,25 +219,16 @@ const activeFilterCount = computed(() => [reportForm.value.from_date, reportForm
 async function fetchData() {
   loading.value = true
   try {
-    const [overviewRes, activityRes] = await Promise.allSettled([
-      dashboardAPI.getOverview(),
-      dashboardAPI.getRecentActivities(),
-    ])
-
-    if (overviewRes.status === 'fulfilled') {
-      const data = overviewRes.value.data?.data ?? overviewRes.value.data
-      stats.value = {
-        total_enrollees: data?.total_enrollees ?? data?.enrollees?.total ?? 0,
-        active_facilities: data?.active_facilities ?? data?.facilities?.active ?? 0,
-        total_referrals: data?.total_referrals ?? data?.referrals?.total ?? 0,
-        paid_claims: data?.paid_claims ?? data?.claims?.paid ?? 0,
-      }
+    const response = await dashboardAPI.getOverview()
+    const data = response.data?.data ?? response.data
+    stats.value = {
+      total_enrollees: data?.total_enrollees ?? data?.enrollees?.total ?? 0,
+      active_facilities: data?.active_facilities ?? data?.facilities?.active ?? 0,
+      total_referrals: data?.total_referrals ?? data?.referrals?.total ?? 0,
+      paid_claims: data?.paid_claims ?? data?.claims?.paid ?? 0,
     }
-
-    if (activityRes.status === 'fulfilled') {
-      const data = activityRes.value.data?.data ?? activityRes.value.data
-      activities.value = Array.isArray(data) ? data : (data?.activities ?? data?.data ?? [])
-    }
+  } catch (err) {
+    error(err?.response?.data?.message || 'Failed to load report statistics')
   } finally {
     loading.value = false
   }
@@ -296,7 +238,7 @@ function resetFilters() {
   reportForm.value = {
     from_date: '',
     to_date: '',
-    format: 'pdf',
+    format: 'xls',
   }
 }
 
@@ -346,17 +288,6 @@ async function generateReport(report) {
     generating.value = false
     activeReportKey.value = ''
   }
-}
-
-function formatRelative(dateValue) {
-  if (!dateValue) return ''
-  const diff = Date.now() - new Date(dateValue).getTime()
-  const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  return new Date(dateValue).toLocaleDateString('en-NG', { day: '2-digit', month: 'short' })
 }
 
 onMounted(fetchData)
