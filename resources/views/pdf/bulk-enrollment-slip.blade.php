@@ -8,8 +8,8 @@
   body {
     font-family: DejaVu Sans, Arial, sans-serif;
     color: #20252b;
-    font-size: 7.2pt;
-    line-height: 1.28;
+    font-size: 8.4pt;
+    line-height: 1.32;
   }
 
   .slip-grid {
@@ -28,7 +28,7 @@
     height: 86mm;
     margin: 1mm;
     border: 0.75pt solid #565c62;
-    padding: 2mm 2.4mm 7.5mm;
+    padding: 1.8mm 2.4mm 5mm;
     page-break-inside: avoid;
     overflow: hidden;
     position: relative;
@@ -45,7 +45,7 @@
   .agency-logo { width: 10mm; height: 10mm; object-fit: contain; display: inline-block; }
   .agency-name {
     color: #1684dc;
-    font-size: 6.6pt;
+    font-size: 7.3pt;
     font-weight: bold;
     line-height: 1.15;
     margin-top: 0.4mm;
@@ -58,7 +58,7 @@
     background: #238fe9;
     border-radius: 3pt;
     color: #fff;
-    font-size: 6.3pt;
+    font-size: 7.1pt;
     font-weight: bold;
     line-height: 1;
     white-space: nowrap;
@@ -73,59 +73,43 @@
   .passport { object-fit: cover; }
   .passport-ph { background: #f1f3f5; text-align: center; color: #98a1aa; padding-top: 7.4mm; font-size: 4.5pt; }
 
-  .summary-tbl { margin-top: 0.8mm; margin-bottom: 0.8mm; }
+  .summary-tbl { margin-top: 0.45mm; margin-bottom: 0.6mm; }
   .summary-info { width: 58%; vertical-align: middle; padding-left: 0.2mm; }
   .summary-qr { width: 19%; text-align: center; vertical-align: middle; }
   .summary-space { width: 23%; }
   .summary-line { margin-bottom: 0.45mm; }
   .summary-line:last-child { margin-bottom: 0; }
-  .summary-label { font-weight: bold; color: #20252b; }
-  .summary-value { font-weight: bold; color: #2f3439; }
+  .summary-label { font-weight: bold; color: #000000; }
+  .summary-value { font-weight: bold; color: #000000; }
   .qr-img { width: 14mm; height: 14mm; display: block; margin: 0 auto; }
 
-  .details-tbl { border: 0.65pt solid #747b82; }
+  .details-tbl { border: 0.65pt solid #000000; }
   .details-tbl td {
-    border-right: 0.55pt solid #92989e;
-    border-bottom: 0.55pt solid #92989e;
-    padding: 0.65mm 1mm;
-    height: 5.4mm;
+    border-right: 0.55pt solid #000000;
+    border-bottom: 0.55pt solid #000000;
+    padding: 0.65mm 1.1mm;
+    height: 5.9mm;
     vertical-align: middle;
-    font-size: 6.3pt;
+    font-size: 9pt;
     white-space: nowrap;
     overflow: hidden;
   }
   .details-tbl tr:last-child td { border-bottom: none; }
   .details-tbl td:last-child { border-right: none; }
-  .details-label { font-weight: bold; color: #30353a; }
-  .details-value { color: #343a40; }
+  .details-label { font-weight: bold; color: #000000; }
+  .details-value { color: #000000; }
   .two-col-left { width: 50%; }
   .two-col-right { width: 50%; }
-
-  .coverage-line {
-    position: absolute;
-    right: 2.4mm;
-    bottom: 4.7mm;
-    left: 2.4mm;
-    padding: 0;
-    color: #4e555c;
-    font-size: 5.5pt;
-    line-height: 1.25;
-    white-space: nowrap;
-    overflow: hidden;
-  }
-  .coverage-line strong { color: #30353a; }
-  .status-approved { color: #15743c; font-weight: bold; }
-  .status-pending { color: #a15c00; font-weight: bold; }
 
   .slip-foot {
     position: absolute;
     right: 2.4mm;
-    bottom: 1.2mm;
+    bottom: 0.9mm;
     left: 2.4mm;
-    border-top: 0.55pt solid #a8adb3;
-    padding-top: 0.45mm;
-    color: #555b61;
-    font-size: 4.9pt;
+    border-top: 0.55pt solid #000000;
+    padding-top: 0.25mm;
+    color: #000000;
+    font-size: 5.1pt;
     white-space: nowrap;
     overflow: hidden;
   }
@@ -166,15 +150,6 @@
       <tr class="slip-grid-row">
       @foreach($rowChunk as $enrollee)
       @php
-        $isApproved = !empty($enrollee->approval_date);
-        $statusText = $isApproved
-          ? 'Approved ' . optional($enrollee->approval_date)->format('d M Y')
-          : ucfirst(strtolower($enrollee->status_label ?? 'Pending'));
-        $statusClass = $isApproved ? 'status-approved' : 'status-pending';
-        $coverageStart = optional($enrollee->coverage_start_date)->format('d M Y') ?: 'Pending';
-        $coverageEnd = $enrollee->coverage_end_date
-          ? optional($enrollee->coverage_end_date)->format('d M Y')
-          : 'No Expiry';
         $photoSrc = $enrollee->pdf_photo_src ?? null;
         $sex = (int) $enrollee->sex === 1 ? 'Male' : ((int) $enrollee->sex === 2 ? 'Female' : 'N/A');
         $enrolledAt = $enrollee->enrollment_date ?: $enrollee->created_at;
@@ -194,9 +169,6 @@
             : null);
         $category = $enrollee->vulnerableGroup->name
           ?? $enrollee->enrolleeCategory->name
-          ?? 'N/A';
-        $plan = $enrollee->premiumPlan->name
-          ?? $enrollee->benefitPackage->name
           ?? 'N/A';
         $extraFields = $enrollee->enrollment_extra_fields;
         if (is_string($extraFields)) {
@@ -279,12 +251,6 @@
             <td><span class="details-label">NOK Phone:</span> <span class="details-value">{{ $nokPhone !== '' ? $nokPhone : 'N/A' }}</span></td>
           </tr>
         </table>
-
-        <div class="coverage-line">
-          <strong>Plan:</strong> {{ $plan }} &nbsp; | &nbsp;
-          <strong>Coverage:</strong> {{ $coverageStart }} - {{ $coverageEnd }} &nbsp; | &nbsp;
-          <strong>Status:</strong> <span class="{{ $statusClass }}">{{ $statusText }}</span>
-        </div>
 
         <div class="slip-foot">
           <table class="foot-tbl">

@@ -20,9 +20,24 @@ final class PdfQrCode
             return null;
         }
 
-        $qrCode = QrCode::create($value)->setSize(240)->setMargin(8);
+        if (!class_exists(QrCode::class)) {
+            Log::error('PDF QR generation is unavailable because the endroid/qr-code package is missing.');
 
-        if (function_exists('imagecreatetruecolor')) {
+            return null;
+        }
+
+        try {
+            $qrCode = QrCode::create($value)->setSize(240)->setMargin(8);
+        } catch (\Throwable $e) {
+            Log::error('PDF QR code object creation failed.', [
+                'exception' => $e::class,
+                'message' => $e->getMessage(),
+            ]);
+
+            return null;
+        }
+
+        if (function_exists('imagecreatetruecolor') && class_exists(PngWriter::class)) {
             try {
                 self::$pngWriter ??= new PngWriter();
 
@@ -33,6 +48,12 @@ final class PdfQrCode
                     'message' => $e->getMessage(),
                 ]);
             }
+        }
+
+        if (!class_exists(SvgWriter::class)) {
+            Log::error('PDF QR SVG generation is unavailable because the SVG writer class is missing.');
+
+            return null;
         }
 
         try {
