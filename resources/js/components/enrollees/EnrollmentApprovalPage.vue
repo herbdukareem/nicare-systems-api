@@ -186,6 +186,7 @@
       </AppCard>
 
       <AppModal
+        :key="selectedRowId || 'approval-review'"
         :model-value="detailModalOpen"
         title="Enrollment Review"
         subtitle="Review the enrollee profile, compare verified NIN data, and complete the approval decision from one place."
@@ -321,6 +322,7 @@
                   Apply suggested choices
                 </v-btn>
                 <v-select
+                  v-if="selectedRow.comparison.length"
                   v-model="selectedRow.mergeStrategy"
                   :items="mergeStrategies"
                   item-title="label"
@@ -480,14 +482,35 @@
                 icon="mdi-card-search-outline"
                 title="No verification comparison yet"
                 description="Verify the enrollee's NIN to load provider data and compare it against the submitted enrollment data."
-              />
+                compact
+              >
+                <v-btn
+                  color="primary"
+                  prepend-icon="mdi-card-account-details-outline"
+                  :loading="verifyingId === selectedRow.id"
+                  @click="verifyNin(selectedRow, false)"
+                >
+                  Verify NIN
+                </v-btn>
+              </AppEmptyState>
 
               <AppEmptyState
                 v-else
                 icon="mdi-card-account-details-outline"
                 title="No NIN provided"
                 description="Approval can continue without NIN verification, but the enrollee will be marked as not provided in the verification status."
-              />
+                compact
+              >
+                <v-btn
+                  color="primary"
+                  prepend-icon="mdi-check-decagram-outline"
+                  :loading="approvingId === selectedRow.id"
+                  :disabled="cannotApprove(selectedRow)"
+                  @click="openApproveDialog(selectedRow)"
+                >
+                  Approve enrollee
+                </v-btn>
+              </AppEmptyState>
             </AppCard>
 
             <AppCard title="Enrollment Location" icon="mdi-map-marker-radius-outline" tone="primary">
