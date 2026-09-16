@@ -507,6 +507,7 @@
             </div>
           </div>
 
+          
           <!-- Capitation Overview -->
           <div class="xl:tw-col-span-2 tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
