@@ -250,6 +250,13 @@
             </div>
 
             <AppAlert
+              v-if="detailLoadingId === selectedRow.id"
+              tone="info"
+              title="Loading review details"
+              message="Fetching the NIN comparison, mobile photos, duplicate flags, and location audit for this enrollee."
+            />
+
+            <AppAlert
               v-if="selectedRow.local_error"
               tone="danger"
               title="Action failed"
@@ -674,6 +681,7 @@ const limit = ref(50)
 const search = ref('')
 const detailModalOpen = ref(false)
 const selectedRowId = ref(null)
+const detailLoadingId = ref(null)
 const approvalDialogOpen = ref(false)
 const approvalTarget = ref(null)
 const rejectDialogOpen = ref(false)
@@ -1044,9 +1052,34 @@ const resolvedDecisionLabel = (row, field) => {
   return resolvedDecision(row, field) === 'verified' ? 'Use verified data' : 'Keep provided data'
 }
 
-const openDetails = (row) => {
+const openDetails = async (row) => {
   selectedRowId.value = row.id
   detailModalOpen.value = true
+
+  if (row.approval_detail_loaded || detailLoadingId.value === row.id) {
+    return
+  }
+
+  detailLoadingId.value = row.id
+  row.local_error = ''
+
+  try {
+    const response = await enrolleeAPI.approvalReview(row.id)
+    const detail = response.data?.data?.data || response.data?.data || {}
+    Object.assign(row, normalizeRow({
+      ...row,
+      ...detail,
+      approval_detail_loaded: true,
+    }))
+    selectedRowId.value = row.id
+  } catch (err) {
+    row.local_error = err.response?.data?.message || 'Could not load full approval review details'
+    error(row.local_error)
+  } finally {
+    if (detailLoadingId.value === row.id) {
+      detailLoadingId.value = null
+    }
+  }
 }
 
 const handleDetailModal = (value) => {

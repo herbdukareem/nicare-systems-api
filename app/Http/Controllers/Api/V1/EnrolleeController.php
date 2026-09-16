@@ -524,12 +524,47 @@ class EnrolleeController extends BaseController
         $sort = $validated['sort'] ?? 'recent';
 
         $query = Enrollee::query()
+            ->select([
+                'id',
+                'enrollee_id',
+                'legacy_id',
+                'legacy_enrollee_id',
+                'nin',
+                'nin_verification_status',
+                'nin_verification_provider',
+                'nin_verified_at',
+                'first_name',
+                'middle_name',
+                'last_name',
+                'phone',
+                'status',
+                'is_possible_duplicate',
+                'duplicate_reviewed',
+                'insurance_programme_id',
+                'premium_plan_id',
+                'benefit_package_id',
+                'funding_type_id',
+                'benefactor_id',
+                'enrollment_phase_id',
+                'facility_id',
+                'lga_id',
+                'ward_id',
+                'enrollment_source',
+                'enrollment_date',
+                'created_at',
+                'updated_at',
+            ])
             ->with([
-                'insuranceProgramme', 'enrolleeCategory', 'premiumPlan', 'fundingType',
-                'benefactor', 'enrollmentPhase', 'facility', 'lga', 'ward', 'principal', 'premiumPurchase',
-                'duplicateFlags',
-                'ninVerifiedBy',
-                'mobileEnrollmentRecord.attachments',
+                'insuranceProgramme:id,name',
+                'premiumPlan:id,name,payment_required,status',
+                'benefitPackage:id,name',
+                'fundingType:id,name',
+                'benefactor:id,name',
+                'enrollmentPhase:id,name',
+                'facility:id,name',
+            ])
+            ->withCount([
+                'duplicateFlags as unresolved_duplicate_flags_count' => fn ($query) => $query->where('resolved', false),
             ])
             ->where('status', Enrollee::STATUS_PENDING);
 
@@ -575,14 +610,135 @@ class EnrolleeController extends BaseController
         }
 
         if ($sort === 'older') {
-            $query->orderByRaw('COALESCE(enrollment_date, created_at) asc')->orderBy('id');
+            $query->orderBy('enrollment_date')->orderBy('created_at')->orderBy('id');
         } else {
-            $query->orderByRaw('COALESCE(enrollment_date, created_at) desc')->orderByDesc('id');
+            $query->orderByDesc('enrollment_date')->orderByDesc('created_at')->orderByDesc('id');
         }
 
         $items = $query->limit($limit)->get();
 
-        return $this->sendResponse(EnrolleeResource::collection($items), 'Pending approval batch retrieved successfully');
+        return $this->sendResponse(
+            $items->map(fn (Enrollee $enrollee): array => $this->transformApprovalQueueEnrollee($enrollee))->values(),
+            'Pending approval batch retrieved successfully'
+        );
+    }
+
+    public function approvalReview(Enrollee $enrollee)
+    {
+        if ((int) $enrollee->status !== Enrollee::STATUS_PENDING) {
+            return $this->sendError('Only pending enrollees can be opened in the approval queue.', [], 422);
+        }
+
+        $enrollee->load([
+            'enrolleeType',
+            'insuranceProgramme',
+            'enrolleeCategory',
+            'premiumPlan',
+            'benefitPackage',
+            'premiumPurchase',
+            'vulnerableGroup',
+            'fundingType',
+            'benefactor',
+            'enrollmentPhase',
+            'facility',
+            'lga',
+            'ward',
+            'principal',
+            'duplicateFlags',
+            'createdBy',
+            'approvedBy',
+            'ninVerifiedBy',
+            'mobileEnrollmentRecord.attachments',
+        ])->loadCount('dependants');
+
+        return $this->sendResponse(new EnrolleeResource($enrollee), 'Pending approval record retrieved successfully');
+    }
+
+    private function transformApprovalQueueEnrollee(Enrollee $enrollee): array
+    {
+        $name = trim(implode(' ', array_filter([
+            $enrollee->first_name,
+            $enrollee->middle_name,
+            $enrollee->last_name,
+        ])));
+        $hasUnresolvedDuplicateFlags = (int) ($enrollee->unresolved_duplicate_flags_count ?? 0) > 0;
+        $ninVerificationStatus = $this->approvalQueueNinVerificationStatus($enrollee);
+
+        return [
+            'id' => $enrollee->id,
+            'enrollee_id' => $enrollee->enrollee_id,
+            'legacy_id' => $enrollee->legacy_id,
+            'legacy_enrollee_id' => $enrollee->legacy_enrollee_id,
+            'nin' => $enrollee->nin,
+            'nin_verification_status' => $ninVerificationStatus,
+            'nin_verification_label' => $this->approvalQueueNinVerificationLabel($ninVerificationStatus),
+            'nin_verified_at' => $enrollee->nin_verified_at,
+            'nin_verification_provider' => $enrollee->nin_verification_provider,
+            'first_name' => $enrollee->first_name,
+            'middle_name' => $enrollee->middle_name,
+            'last_name' => $enrollee->last_name,
+            'name' => $name,
+            'full_name' => $name,
+            'phone' => $enrollee->phone,
+            'status' => $enrollee->status,
+            'status_label' => $this->approvalQueueStatusLabel((int) $enrollee->status),
+            'enrollment_source' => $enrollee->enrollment_source ?? 'staff',
+            'enrollment_date' => $enrollee->enrollment_date,
+            'is_possible_duplicate' => (bool) $enrollee->is_possible_duplicate || $hasUnresolvedDuplicateFlags,
+            'duplicate_reviewed' => (bool) $enrollee->duplicate_reviewed,
+            'unresolved_duplicate_flags_count' => (int) ($enrollee->unresolved_duplicate_flags_count ?? 0),
+            'insurance_programme' => $this->simpleRelation($enrollee->insuranceProgramme, ['id', 'name']),
+            'premium_plan' => $this->simpleRelation($enrollee->premiumPlan, ['id', 'name', 'payment_required', 'status']),
+            'benefit_package' => $this->simpleRelation($enrollee->benefitPackage, ['id', 'name']),
+            'funding_type' => $this->simpleRelation($enrollee->fundingType, ['id', 'name']),
+            'benefactor' => $this->simpleRelation($enrollee->benefactor, ['id', 'name']),
+            'enrollment_phase' => $this->simpleRelation($enrollee->enrollmentPhase, ['id', 'name']),
+            'facility' => $this->simpleRelation($enrollee->facility, ['id', 'name']),
+            'approval_detail_loaded' => false,
+            'created_at' => $enrollee->created_at,
+            'updated_at' => $enrollee->updated_at,
+        ];
+    }
+
+    private function simpleRelation(mixed $model, array $fields): ?array
+    {
+        if (!$model) {
+            return null;
+        }
+
+        return collect($fields)
+            ->mapWithKeys(fn (string $field): array => [$field => $model->{$field}])
+            ->all();
+    }
+
+    private function approvalQueueNinVerificationStatus(Enrollee $enrollee): string
+    {
+        if (blank($enrollee->nin)) {
+            return Enrollee::NIN_VERIFICATION_NOT_PROVIDED;
+        }
+
+        return $enrollee->nin_verification_status ?: Enrollee::NIN_VERIFICATION_NOT_STARTED;
+    }
+
+    private function approvalQueueNinVerificationLabel(string $status): string
+    {
+        return match ($status) {
+            Enrollee::NIN_VERIFICATION_VERIFIED => 'Verified',
+            Enrollee::NIN_VERIFICATION_FAILED => 'Verification Failed',
+            Enrollee::NIN_VERIFICATION_NOT_PROVIDED => 'NIN Not Provided',
+            default => 'Not Verified',
+        };
+    }
+
+    private function approvalQueueStatusLabel(int $status): string
+    {
+        return match ($status) {
+            Enrollee::STATUS_ACTIVE => 'Active',
+            Enrollee::STATUS_REJECTED => 'Rejected',
+            Enrollee::STATUS_SUSPENDED => 'Suspended',
+            Enrollee::STATUS_EXPIRED => 'Expired / Inactive',
+            default => 'Pending',
+        };
     }
 
     public function bulkIdCard(Request $request)

@@ -132,6 +132,7 @@ export const enrolleeAPI = {
   verifyNin: (id, data = {}) => api.post(`/enrollees/${id}/verify-nin`, data),
   approve: (id, data = {}) => api.post(`/enrollees/${id}/approve`, data),
   pendingApproval: (params) => api.get('/enrollees/pending-approval', { params }),
+  approvalReview: (id) => api.get(`/enrollees/${id}/approval-review`),
   ninVerificationIntelligence: (params) => api.get('/enrollment/intelligence/nin-verification', { params }),
   exportNinVerificationIntelligence: (params) => api.get('/enrollment/intelligence/nin-verification/export', {
     params,

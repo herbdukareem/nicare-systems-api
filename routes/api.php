@@ -190,6 +190,8 @@ Route::middleware('auth:sanctum')->group(function () {
     // Enrollee routes
     Route::get('enrollees/pending-approval', [EnrolleeController::class, 'pendingApproval'])
         ->middleware('permission:any,enrollees.view,enrollee.approve,enrollee.nin.verify');
+    Route::get('enrollees/{enrollee}/approval-review', [EnrolleeController::class, 'approvalReview'])
+        ->middleware('permission:any,enrollees.view,enrollee.approve,enrollee.nin.verify');
     Route::get('enrollment/intelligence/nin-verification', [EnrollmentIntelligenceController::class, 'ninVerificationReport'])
         ->middleware('permission:any,enrollee.nin.verify,reports.view');
     Route::get('enrollment/intelligence/nin-verification/export', [EnrollmentIntelligenceController::class, 'exportNinVerificationReport'])
