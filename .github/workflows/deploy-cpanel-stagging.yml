@@ -77,8 +77,11 @@ jobs:
             --exclude="storage/logs" \
             --exclude="storage/framework" \
             --exclude="public/storage" \
-            -czf - . | ssh -p "$CPANEL_SSH_PORT" "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST" \
-              "mkdir -p \"$CPANEL_DEPLOY_PATH_STAGING\" && cd \"$CPANEL_DEPLOY_PATH_STAGING\" && tar -xzf -"
+            -czf "$RUNNER_TEMP/app-deploy.tar.gz" .
+          scp -P "$CPANEL_SSH_PORT" "$RUNNER_TEMP/app-deploy.tar.gz" \
+            "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST:$CPANEL_DEPLOY_PATH_STAGING/.app-deploy.tar.gz"
+          ssh -p "$CPANEL_SSH_PORT" "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST" \
+            "cd \"$CPANEL_DEPLOY_PATH_STAGING\" && tar -xzf .app-deploy.tar.gz && rm -f .app-deploy.tar.gz"
 
       - name: Run remote post-deploy tasks
         env:
