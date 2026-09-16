@@ -68,21 +68,17 @@ jobs:
 
       - name: Sync application files
         run: |
-          rsync -az \
-            -e "ssh -p $CPANEL_SSH_PORT" \
-            --omit-dir-times \
-            --no-perms \
-            --no-owner \
-            --no-group \
-            --exclude ".git/" \
-            --exclude ".github/" \
-            --exclude "node_modules/" \
-            --exclude "tests/" \
-            --exclude ".env" \
-            --exclude "storage/logs/" \
-            --exclude "storage/framework/" \
-            --exclude "public/storage/" \
-            ./ "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST:$CPANEL_DEPLOY_PATH/"
+          tar \
+            --exclude=".git" \
+            --exclude=".github" \
+            --exclude="node_modules" \
+            --exclude="tests" \
+            --exclude=".env" \
+            --exclude="storage/logs" \
+            --exclude="storage/framework" \
+            --exclude="public/storage" \
+            -czf - . | ssh -p "$CPANEL_SSH_PORT" "$CPANEL_SSH_USERNAME@$CPANEL_SSH_HOST" \
+              "mkdir -p \"$CPANEL_DEPLOY_PATH\" && cd \"$CPANEL_DEPLOY_PATH\" && tar -xzf -"
 
       - name: Run remote post-deploy tasks
         env:
