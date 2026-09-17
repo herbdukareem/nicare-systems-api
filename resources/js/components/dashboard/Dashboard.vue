@@ -72,6 +72,9 @@
             :helper="card.helper"
             :icon="card.icon"
             :tone="card.tone"
+            :tooltip-title="isActiveCoverageCard(card) ? 'Programme Mix' : ''"
+            :tooltip-total="isActiveCoverageCard(card) ? formatValue(card.value) : ''"
+            :tooltip-items="isActiveCoverageCard(card) ? activeCoverageTooltipItems : []"
           />
         </section>
 
@@ -248,7 +251,7 @@
               <p v-else class="tw-py-8 tw-text-center tw-text-gray-400 tw-text-sm">No programme data yet</p>
               <div class="tw-mt-4 tw-space-y-2">
                 <div
-                  v-for="(item, i) in programmeMixWithTiShip.slice(0, 5)"
+                  v-for="(item, i) in programmeMixItems.slice(0, 5)"
                   :key="item.label"
                   class="tw-flex tw-items-center tw-gap-2"
                 >
@@ -622,24 +625,12 @@ const { error, success } = useToast()
 
 const loading    = ref(false)
 const overview   = ref({})
-const TISHIP_PROGRAMME = { label: 'TISHIP', count: 37150 }
 
 const numericValue = (value) => Number(String(value ?? 0).replace(/,/g, '')) || 0
 
 // ── Computed accessors ──────────────────────────────────────────────────────
 const currentMonth    = computed(() => new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
-const executiveCards  = computed(() => {
-  const cards = overview.value.executive_summary || []
-
-  return cards.map((card, index) => {
-    if (index !== 0) return card
-
-    return {
-      ...card,
-      value: numericValue(card.value) + TISHIP_PROGRAMME.count,
-    }
-  })
-})
+const executiveCards  = computed(() => overview.value.executive_summary || [])
 const performance     = computed(() => overview.value.performance || {})
 const coverage        = computed(() => overview.value.coverage || {})
 const geography       = computed(() => overview.value.geography || {})
@@ -662,33 +653,27 @@ const CHART_COLORS  = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#
 const PURPLE_COLORS = ['#8b5cf6', '#a78bfa', '#7c3aed', '#c4b5fd', '#6d28d9']
 
 // ── Programme Mix ───────────────────────────────────────────────────────────
-const programmeMixWithTiShip = computed(() => {
-  const existingItems = (overview.value.programme_mix || [])
-    .filter(item => String(item.label || '').toLowerCase() !== TISHIP_PROGRAMME.label.toLowerCase())
-    .map(item => ({
-      ...item,
-      count: numericValue(item.count),
-    }))
-
-  const items = [...existingItems, { ...TISHIP_PROGRAMME }]
-  const total = items.reduce((sum, item) => sum + numericValue(item.count), 0)
-
-  return items
-    .map(item => ({
-      ...item,
-      percentage: total ? Number(((numericValue(item.count) / total) * 100).toFixed(1)) : 0,
-    }))
-    .sort((a, b) => numericValue(b.count) - numericValue(a.count))
-})
+const programmeMixItems = computed(() => (overview.value.programme_mix || []).map(item => ({
+  ...item,
+  count: numericValue(item.count),
+  percentage: numericValue(item.percentage),
+})))
 
 const programmeMixData = computed(() => {
-  const items = programmeMixWithTiShip.value
+  const items = programmeMixItems.value
   if (!items.length) return { labels: [], datasets: [] }
   return {
     labels: items.map(i => i.label),
     datasets: [{ data: items.map(i => i.count), backgroundColor: CHART_COLORS, borderWidth: 0 }],
   }
 })
+
+const activeCoverageTooltipItems = computed(() => programmeMixItems.value.map((item, index) => ({
+  label: item.label,
+  value: number(item.count),
+  percentage: item.percentage,
+  color: CHART_COLORS[index % CHART_COLORS.length],
+})))
 
 // ── Performance meters ──────────────────────────────────────────────────────
 const performanceMeters = computed(() => [
@@ -853,6 +838,9 @@ function money(value) {
 function formatValue(value) {
   return typeof value === 'string' ? value : number(value)
 }
+function isActiveCoverageCard(card) {
+  return String(card?.label || '').toLowerCase() === 'active coverage'
+}
 function largest(items = []) {
   return Math.max(...items.map(i => Number(i.count || i.enrollees || 0)), 1)
 }
@@ -903,6 +891,9 @@ const KpiCard = defineComponent({
     helper: String,
     icon:   { type: String, default: 'mdi-chart-bar' },
     tone:   { type: String, default: 'primary' },
+    tooltipTitle: { type: String, default: '' },
+    tooltipTotal: { type: [String, Number], default: '' },
+    tooltipItems: { type: Array, default: () => [] },
   },
   setup(props) {
     const VIcon = resolveComponent('v-icon')
@@ -916,8 +907,10 @@ const KpiCard = defineComponent({
     }
     return () => {
       const t = toneMap[props.tone] ?? toneMap.primary
+      const hasTooltip = props.tooltipItems?.length > 0
       return h('div', {
-        class: `tw-bg-white tw-border ${t.border} tw-p-3.5 tw-shadow-sm hover:tw-shadow-md tw-transition-all tw-duration-200`,
+        class: `tw-relative tw-group tw-bg-white tw-border ${t.border} tw-p-3.5 tw-shadow-sm hover:tw-shadow-md tw-transition-all tw-duration-200 ${hasTooltip ? 'tw-cursor-help focus:tw-outline-none focus:tw-ring-2 focus:tw-ring-green-100' : ''}`,
+        tabindex: hasTooltip ? 0 : undefined,
       }, [
         h('div', { class: 'tw-flex tw-items-center tw-justify-between tw-gap-2 tw-mb-2' }, [
           h('p', { class: 'tw-text-[10px] tw-font-semibold tw-uppercase tw-tracking-wide tw-text-gray-500' }, props.label),
@@ -927,6 +920,24 @@ const KpiCard = defineComponent({
         ]),
         h('p', { class: 'tw-text-xl tw-font-extrabold tw-text-gray-950 tw-leading-tight' }, props.value),
         h('p', { class: 'tw-text-[10px] tw-text-gray-400 tw-mt-1 tw-leading-snug' }, props.helper),
+        hasTooltip ? h('div', {
+          class: 'tw-pointer-events-none tw-absolute tw-left-3 tw-right-3 tw-top-full tw-z-30 tw-mt-2 tw-translate-y-1 tw-opacity-0 tw-transition-all tw-duration-150 group-hover:tw-translate-y-0 group-hover:tw-opacity-100 group-focus:tw-translate-y-0 group-focus:tw-opacity-100',
+        }, [
+          h('div', { class: 'tw-border tw-border-gray-200 tw-bg-white tw-p-3 tw-shadow-xl' }, [
+            h('div', { class: 'tw-mb-2 tw-flex tw-items-start tw-justify-between tw-gap-3' }, [
+              h('p', { class: 'tw-text-[10px] tw-font-bold tw-uppercase tw-tracking-wide tw-text-gray-500' }, props.tooltipTitle || 'Breakdown'),
+              props.tooltipTotal ? h('p', { class: 'tw-text-xs tw-font-extrabold tw-text-gray-950' }, props.tooltipTotal) : null,
+            ]),
+            h('div', { class: 'tw-space-y-1.5' }, props.tooltipItems.map(item => h('div', {
+              key: item.label,
+              class: 'tw-flex tw-items-center tw-gap-2',
+            }, [
+              h('span', { class: 'tw-h-2 tw-w-2 tw-shrink-0 tw-rounded-full', style: { backgroundColor: item.color || '#3b82f6' } }),
+              h('span', { class: 'tw-min-w-0 tw-flex-1 tw-truncate tw-text-xs tw-font-medium tw-text-gray-600' }, item.label),
+              h('span', { class: 'tw-shrink-0 tw-text-xs tw-font-bold tw-text-gray-950' }, item.value),
+            ]))),
+          ]),
+        ]) : null,
       ])
     }
   },
