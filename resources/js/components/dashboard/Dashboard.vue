@@ -485,31 +485,10 @@
           </div>
         </section>
 
-        <!-- ── Benefactor Participation + Capitation Overview ──────────────── -->
-        <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-3 tw-gap-6">
-
-          <!-- Benefactor Participation -->
-          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
-            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
-              <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Benefactor Participation</h2>
-              <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Sponsored vs self-funded distribution</p>
-            </div>
-            <div class="tw-p-5 tw-space-y-3">
-              <BreakdownRow
-                v-for="(item, i) in (overview.benefactor_mix || [])"
-                :key="item.label"
-                :label="item.label"
-                :count="item.count"
-                :pct="item.percentage || 0"
-                :color="TEAL_COLORS[i % TEAL_COLORS.length]"
-              />
-              <p v-if="!(overview.benefactor_mix || []).length" class="tw-py-8 tw-text-center tw-text-gray-400 tw-text-sm">No benefactor data yet</p>
-            </div>
-          </div>
-
-
+        <!-- ── Capitation Overview ─────────────────────────────────────────── -->
+        <section>
           <!-- Capitation Overview -->
-          <div class="xl:tw-col-span-2 tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
             <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100 tw-flex tw-items-center tw-justify-between">
               <div>
                 <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Capitation Overview</h2>
@@ -667,7 +646,6 @@ const headerPills = computed(() => [
 // ── Chart colours ───────────────────────────────────────────────────────────
 const CHART_COLORS  = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#6366f1']
 const PURPLE_COLORS = ['#8b5cf6', '#a78bfa', '#7c3aed', '#c4b5fd', '#6d28d9']
-const TEAL_COLORS   = ['#14b8a6', '#0d9488', '#5eead4', '#0f766e', '#2dd4bf']
 
 // ── Programme Mix ───────────────────────────────────────────────────────────
 const programmeMixData = computed(() => {
@@ -999,4 +977,3 @@ const FinancialTile = defineComponent({
   },
 })
 </script>
-
