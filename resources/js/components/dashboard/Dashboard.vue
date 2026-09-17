@@ -248,7 +248,7 @@
               <p v-else class="tw-py-8 tw-text-center tw-text-gray-400 tw-text-sm">No programme data yet</p>
               <div class="tw-mt-4 tw-space-y-2">
                 <div
-                  v-for="(item, i) in (overview.programme_mix || []).slice(0, 5)"
+                  v-for="(item, i) in programmeMixWithTiShip.slice(0, 5)"
                   :key="item.label"
                   class="tw-flex tw-items-center tw-gap-2"
                 >
@@ -622,18 +622,32 @@ const { error, success } = useToast()
 
 const loading    = ref(false)
 const overview   = ref({})
+const TISHIP_PROGRAMME = { label: 'TISHIP', count: 37150 }
+
+const numericValue = (value) => Number(String(value ?? 0).replace(/,/g, '')) || 0
 
 // ── Computed accessors ──────────────────────────────────────────────────────
 const currentMonth    = computed(() => new Date().toLocaleDateString(undefined, { month: 'long', year: 'numeric' }))
-const executiveCards  = computed(() => overview.value.executive_summary || [])
+const executiveCards  = computed(() => {
+  const cards = overview.value.executive_summary || []
+
+  return cards.map((card, index) => {
+    if (index !== 0) return card
+
+    return {
+      ...card,
+      value: numericValue(card.value) + TISHIP_PROGRAMME.count,
+    }
+  })
+})
 const performance     = computed(() => overview.value.performance || {})
 const coverage        = computed(() => overview.value.coverage || {})
 const geography       = computed(() => overview.value.geography || {})
 const facilities      = computed(() => overview.value.facilities || {})
 const financials      = computed(() => overview.value.financials || {})
 const pipeline        = computed(() => overview.value.pipeline || {})
-const totalEnrollees  = computed(() => Number(executiveCards.value[0]?.value || 0))
-const vulnerableCovered = computed(() => Number(executiveCards.value[3]?.value || 0))
+const totalEnrollees  = computed(() => numericValue(executiveCards.value[0]?.value))
+const vulnerableCovered = computed(() => numericValue(executiveCards.value[3]?.value))
 
 // ── Header pills (performance rates — not duplicating the count KPI cards) ──
 const headerPills = computed(() => [
@@ -648,8 +662,27 @@ const CHART_COLORS  = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#
 const PURPLE_COLORS = ['#8b5cf6', '#a78bfa', '#7c3aed', '#c4b5fd', '#6d28d9']
 
 // ── Programme Mix ───────────────────────────────────────────────────────────
+const programmeMixWithTiShip = computed(() => {
+  const existingItems = (overview.value.programme_mix || [])
+    .filter(item => String(item.label || '').toLowerCase() !== TISHIP_PROGRAMME.label.toLowerCase())
+    .map(item => ({
+      ...item,
+      count: numericValue(item.count),
+    }))
+
+  const items = [...existingItems, { ...TISHIP_PROGRAMME }]
+  const total = items.reduce((sum, item) => sum + numericValue(item.count), 0)
+
+  return items
+    .map(item => ({
+      ...item,
+      percentage: total ? Number(((numericValue(item.count) / total) * 100).toFixed(1)) : 0,
+    }))
+    .sort((a, b) => numericValue(b.count) - numericValue(a.count))
+})
+
 const programmeMixData = computed(() => {
-  const items = overview.value.programme_mix || []
+  const items = programmeMixWithTiShip.value
   if (!items.length) return { labels: [], datasets: [] }
   return {
     labels: items.map(i => i.label),
