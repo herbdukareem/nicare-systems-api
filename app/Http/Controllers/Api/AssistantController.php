@@ -29,6 +29,24 @@ class AssistantController extends Controller
         ]);
 
         $assistantContext = $this->assistantContext($request, $validated['context'] ?? []);
+
+        if ($this->isDestructiveDatabaseRequest($validated['message'])) {
+            Log::warning('assistant_destructive_database_request_blocked', [
+                'user_type' => $this->userType($request),
+                'user_id' => $request->user()?->getKey(),
+                'route' => data_get($validated, 'context.route'),
+                'page_area' => $assistantContext['current_page_area'],
+                'message_length' => strlen($validated['message']),
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'answer' => 'I cannot run, generate, or guide destructive database queries such as DELETE, DROP, TRUNCATE, ALTER, or UPDATE statements. I can help you use the portal safely or point you to the correct admin workflow.',
+                ],
+            ]);
+        }
+
         $rateKey = $this->rateKey($request);
 
         if (RateLimiter::tooManyAttempts($rateKey, 12)) {
@@ -105,6 +123,17 @@ class AssistantController extends Controller
         $user = $request->user();
 
         return $user ? class_basename($user::class) : 'guest';
+    }
+
+    private function isDestructiveDatabaseRequest(string $message): bool
+    {
+        $normalized = strtolower($message);
+
+        $hasDatabaseIntent = preg_match('/\b(sql|query|database|db|table|migration|artisan|tinker|statement)\b/', $normalized) === 1;
+        $hasDestructiveVerb = preg_match('/\b(delete|drop|truncate|alter|update|insert|replace|merge|wipe|clear|purge|remove|destroy|reset)\b/', $normalized) === 1;
+        $hasSqlCommand = preg_match('/\b(delete\s+from|drop\s+table|drop\s+database|truncate\s+table|alter\s+table|update\s+\w+\s+set|insert\s+into|replace\s+into)\b/', $normalized) === 1;
+
+        return $hasSqlCommand || ($hasDatabaseIntent && $hasDestructiveVerb);
     }
 
     private function assistantContext(Request $request, array $clientContext): array
