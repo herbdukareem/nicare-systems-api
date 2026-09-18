@@ -33,6 +33,7 @@ class BhcpfMandeReportExport
                 'enrollees.first_name', 'enrollees.middle_name', 'enrollees.last_name',
                 'enrollees.date_of_birth', 'enrollees.sex', 'enrollees.address',
                 'enrollees.village', 'enrollees.community', 'enrollees.nin', 'enrollees.phone',
+                'enrollees.marital_status', 'enrollees.occupation', 'enrollees.educational_status',
                 'enrollees.disability', 'enrollees.enrollment_date',
                 'enrollees.lga_id', 'enrollees.ward_id', 'enrollees.facility_id',
             ])
@@ -60,7 +61,10 @@ class BhcpfMandeReportExport
             },
             $enrollee->address, $enrollee->lga_name, $enrollee->ward_name,
             $enrollee->village ?: $enrollee->community,
-            '', $enrollee->nin, $enrollee->phone, '', '', '', $enrollee->disability,
+            $enrollee->occupation, $enrollee->nin, $enrollee->phone, '',
+            $this->maritalStatusLabel($enrollee->marital_status),
+            $enrollee->educational_status,
+            $enrollee->disability,
             $enrollee->facility_name, $enrollee->facility_name,
             $enrollee->facility_lga_name, $enrollee->facility_ward_name,
             $this->formatDate($enrollee->enrollment_date),
@@ -131,6 +135,15 @@ class BhcpfMandeReportExport
         return $date && substr($date, 0, 10) !== '0000-00-00'
             ? substr($date, 8, 2).'/'.substr($date, 5, 2).'/'.substr($date, 0, 4)
             : '';
+    }
+
+    private function maritalStatusLabel(mixed $status): string
+    {
+        if ($status === null || $status === '') {
+            return '';
+        }
+
+        return Enrollee::MARITAL_STATUS_OPTIONS[(int) $status] ?? (string) $status;
     }
 
     private function temporaryFilePath(): string
