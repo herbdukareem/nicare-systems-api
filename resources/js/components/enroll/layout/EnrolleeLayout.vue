@@ -90,6 +90,8 @@
         <span class="tw-hidden sm:tw-inline">{{ org.website }}</span>
       </div>
     </footer>
+
+    <PortalAssistant />
   </div>
 </template>
 
@@ -100,6 +102,7 @@ import { useEnrolleeAuthStore } from '../../../stores/enrolleeAuth';
 import { useToast } from '../../../composables/useToast';
 import { useOrganizationSettings } from '../../../composables/useOrganizationSettings';
 import AppAlert from '../../common/AppAlert.vue';
+import PortalAssistant from '../../common/PortalAssistant.vue';
 
 const router = useRouter();
 const enrolleeAuth = useEnrolleeAuthStore();

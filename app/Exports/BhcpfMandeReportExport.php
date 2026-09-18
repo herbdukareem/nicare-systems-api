@@ -38,7 +38,7 @@ class BhcpfMandeReportExport
                 'enrollees.disability', 'enrollees.enrollment_date',
                 'enrollees.lga_id', 'enrollees.ward_id', 'enrollees.facility_id',
             ])
-            ->where('enrollees.status', Enrollee::STATUS_ACTIVE)
+            ->whereIn('enrollees.status', [Enrollee::STATUS_ACTIVE, Enrollee::STATUS_PENDING])
             ->whereHas('fundingType', fn (Builder $query) => $query
                 ->whereIn('name', ['BHCPF', 'Basic Healthcare Provision Fund']))
             // Migrated HUWE records and current vulnerable programme enrollments.

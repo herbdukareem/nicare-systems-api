@@ -199,7 +199,7 @@ const reportForm = ref({
 const formatOptions = [{ title: 'Excel (XLS)', value: 'xls' }]
 
 const reportDefinitions = [
-  { key: 'bhcpf-mande', title: 'M&E BHCPF Enrollees', description: 'Approved BHCPF enrollees in the legacy 25-column M&E Excel template.', icon: 'mdi-microsoft-excel', tone: 'success', formats: ['xls'], permission: 'enrollees.export', notes: 'Uses the exact legacy BHCPF Enrollees template, including its column order, blank fields, borders, and date format. Date filters apply to enrollment dates.' },
+  { key: 'bhcpf-mande', title: 'M&E BHCPF Enrollees', description: 'Approved and pending-approval BHCPF enrollees in the legacy 25-column M&E Excel template.', icon: 'mdi-microsoft-excel', tone: 'success', formats: ['xls'], permission: 'enrollees.export', notes: 'Uses the exact legacy BHCPF Enrollees template, including its column order, blank fields, borders, and date format. Date filters apply to enrollment dates.' },
 ]
 
 const todoReports = [

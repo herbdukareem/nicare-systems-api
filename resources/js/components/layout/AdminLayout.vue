@@ -114,6 +114,8 @@
         </div>
       </main>
     </section>
+
+    <PortalAssistant />
   </div>
 </template>
 
@@ -126,6 +128,7 @@ import { useOrganizationSettings } from '../../composables/useOrganizationSettin
 import { canAccessNavigationItem, navigationItems } from '../../navigation';
 import Breadcrumb from '../common/Breadcrumb.vue';
 import Logo from '../common/Logo.vue';
+import PortalAssistant from '../common/PortalAssistant.vue';
 import RoleSwitcher from '../common/RoleSwitcher.vue';
 
 const route = useRoute();

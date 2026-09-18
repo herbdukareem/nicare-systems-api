@@ -28,23 +28,21 @@ class DashboardController extends Controller
     {
         try {
             $today = now()->toDateString();
-            $totalEnrollees = Enrollee::count();
-            $activeCovered = $this->activeCoveredQuery($today)->count();
-            $pendingApproval = $this->statusCount(Enrollee::STATUS_PENDING);
-            $suspended = $this->statusCount(Enrollee::STATUS_SUSPENDED);
-            $expiredStatus = $this->statusCount(Enrollee::STATUS_EXPIRED);
-            $rejected = $this->statusCount(Enrollee::STATUS_REJECTED);
-            $inactiveOrExpiredCoverage = $this->expiredCoverageCount($today);
-            $noExpiryCoverage = $this->activeCoveredQuery($today)->whereNull('coverage_end_date')->count();
-            $expiringSoon = $this->activeCoveredQuery($today)
-                ->whereNotNull('coverage_end_date')
-                ->whereBetween('coverage_end_date', [$today, now()->addDays(30)->toDateString()])
-                ->count();
-            $vulnerableCovered = $this->activeCoveredQuery($today)->whereNotNull('vulnerable_group_id')->count();
+            $summary = $this->enrolleeSummary($today);
+            $totalEnrollees = $summary['total'];
+            $activeCovered = $summary['active_covered'];
+            $pendingApproval = $summary['pending'];
+            $suspended = $summary['suspended'];
+            $expiredStatus = $summary['expired'];
+            $rejected = $summary['rejected'];
+            $inactiveOrExpiredCoverage = $summary['inactive_or_expired_coverage'];
+            $noExpiryCoverage = $summary['no_expiry_coverage'];
+            $expiringSoon = $summary['expiring_soon'];
+            $vulnerableCovered = $summary['vulnerable_covered'];
             $totalFacilities = Facility::count();
             $activeFacilities = $this->facilityStatusCount('active');
             $totalLgas = Lga::count();
-            $coveredLgas = Enrollee::whereNotNull('lga_id')->distinct('lga_id')->count('lga_id');
+            $coveredLgas = $summary['covered_lgas'];
 
             $coverageRate = $this->percent($activeCovered, $totalEnrollees);
             $approvalRate = $this->percent($totalEnrollees - $pendingApproval, $totalEnrollees);
@@ -118,12 +116,28 @@ class DashboardController extends Controller
                     'rejected' => $rejected,
                     'pending' => $pendingApproval,
                 ],
-                'status_breakdown' => $this->statusBreakdown($totalEnrollees),
+                'status_breakdown' => $this->statusBreakdown($totalEnrollees, [
+                    Enrollee::STATUS_PENDING => $pendingApproval,
+                    Enrollee::STATUS_ACTIVE => $summary['active_status'],
+                    Enrollee::STATUS_REJECTED => $rejected,
+                    Enrollee::STATUS_SUSPENDED => $suspended,
+                    Enrollee::STATUS_EXPIRED => $expiredStatus,
+                ]),
                 'programme_mix' => $this->dimensionBreakdown(
                     'insurance_programmes',
                     'insurance_programme_id',
                     'programme',
                     $totalEnrollees
+                ),
+                'active_programme_mix' => $this->dimensionBreakdown(
+                    'insurance_programmes',
+                    'insurance_programme_id',
+                    'programme',
+                    max($activeCovered, 1),
+                    'Not Specified',
+                    false,
+                    10,
+                    $this->activeCoveredQuery($today)
                 ),
                 'category_mix' => $this->dimensionBreakdown(
                     'enrollee_categories',
@@ -431,13 +445,70 @@ class DashboardController extends Controller
         $date ??= now()->toDateString();
 
         return Enrollee::query()
-            ->where('status', Enrollee::STATUS_ACTIVE)
-            ->whereNotNull('coverage_start_date')
-            ->whereDate('coverage_start_date', '<=', $date)
+            ->where('enrollees.status', Enrollee::STATUS_ACTIVE)
+            ->whereNotNull('enrollees.coverage_start_date')
+            ->where('enrollees.coverage_start_date', '<=', $date)
             ->where(function (Builder $query) use ($date): void {
-                $query->whereNull('coverage_end_date')
-                    ->orWhereDate('coverage_end_date', '>=', $date);
+                $query->whereNull('enrollees.coverage_end_date')
+                    ->orWhere('enrollees.coverage_end_date', '>=', $date);
             });
+    }
+
+    private function enrolleeSummary(string $date): array
+    {
+        $inThirtyDays = now()->addDays(30)->toDateString();
+
+        $row = Enrollee::query()
+            ->selectRaw(
+                'COUNT(*) as total,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as active_status,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as suspended,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as expired,
+                SUM(CASE WHEN status = ? THEN 1 ELSE 0 END) as rejected,
+                SUM(CASE WHEN status = ? AND coverage_start_date IS NOT NULL AND coverage_start_date <= ? AND (coverage_end_date IS NULL OR coverage_end_date >= ?) THEN 1 ELSE 0 END) as active_covered,
+                SUM(CASE WHEN status = ? AND coverage_start_date IS NOT NULL AND coverage_start_date <= ? AND coverage_end_date IS NULL THEN 1 ELSE 0 END) as no_expiry_coverage,
+                SUM(CASE WHEN status = ? AND coverage_start_date IS NOT NULL AND coverage_start_date <= ? AND coverage_end_date BETWEEN ? AND ? THEN 1 ELSE 0 END) as expiring_soon,
+                SUM(CASE WHEN coverage_end_date IS NOT NULL AND coverage_end_date < ? THEN 1 ELSE 0 END) as inactive_or_expired_coverage,
+                SUM(CASE WHEN status = ? AND coverage_start_date IS NOT NULL AND coverage_start_date <= ? AND (coverage_end_date IS NULL OR coverage_end_date >= ?) AND vulnerable_group_id IS NOT NULL THEN 1 ELSE 0 END) as vulnerable_covered,
+                COUNT(DISTINCT CASE WHEN lga_id IS NOT NULL THEN lga_id END) as covered_lgas',
+                [
+                    Enrollee::STATUS_PENDING,
+                    Enrollee::STATUS_ACTIVE,
+                    Enrollee::STATUS_SUSPENDED,
+                    Enrollee::STATUS_EXPIRED,
+                    Enrollee::STATUS_REJECTED,
+                    Enrollee::STATUS_ACTIVE,
+                    $date,
+                    $date,
+                    Enrollee::STATUS_ACTIVE,
+                    $date,
+                    Enrollee::STATUS_ACTIVE,
+                    $date,
+                    $date,
+                    $inThirtyDays,
+                    $date,
+                    Enrollee::STATUS_ACTIVE,
+                    $date,
+                    $date,
+                ]
+            )
+            ->first();
+
+        return [
+            'total' => (int) ($row->total ?? 0),
+            'pending' => (int) ($row->pending ?? 0),
+            'active_status' => (int) ($row->active_status ?? 0),
+            'suspended' => (int) ($row->suspended ?? 0),
+            'expired' => (int) ($row->expired ?? 0),
+            'rejected' => (int) ($row->rejected ?? 0),
+            'active_covered' => (int) ($row->active_covered ?? 0),
+            'no_expiry_coverage' => (int) ($row->no_expiry_coverage ?? 0),
+            'expiring_soon' => (int) ($row->expiring_soon ?? 0),
+            'inactive_or_expired_coverage' => (int) ($row->inactive_or_expired_coverage ?? 0),
+            'vulnerable_covered' => (int) ($row->vulnerable_covered ?? 0),
+            'covered_lgas' => (int) ($row->covered_lgas ?? 0),
+        ];
     }
 
     private function statusCount(int $status): int
@@ -461,7 +532,7 @@ class DashboardController extends Controller
         return Facility::where('accreditation_status', $status)->count();
     }
 
-    private function statusBreakdown(int $total): array
+    private function statusBreakdown(int $total, array $counts = []): array
     {
         $labels = [
             Enrollee::STATUS_PENDING => 'Pending',
@@ -471,8 +542,8 @@ class DashboardController extends Controller
             Enrollee::STATUS_EXPIRED => 'Expired / Inactive',
         ];
 
-        return collect($labels)->map(function (string $label, int $status) use ($total): array {
-            $count = $this->statusCount($status);
+        return collect($labels)->map(function (string $label, int $status) use ($total, $counts): array {
+            $count = (int) ($counts[$status] ?? $this->statusCount($status));
 
             return [
                 'label' => $label,
@@ -489,13 +560,16 @@ class DashboardController extends Controller
         int $total,
         string $emptyLabel = 'Not Specified',
         bool $excludeEmpty = false,
-        int $limit = 10
+        int $limit = 10,
+        ?Builder $baseQuery = null
     ): array {
         if (!Schema::hasTable($table) || !Schema::hasColumn('enrollees', $foreignKey)) {
             return [];
         }
 
-        $rows = Enrollee::query()
+        $query = $baseQuery ? clone $baseQuery : Enrollee::query();
+
+        $rows = $query
             ->leftJoin($table, "enrollees.{$foreignKey}", '=', "{$table}.id")
             ->select("{$table}.name as label", DB::raw('COUNT(enrollees.id) as total'))
             ->groupBy("{$table}.id", "{$table}.name")
@@ -568,10 +642,10 @@ class DashboardController extends Controller
                 $join->on('facilities.id', '=', 'enrollees.facility_id')
                     ->where('enrollees.status', Enrollee::STATUS_ACTIVE)
                     ->whereNotNull('enrollees.coverage_start_date')
-                    ->whereDate('enrollees.coverage_start_date', '<=', $today)
+                    ->where('enrollees.coverage_start_date', '<=', $today)
                     ->where(function ($query) use ($today): void {
                         $query->whereNull('enrollees.coverage_end_date')
-                            ->orWhereDate('enrollees.coverage_end_date', '>=', $today);
+                            ->orWhere('enrollees.coverage_end_date', '>=', $today);
                     });
             })
             ->select(

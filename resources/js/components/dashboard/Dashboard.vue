@@ -659,6 +659,12 @@ const programmeMixItems = computed(() => (overview.value.programme_mix || []).ma
   percentage: numericValue(item.percentage),
 })))
 
+const activeProgrammeMixItems = computed(() => (overview.value.active_programme_mix || programmeMixItems.value || []).map(item => ({
+  ...item,
+  count: numericValue(item.count),
+  percentage: numericValue(item.percentage),
+})))
+
 const programmeMixData = computed(() => {
   const items = programmeMixItems.value
   if (!items.length) return { labels: [], datasets: [] }
@@ -668,7 +674,7 @@ const programmeMixData = computed(() => {
   }
 })
 
-const activeCoverageTooltipItems = computed(() => programmeMixItems.value.map((item, index) => ({
+const activeCoverageTooltipItems = computed(() => activeProgrammeMixItems.value.map((item, index) => ({
   label: item.label,
   value: number(item.count),
   percentage: item.percentage,

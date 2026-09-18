@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\AssistantController;
 use App\Http\Controllers\Api\DashboardController;
 use App\Models\Enrollee;
 use App\Http\Controllers\Api\V1\EnrolleeController;
@@ -154,6 +155,9 @@ Route::middleware(['auth:sanctum'])->prefix('mobile/v1')->group(function () {
     Route::get('enrollments/failed', [MobileV1Controller::class, 'failed'])->middleware('permission:any,mobile-sync.status,enrollees.create');
     Route::post('enrollments/{record}/attachments', [MobileV1Controller::class, 'uploadAttachment'])->middleware('permission:any,mobile-sync.push,enrollees.create');
 });
+
+Route::post('assistant/chat', [AssistantController::class, 'chat'])
+    ->middleware(['auth:sanctum', 'throttle:20,1']);
 
 // Dashboard routes
 Route::middleware('auth:sanctum')->group(function () {
