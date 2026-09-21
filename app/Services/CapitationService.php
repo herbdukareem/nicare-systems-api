@@ -1794,7 +1794,12 @@ class CapitationService
             ->where('enrollees.funding_type_id', $fundingType->id)
             ->where('enrollees.status', Enrollee::STATUS_ACTIVE)
             ->whereNotNull('enrollees.facility_id')
-            ->whereNotNull('enrollees.coverage_start_date');
+            ->whereNotNull('enrollees.coverage_start_date')
+            // Temporary exclusion requested for capitation generation.
+            ->where(function (EloquentBuilder $builder): void {
+                $builder->whereNull('enrollees.enrollment_phase_id')
+                    ->orWhere('enrollees.enrollment_phase_id', '!=', 8);
+            });
 
         if ($cutoffDate) {
             $query->whereDate('enrollees.coverage_start_date', '<=', $cutoffDate)
