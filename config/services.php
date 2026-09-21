@@ -41,4 +41,10 @@ return [
         'base_url' => env('OPENAI_BASE_URL', 'https://api.openai.com/v1'),
     ],
 
+    'duplicate_nin_provider' => [
+        'key' => env('DUPLICATE_NIN_PROVIDER_KEY'),
+        'url' => env('DUPLICATE_NIN_PROVIDER_URL'),
+        'name' => env('DUPLICATE_NIN_PROVIDER_NAME', 'Duplicate NIN Verification'),
+    ],
+
 ];

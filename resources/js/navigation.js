@@ -19,6 +19,7 @@ export const navigationItems = [
       { name: 'All Enrollees', path: '/enrollees', icon: 'mdi-account-group-outline', permissions: ['enrollees.view'] },
       { name: 'Pending Approval', path: '/enrollees/approval', icon: 'mdi-account-check-outline', permissions: ['enrollees.update', 'enrollee.approve'] },
       { name: 'NIN & Duplicates', path: '/enrollees/integrity', icon: 'mdi-shield-account-outline', permissions: ['enrollees.update', 'enrollee.approve', 'enrollee.nin.verify', 'enrollee.status.change'] },
+      { name: 'Duplicate NIN Verify', path: '/enrollees/duplicate-nin-verification', icon: 'mdi-card-account-details-star-outline', permissions: ['enrollees.update', 'enrollee.approve', 'enrollee.nin.verify'] },
       { name: 'Enrollment Intelligence', path: '/enrollment/intelligence', icon: 'mdi-chart-box-outline', permissions: ['enrollee.nin.verify', 'reports.view'] },
       { name: 'Demo Enrollment', path: '/enrollees/demo-enrollment', icon: 'mdi-account-plus-outline', permissions: ['enrollees.create'] },
       { name: 'Enrollment Slips', path: '/enrollees/bulk-enrollment-slip', icon: 'mdi-file-document-multiple-outline', permissions: ['enrollee.print-bulk-slip'] },

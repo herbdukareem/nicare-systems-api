@@ -180,6 +180,27 @@ export const enrolleeAPI = {
   getStatistics: (id) => api.get(`/enrollees/${id}/statistics`),
 };
 
+export const duplicateNinVerificationAPI = {
+  batches: () => api.get('/enrollees/duplicate-nin-verification/batches'),
+  createBatch: (data) => api.post('/enrollees/duplicate-nin-verification/batches', data, {
+    timeout: 120000,
+  }),
+  getBatch: (id) => api.get(`/enrollees/duplicate-nin-verification/batches/${id}`, {
+    timeout: 120000,
+  }),
+  verifyItem: (id) => api.post(`/enrollees/duplicate-nin-verification/items/${id}/verify`, {}, {
+    timeout: 120000,
+    showGlobalLoader: false,
+  }),
+  verifyBatch: (id) => api.post(`/enrollees/duplicate-nin-verification/batches/${id}/verify-all`, {}, {
+    timeout: 900000,
+    showGlobalLoader: false,
+  }),
+  decide: (id, data) => api.post(`/enrollees/duplicate-nin-verification/items/${id}/decision`, data, {
+    timeout: 120000,
+  }),
+};
+
 export const dashboardAPI = {
   getOverview: () => api.get('/dashboard/overview'),
   getEnrolleeStats: () => api.get('/dashboard/enrollee-stats'),

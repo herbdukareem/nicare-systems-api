@@ -66,6 +66,7 @@ use App\Http\Controllers\Api\ClaimsDashboardController;
 use App\Http\Controllers\Api\CapitationController;
 use App\Http\Controllers\Api\MobileSyncController;
 use App\Http\Controllers\Api\NinProviderConfigurationController;
+use App\Http\Controllers\Api\DuplicateNinVerificationController;
 use App\Http\Controllers\Api\OrganizationSettingsController;
 use App\Http\Controllers\Api\PaymentGatewayConfigurationController;
 use App\Http\Controllers\Api\PaymentCollectionConfigurationController;
@@ -236,6 +237,16 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,enrollees.update,enrollees.edit,enrollee.approve,enrollee.status.change');
     Route::post('enrollees/integrity/bulk-update-nin', \App\Http\Controllers\Api\BulkEnrolleeNinUpdateController::class)
         ->middleware('permission:any,enrollees.update,enrollees.edit');
+    Route::prefix('enrollees/duplicate-nin-verification')
+        ->middleware('permission:any,enrollees.update,enrollees.edit,enrollee.approve,enrollee.nin.verify')
+        ->group(function () {
+            Route::get('batches', [DuplicateNinVerificationController::class, 'index']);
+            Route::post('batches', [DuplicateNinVerificationController::class, 'store']);
+            Route::get('batches/{batch}', [DuplicateNinVerificationController::class, 'show']);
+            Route::post('batches/{batch}/verify-all', [DuplicateNinVerificationController::class, 'verifyBatch']);
+            Route::post('items/{item}/verify', [DuplicateNinVerificationController::class, 'verifyItem']);
+            Route::post('items/{item}/decision', [DuplicateNinVerificationController::class, 'decide']);
+        });
     Route::post('enrollees', [EnrolleeController::class, 'store'])
         ->middleware('permission:enrollees.create');
     Route::get('enrollees/{enrollee}', [EnrolleeController::class, 'show'])

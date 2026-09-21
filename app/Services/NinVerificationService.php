@@ -182,13 +182,19 @@ class NinVerificationService
      *
      * @return array<string, mixed>
      */
-    public function verifyRaw(string $nin, User $verifiedBy, bool $consent = true): array
+    public function verifyRaw(
+        string $nin,
+        User $verifiedBy,
+        bool $consent = true,
+        string $channel = 'mobile',
+        array $configOverrides = []
+    ): array
     {
         if (blank($nin)) {
             throw new RuntimeException('Enter a NIN to verify.');
         }
 
-        $config = $this->configService->getConfig();
+        $config = array_replace($this->configService->getConfig(), $configOverrides);
 
         if (!$config['enabled']) {
             throw new RuntimeException('NIN verification is not enabled. Configure and enable a provider first.');
@@ -199,12 +205,14 @@ class NinVerificationService
         }
 
         if ($cached = $this->cachedVerification($nin, $config)) {
-            $this->recordCacheReuse(null, $verifiedBy, $nin, $cached, 'mobile');
+            $this->recordCacheReuse(null, $verifiedBy, $nin, $cached, $channel);
             AuditTrail::create([
                 'auditable_type' => User::class,
                 'auditable_id' => $verifiedBy->id,
-                'action' => 'mobile_nin_cache_used',
-                'description' => 'Mobile officer reused cached live NIN verification data before enrollment sync.',
+                'action' => $channel === 'mobile' ? 'mobile_nin_cache_used' : 'raw_nin_cache_used',
+                'description' => $channel === 'mobile'
+                    ? 'Mobile officer reused cached live NIN verification data before enrollment sync.'
+                    : 'Cached live NIN verification data reused.',
                 'user_id' => $verifiedBy->id,
                 'new_values' => [
                     'provider' => $cached->provider_name,
@@ -222,7 +230,7 @@ class NinVerificationService
             ];
         }
 
-        $attempt = $this->startProviderAttempt(null, $verifiedBy, $nin, $config, 'mobile');
+        $attempt = $this->startProviderAttempt(null, $verifiedBy, $nin, $config, $channel);
 
         $payload = [
             $config['request_nin_field'] => $nin,
@@ -281,8 +289,10 @@ class NinVerificationService
         AuditTrail::create([
             'auditable_type' => User::class,
             'auditable_id' => $verifiedBy->id,
-            'action' => 'mobile_nin_verified',
-            'description' => 'Mobile officer completed live NIN verification before enrollment sync.',
+            'action' => $channel === 'mobile' ? 'mobile_nin_verified' : 'raw_nin_verified',
+            'description' => $channel === 'mobile'
+                ? 'Mobile officer completed live NIN verification before enrollment sync.'
+                : 'Live NIN verification completed.',
             'user_id' => $verifiedBy->id,
             'new_values' => [
                 'provider' => $config['provider_name'],

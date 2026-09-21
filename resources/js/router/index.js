@@ -15,6 +15,7 @@ const RolesPermissionsPage = () => import('../components/settings/RolesPermissio
 const PendingEnrolleesPage = () => import('../components/enrollees/PendingEnrolleesPage.vue');
 const EnrollmentApprovalPage = () => import('../components/enrollees/EnrollmentApprovalPage.vue');
 const EnrolleeIntegrityPage = () => import('../components/enrollees/EnrolleeIntegrityPage.vue');
+const DuplicateNinVerificationPage = () => import('../components/enrollees/DuplicateNinVerificationPage.vue');
 const EnrollmentIntelligencePage = () => import('../components/enrollees/EnrollmentIntelligencePage.vue');
 const EnrollmentPhasesPage = () => import('../components/enrollees/EnrollmentPhasesPage.vue');
 const BhcpfExecutiveDashboardPage = () => import('../components/enrollees/BhcpfExecutiveDashboardPage.vue');
@@ -120,6 +121,17 @@ const routes = [
       permissions: ['enrollees.update', 'enrollee.approve', 'enrollee.nin.verify', 'enrollee.status.change'],
       title: 'NIN & Duplicates',
       breadcrumb: 'NIN & Duplicates',
+    },
+  },
+  {
+    path: '/enrollees/duplicate-nin-verification',
+    name: 'duplicate-nin-verification',
+    component: DuplicateNinVerificationPage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['enrollees.update', 'enrollee.approve', 'enrollee.nin.verify'],
+      title: 'Duplicate NIN Verification',
+      breadcrumb: 'Duplicate NIN Verification',
     },
   },
   {

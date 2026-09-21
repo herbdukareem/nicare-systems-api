@@ -31,6 +31,8 @@ return [
         env('AWS_BUCKET') ? 's3' : 'public'
     ),
 
+    'legacy_enrollee_photo_root' => env('LEGACY_ENROLLEE_PHOTO_ROOT', '/home/ngshia5'),
+
     /*
     |--------------------------------------------------------------------------
     | Filesystem Disks
