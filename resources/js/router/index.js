@@ -157,6 +157,19 @@ const routes = [
     },
   },
   {
+    path: '/dashboard/executive',
+    name: 'executive-dashboard',
+    component: BhcpfExecutiveDashboardPage,
+    meta: {
+      requiresAuth: true,
+      permissions: ['dashboard.bhcpf_executive.view'],
+      title: 'Executive Dashboard',
+      breadcrumb: 'Executive Dashboard',
+      dashboardTitle: 'Executive Dashboard',
+      showPatronCard: false,
+    },
+  },
+  {
     path: '/dashboard/executive/bhcpf-vulnerable',
     name: 'bhcpf-executive-dashboard',
     component: BhcpfExecutiveDashboardPage,

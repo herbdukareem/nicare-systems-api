@@ -662,14 +662,28 @@ const scrollToError = async () => {
   errorArea.value?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
-const verifyReturnedPayment = async (reference) => {
+const savedPaymentToken = (reference) => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('public_enrollment_payment_return') || '{}')
+    return saved.reference === reference ? saved.token : ''
+  } catch {
+    return ''
+  }
+}
+
+const verifyReturnedPayment = async (reference, token) => {
   if (!reference) return
+  token = token || savedPaymentToken(reference)
+  if (!token) {
+    paymentSummary.value = 'Payment verification needs the secure token from your checkout return link. If you still have the application confirmation open, use that link again or contact support with your payment reference.'
+    return
+  }
 
   verifyingPayment.value = true
   paymentSummary.value = ''
 
   try {
-    const response = await publicEnrollmentAPI.verifyPayment(reference)
+    const response = await publicEnrollmentAPI.verifyPayment(reference, token)
     const payload = response.data?.data || {}
     const purchase = payload.purchase
     const verification = payload.verification || {}
@@ -726,6 +740,7 @@ const submitApplication = async () => {
     const responseData = response.data.data
     const enrolleeId = responseData?.enrollee?.enrollee_id
     const paymentRef = responseData?.purchase?.payment_reference
+    const paymentToken = responseData?.payment_verification_token
     const checkout = responseData?.payment_checkout
     const portalPassword = form.password
     paymentCollection.value = responseData?.payment_collection || null
@@ -743,6 +758,13 @@ const submitApplication = async () => {
 
     submittedEnrolleeId.value = enrolleeId || ''
     submittedPaymentReference.value = paymentRef || ''
+    if (paymentRef && paymentToken) {
+      localStorage.setItem('public_enrollment_payment_return', JSON.stringify({
+        reference: paymentRef,
+        token: paymentToken,
+        saved_at: new Date().toISOString(),
+      }))
+    }
     successNextSteps.value = responseData?.next_steps || []
     await automaticallySignIn(enrolleeId, portalPassword)
     successDialog.value = true
@@ -814,8 +836,9 @@ onMounted(() => {
   fetchMetadata()
 
   const returnedReference = route.query.payment_reference || route.query.reference || route.query.trxref
+  const returnedToken = route.query.public_payment_token || route.query.token
   if (returnedReference) {
-    verifyReturnedPayment(String(returnedReference))
+    verifyReturnedPayment(String(returnedReference), returnedToken ? String(returnedToken) : '')
   }
 })
 </script>

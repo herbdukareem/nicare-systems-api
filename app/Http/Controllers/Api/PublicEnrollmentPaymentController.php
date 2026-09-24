@@ -7,6 +7,7 @@ use App\Http\Resources\EnrolleeResource;
 use App\Models\PremiumPurchase;
 use App\Services\Billing\BillingPaymentVerificationService;
 use App\Services\PublicEnrollmentService;
+use Illuminate\Http\Request;
 
 class PublicEnrollmentPaymentController extends BaseController
 {
@@ -14,9 +15,20 @@ class PublicEnrollmentPaymentController extends BaseController
     {
     }
 
-    public function verify(string $reference, PublicEnrollmentService $publicEnrollmentService)
+    public function verify(Request $request, string $reference, PublicEnrollmentService $publicEnrollmentService)
     {
+        $validated = $request->validate([
+            'token' => ['required', 'string', 'size:64'],
+        ]);
+
         $purchase = PremiumPurchase::with('plan')->where('payment_reference', $reference)->firstOrFail();
+
+        if (
+            data_get($purchase->payer_details, 'channel') !== 'self_service_enrollment'
+            || !hash_equals((string) data_get($purchase->payer_details, 'public_verification_token'), $validated['token'])
+        ) {
+            return $this->sendError('The payment verification link is invalid or incomplete.', [], 422);
+        }
 
         $result = $this->verificationService->verifyPurchase($purchase);
         $enrollmentResult = $publicEnrollmentService->finalizePaymentVerification($result['purchase']);

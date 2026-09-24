@@ -75,10 +75,19 @@ class BhcpfExecutiveDashboardController extends BaseController
             ? 0
             : (int) $this->campaignCaptureQuery($todayStart, $todayEnd, $phase?->id)->count();
 
-        $lgaRows = $targets
+        $targetLgaIds = $targets->pluck('lga_id')->filter()->map(fn ($id) => (int) $id)->values();
+        $targetlessCaptureCounts = $captureCounts
+            ->reject(fn ($count, $lgaId) => $targetLgaIds->contains((int) $lgaId));
+        $extraCount = (int) $targetlessCaptureCounts->sum();
+
+        $baseLgaRows = $targets
             ->map(function (BhcpfExecutiveTarget $target) use ($captureCounts): array {
-                $captured = (int) ($captureCounts[$target->lga_id] ?? 0);
+                $rawCaptured = (int) ($captureCounts[$target->lga_id] ?? 0);
                 $campaignTarget = (int) $target->proposed_enrolments;
+                $captured = $campaignTarget > 0 ? min($rawCaptured, $campaignTarget) : 0;
+                $extraCount = $campaignTarget > 0
+                    ? max($rawCaptured - $campaignTarget, 0)
+                    : $rawCaptured;
                 $progress = $campaignTarget > 0
                     ? round(($captured / $campaignTarget) * 100, 1)
                     : 0.0;
@@ -93,11 +102,14 @@ class BhcpfExecutiveDashboardController extends BaseController
                     'proposed_enrolments' => (int) $target->proposed_enrolments,
                     'target' => $campaignTarget,
                     'captured' => $captured,
+                    'captured_raw' => $rawCaptured,
+                    'extra_count' => $extraCount,
                     'remaining' => max($campaignTarget - $captured, 0),
                     'progress_percent' => $progress,
                     'status' => $status['label'],
                     'status_tone' => $status['tone'],
                     'status_color' => $status['color'],
+                    'is_extra' => false,
                     'plwd_target' => (int) $target->plwd_target,
                     'under_5_target' => (int) $target->under_5_target,
                     'female_reproductive_target' => (int) $target->female_reproductive_target,
@@ -108,13 +120,23 @@ class BhcpfExecutiveDashboardController extends BaseController
             ->sortByDesc('captured')
             ->values();
 
-        $bestPerforming = collect($lgaRows)->sortByDesc('progress_percent')->first();
-        $lowestPerforming = collect($lgaRows)->sortBy('progress_percent')->first();
-        $topPerformers = collect($lgaRows)->sortByDesc('progress_percent')->take(5)->values();
-        $supportList = collect($lgaRows)->sortBy('progress_percent')->take(5)->values();
+        $extraCount += (int) $baseLgaRows->sum('extra_count');
+        $lgaRows = $baseLgaRows->values();
+
+        if ($extraCount > 0) {
+            $lgaRows->push($this->extraLgaRow($extraCount));
+        }
+
+        $bestPerforming = $baseLgaRows->sortByDesc('progress_percent')->first();
+        $lowestPerforming = $baseLgaRows->sortBy('progress_percent')->first();
+        $topPerformers = $baseLgaRows->sortByDesc('progress_percent')->take(5)->values();
+        $supportList = $baseLgaRows->sortBy('progress_percent')->take(5)->values();
 
         $dailyRows = $this->buildDailyRows($dateFrom, $dateTo, $phase?->id);
-        $demographics = $this->demographicBreakdowns($dateFrom, $dateTo, $targets, collect($lgaRows), $phase?->id);
+        $demographics = $this->demographicBreakdowns($dateFrom, $dateTo, $targets, $baseLgaRows, $phase?->id);
+        $overallProgress = $overallTarget > 0
+            ? round((min($totalEnrolled, $overallTarget) / $overallTarget) * 100, 1)
+            : 0;
 
         return $this->sendResponse([
             'campaign' => [
@@ -135,7 +157,8 @@ class BhcpfExecutiveDashboardController extends BaseController
                 'enrolled_today' => $enrolledToday,
                 'total_enrolled' => $totalEnrolled,
                 'remaining' => max($overallTarget - $totalEnrolled, 0),
-                'overall_progress_percent' => $overallTarget > 0 ? round(($totalEnrolled / $overallTarget) * 100, 1) : 0,
+                'overall_progress_percent' => $overallProgress,
+                'extra_enrolled' => $extraCount,
                 'best_performing_lga' => $bestPerforming,
                 'lowest_performing_lga' => $lowestPerforming,
                 'total_lgas' => $targets->count(),
@@ -166,6 +189,33 @@ class BhcpfExecutiveDashboardController extends BaseController
                 'end_date' => $item->end_date?->toDateString(),
             ])->values(),
         ], 'BHCPF executive dashboard retrieved successfully.');
+    }
+
+    private function extraLgaRow(int $captured): array
+    {
+        return [
+            'lga_id' => 'extras',
+            'lga_name' => 'Extras',
+            'ward_count' => null,
+            'current_enrollee_count' => null,
+            'poverty_index' => null,
+            'proposed_enrolments' => null,
+            'target' => null,
+            'captured' => $captured,
+            'captured_raw' => $captured,
+            'extra_count' => $captured,
+            'remaining' => null,
+            'progress_percent' => null,
+            'status' => 'Extra',
+            'status_tone' => 'secondary',
+            'status_color' => '#64748b',
+            'is_extra' => true,
+            'plwd_target' => 0,
+            'under_5_target' => 0,
+            'female_reproductive_target' => 0,
+            'elderly_target' => 0,
+            'others_target' => 0,
+        ];
     }
 
     private function campaignCaptureQuery(Carbon $dateFrom, Carbon $dateTo, ?int $enrollmentPhaseId = null): Builder

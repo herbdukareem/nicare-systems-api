@@ -175,6 +175,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
 Route::middleware('auth:sanctum')->group(function () {
 
+    Route::post('users/stop-impersonation', [UserController::class, 'stopImpersonation']);
 
     // DOFacility Management - Specific routes must come before apiResource
     Route::middleware('permission:facilities.assign')->group(function () {
@@ -347,7 +348,6 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('users/{user}/revoke-sessions', [UserController::class, 'revokeAllSessions']);
         // Advanced user features
         Route::post('users/{user}/impersonate', [UserController::class, 'impersonate']);
-        Route::post('users/stop-impersonation', [UserController::class, 'stopImpersonation']);
         Route::get('users/export', [UserController::class, 'export']);
         Route::post('users/import', [UserController::class, 'import']);
         Route::get('users/{user}/activity-stats', [UserController::class, 'activityStats']);

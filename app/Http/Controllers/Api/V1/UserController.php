@@ -571,6 +571,10 @@ class UserController extends BaseController
     {
         $currentUser = Auth::user();
 
+        if (!$currentUser) {
+            return $this->sendError('Unauthenticated', [], 401);
+        }
+
         // Check if current user has permission to impersonate
         if (!$currentUser->hasRole('Super Admin') && !$currentUser->can('impersonate_users')) {
             return $this->sendError('Unauthorized to impersonate users', [], 403);
@@ -586,16 +590,29 @@ class UserController extends BaseController
             return $this->sendError('Cannot impersonate super admin', [], 403);
         }
 
+        if ((int) $user->status !== 1) {
+            return $this->sendError('Only active users can be impersonated', [], 422);
+        }
+
         // Store original user ID in session
         Session::put('impersonated_by', $currentUser->id);
 
-        // Login as the target user
-        Auth::login($user);
+        $token = $user->createToken(
+            'impersonation-token',
+            ['*', 'impersonation', 'impersonated-by:' . $currentUser->id],
+            now()->addHours(8)
+        )->plainTextToken;
+
+        $user = $this->loadUserForAuthResponse($user);
+        $currentUser = $this->loadUserForAuthResponse($currentUser);
 
         return $this->sendResponse([
             'user' => new UserResource($user),
             'original_user' => new UserResource($currentUser),
-            'impersonation_token' => Session::getId()
+            'token' => $token,
+            'impersonation_token' => $token,
+            'impersonated_by' => $currentUser->id,
+            'expires_at' => now()->addHours(8)->toIso8601String(),
         ], 'Impersonation started successfully');
     }
 
@@ -604,27 +621,43 @@ class UserController extends BaseController
      */
     public function stopImpersonation()
     {
-        if (!Session::has('impersonated_by')) {
+        $currentToken = request()->user()?->currentAccessToken();
+        $isTokenImpersonation = $currentToken
+            && str_contains((string) $currentToken->name, 'impersonation-token');
+
+        if (!Session::has('impersonated_by') && !$isTokenImpersonation) {
             return $this->sendError('Not currently impersonating', [], 400);
         }
 
         $originalUserId = Session::get('impersonated_by');
         $originalUser = User::find($originalUserId);
 
-        if (!$originalUser) {
+        if ($originalUserId && !$originalUser) {
             return $this->sendError('Original user not found', [], 404);
         }
 
         // Clear impersonation session
         Session::forget('impersonated_by');
 
-        // Login back as original user
-        Auth::login($originalUser);
+        if ($isTokenImpersonation) {
+            $currentToken->delete();
+        }
 
         return $this->sendResponse(
-            new UserResource($originalUser),
+            $originalUser ? new UserResource($this->loadUserForAuthResponse($originalUser)) : null,
             'Impersonation stopped successfully'
         );
+    }
+
+    private function loadUserForAuthResponse(User $user): User
+    {
+        return $user->load([
+            'roles:id,name,label,description',
+            'roles.permissions:id,name,label,category',
+            'currentRole:id,name,label,description',
+            'currentRole.permissions:id,name,label,category',
+            'directPermissions:id,name,label,category',
+        ]);
     }
 
     /**

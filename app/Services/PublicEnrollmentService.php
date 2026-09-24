@@ -12,6 +12,7 @@ use App\Services\Billing\BillingCheckoutService;
 use App\Services\Billing\PaymentCollectionConfigurationService;
 use App\Services\Billing\PaymentCollectionService;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Storage;
@@ -93,16 +94,33 @@ class PublicEnrollmentService
             throw new RuntimeException('Email address is required before checkout can continue for this enrollment.');
         }
 
-        $paymentReference = $requiresPayment
-            ? (($data['payment_reference'] ?? null) ?: $this->generatedPaymentReference())
-            : null;
-        $passportPath = $this->storePassport($data['passport'] ?? null);
         $paymentBreakdown = [
             'plan_amount' => round($planAmountDue, 2),
             'nin_verification_fee' => round($ninVerificationFee, 2),
             'total_amount' => round($totalDue, 2),
         ];
 
+        if ($existing = $this->findExistingApplicationForNin($data['nin'] ?? null)) {
+            return $this->resumeExistingApplication(
+                $existing,
+                $data,
+                $plan,
+                $enrollmentMethod,
+                $requiresPayment,
+                $requiresHostedPayment,
+                $usesBankTransfer,
+                $paymentBreakdown,
+                $requiresPublicNinVerification
+            );
+        }
+
+        $this->assertNoIdentityConflict($data);
+
+        $paymentReference = $requiresPayment
+            ? (($data['payment_reference'] ?? null) ?: $this->generatedPaymentReference())
+            : null;
+        $publicVerificationToken = $requiresPayment ? Str::random(64) : null;
+        $passportPath = $this->storePassport($data['passport'] ?? null);
         $paymentCheckout = null;
         $paymentCollection = null;
 
@@ -112,6 +130,9 @@ class PublicEnrollmentService
                 [
                     'email' => $data['email'],
                     'amount' => $totalDue,
+                    'first_name' => $data['first_name'],
+                    'last_name' => $data['last_name'],
+                    'phone' => $data['phone'] ?? null,
                     'metadata' => [
                         'channel' => 'self_service_enrollment',
                         'payment_breakdown' => $paymentBreakdown,
@@ -121,7 +142,8 @@ class PublicEnrollmentService
                         'facility_id' => $data['facility_id'],
                     ],
                 ],
-                $paymentReference
+                $paymentReference,
+                $publicVerificationToken
             );
         }
 
@@ -141,6 +163,7 @@ class PublicEnrollmentService
             $requiresPublicNinVerification,
             $usesBankTransfer,
             $paymentReference,
+            $publicVerificationToken,
             $paymentCheckout,
             $paymentCollection,
             $passportPath,
@@ -152,6 +175,7 @@ class PublicEnrollmentService
                 'channel' => 'self_service_enrollment',
                 'enrollment_method' => $enrollmentMethod,
                 'payment_purpose' => $this->paymentPurpose($enrollmentMethod, $paymentBreakdown),
+                'public_verification_token' => $publicVerificationToken,
                 'requires_public_nin_verification' => $requiresPublicNinVerification,
                 'payment_breakdown' => $paymentBreakdown,
                 'facility_id' => $data['facility_id'],
@@ -271,6 +295,7 @@ class PublicEnrollmentService
                 'enrollment_method' => $enrollmentMethod,
                 'payment_checkout' => $paymentCheckout,
                 'payment_collection' => $paymentCollection,
+                'payment_verification_token' => $publicVerificationToken,
                 'payment_breakdown' => $paymentBreakdown,
                 'nin_verification' => $ninVerification,
                 'next_steps' => $this->buildNextSteps(
@@ -378,6 +403,273 @@ class PublicEnrollmentService
             'warnings' => $warnings,
             'next_steps' => $this->buildVerificationNextSteps($purchase, $enrollee, $ninVerification, $warnings),
         ];
+    }
+
+    private function findExistingApplicationForNin(?string $nin): ?Enrollee
+    {
+        $normalizedNin = Enrollee::normalizeNin($nin);
+
+        if ($normalizedNin === null) {
+            return null;
+        }
+
+        return Enrollee::with([
+            'premiumPlan',
+            'premiumPin',
+            'premiumPurchase.plan',
+            'benefitPackage',
+            'fundingType',
+            'facility',
+            'lga',
+            'ward',
+            'insuranceProgramme',
+        ])
+            ->where('nin', $normalizedNin)
+            ->whereIn('status', [
+                Enrollee::STATUS_PENDING,
+                Enrollee::STATUS_ACTIVE,
+                Enrollee::STATUS_REJECTED,
+            ])
+            ->latest('id')
+            ->first();
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function assertNoIdentityConflict(array $data): void
+    {
+        foreach (['phone' => 'phone number', 'email' => 'email address'] as $field => $label) {
+            if (blank($data[$field] ?? null)) {
+                continue;
+            }
+
+            $exists = Enrollee::query()
+                ->where($field, $data[$field])
+                ->whereIn('status', [
+                    Enrollee::STATUS_PENDING,
+                    Enrollee::STATUS_ACTIVE,
+                    Enrollee::STATUS_REJECTED,
+                ])
+                ->exists();
+
+            if ($exists) {
+                throw new RuntimeException("This {$label} already belongs to another enrollee record.");
+            }
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     * @param  array<string, mixed>  $paymentBreakdown
+     * @return array<string, mixed>
+     */
+    private function resumeExistingApplication(
+        Enrollee $enrollee,
+        array $data,
+        PremiumPlan $plan,
+        string $enrollmentMethod,
+        bool $requiresPayment,
+        bool $requiresHostedPayment,
+        bool $usesBankTransfer,
+        array $paymentBreakdown,
+        bool $requiresPublicNinVerification
+    ): array {
+        $this->assertExistingApplicationMatchesSubmission($enrollee, $data, $plan);
+
+        $purchase = $enrollee->premiumPurchase;
+        $enrollmentMethod = data_get($purchase?->payer_details, 'enrollment_method', $enrollmentMethod);
+        $usesBankTransfer = $purchase
+            ? $purchase->payment_method === 'bank_transfer'
+            : $usesBankTransfer;
+        $requiresHostedPayment = $purchase
+            ? in_array($purchase->payment_method, ['online_payment', 'virtual_account'], true)
+            : $requiresHostedPayment;
+        $storedBreakdown = data_get($purchase?->payer_details, 'payment_breakdown');
+        if (is_array($storedBreakdown)) {
+            $paymentBreakdown = $storedBreakdown;
+        }
+
+        $paymentCollection = data_get($purchase?->payer_details, 'bank_transfer_account');
+        $paymentCheckout = null;
+        $verificationToken = $purchase ? $this->ensurePublicVerificationToken($purchase) : null;
+        $paymentStillPending = $requiresPayment && (!$purchase || $purchase->payment_status !== 'confirmed');
+
+        if ($purchase && $paymentStillPending && $requiresHostedPayment) {
+            $paymentCheckout = $this->checkoutPayloadFromPurchase($purchase)
+                ?: $this->reinitializeCheckoutForExistingPurchase($purchase, $enrollee, $plan, $paymentBreakdown, $verificationToken);
+        }
+
+        if ($purchase && $paymentStillPending && $usesBankTransfer && !$paymentCollection) {
+            $paymentCollection = $plan->bankTransferDetails($purchase->payment_reference);
+        }
+
+        $enrollee = $enrollee->fresh([
+            'premiumPlan',
+            'premiumPin',
+            'premiumPurchase',
+            'benefitPackage',
+            'fundingType',
+            'facility',
+            'lga',
+            'ward',
+            'insuranceProgramme',
+        ]);
+
+        return [
+            'enrollee' => $enrollee,
+            'purchase' => $purchase?->fresh(['plan']),
+            'requires_payment' => $paymentStillPending,
+            'enrollment_method' => $enrollmentMethod,
+            'payment_checkout' => $paymentCheckout,
+            'payment_collection' => $paymentStillPending && $usesBankTransfer ? $paymentCollection : null,
+            'payment_verification_token' => $verificationToken,
+            'payment_breakdown' => $paymentBreakdown,
+            'nin_verification' => null,
+            'next_steps' => $purchase && $purchase->payment_status === 'confirmed'
+                ? $this->buildVerificationNextSteps($purchase, $enrollee, null, [])
+                : $this->buildNextSteps(
+                    $paymentStillPending,
+                    $requiresHostedPayment,
+                    $usesBankTransfer,
+                    $enrollmentMethod,
+                    $purchase?->payment_reference,
+                    is_array($paymentCollection) ? $paymentCollection : null,
+                    $paymentBreakdown,
+                    $requiresPublicNinVerification,
+                    null
+                ),
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $data
+     */
+    private function assertExistingApplicationMatchesSubmission(Enrollee $enrollee, array $data, PremiumPlan $plan): void
+    {
+        $isSelfServicePending = (int) $enrollee->status === Enrollee::STATUS_PENDING
+            && ($enrollee->enrollment_source ?? null) === 'self_service';
+
+        if (!$isSelfServicePending) {
+            throw new RuntimeException('This NIN already belongs to another enrollee record.');
+        }
+
+        if ((int) $enrollee->premium_plan_id !== (int) $plan->id) {
+            throw new RuntimeException('A pending self-enrollment application already exists for this NIN. Continue with the original selected plan or contact support.');
+        }
+
+        $matches = $this->sameText($enrollee->first_name, $data['first_name'] ?? null)
+            && $this->sameText($enrollee->last_name, $data['last_name'] ?? null)
+            && $this->sameText($enrollee->phone, $data['phone'] ?? null)
+            && $this->sameDate($enrollee->date_of_birth, $data['date_of_birth'] ?? null);
+
+        if (!$matches) {
+            throw new RuntimeException('A pending self-enrollment application already exists for this NIN, but the submitted details do not match the original application.');
+        }
+
+        if (filled($enrollee->email) && filled($data['email'] ?? null) && !$this->sameText($enrollee->email, $data['email'])) {
+            throw new RuntimeException('A pending self-enrollment application already exists for this NIN with a different email address.');
+        }
+    }
+
+    private function ensurePublicVerificationToken(PremiumPurchase $purchase): string
+    {
+        $details = is_array($purchase->payer_details) ? $purchase->payer_details : [];
+        $token = (string) ($details['public_verification_token'] ?? '');
+
+        if (strlen($token) !== 64) {
+            $token = Str::random(64);
+            $details['public_verification_token'] = $token;
+            $purchase->forceFill(['payer_details' => $details])->save();
+            $purchase->refresh();
+        }
+
+        return $token;
+    }
+
+    private function checkoutPayloadFromPurchase(PremiumPurchase $purchase): ?array
+    {
+        $rawResponse = is_array($purchase->gateway_response) ? $purchase->gateway_response : [];
+        $checkoutForm = data_get($rawResponse, 'checkout_form');
+
+        if (blank($purchase->authorization_url) && !is_array($checkoutForm)) {
+            return null;
+        }
+
+        $payload = [
+            'provider' => $purchase->gateway_code,
+            'reference' => $purchase->payment_reference,
+            'authorization_url' => $purchase->authorization_url,
+            'access_code' => $purchase->gateway_access_code,
+            'status' => $purchase->gateway_status ?: 'initialized',
+            'raw_response' => $rawResponse,
+        ];
+
+        if (is_array($checkoutForm)) {
+            $payload['checkout_form'] = $checkoutForm;
+        }
+
+        return $payload;
+    }
+
+    /**
+     * @param  array<string, mixed>  $paymentBreakdown
+     */
+    private function reinitializeCheckoutForExistingPurchase(
+        PremiumPurchase $purchase,
+        Enrollee $enrollee,
+        PremiumPlan $plan,
+        array $paymentBreakdown,
+        string $verificationToken
+    ): array {
+        if (blank($purchase->payer_email ?: $enrollee->email)) {
+            throw new RuntimeException('Email address is required before checkout can continue for this enrollment.');
+        }
+
+        $checkout = $this->billingCheckoutService->initializePublicEnrollmentCheckout(
+            $plan,
+            [
+                'email' => $purchase->payer_email ?: $enrollee->email,
+                'amount' => (float) ($paymentBreakdown['total_amount'] ?? $purchase->amount),
+                'first_name' => $enrollee->first_name,
+                'last_name' => $enrollee->last_name,
+                'phone' => $purchase->payer_phone ?: $enrollee->phone,
+                'metadata' => [
+                    'channel' => 'self_service_enrollment',
+                    'payment_breakdown' => $paymentBreakdown,
+                    'enrollment_method' => data_get($purchase->payer_details, 'enrollment_method', 'online_payment'),
+                    'lga_id' => $enrollee->lga_id,
+                    'ward_id' => $enrollee->ward_id,
+                    'facility_id' => $enrollee->facility_id,
+                ],
+            ],
+            (string) $purchase->payment_reference,
+            $verificationToken
+        );
+
+        $purchase->update([
+            'gateway_code' => $checkout['provider'] ?? $purchase->gateway_code,
+            'gateway_status' => $checkout['status'] ?? 'initialized',
+            'authorization_url' => $checkout['authorization_url'] ?? null,
+            'gateway_access_code' => $checkout['access_code'] ?? null,
+            'gateway_response' => $checkout['raw_response'] ?? null,
+        ]);
+
+        return $checkout;
+    }
+
+    private function sameText(mixed $left, mixed $right): bool
+    {
+        return mb_strtolower(trim((string) $left)) === mb_strtolower(trim((string) $right));
+    }
+
+    private function sameDate(mixed $left, mixed $right): bool
+    {
+        if (!$left || !$right) {
+            return false;
+        }
+
+        return Carbon::parse($left)->toDateString() === Carbon::parse($right)->toDateString();
     }
 
     private function storePassport(mixed $passport): ?string

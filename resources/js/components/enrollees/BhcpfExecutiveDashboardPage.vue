@@ -8,9 +8,9 @@
       }"
     >
       <AppPageHeader
-        :title="`${campaign.name || 'BHCPF'} Executive Dashboard`"
-        subtitle="Monitor captured vulnerable-group enrollments across Niger State against the official BHCPF campaign allocation."
-        kicker="Executive Monitoring"
+        :title="pageTitle"
+        :subtitle="pageSubtitle"
+        :kicker="pageKicker"
         icon="mdi-chart-box-multiple-outline"
       >
         <template #meta>
@@ -28,7 +28,7 @@
           </span>
         </template>
       
-        <div class="tw-flex tw-items-center tw-gap-3 tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-white tw-px-3 tw-py-2 tw-shadow-sm">
+        <div v-if="showPatronCard" class="tw-flex tw-items-center tw-gap-3 tw-rounded-2xl tw-border tw-border-slate-200 tw-bg-white tw-px-3 tw-py-2 tw-shadow-sm">
           <img
             :src="firstLadyImage"
             alt="Her Excellency Hajiya Fatima Mohammed Bago, First Lady of Niger State"
@@ -188,7 +188,10 @@
           <template #toolbar>
             <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-text-slate-500">
               <span class="tw-rounded-full tw-bg-slate-200 tw-px-2.5 tw-py-1 tw-font-semibold tw-text-slate-700">
-                {{ lgaRows.length }} LGA row{{ lgaRows.length === 1 ? '' : 's' }}
+                {{ targetLgaRowCount }} LGA row{{ targetLgaRowCount === 1 ? '' : 's' }}
+              </span>
+              <span v-if="extrasRow" class="tw-rounded-full tw-bg-slate-100 tw-px-2.5 tw-py-1 tw-font-semibold tw-text-slate-600">
+                Extras: {{ formatNumber(extrasRow.captured) }}
               </span>
               <span>Progress is based on captured divided by target.</span>
             </div>
@@ -197,12 +200,29 @@
           <template #item.lga="{ item }">
             <div class="tw-min-w-0">
               <p class="tw-font-semibold tw-text-slate-900">{{ item.lga_name }}</p>
-              <p class="tw-text-xs tw-text-slate-500">{{ item.ward_count }} wards</p>
+              <p class="tw-text-xs tw-text-slate-500">
+                {{ item.is_extra ? 'Temporary count without target' : `${item.ward_count} wards` }}
+              </p>
             </div>
           </template>
 
+          <template #item.target="{ item }">
+            <span>{{ item.is_extra ? '—' : formatNumber(item.target) }}</span>
+          </template>
+
+          <template #item.captured="{ item }">
+            <span>{{ formatNumber(item.captured) }}</span>
+          </template>
+
+          <template #item.remaining="{ item }">
+            <span>{{ item.is_extra ? '—' : formatNumber(item.remaining) }}</span>
+          </template>
+
           <template #item.progress="{ item }">
-            <div class="tw-flex tw-items-center tw-gap-3">
+            <div v-if="item.is_extra" class="tw-text-sm tw-font-semibold tw-text-slate-500">
+              Count only
+            </div>
+            <div v-else class="tw-flex tw-items-center tw-gap-3">
               <div class="tw-h-2.5 tw-w-28 tw-overflow-hidden tw-rounded-full tw-bg-slate-200">
                 <div class="tw-h-full tw-rounded-full" :style="{ width: `${Math.min(item.progress_percent, 100)}%`, backgroundColor: item.status_color }"></div>
               </div>
@@ -263,6 +283,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import AdminLayout from '../layout/AdminLayout.vue'
 import AppCard from '../common/AppCard.vue'
 import AppDataTable from '../common/AppDataTable.vue'
@@ -273,6 +294,7 @@ import { dashboardAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
 
 const { error } = useToast()
+const route = useRoute()
 const firstLadyImage = '/first-lady.jpg'
 
 const loading = ref(false)
@@ -322,11 +344,12 @@ const selectedLgaId = ref(null)
 const enrollmentPhases = ref([])
 
 const statusLegend = [
-  { label: 'Completed', range: '100%+', color: '#2563eb' },
+  { label: 'Completed', range: '100%', color: '#2563eb' },
   { label: 'On Track', range: '80% - 99.9%', color: '#15803d' },
   { label: 'In Progress', range: '50% - 79.9%', color: '#f59e0b' },
   { label: 'Needs Support', range: '25% - 49.9%', color: '#ea580c' },
   { label: 'Needs Push', range: 'Below 25%', color: '#dc2626' },
+  { label: 'Extra', range: 'Count only', color: '#64748b' },
 ]
 
 const lgaHeaders = [
@@ -464,6 +487,13 @@ const demographicChartOptions = {
   },
 }
 
+const pageTitle = computed(() => route.meta.dashboardTitle || `${campaign.name || 'BHCPF'} Executive Dashboard`)
+const pageSubtitle = computed(() => route.meta.dashboardSubtitle || 'Monitor captured vulnerable-group enrollments across Niger State against the official BHCPF campaign allocation.')
+const pageKicker = computed(() => route.meta.dashboardKicker || 'Executive Monitoring')
+const showPatronCard = computed(() => route.meta.showPatronCard !== false)
+const targetLgaRowCount = computed(() => lgaRows.value.filter((item) => !item.is_extra).length)
+const extrasRow = computed(() => lgaRows.value.find((item) => item.is_extra) || null)
+
 const selectedLgaBreakdown = computed(() => {
   if (selectedLgaId.value === null) {
     return null
@@ -506,7 +536,7 @@ const toggleFullscreen = async () => {
 
 const handleLgaChartSelect = (payload) => {
   const lga = lgaRows.value.find((item) => item.lga_name === payload?.label)
-  if (!lga) {
+  if (!lga || lga.is_extra) {
     return
   }
 
@@ -563,7 +593,7 @@ const resetFilters = () => {
 }
 
 const formatNumber = (value) => Number(value || 0).toLocaleString()
-const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`
+const formatPercent = (value) => value === null || value === undefined ? '—' : `${Number(value || 0).toFixed(1)}%`
 const formatDate = (value) => {
   if (!value) return 'N/A'
   return new Date(value).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
@@ -574,6 +604,7 @@ const statusClass = (tone) => ({
   'tw-bg-emerald-50 tw-text-emerald-800': tone === 'success',
   'tw-bg-amber-50 tw-text-amber-800': tone === 'warning',
   'tw-bg-rose-50 tw-text-rose-800': tone === 'danger',
+  'tw-bg-slate-100 tw-text-slate-700': tone === 'secondary',
 })
 
 onMounted(() => {

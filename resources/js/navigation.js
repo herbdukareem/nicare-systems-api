@@ -4,6 +4,7 @@ export const navigationItems = [
     icon: 'mdi-view-dashboard-outline',
     children: [
       { name: 'Main', path: '/dashboard', icon: 'mdi-home-outline', permissions: ['dashboard.view'] },
+      { name: 'Executive Dashboard', path: '/dashboard/executive', icon: 'mdi-monitor-dashboard', permissions: ['dashboard.bhcpf_executive.view'] },
       { name: 'BHCPF Executive', path: '/dashboard/executive/bhcpf-vulnerable', icon: 'mdi-chart-box-multiple-outline', permissions: ['dashboard.bhcpf_executive.view'] },
       { name: 'Desk Officer', path: '/do-dashboard', icon: 'mdi-desk', permissions: ['dashboard.desk_officer.view'] },
       { name: 'Facility', path: '/facility-dashboard', icon: 'mdi-hospital-building', permissions: ['dashboard.facility.view'] },

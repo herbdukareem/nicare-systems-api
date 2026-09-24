@@ -107,6 +107,28 @@
         </div>
       </header>
 
+      <div
+        v-if="authStore.isImpersonating"
+        class="tw-flex tw-flex-col tw-gap-2 tw-border-b tw-border-amber-200 tw-bg-amber-50 tw-px-4 tw-py-3 tw-text-sm tw-text-amber-950 sm:tw-flex-row sm:tw-items-center sm:tw-justify-between lg:tw-px-6"
+      >
+        <div class="tw-flex tw-items-center tw-gap-2">
+          <v-icon size="18" color="warning">mdi-account-switch</v-icon>
+          <span>
+            Impersonating <strong>{{ userName }}</strong>
+            <template v-if="authStore.originalUserName"> from {{ authStore.originalUserName }}</template>
+          </span>
+        </div>
+        <v-btn
+          color="warning"
+          variant="outlined"
+          size="small"
+          :loading="stopImpersonationLoading"
+          @click="handleStopImpersonation"
+        >
+          Return to my account
+        </v-btn>
+      </div>
+
       <main class="tw-min-h-0 tw-flex-1 tw-overflow-y-auto tw-bg-slate-50">
         <div class="tw-p-4 sm:tw-p-5 lg:tw-p-6">
           <Breadcrumb />
@@ -134,13 +156,14 @@ import RoleSwitcher from '../common/RoleSwitcher.vue';
 const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
-const { success } = useToast();
+const { success, error } = useToast();
 const { settings: org, fetchSettings } = useOrganizationSettings();
 
 onMounted(fetchSettings);
 
 const sidebarOpen = ref(false);
 const logoutLoading = ref(false);
+const stopImpersonationLoading = ref(false);
 const expandedMenus = ref([]);
 const menuSearch = ref('');
 
@@ -238,6 +261,20 @@ const handleLogout = async () => {
     router.push('/login');
   } finally {
     logoutLoading.value = false;
+  }
+};
+
+const handleStopImpersonation = async () => {
+  stopImpersonationLoading.value = true;
+  try {
+    await authStore.stopImpersonation();
+    success('Returned to your account');
+    router.push('/dashboard');
+  } catch (exception) {
+    error(exception?.message || 'Failed to stop impersonation');
+    router.push('/login');
+  } finally {
+    stopImpersonationLoading.value = false;
   }
 };
 </script>

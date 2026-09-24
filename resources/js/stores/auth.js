@@ -74,6 +74,8 @@ export const useAuthStore = defineStore('auth', {
     loading: false,
     currentRole: null, // Currently active role
     availableRoles: [], // All roles user can switch to
+    isImpersonating: false,
+    originalUser: null,
     _initializing: false, // Flag to prevent multiple initializations
   }),
 
@@ -102,6 +104,7 @@ export const useAuthStore = defineStore('auth', {
       return collectPermissions(state);
     },
     canSwitchRoles: (state) => state.availableRoles.length > 1,
+    originalUserName: (state) => state.originalUser?.name || state.originalUser?.username || '',
   },
 
   actions: {
@@ -136,12 +139,16 @@ export const useAuthStore = defineStore('auth', {
         }
       } catch (error) {
         // Clear any existing auth state on login failure
-        this.user = null;
-        this.token = null;
-        this.isAuthenticated = false;
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
-        localStorage.removeItem('currentRole');
+          this.user = null;
+          this.token = null;
+          this.isAuthenticated = false;
+          this.isImpersonating = false;
+          this.originalUser = null;
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+          localStorage.removeItem('currentRole');
+          localStorage.removeItem('impersonationOriginalAuth');
+          localStorage.removeItem('impersonationMeta');
         throw error;
       } finally {
         this.loading = false;
@@ -160,9 +167,13 @@ export const useAuthStore = defineStore('auth', {
         this.isAuthenticated = false;
         this.currentRole = null;
         this.availableRoles = [];
+        this.isImpersonating = false;
+        this.originalUser = null;
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('currentRole');
+        localStorage.removeItem('impersonationOriginalAuth');
+        localStorage.removeItem('impersonationMeta');
       }
     },
 
@@ -172,9 +183,13 @@ export const useAuthStore = defineStore('auth', {
       this.isAuthenticated = false;
       this.currentRole = null;
       this.availableRoles = [];
+      this.isImpersonating = false;
+      this.originalUser = null;
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('currentRole');
+      localStorage.removeItem('impersonationOriginalAuth');
+      localStorage.removeItem('impersonationMeta');
     },
 
    async fetchUser() {
@@ -276,6 +291,18 @@ export const useAuthStore = defineStore('auth', {
   try {
     const token = localStorage.getItem('token');
     const savedUser = localStorage.getItem('user');
+    const impersonationMeta = localStorage.getItem('impersonationMeta');
+
+    if (impersonationMeta) {
+      try {
+        const parsedMeta = JSON.parse(impersonationMeta);
+        this.isImpersonating = true;
+        this.originalUser = parsedMeta.original_user || null;
+      } catch {
+        this.isImpersonating = false;
+        this.originalUser = null;
+      }
+    }
 
     if (token) {
       this.token = token;
@@ -318,9 +345,13 @@ export const useAuthStore = defineStore('auth', {
         this.availableRoles = [];
 
         this.token = null;
+        this.isImpersonating = false;
+        this.originalUser = null;
         localStorage.removeItem('token');
         localStorage.removeItem('user');
         localStorage.removeItem('currentRole');
+        localStorage.removeItem('impersonationOriginalAuth');
+        localStorage.removeItem('impersonationMeta');
       } else {
       }
     } else {
@@ -367,6 +398,76 @@ export const useAuthStore = defineStore('auth', {
     resetToAllRoles() {
       this.currentRole = null;
       localStorage.removeItem('currentRole');
+    },
+
+    startImpersonation(payload) {
+      const { user, token, original_user } = payload || {};
+      if (!user || !token) {
+        throw new Error('Invalid impersonation response');
+      }
+
+      if (!localStorage.getItem('impersonationOriginalAuth')) {
+        localStorage.setItem('impersonationOriginalAuth', JSON.stringify({
+          token: this.token || localStorage.getItem('token'),
+          user: this.user || JSON.parse(localStorage.getItem('user') || 'null'),
+          currentRole: this.currentRole || JSON.parse(localStorage.getItem('currentRole') || 'null'),
+        }));
+      }
+
+      this.user = user;
+      this.token = token;
+      this.isAuthenticated = true;
+      this.availableRoles = user.roles || [];
+      this.currentRole = user.current_role || (this.availableRoles.length > 0 ? this.availableRoles[0] : null);
+      this.isImpersonating = true;
+      this.originalUser = original_user || null;
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      if (this.currentRole) {
+        localStorage.setItem('currentRole', JSON.stringify(this.currentRole));
+      } else {
+        localStorage.removeItem('currentRole');
+      }
+      localStorage.setItem('impersonationMeta', JSON.stringify({
+        original_user: this.originalUser,
+        started_at: new Date().toISOString(),
+      }));
+    },
+
+    async stopImpersonation() {
+      const original = JSON.parse(localStorage.getItem('impersonationOriginalAuth') || 'null');
+
+      try {
+        await userAPI.stopImpersonation();
+      } catch (error) {
+        console.warn('[Auth] Failed to revoke impersonation token before restore:', error?.message || error);
+      }
+
+      if (!original?.token || !original?.user) {
+        this.clearSession();
+        throw new Error('Original session was not found. Please log in again.');
+      }
+
+      this.user = original.user;
+      this.token = original.token;
+      this.isAuthenticated = true;
+      this.availableRoles = original.user.roles || [];
+      this.currentRole = original.currentRole || original.user.current_role || (this.availableRoles.length > 0 ? this.availableRoles[0] : null);
+      this.isImpersonating = false;
+      this.originalUser = null;
+
+      localStorage.setItem('token', original.token);
+      localStorage.setItem('user', JSON.stringify(original.user));
+      if (this.currentRole) {
+        localStorage.setItem('currentRole', JSON.stringify(this.currentRole));
+      } else {
+        localStorage.removeItem('currentRole');
+      }
+      localStorage.removeItem('impersonationOriginalAuth');
+      localStorage.removeItem('impersonationMeta');
+
+      await this.fetchUser();
     },
 
     isSuperAdmin() {

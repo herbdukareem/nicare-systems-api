@@ -735,6 +735,7 @@ import AppDataTable from '../common/AppDataTable.vue'
 import { useToast } from '../../composables/useToast'
 import { userAPI, roleAPI, departmentAPI, designationAPI, permissionAPI } from '../../utils/api'
 import { useAuthStore } from '../../stores/auth'
+import { firstAccessiblePath } from '../../navigation'
 
 const { success, error } = useToast()
 const auth = useAuthStore()
@@ -1334,17 +1335,18 @@ const currentUser = computed(() => {
 })
 const canResetPasswordFor = (user) =>
   canResetUserPassword.value && user?.id && Number(user.id) !== Number(currentUser.value?.id)
-const canImpersonate = (user) => user?.id && user.id !== currentUser.value?.id
+const canImpersonate = (user) => user?.id && Number(user.id) !== Number(currentUser.value?.id)
 const impersonateUser = async (user) => {
   if (!confirm(`Impersonate ${user.name}?`)) return
   try {
     const res = await userAPI.impersonate(user.id)
     if (res?.data?.success) {
+      auth.startImpersonation(res.data.data)
       success(`Now impersonating ${user.name}`)
-      window.location.href = '/admin/dashboard'
+      window.location.href = firstAccessiblePath(auth) || '/dashboard'
     }
   } catch (e) {
-    error('Failed to impersonate user')
+    error(e?.response?.data?.message || 'Failed to impersonate user')
     console.error(e)
   }
 }

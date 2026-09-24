@@ -85,12 +85,12 @@ class PublicEnrollmentController extends BaseController
 
         $validated = $request->validate([
             'premium_plan_id' => ['required', 'exists:premium_plans,id'],
-            'nin' => ['required', 'string', 'max:255', 'unique:enrollees,nin'],
+            'nin' => ['required', 'string', 'max:255'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name' => ['required', 'string', 'max:255'],
             'middle_name' => ['nullable', 'string', 'max:255'],
-            'email' => ['nullable', 'email', 'max:255', 'unique:enrollees,email'],
-            'phone' => ['required', 'string', 'max:255', 'unique:enrollees,phone'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'phone' => ['required', 'string', 'max:255'],
             'date_of_birth' => ['required', 'date'],
             'sex' => ['required', 'integer', Rule::in([1, 2])],
             'marital_status' => ['nullable', 'integer', Rule::in(array_keys(Enrollee::MARITAL_STATUS_OPTIONS))],
@@ -110,21 +110,10 @@ class PublicEnrollmentController extends BaseController
             'passport' => ['nullable', 'image', 'mimes:jpeg,png,jpg,gif', 'max:2048'],
         ]);
 
-        if ($this->duplicateDetectionService->findExistingByNin((string) $validated['nin'])) {
-            return $this->sendError('This NIN already belongs to another enrollee record.', [
-                'nin' => ['This NIN already belongs to another enrollee record.'],
-            ], 422);
-        }
-
         try {
             $result = $this->duplicateDetectionService->withinSubmissionLock(
                 $validated + ['gender' => $validated['sex'] ?? null],
                 function () use ($service, $validated) {
-                    $existingByNin = $this->duplicateDetectionService->findExistingByNin($validated['nin'] ?? null);
-                    if ($existingByNin) {
-                        throw new RuntimeException('This NIN already belongs to another enrollee record.');
-                    }
-
                     return $service->submitApplication($validated);
                 }
             );
@@ -139,6 +128,7 @@ class PublicEnrollmentController extends BaseController
             'enrollment_method' => $result['enrollment_method'],
             'payment_checkout' => $result['payment_checkout'] ?? null,
             'payment_collection' => $result['payment_collection'] ?? null,
+            'payment_verification_token' => $result['payment_verification_token'] ?? null,
             'payment_breakdown' => $result['payment_breakdown'] ?? null,
             'nin_verification' => $result['nin_verification'] ?? null,
             'next_steps' => $result['next_steps'],

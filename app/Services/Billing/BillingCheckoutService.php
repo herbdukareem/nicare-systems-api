@@ -31,8 +31,9 @@ class BillingCheckoutService
 
         $callbackBase = rtrim(config('app.url'), '/');
         $callbackPath = (string) ($configuration['callback_path'] ?? '/enroll/start?checkout_return=1');
-        $separator = str_contains($callbackPath, '?') ? '&' : '?';
-        $callbackUrl = "{$callbackBase}{$callbackPath}{$separator}payment_reference={$reference}";
+        $callbackUrl = $this->callbackUrl($callbackBase, $callbackPath, [
+            'payment_reference' => $reference,
+        ]);
 
         return $this->gatewayManager->gateway($gatewayCode)->initializeCheckout([
             'email' => $payer['email'],
@@ -69,12 +70,12 @@ class BillingCheckoutService
         ];
     }
 
-    public function initializePublicEnrollmentCheckout(PremiumPlan $plan, array $payer, string $reference): array
+    public function initializePublicEnrollmentCheckout(PremiumPlan $plan, array $payer, string $reference, ?string $publicVerificationToken = null): array
     {
         $gatewayCode = $plan->payment_gateway ?: $this->configurationService->getActiveGatewayCode();
         $configuration = $this->configurationService->getConfig($gatewayCode);
 
-        if (!in_array($gatewayCode, ['paystack'], true)) {
+        if (!in_array($gatewayCode, $this->supportedOnlineGateways(), true)) {
             throw new RuntimeException('The selected plan is not linked to a supported online checkout gateway yet.');
         }
 
@@ -84,15 +85,27 @@ class BillingCheckoutService
 
         $callbackBase = rtrim(config('app.url'), '/');
         $callbackPath = (string) ($configuration['callback_path'] ?? '/enroll/start?checkout_return=1');
-        $separator = str_contains($callbackPath, '?') ? '&' : '?';
-        $callbackUrl = "{$callbackBase}{$callbackPath}{$separator}payment_reference={$reference}";
+        $callbackUrl = $this->callbackUrl($callbackBase, $callbackPath, array_filter([
+            'payment_reference' => $reference,
+            'public_payment_token' => $publicVerificationToken,
+        ], static fn ($value) => $value !== null && $value !== ''));
 
         return $this->gatewayManager->gateway($gatewayCode)->initializeCheckout([
             'email' => $payer['email'],
             'amount' => (float) ($payer['amount'] ?? $plan->amount),
             'reference' => $reference,
             'callback_url' => $callbackUrl,
+            'description' => $plan->name,
+            'name' => $this->payerName(
+                $payer['name'] ?? null,
+                $payer['first_name'] ?? null,
+                $payer['last_name'] ?? null
+            ),
+            'first_name' => $payer['first_name'] ?? null,
+            'last_name' => $payer['last_name'] ?? null,
+            'phone' => $payer['phone'] ?? null,
             'metadata' => Arr::get($payer, 'metadata', []),
+            'split_config' => $this->splitConfigurationService->resolveForPlan($plan, $gatewayCode),
         ], $configuration);
     }
 
@@ -155,7 +168,7 @@ class BillingCheckoutService
         $gatewayCode = $plan->payment_gateway ?: $this->configurationService->getActiveGatewayCode();
         $configuration = $this->configurationService->getConfig($gatewayCode);
 
-        if (!in_array($gatewayCode, ['paystack', 'monnify', 'remita', 'quickteller'], true)) {
+        if (!in_array($gatewayCode, $this->supportedOnlineGateways(), true)) {
             throw new RuntimeException('The selected plan is not linked to a supported online checkout gateway yet.');
         }
 
@@ -164,5 +177,24 @@ class BillingCheckoutService
         }
 
         return [$gatewayCode, $configuration];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function supportedOnlineGateways(): array
+    {
+        return ['paystack', 'monnify', 'remita', 'quickteller'];
+    }
+
+    /**
+     * @param  array<string, mixed>  $query
+     */
+    private function callbackUrl(string $base, string $path, array $query): string
+    {
+        $url = $base . $path;
+        $separator = str_contains($url, '?') ? '&' : '?';
+
+        return $url . $separator . http_build_query($query);
     }
 }
