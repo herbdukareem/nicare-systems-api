@@ -248,9 +248,13 @@ class EnrollmentIntelligenceController extends BaseController
             ])
             ->values();
 
+        $verificationPerPage = (int) ($validated['per_page'] ?? 25);
+        $facilityPerPage = (int) ($validated['facility_per_page'] ?? $verificationPerPage);
+        $officerPerPage = (int) ($validated['officer_per_page'] ?? $verificationPerPage);
+
         $facilitySummary = $this->facilitySummaryQuery($validated, $dateFrom, $dateTo)
             ->orderByDesc('captured_count')
-            ->paginate((int) ($validated['per_page'] ?? 25), ['*'], 'facility_page')
+            ->paginate($facilityPerPage, ['*'], 'facility_page')
             ->through(fn ($row) => [
                 'facility_name' => (string) $row->facility_name,
                 'lga_name' => (string) $row->lga_name,
@@ -267,7 +271,7 @@ class EnrollmentIntelligenceController extends BaseController
 
         $officerSummary = $this->officerSummaryQuery($validated, $dateFrom, $dateTo)
             ->orderByDesc('captured_count')
-            ->paginate((int) ($validated['per_page'] ?? 25), ['*'], 'officer_page')
+            ->paginate($officerPerPage, ['*'], 'officer_page')
             ->through(function ($row) use ($verificationValueAmount): array {
                 return [
                     'officer_name' => (string) $row->officer_name,
@@ -307,7 +311,7 @@ class EnrollmentIntelligenceController extends BaseController
             ->orderByDesc('nin_verified_at');
 
         $rows = $tableQuery
-            ->paginate((int) ($validated['per_page'] ?? 25))
+            ->paginate($verificationPerPage)
             ->through(function (Enrollee $enrollee): array {
                 return [
                     'id' => $enrollee->id,
@@ -844,6 +848,10 @@ class EnrollmentIntelligenceController extends BaseController
             'search' => ['nullable', 'string', 'max:255'],
             'page' => ['nullable', 'integer', 'min:1'],
             'per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+            'facility_page' => ['nullable', 'integer', 'min:1'],
+            'facility_per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
+            'officer_page' => ['nullable', 'integer', 'min:1'],
+            'officer_per_page' => ['nullable', 'integer', 'min:10', 'max:100'],
         ];
     }
 

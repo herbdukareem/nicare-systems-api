@@ -27,7 +27,7 @@
       :items="items"
       :loading="loading"
       :items-length="effectiveTotal > items.length ? effectiveTotal : undefined"
-      :page="localPage"
+      :page="tablePage"
       :items-per-page="localPerPage"
       hide-default-footer
       v-bind="tableAttrs"
@@ -125,6 +125,7 @@ const props = defineProps({
   items: { type: Array, default: () => [] },
   loading: { type: Boolean, default: false },
   itemsLength: { type: Number, default: 0 },
+  serverItemsLength: { type: Number, default: 0 },
   page: { type: Number, default: 1 },
   itemsPerPage: { type: Number, default: 25 },
   search: { type: String, default: '' },
@@ -160,7 +161,14 @@ watch(() => props.page, (value) => { localPage.value = value; jumpPage.value = v
 watch(() => props.itemsPerPage, (value) => { localPerPage.value = value })
 watch(() => props.search, (value) => { localSearch.value = value })
 
-const effectiveTotal = computed(() => props.itemsLength > 0 ? props.itemsLength : props.items.length)
+const effectiveTotal = computed(() => {
+  if (props.itemsLength > 0) return props.itemsLength
+  if (props.serverItemsLength > 0) return props.serverItemsLength
+
+  return props.items.length
+})
+const isServerPaginated = computed(() => effectiveTotal.value > props.items.length)
+const tablePage = computed(() => isServerPaginated.value ? 1 : localPage.value)
 const totalPages = computed(() => Math.max(1, Math.ceil(effectiveTotal.value / localPerPage.value)))
 const startRecord = computed(() => Math.min((localPage.value - 1) * localPerPage.value + 1, effectiveTotal.value))
 const endRecord = computed(() => Math.min(localPage.value * localPerPage.value, effectiveTotal.value))

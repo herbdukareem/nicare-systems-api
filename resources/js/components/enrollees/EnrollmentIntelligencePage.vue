@@ -246,11 +246,12 @@
             <div class="tw-space-y-5">
               <AppCard title="Facility Summary Table" icon="mdi-table-large" tone="primary">
                 <AppDataTable
+                  v-model:page="facilityTable.page"
+                  v-model:items-per-page="facilityTable.perPage"
                   :headers="facilityHeaders"
                   :items="facilityTable.rows"
                   :items-length="facilityTable.total"
                   :loading="loading"
-                  :items-per-page="facilityTable.perPage"
                 >
                   <template #toolbar>
                     <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-text-slate-500">
@@ -276,11 +277,12 @@
 
               <AppCard title="Summary Table by Enrollment Officers" icon="mdi-account-supervisor-outline" tone="secondary">
                 <AppDataTable
+                  v-model:page="officerTable.page"
+                  v-model:items-per-page="officerTable.perPage"
                   :headers="officerHeaders"
                   :items="officerTable.rows"
                   :items-length="officerTable.total"
                   :loading="loading"
-                  :items-per-page="officerTable.perPage"
                 >
                   <template #toolbar>
                     <div class="tw-flex tw-flex-wrap tw-items-center tw-gap-2 tw-text-xs tw-text-slate-500">
@@ -390,12 +392,14 @@ const verificationTable = reactive({
 
 const facilityTable = reactive({
   rows: [],
+  page: 1,
   total: 0,
   perPage: 25,
 })
 
 const officerTable = reactive({
   rows: [],
+  page: 1,
   total: 0,
   perPage: 25,
 })
@@ -688,7 +692,10 @@ const buildParams = () => {
     page: verificationTable.page,
     per_page: verificationTable.perPage,
     search: verificationTable.search || null,
-    facility_page: 1,
+    facility_page: facilityTable.page,
+    facility_per_page: facilityTable.perPage,
+    officer_page: officerTable.page,
+    officer_per_page: officerTable.perPage,
   }
 
   Object.keys(params).forEach((key) => {
@@ -732,11 +739,13 @@ const applyResponse = (payload = {}) => {
   const facilityPayload = payload.tables?.facility_summary || {}
   facilityTable.rows = facilityPayload.data || []
   facilityTable.total = Number(facilityPayload.meta?.total || 0)
+  facilityTable.page = Number(facilityPayload.meta?.current_page || 1)
   facilityTable.perPage = Number(facilityPayload.meta?.per_page || facilityTable.perPage)
 
   const officerPayload = payload.tables?.officer_summary || {}
   officerTable.rows = officerPayload.data || []
   officerTable.total = Number(officerPayload.meta?.total || 0)
+  officerTable.page = Number(officerPayload.meta?.current_page || 1)
   officerTable.perPage = Number(officerPayload.meta?.per_page || officerTable.perPage)
 }
 
@@ -777,8 +786,7 @@ const exportExcel = async () => {
 }
 
 const applyFilters = async () => {
-  if (verificationTable.page !== 1) {
-    verificationTable.page = 1
+  if (resetTablePages()) {
     return
   }
 
@@ -789,8 +797,7 @@ const resetFilters = async () => {
   Object.assign(filters, defaultFilters())
   verificationTable.search = ''
 
-  if (verificationTable.page !== 1) {
-    verificationTable.page = 1
+  if (resetTablePages()) {
     return
   }
 
@@ -806,6 +813,27 @@ const handleVerificationSearch = async () => {
   await loadReport()
 }
 
+const resetTablePages = () => {
+  let changed = false
+
+  if (verificationTable.page !== 1) {
+    verificationTable.page = 1
+    changed = true
+  }
+
+  if (facilityTable.page !== 1) {
+    facilityTable.page = 1
+    changed = true
+  }
+
+  if (officerTable.page !== 1) {
+    officerTable.page = 1
+    changed = true
+  }
+
+  return changed
+}
+
 watch(() => filters.lga_id, () => {
   if (filters.facility_id && !facilityOptions.value.some((facility) => Number(facility.id) === Number(filters.facility_id))) {
     filters.facility_id = null
@@ -819,6 +847,32 @@ watch(() => verificationTable.page, () => {
 watch(() => verificationTable.perPage, async () => {
   if (verificationTable.page !== 1) {
     verificationTable.page = 1
+    return
+  }
+
+  await loadReport()
+})
+
+watch(() => facilityTable.page, () => {
+  void loadReport()
+})
+
+watch(() => facilityTable.perPage, async () => {
+  if (facilityTable.page !== 1) {
+    facilityTable.page = 1
+    return
+  }
+
+  await loadReport()
+})
+
+watch(() => officerTable.page, () => {
+  void loadReport()
+})
+
+watch(() => officerTable.perPage, async () => {
+  if (officerTable.page !== 1) {
+    officerTable.page = 1
     return
   }
 
