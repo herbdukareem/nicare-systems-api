@@ -123,6 +123,7 @@ class DashboardController extends Controller
                     Enrollee::STATUS_SUSPENDED => $suspended,
                     Enrollee::STATUS_EXPIRED => $expiredStatus,
                 ]),
+                'gender_distribution' => $this->genderBreakdown($totalEnrollees),
                 'programme_mix' => $this->dimensionBreakdown(
                     'insurance_programmes',
                     'insurance_programme_id',
@@ -738,7 +739,7 @@ class DashboardController extends Controller
             ->select('sex', DB::raw('COUNT(*) as total'))
             ->groupBy('sex')
             ->get()
-            ->map(function ($row) use ($total): array {
+            ->map(function ($row): array {
                 $label = match ((string) $row->sex) {
                     '1', 'male', 'Male', 'M' => 'Male',
                     '2', 'female', 'Female', 'F' => 'Female',
@@ -750,9 +751,22 @@ class DashboardController extends Controller
                     'label' => $label,
                     'count' => (int) $row->total,
                     'value' => (int) $row->total,
-                    'percentage' => $this->percent((int) $row->total, $total),
                 ];
             })
+            ->groupBy('label')
+            ->map(function ($rows) use ($total): array {
+                $count = $rows->sum('count');
+                $label = $rows->first()['label'];
+
+                return [
+                    'gender' => $label,
+                    'label' => $label,
+                    'count' => $count,
+                    'value' => $count,
+                    'percentage' => $this->percent($count, $total),
+                ];
+            })
+            ->values()
             ->all();
     }
 

@@ -187,7 +187,7 @@
         </section>
 
         <!-- ── Enrollment Trend (Interactive: Year → Month) + Programme Mix ── -->
-        <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-3 tw-gap-6">
+        <section class="tw-grid tw-grid-cols-1 xl:tw-grid-cols-4 tw-gap-6">
 
           <!-- Enrollment Trend -->
           <div class="xl:tw-col-span-2 tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
@@ -236,6 +236,30 @@
               />
               <div v-else class="tw-h-60 tw-flex tw-items-center tw-justify-center tw-text-gray-400 tw-text-sm">
                 No enrollment data available
+              </div>
+            </div>
+          </div>
+
+          <!-- Sex/Gender Distribution -->
+          <div class="tw-bg-white tw-border tw-border-gray-100 tw-shadow-sm tw-overflow-hidden">
+            <div class="tw-px-6 tw-py-4 tw-border-b tw-border-gray-100">
+              <h2 class="tw-text-base tw-font-bold tw-text-gray-900">Sex/Gender Distribution</h2>
+              <p class="tw-text-xs tw-text-gray-500 tw-mt-0.5">Enrollee distribution by recorded sex/gender</p>
+            </div>
+            <div class="tw-p-5">
+              <DoughnutChart v-if="genderDistributionData.labels?.length" :data="genderDistributionData" :height="180" />
+              <p v-else class="tw-py-8 tw-text-center tw-text-gray-400 tw-text-sm">No sex/gender data yet</p>
+              <div class="tw-mt-4 tw-space-y-2">
+                <div
+                  v-for="(item, i) in genderDistributionItems"
+                  :key="item.label"
+                  class="tw-flex tw-items-center tw-gap-2"
+                >
+                  <div class="tw-w-2 tw-h-2 tw-rounded-full tw-shrink-0" :style="{ backgroundColor: GENDER_COLORS[i % GENDER_COLORS.length] }" />
+                  <span class="tw-text-xs tw-text-gray-600 tw-flex-1 tw-truncate">{{ item.label }}</span>
+                  <span class="tw-text-xs tw-font-semibold tw-text-gray-900">{{ number(item.count) }}</span>
+                  <span class="tw-text-xs tw-text-gray-400 tw-w-10 tw-text-right">{{ item.percentage || 0 }}%</span>
+                </div>
               </div>
             </div>
           </div>
@@ -651,6 +675,7 @@ const headerPills = computed(() => [
 // ── Chart colours ───────────────────────────────────────────────────────────
 const CHART_COLORS  = ['#3b82f6', '#22c55e', '#f59e0b', '#8b5cf6', '#ef4444', '#14b8a6', '#f97316', '#6366f1']
 const PURPLE_COLORS = ['#8b5cf6', '#a78bfa', '#7c3aed', '#c4b5fd', '#6d28d9']
+const GENDER_COLORS = ['#2563eb', '#db2777', '#64748b']
 
 // ── Programme Mix ───────────────────────────────────────────────────────────
 const programmeMixItems = computed(() => (overview.value.programme_mix || []).map(item => ({
@@ -671,6 +696,21 @@ const programmeMixData = computed(() => {
   return {
     labels: items.map(i => i.label),
     datasets: [{ data: items.map(i => i.count), backgroundColor: CHART_COLORS, borderWidth: 0 }],
+  }
+})
+
+const genderDistributionItems = computed(() => (overview.value.gender_distribution || []).map(item => ({
+  ...item,
+  count: numericValue(item.count),
+  percentage: numericValue(item.percentage),
+})))
+
+const genderDistributionData = computed(() => {
+  const items = genderDistributionItems.value
+  if (!items.length) return { labels: [], datasets: [] }
+  return {
+    labels: items.map(i => i.label),
+    datasets: [{ data: items.map(i => i.count), backgroundColor: GENDER_COLORS, borderWidth: 0 }],
   }
 })
 

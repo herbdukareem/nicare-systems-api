@@ -17,6 +17,7 @@ return new class extends Migration
             $this->indexIfMissing($table, 'enrollees', ['status', 'coverage_start_date', 'coverage_end_date'], 'enrollees_dashboard_coverage_idx');
             $this->indexIfMissing($table, 'enrollees', ['facility_id', 'status', 'coverage_start_date', 'coverage_end_date'], 'enrollees_dashboard_facility_coverage_idx');
             $this->indexIfMissing($table, 'enrollees', ['insurance_programme_id', 'status'], 'enrollees_dashboard_programme_status_idx');
+            $this->indexIfMissing($table, 'enrollees', ['sex'], 'enrollees_dashboard_sex_idx');
             $this->indexIfMissing($table, 'enrollees', ['approval_date'], 'enrollees_dashboard_approval_date_idx');
             $this->indexIfMissing($table, 'enrollees', ['coverage_end_date'], 'enrollees_dashboard_coverage_end_idx');
         });
@@ -31,6 +32,7 @@ return new class extends Migration
         Schema::table('enrollees', function (Blueprint $table): void {
             $this->dropIndexIfExists($table, 'enrollees', 'enrollees_dashboard_coverage_end_idx');
             $this->dropIndexIfExists($table, 'enrollees', 'enrollees_dashboard_approval_date_idx');
+            $this->dropIndexIfExists($table, 'enrollees', 'enrollees_dashboard_sex_idx');
             $this->dropIndexIfExists($table, 'enrollees', 'enrollees_dashboard_programme_status_idx');
             $this->dropIndexIfExists($table, 'enrollees', 'enrollees_dashboard_facility_coverage_idx');
             $this->dropIndexIfExists($table, 'enrollees', 'enrollees_dashboard_coverage_idx');
