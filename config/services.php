@@ -47,4 +47,8 @@ return [
         'name' => env('DUPLICATE_NIN_PROVIDER_NAME', 'Duplicate NIN Verification'),
     ],
 
+    'odk_reference' => [
+        'token' => env('ODK_REFERENCE_API_TOKEN'),
+    ],
+
 ];

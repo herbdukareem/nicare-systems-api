@@ -68,6 +68,7 @@ use App\Http\Controllers\Api\MobileSyncController;
 use App\Http\Controllers\Api\NinProviderConfigurationController;
 use App\Http\Controllers\Api\DuplicateNinVerificationController;
 use App\Http\Controllers\Api\OrganizationSettingsController;
+use App\Http\Controllers\Api\OdkReferenceController;
 use App\Http\Controllers\Api\PaymentGatewayConfigurationController;
 use App\Http\Controllers\Api\PaymentCollectionConfigurationController;
 use App\Http\Controllers\Api\PaymentCollectionController;
@@ -113,6 +114,13 @@ use App\Http\Controllers\Api\EnrolleeAuthController;
 
 Route::get('organization-settings', [OrganizationSettingsController::class, 'show'])->middleware('throttle:60,1');
 Route::post('webhooks/payment-collections/paystack', [PaymentCollectionWebhookController::class, 'paystack'])->withoutMiddleware(['web'])->middleware('throttle:120,1');
+
+Route::prefix('odk/reference')->middleware('throttle:60,1')->group(function () {
+    Route::get('facilities', [OdkReferenceController::class, 'facilities']);
+    Route::get('lgas', [OdkReferenceController::class, 'lgas']);
+    Route::get('wards', [OdkReferenceController::class, 'wards']);
+    Route::get('premium-metadata', [OdkReferenceController::class, 'premiumMetadata']);
+});
 
 Route::post('enroll/login', [EnrolleeAuthController::class, 'login'])->middleware('security');
 Route::get('enroll/plans', [EnrolleeAuthController::class, 'plans']);

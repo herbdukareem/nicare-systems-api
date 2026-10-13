@@ -219,6 +219,16 @@
 
               <div class="tw-flex tw-flex-wrap tw-gap-2">
                 <v-btn
+                  v-if="canEdit"
+                  variant="outlined"
+                  color="primary"
+                  prepend-icon="mdi-pencil-outline"
+                  :disabled="saving"
+                  @click="openEdit(selectedRow)"
+                >
+                  Edit enrollee
+                </v-btn>
+                <v-btn
                   v-if="selectedRow.nin"
                   variant="outlined"
                   color="primary"
@@ -585,6 +595,85 @@
         </template>
       </AppModal>
 
+      <AppModal
+        v-model="editDialog"
+        title="Edit Enrollee"
+        :subtitle="editTarget ? (editTarget.full_name || editTarget.name || `Enrollee #${editTarget.id}`) : ''"
+        icon="mdi-account-edit-outline"
+        size="lg"
+        :loading="saving"
+      >
+        <template #actions>
+          <v-btn variant="outlined" :disabled="saving" @click="editDialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" :loading="saving" prepend-icon="mdi-content-save" @click="saveEdit">
+            Save Changes
+          </v-btn>
+        </template>
+
+        <div class="tw-grid tw-gap-3 md:tw-grid-cols-3">
+          <v-text-field v-model="editForm.first_name" label="First name" density="compact" variant="outlined" />
+          <v-text-field v-model="editForm.middle_name" label="Middle name" density="compact" variant="outlined" />
+          <v-text-field v-model="editForm.last_name" label="Last name" density="compact" variant="outlined" />
+          <v-text-field v-model="editForm.nin" label="NIN" density="compact" variant="outlined" />
+          <v-select v-model="editForm.sex" :items="sexOptions" item-title="title" item-value="value" label="Sex" density="compact" variant="outlined" />
+          <v-text-field v-model="editForm.date_of_birth" type="date" label="Date of birth" density="compact" variant="outlined" />
+          <v-text-field v-model="editForm.phone" label="Phone" density="compact" variant="outlined" />
+          <v-text-field v-model="editForm.email" label="Email" density="compact" variant="outlined" />
+          <v-text-field v-model="editForm.community" label="Community" density="compact" variant="outlined" />
+          <v-autocomplete
+            v-model="editForm.occupation"
+            :items="occupationOptions"
+            label="Occupation"
+            density="compact"
+            variant="outlined"
+            clearable
+          />
+          <v-select
+            v-model="editForm.marital_status"
+            :items="maritalStatusOptions"
+            item-title="title"
+            item-value="value"
+            label="Marital Status"
+            density="compact"
+            variant="outlined"
+            clearable
+          />
+          <v-select
+            v-model="editForm.educational_status"
+            :items="educationalStatusOptions"
+            label="Educational Status"
+            density="compact"
+            variant="outlined"
+            clearable
+          />
+          <v-select
+            v-model="editForm.disability"
+            :items="disabilityOptions"
+            label="Special Needs"
+            density="compact"
+            variant="outlined"
+            clearable
+          />
+          <v-select v-model="editForm.lga_id" :items="metadata.lgas" item-title="name" item-value="id" label="LGA" density="compact" variant="outlined" />
+          <v-select
+            v-model="editForm.ward_id"
+            :items="editFilteredWards"
+            item-title="name"
+            item-value="id"
+            label="Ward"
+            density="compact"
+            variant="outlined"
+            clearable
+            :disabled="!editForm.lga_id"
+          />
+          <v-select v-model="editForm.facility_id" :items="editFacilityOptions" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" />
+          <v-select v-model="editForm.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding type" density="compact" variant="outlined" />
+          <v-select v-model="editForm.benefactor_id" :items="metadata.benefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
+          <v-select v-model="editForm.enrollment_phase_id" :items="metadata.enrollment_phases" item-title="name" item-value="id" label="Enrollment phase" density="compact" variant="outlined" clearable />
+          <v-textarea v-model="editForm.address" label="Address" density="compact" variant="outlined" rows="2" class="md:tw-col-span-3" />
+        </div>
+      </AppModal>
+
       <AppConfirmDialog
         :model-value="approvalDialogOpen"
         title="Approve enrollee"
@@ -663,7 +752,7 @@
 </template>
 
 <script setup>
-import { computed, defineComponent, h, onMounted, reactive, ref } from 'vue'
+import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'vue'
 import AdminLayout from '../layout/AdminLayout.vue'
 import AppAlert from '../common/AppAlert.vue'
 import AppBadge from '../common/AppBadge.vue'
@@ -678,6 +767,7 @@ import AppStatusBadge from '../common/AppStatusBadge.vue'
 import DateDisplay from '../common/DateDisplay.vue'
 import { enrolleeAPI, premiumAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
+import { useAuthStore } from '../../stores/auth'
 
 const Info = defineComponent({
   name: 'ApprovalInfo',
@@ -694,17 +784,23 @@ const Info = defineComponent({
 })
 
 const { success, error } = useToast()
+const auth = useAuthStore()
+
+const canEdit = computed(() => auth.hasPermission('enrollees.update') || auth.hasPermission('enrollees.edit') || auth.hasPermission('enrollee.update'))
 
 const rows = ref([])
 const loading = ref(false)
 const verifyingId = ref(null)
 const approvingId = ref(null)
 const rejectingId = ref(null)
+const saving = ref(false)
 const limit = ref(50)
 const search = ref('')
 const detailModalOpen = ref(false)
 const selectedRowId = ref(null)
 const detailLoadingId = ref(null)
+const editDialog = ref(false)
+const editTarget = ref(null)
 const approvalDialogOpen = ref(false)
 const approvalTarget = ref(null)
 const rejectDialogOpen = ref(false)
@@ -713,6 +809,7 @@ const rejectionReason = ref('')
 const locationMapOpen = ref(false)
 const locationMapTitle = ref('Enrollment Location Map')
 const locationMapPoint = ref(null)
+const editForm = reactive({})
 
 const headers = [
   { title: 'Enrollee', key: 'enrollee', sortable: false, minWidth: 220 },
@@ -726,6 +823,8 @@ const headers = [
 
 const metadata = reactive({
   insurance_programmes: [],
+  lgas: [],
+  wards: [],
   facilities: [],
   benefactors: [],
   enrollment_phases: [],
@@ -760,11 +859,97 @@ const decisionOptions = [
   { label: 'Use verified', value: 'verified' },
 ]
 
+const sexOptions = [
+  { title: 'Male', value: 1 },
+  { title: 'Female', value: 2 },
+  { title: 'Other', value: 3 },
+]
+
+const maritalStatusOptions = [
+  { title: 'Single', value: 1 },
+  { title: 'Married', value: 2 },
+  { title: 'Divorced', value: 3 },
+  { title: 'Widowed', value: 4 },
+  { title: 'Not Stated', value: 5 },
+]
+
+const occupationOptions = [
+  'Student',
+  'Farmer',
+  'Trader/Business Owner',
+  'Civil Servant',
+  'Private Sector Employee',
+  'Teacher/Lecturer',
+  'Health Worker',
+  'Artisan',
+  'Driver/Transport Worker',
+  'Security Personnel',
+  'Religious Leader',
+  'House Wife',
+  'Homemaker',
+  'Retired',
+  'Unemployed',
+  'Self-Employed',
+  'Other',
+  'Not Stated',
+]
+
+const educationalStatusOptions = [
+  'Primary',
+  'Secondary',
+  'Tertiary',
+  'Postgraduate',
+  'No Formal Education',
+  'Others',
+]
+
+const disabilityOptions = [
+  'None',
+  'Visual Impairment',
+  'Hearing Impairment',
+  'Speech Impairment',
+  'Physical/Mobility Disability',
+  'Intellectual Disability',
+  'Learning Disability',
+  'Mental/Psychosocial Disability',
+  'Albinism',
+  'Multiple Disabilities',
+  'Others',
+]
+
+const occupationAliasMap = {
+  'petty trader': 'Trader/Business Owner',
+  trader: 'Trader/Business Owner',
+  'business owner': 'Trader/Business Owner',
+  businessman: 'Trader/Business Owner',
+  businesswoman: 'Trader/Business Owner',
+  'private employee': 'Private Sector Employee',
+  'private sector worker': 'Private Sector Employee',
+  teacher: 'Teacher/Lecturer',
+  lecturer: 'Teacher/Lecturer',
+  'healthcare worker': 'Health Worker',
+  driver: 'Driver/Transport Worker',
+  'transport worker': 'Driver/Transport Worker',
+  'security officer': 'Security Personnel',
+  'house wife': 'House Wife',
+  housewife: 'House Wife',
+  'self employed': 'Self-Employed',
+  none: 'Not Stated',
+  'n a': 'Not Stated',
+  na: 'Not Stated',
+}
+
 const approvedCount = computed(() => rows.value.filter((row) => row.local_status === 'approved').length)
 const readyCount = computed(() => rows.value.filter((row) => !cannotApprove(row)).length)
 const attentionCount = computed(() => rows.value.filter((row) => row.local_status === 'failed' || row.local_status === 'rejected' || requiresVerification(row) || row.is_possible_duplicate).length)
 
 const selectedRow = computed(() => rows.value.find((row) => row.id === selectedRowId.value) || null)
+const editFilteredWards = computed(() => metadata.wards.filter((ward) => editForm.lga_id && Number(ward.lga_id) === Number(editForm.lga_id)))
+const editFacilityOptions = computed(() => metadata.facilities.filter((facility) => {
+  if (editForm.ward_id) return Number(facility.ward_id) === Number(editForm.ward_id)
+  if (editForm.lga_id) return Number(facility.lga_id) === Number(editForm.lga_id)
+  return true
+}))
 
 const filteredRows = computed(() => {
   const query = search.value.trim().toLowerCase()
@@ -921,6 +1106,27 @@ const normalizeRow = (row) => {
     })),
     selectedPhotoAttachmentId: row.current_mobile_photo_attachment_id || mobilePassportAttachments.find((attachment) => attachment.is_current)?.id || mobilePassportAttachments[mobilePassportAttachments.length - 1]?.id || null,
   }
+}
+
+const normalizeOccupationValue = (value) => {
+  if (!value) return null
+  const trimmed = String(value).trim()
+  if (!trimmed) return null
+
+  const exact = occupationOptions.find((option) => option.toLowerCase() === trimmed.toLowerCase())
+  if (exact) return exact
+
+  const normalized = trimmed.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
+  return occupationAliasMap[normalized] || trimmed
+}
+
+const updateRowFromResponse = (row, response, fallback = {}) => {
+  const updated = response?.data?.data?.data || response?.data?.data || fallback
+  Object.assign(row, normalizeRow({
+    ...row,
+    ...updated,
+    approval_detail_loaded: row.approval_detail_loaded,
+  }))
 }
 
 const setMergeStrategy = (row, strategy) => {
@@ -1112,6 +1318,60 @@ const handleDetailModal = (value) => {
   }
 }
 
+const openEdit = (row) => {
+  if (!canEdit.value) {
+    error('You do not have permission to edit enrollees.')
+    return
+  }
+
+  editTarget.value = row
+  Object.keys(editForm).forEach((key) => delete editForm[key])
+  Object.assign(editForm, {
+    first_name: row.first_name,
+    middle_name: row.middle_name,
+    last_name: row.last_name,
+    nin: row.nin,
+    sex: Number(row.sex || (row.gender === 'Male' ? 1 : row.gender === 'Female' ? 2 : 3)),
+    date_of_birth: row.date_of_birth?.slice?.(0, 10),
+    phone: row.phone,
+    email: row.email,
+    community: row.community,
+    occupation: normalizeOccupationValue(row.occupation),
+    marital_status: row.marital_status !== undefined && row.marital_status !== null ? Number(row.marital_status) : null,
+    educational_status: row.educational_status,
+    disability: row.disability,
+    address: row.address,
+    lga_id: row.lga?.id || row.lga_id,
+    ward_id: row.ward?.id || row.ward_id,
+    facility_id: row.facility?.id || row.facility_id,
+    funding_type_id: row.funding_type?.id || row.funding_type_id,
+    benefactor_id: row.benefactor?.id || row.benefactor_id,
+    enrollment_phase_id: row.enrollment_phase?.id || row.enrollment_phase_id,
+  })
+  editDialog.value = true
+}
+
+const saveEdit = async () => {
+  if (!editTarget.value) return
+  if (!canEdit.value) {
+    error('You do not have permission to edit enrollees.')
+    return
+  }
+
+  saving.value = true
+
+  try {
+    const response = await enrolleeAPI.update(editTarget.value.id, editForm)
+    updateRowFromResponse(editTarget.value, response, editForm)
+    success('Enrollee updated')
+    editDialog.value = false
+  } catch (err) {
+    error(err.response?.data?.message || 'Could not update enrollee')
+  } finally {
+    saving.value = false
+  }
+}
+
 const setFieldDecision = (row, field, value) => {
   if (!row) return
   row.fieldSelection[field] = value === 'verified' ? 'verified' : 'provided'
@@ -1268,6 +1528,37 @@ const confirmReject = async () => {
     rejectingId.value = null
   }
 }
+
+watch(() => editForm.lga_id, () => {
+  if (editForm.ward_id && !editFilteredWards.value.some((ward) => Number(ward.id) === Number(editForm.ward_id))) {
+    editForm.ward_id = null
+  }
+  if (editForm.facility_id && !editFacilityOptions.value.some((facility) => Number(facility.id) === Number(editForm.facility_id))) {
+    editForm.facility_id = null
+  }
+})
+
+watch(() => editForm.ward_id, () => {
+  if (editForm.facility_id && !editFacilityOptions.value.some((facility) => Number(facility.id) === Number(editForm.facility_id))) {
+    editForm.facility_id = null
+  }
+})
+
+watch(() => editForm.facility_id, (facilityId) => {
+  const facility = metadata.facilities.find((item) => Number(item.id) === Number(facilityId))
+  if (facility) {
+    editForm.lga_id = facility.lga_id || editForm.lga_id
+    editForm.ward_id = facility.ward_id || null
+  } else if (!facilityId) {
+    editForm.ward_id = null
+  }
+})
+
+watch(editDialog, (open) => {
+  if (!open) {
+    editTarget.value = null
+  }
+})
 
 onMounted(async () => {
   await loadMetadata()
