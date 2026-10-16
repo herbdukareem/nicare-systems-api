@@ -31,7 +31,8 @@
       <AppCard title="Approval Filters" icon="mdi-filter-outline" tone="primary">
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-2 xl:tw-grid-cols-4">
           <v-autocomplete v-model="filters.programme_id" :items="metadata.insurance_programmes" item-title="name" item-value="id" label="Programme" density="compact" variant="outlined" clearable />
-          <v-autocomplete v-model="filters.facility_id" :items="metadata.facilities" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.lga_id" :items="metadata.lgas" item-title="name" item-value="id" label="LGA" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.facility_id" :items="filteredFacilities" item-title="name" item-value="id" label="Facility" density="compact" variant="outlined" clearable />
           <v-autocomplete v-model="filters.benefactor_id" :items="metadata.benefactors" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
           <v-autocomplete v-model="filters.enrollment_phase_id" :items="metadata.enrollment_phases" item-title="name" item-value="id" label="Phase" density="compact" variant="outlined" clearable />
           <v-autocomplete v-model="filters.funding_type_id" :items="metadata.funding_types" item-title="name" item-value="id" label="Funding" density="compact" variant="outlined" clearable />
@@ -833,6 +834,7 @@ const metadata = reactive({
 
 const filters = reactive({
   programme_id: null,
+  lga_id: null,
   facility_id: null,
   benefactor_id: null,
   enrollment_phase_id: null,
@@ -944,10 +946,15 @@ const readyCount = computed(() => rows.value.filter((row) => !cannotApprove(row)
 const attentionCount = computed(() => rows.value.filter((row) => row.local_status === 'failed' || row.local_status === 'rejected' || requiresVerification(row) || row.is_possible_duplicate).length)
 
 const selectedRow = computed(() => rows.value.find((row) => row.id === selectedRowId.value) || null)
+const facilityLgaId = (facility) => facility?.lga_id ?? facility?.lga?.id ?? null
+const filteredFacilities = computed(() => metadata.facilities.filter((facility) => {
+  if (!filters.lga_id) return true
+  return Number(facilityLgaId(facility)) === Number(filters.lga_id)
+}))
 const editFilteredWards = computed(() => metadata.wards.filter((ward) => editForm.lga_id && Number(ward.lga_id) === Number(editForm.lga_id)))
 const editFacilityOptions = computed(() => metadata.facilities.filter((facility) => {
   if (editForm.ward_id) return Number(facility.ward_id) === Number(editForm.ward_id)
-  if (editForm.lga_id) return Number(facility.lga_id) === Number(editForm.lga_id)
+  if (editForm.lga_id) return Number(facilityLgaId(facility)) === Number(editForm.lga_id)
   return true
 }))
 
@@ -1151,7 +1158,14 @@ const setMergeStrategy = (row, strategy) => {
 
 const loadMetadata = async () => {
   const response = await premiumAPI.metadata()
-  Object.assign(metadata, response.data?.data || {})
+  const payload = response.data?.data || {}
+  Object.assign(metadata, payload, {
+    facilities: (payload.facilities || []).map((facility) => ({
+      ...facility,
+      lga_id: facility.lga_id ?? facility.lga?.id ?? null,
+      ward_id: facility.ward_id ?? facility.ward?.id ?? null,
+    })),
+  })
 }
 
 const loadBatch = async () => {
@@ -1179,6 +1193,7 @@ const loadBatch = async () => {
 
 const clearFilters = () => {
   filters.programme_id = null
+  filters.lga_id = null
   filters.facility_id = null
   filters.benefactor_id = null
   filters.enrollment_phase_id = null
@@ -1189,6 +1204,12 @@ const clearFilters = () => {
   filters.sort = 'recent'
   loadBatch()
 }
+
+watch(() => filters.lga_id, () => {
+  if (filters.facility_id && !filteredFacilities.value.some((facility) => Number(facility.id) === Number(filters.facility_id))) {
+    filters.facility_id = null
+  }
+})
 
 const requiresVerification = (row) => !!row.nin && row.nin_verification_status !== 'verified'
 const rowWorkflowStatus = (row) => {

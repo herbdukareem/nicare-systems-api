@@ -66,6 +66,7 @@ class PremiumMetadataController extends Controller
                 'facilities' => Facility::query()
                     ->when($lgaId, fn ($query) => $query->where('lga_id', $lgaId))
                     ->when($wardId, fn ($query) => $query->where('ward_id', $wardId))
+                    ->select(['id', 'name', 'lga_id', 'ward_id', 'type', 'status'])
                     ->orderBy('name')
                     ->get(),
                 'payment_gateways' => $this->paymentGatewayConfigurationService->availableGatewayOptions(),

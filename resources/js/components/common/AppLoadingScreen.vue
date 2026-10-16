@@ -20,7 +20,7 @@ import Logo from './Logo.vue';
 defineProps({
   title: {
     type: String,
-    default: 'Loading NiCare',
+    default: 'Loading DataKit',
   },
   subtitle: {
     type: String,

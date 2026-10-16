@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { finishGlobalRequest, startGlobalRequest } from './globalRequestLoader';
 
 const getApiBaseUrl = () => {
   if (import.meta.env.DEV) return import.meta.env.VITE_API_URL;
@@ -19,8 +20,19 @@ const assistantHttp = axios.create({
 assistantHttp.interceptors.request.use((config) => {
   const token = localStorage.getItem('token') || localStorage.getItem('enrollee_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
-  return config;
+  return startGlobalRequest(config);
 });
+
+assistantHttp.interceptors.response.use(
+  (response) => {
+    finishGlobalRequest(response.config);
+    return response;
+  },
+  (error) => {
+    finishGlobalRequest(error.config);
+    return Promise.reject(error);
+  },
+);
 
 export const assistantAPI = {
   chat: (data) => assistantHttp.post('/assistant/chat', data),

@@ -510,6 +510,7 @@ class EnrolleeController extends BaseController
             'limit' => ['nullable', 'integer', 'min:1', 'max:100'],
             'programme_id' => ['nullable', 'integer', 'exists:insurance_programmes,id'],
             'insurance_programme_id' => ['nullable', 'integer', 'exists:insurance_programmes,id'],
+            'lga_id' => ['nullable', 'integer', 'exists:lgas,id'],
             'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
             'benefactor_id' => ['nullable', 'integer', 'exists:benefactors,id'],
             'funding_type_id' => ['nullable', 'integer', 'exists:funding_types,id'],
@@ -571,6 +572,7 @@ class EnrolleeController extends BaseController
         foreach ([
             'programme_id' => 'insurance_programme_id',
             'insurance_programme_id' => 'insurance_programme_id',
+            'lga_id' => 'lga_id',
             'facility_id' => 'facility_id',
             'benefactor_id' => 'benefactor_id',
             'funding_type_id' => 'funding_type_id',

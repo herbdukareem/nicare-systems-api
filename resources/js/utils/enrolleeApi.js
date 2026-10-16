@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { useUiStore } from '../stores/ui';
+import { finishGlobalRequest, startGlobalRequest } from './globalRequestLoader';
 
 const getApiBaseUrl = () => {
   if (import.meta.env.DEV) return import.meta.env.VITE_API_URL;
@@ -17,56 +17,19 @@ const enrolleeHttp = axios.create({
   },
 });
 
-const globalLoaderOptions = (config = {}) => {
-  const method = (config.method || 'get').toUpperCase();
-
-  if (config.loaderTitle || config.loaderSubtitle) {
-    return {
-      title: config.loaderTitle,
-      subtitle: config.loaderSubtitle,
-    };
-  }
-
-  if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
-    return {
-      title: 'Processing request',
-      subtitle: 'Saving your changes securely',
-    };
-  }
-
-  return {
-    title: 'Loading data',
-    subtitle: 'Fetching the latest records from the server',
-  };
-};
-
-const startGlobalLoader = (config) => {
-  if (config.showGlobalLoader === false) return config;
-
-  config.__globalLoader = true;
-  useUiStore().startRequestLoading(globalLoaderOptions(config));
-  return config;
-};
-
-const finishGlobalLoader = (config) => {
-  if (config?.__globalLoader) {
-    useUiStore().finishRequestLoading();
-  }
-};
-
 enrolleeHttp.interceptors.request.use((config) => {
   const token = localStorage.getItem('enrollee_token');
   if (token) config.headers.Authorization = `Bearer ${token}`;
-  return startGlobalLoader(config);
+  return startGlobalRequest(config);
 });
 
 enrolleeHttp.interceptors.response.use(
   (response) => {
-    finishGlobalLoader(response.config);
+    finishGlobalRequest(response.config);
     return response;
   },
   (error) => {
-    finishGlobalLoader(error.config);
+    finishGlobalRequest(error.config);
 
     if (error?.response?.status === 401) {
       window.dispatchEvent(new Event('enrollee:unauthorized'));
