@@ -1,10 +1,7 @@
 <template>
   <AdminLayout>
     <div class="tw-space-y-5">
-      <div>
-        <h1 class="tw-text-2xl tw-font-bold tw-text-slate-950">Enrollment Slips</h1>
-        <p class="tw-text-sm tw-text-slate-500">Download one enrollee's slip or generate a filtered bulk file.</p>
-      </div>
+      <AppPageHeader title="Enrollment Slips" subtitle="Download one enrollee's slip or generate a filtered bulk file." />
 
       <v-alert type="info" variant="tonal">
         Enter an Enrollment Number or NIN for a single slip, or select a Benefactor or Provider/Facility for bulk slips. Bulk files are generated in smaller parts and combined into one download in your browser.
@@ -34,7 +31,7 @@
         </div>
       </v-alert>
 
-      <div class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white tw-p-5">
+      <AppCard>
         <div class="tw-grid tw-gap-3 md:tw-grid-cols-3">
           <v-text-field
             v-model="filters.identifier"
@@ -57,7 +54,8 @@
           </div>
 
           <v-autocomplete v-model="filters.benefactor_id" :items="metadata.benefactors" :disabled="isSingleLookup" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
-          <v-autocomplete v-model="filters.facility_id" :items="metadata.facilities" :disabled="isSingleLookup" item-title="name" item-value="id" label="Provider / Facility" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="selectedLgaId" :items="metadata.lgas" :disabled="isSingleLookup" item-title="name" item-value="id" label="LGA" density="compact" variant="outlined" clearable />
+          <v-autocomplete v-model="filters.facility_id" :items="filteredFacilities" :disabled="isSingleLookup" item-title="name" item-value="id" label="Provider / Facility" density="compact" variant="outlined" clearable />
           <v-autocomplete v-model="filters.insurance_programme_id" :items="metadata.insurance_programmes" :disabled="isSingleLookup" item-title="name" item-value="id" label="Programme" density="compact" variant="outlined" clearable />
           <v-autocomplete v-model="filters.enrollee_category_id" :items="metadata.enrollee_categories" :disabled="isSingleLookup" item-title="name" item-value="id" label="Category" density="compact" variant="outlined" clearable />
           <v-autocomplete v-model="filters.funding_type_id" :items="metadata.funding_types" :disabled="isSingleLookup" item-title="name" item-value="id" label="Funding Type" density="compact" variant="outlined" clearable />
@@ -67,26 +65,40 @@
           <v-text-field v-model="filters.date_to" :disabled="isSingleLookup" type="date" label="Date To" density="compact" variant="outlined" />
         </div>
         <div class="tw-mt-4 tw-flex tw-justify-end">
-          <v-btn color="primary" prepend-icon="mdi-file-download-outline" :loading="downloading" @click="downloadPdf">
+          <AppButton prepend-icon="mdi-file-download-outline" :loading="downloading" @click="downloadPdf">
             {{ isSingleLookup ? 'Download Enrollee Slip' : 'Download Slip File' }}
-          </v-btn>
+          </AppButton>
         </div>
-      </div>
+      </AppCard>
     </div>
   </AdminLayout>
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import JSZip from 'jszip';
 import AdminLayout from '../layout/AdminLayout.vue';
+import AppButton from '../common/AppButton.vue';
+import AppCard from '../common/AppCard.vue';
+import AppPageHeader from '../common/AppPageHeader.vue';
 import { enrolleeAPI, premiumAPI } from '../../utils/api';
 import { useToast } from '../../composables/useToast';
 
 const { error, success } = useToast();
 const downloading = ref(false);
-const metadata = reactive({ benefactors: [], facilities: [], insurance_programmes: [], enrollee_categories: [], funding_types: [], enrollment_phases: [] });
+const metadata = reactive({ benefactors: [], lgas: [], facilities: [], insurance_programmes: [], enrollee_categories: [], funding_types: [], enrollment_phases: [] });
+// LGA narrows facility choices; it is separate from enrollee residence filters.
+const selectedLgaId = ref(null);
 const filters = reactive({ identifier: '', benefactor_id: null, facility_id: null, insurance_programme_id: null, enrollee_category_id: null, funding_type_id: null, enrollment_phase_id: null, approval_status: 'all', date_from: '', date_to: '' });
+const filteredFacilities = computed(() => metadata.facilities.filter((facility) => (
+  !selectedLgaId.value || Number(facility.lga_id ?? facility.lga?.id) === Number(selectedLgaId.value)
+)));
+
+watch(selectedLgaId, () => {
+  if (filters.facility_id && !filteredFacilities.value.some((facility) => Number(facility.id) === Number(filters.facility_id))) {
+    filters.facility_id = null;
+  }
+});
 const exportState = reactive({ status: '', message: '', progress: 0, enrolleeCount: 0, processedCount: 0, currentPart: 0, totalParts: 0 });
 const approvalOptions = [{ title: 'All', value: 'all' }, { title: 'Pending', value: 'pending' }, { title: 'Approved', value: 'approved' }];
 const normalizedIdentifier = computed(() => String(filters.identifier || '').trim());
