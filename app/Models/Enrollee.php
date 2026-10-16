@@ -20,6 +20,11 @@ class Enrollee extends Authenticatable
 
     protected $hidden = ['password'];
 
+    public function slipLastGeneratedBy()
+    {
+        return $this->belongsTo(User::class, 'slip_last_generated_by');
+    }
+
     public const STATUS_PENDING = 0;
     public const STATUS_ACTIVE = 1;
     public const STATUS_REJECTED = 2;
@@ -182,6 +187,10 @@ protected $guarded = ['id'];
      * @var array<string, string>
      */
     protected $casts = [
+        'slip_first_generated_at' => 'datetime',
+        'slip_last_generated_at' => 'datetime',
+        'slip_reserved_until' => 'datetime',
+        'slip_generation_count' => 'integer',
         'date_of_birth' => 'date',
         'capitation_start_date' => 'date',
         'coverage_start_date' => 'date',

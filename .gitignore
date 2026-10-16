@@ -27,3 +27,4 @@ Thumbs.db
 /tests/Feature/*
 !/tests/Feature/BhcpfMandeReportTest.php
 !/tests/Feature/BulkEnrolleeNinUpdateTest.php
+!/tests/Feature/EnrollmentSlipPrintingTest.php

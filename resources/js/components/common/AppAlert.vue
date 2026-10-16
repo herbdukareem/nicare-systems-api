@@ -4,9 +4,9 @@
       <v-icon :size="18">{{ iconToUse }}</v-icon>
       <div class="tw-min-w-0">
         <p v-if="title" class="tw-text-sm tw-font-semibold">{{ title }}</p>
-        <p class="tw-text-sm">
+        <div class="tw-text-sm">
           <slot>{{ message }}</slot>
-        </p>
+        </div>
       </div>
     </div>
   </div>

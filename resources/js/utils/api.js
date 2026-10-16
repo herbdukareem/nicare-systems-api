@@ -113,8 +113,15 @@ export const enrolleeAPI = {
     timeout: 120000,
   }),
   prepareBulkEnrollmentSlip: (params) => api.post('/enrollees/bulk-enrollment-slip', params, {
+    timeout: 120000,
     showGlobalLoader: false,
   }),
+  enrollmentSlipQueue: (params, config = {}) => api.get('/enrollees/slip-printing/queue', { params, showGlobalLoader: false, ...config }),
+  enrollmentSlipCollectionList: (params) => api.get('/enrollees/slip-printing/collection-list', { params, responseType: 'blob', timeout: 300000, showGlobalLoader: false }),
+  enrollmentSlipBatches: (params, config = {}) => api.get('/enrollees/slip-printing/batches', { params, showGlobalLoader: false, ...config }),
+  enrollmentSlipBatch: (id) => api.get(`/enrollees/slip-printing/batches/${id}`, { showGlobalLoader: false }),
+  completeEnrollmentSlipBatch: (id) => api.post(`/enrollees/slip-printing/batches/${id}/complete`, {}, { showGlobalLoader: false, timeout: 120000 }),
+  cancelEnrollmentSlipBatch: (id) => api.post(`/enrollees/slip-printing/batches/${id}/cancel`, {}, { showGlobalLoader: false }),
   bulkEnrollmentSlipPart: (data, config = {}) => api.post('/enrollees/bulk-enrollment-slip/part', data, {
     ...config,
     responseType: 'blob',

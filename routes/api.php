@@ -220,6 +220,14 @@ Route::middleware('auth:sanctum')->group(function () {
         ->middleware('permission:any,enrollment-phase.manage,settings.edit');
     Route::put('enrollment-phases/{enrollmentPhase}/bhcpf-targets', [\App\Http\Controllers\Api\EnrollmentPhaseController::class, 'updateTargets'])
         ->middleware('permission:any,enrollment-phase.manage,settings.edit');
+    Route::prefix('enrollees/slip-printing')->middleware('permission:any,enrollees.view,enrollee.print-bulk-slip')->group(function () {
+        Route::get('collection-list', [EnrolleeController::class, 'enrollmentSlipCollectionList']);
+        Route::get('queue', [EnrolleeController::class, 'enrollmentSlipQueue']);
+        Route::get('batches', [EnrolleeController::class, 'enrollmentSlipBatches']);
+        Route::get('batches/{batch}', [EnrolleeController::class, 'enrollmentSlipBatch'])->whereUuid('batch');
+        Route::post('batches/{batch}/complete', [EnrolleeController::class, 'completeEnrollmentSlipBatch'])->whereUuid('batch');
+        Route::post('batches/{batch}/cancel', [EnrolleeController::class, 'cancelEnrollmentSlipBatch'])->whereUuid('batch');
+    });
     Route::get('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip'])
         ->middleware('permission:any,enrollees.view,enrollee.print-bulk-slip');
     Route::post('enrollees/bulk-enrollment-slip', [EnrolleeController::class, 'bulkEnrollmentSlip'])

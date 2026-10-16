@@ -16,6 +16,9 @@ use App\Models\PremiumPurchase;
 use App\Services\Billing\BillingPaymentVerificationService;
 use App\Services\EnrolleeDuplicateDetectionService;
 use App\Services\EnrolleeService;
+use App\Services\EnrollmentSlipPrintingService;
+use App\Services\EnrollmentSlipCollectionListService;
+use App\Models\EnrollmentSlipPrintBatch;
 use App\Services\EnrolleePortalRenewalService;
 use App\Services\NinVerificationService;
 use App\Services\PublicEnrollmentService;
@@ -34,6 +37,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
+use Ramsey\Uuid\Uuid;
 
 /**
  * Class EnrolleeController
@@ -43,8 +47,6 @@ use Illuminate\Validation\Rule;
 class EnrolleeController extends BaseController
 {
     private const BULK_ENROLLMENT_SLIP_CHUNK_SIZE = 40;
-
-    private const BULK_ENROLLMENT_SLIP_TOKEN_TTL_MINUTES = 120;
 
     /**
      * @var EnrolleeService
@@ -844,107 +846,126 @@ class EnrolleeController extends BaseController
         return $pdf->stream('enrollee_id_card_' . ($enrollee->enrollee_id ?: $enrollee->id) . '.pdf');
     }
 
-    public function bulkEnrollmentSlip(Request $request)
+    public function enrollmentSlipCollectionList(Request $request, EnrollmentSlipPrintingService $printing, EnrollmentSlipCollectionListService $lists)
     {
+        $filters = $request->validate($printing->rules() + [
+            'batch_id' => ['nullable', 'uuid'],
+            'facility_lga_id' => ['nullable', 'integer', 'exists:lgas,id'],
+        ]);
         $this->extendPdfExecutionWindow(300, '512M');
-
-        $identifier = trim((string) $request->input('identifier', ''));
-        $rules = [
-            'identifier' => ['nullable', 'string', 'max:50'],
-        ];
-
-        if ($identifier === '') {
-            $rules += [
-                'benefactor_id' => ['nullable', 'exists:benefactors,id'],
-                'facility_id' => ['nullable', 'exists:facilities,id'],
-                'provider_id' => ['nullable', 'exists:facilities,id'],
-                'insurance_programme_id' => ['nullable', 'exists:insurance_programmes,id'],
-                'enrollee_category_id' => ['nullable', 'exists:enrollee_categories,id'],
-                'funding_type_id' => ['nullable', 'exists:funding_types,id'],
-                'enrollment_phase_id' => ['nullable', 'exists:enrollment_phases,id'],
-                'status' => ['nullable', 'integer', 'in:0,1,2,3,4'],
-                'approval_status' => ['nullable', 'in:pending,approved,all'],
-                'date_from' => ['nullable', 'date'],
-                'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-            ];
-        }
-
-        $data = $request->validate($rules);
-
-        $facilityId = $data['facility_id'] ?? $data['provider_id'] ?? null;
-        if ($identifier === '' && empty($data['benefactor_id']) && empty($facilityId)) {
-            return $this->sendError('Enter an Enrollment Number or NIN, or select at least a Benefactor or Provider/Facility.', [], 422);
-        }
-
-        if ($facilityId) {
-            $data['facility_id'] = $facilityId;
-        }
-        unset($data['provider_id']);
-
-        $query = $this->buildEnrollmentSlipQuery($data, $identifier);
-
-        if ($identifier !== '') {
-            $enrollees = $query->limit(2)->get();
-
-            if ($enrollees->isEmpty()) {
-                return $this->sendError('No enrollee was found with that Enrollment Number or NIN.', [], 404);
-            }
-
-            if ($enrollees->count() > 1) {
-                return $this->sendError('More than one enrollee matches that identifier. Use the unique Enrollment Number instead.', [], 422);
-            }
-
-            $singleFilename = 'enrollment_slip_'
-                . preg_replace('/[^A-Za-z0-9_-]+/', '_', (string) $enrollees->first()->enrollee_id)
-                . '.pdf';
-
-            return $this->streamBulkEnrollmentSlipPdf($enrollees, $data, auth()->user(), now(), null, null, $singleFilename);
-        }
-
-        // Freeze the upper ID boundary and use keyset pagination for every part.
-        // This includes all matches without placing thousands of IDs in the token.
-        $snapshotMaxId = (int) (clone $query)->reorder()->max('id');
-        if ($snapshotMaxId < 1) {
-            return $this->sendError('No enrollees match the selected filters.', [], 404);
-        }
-
-        $matchingCount = (int) (clone $query)
-            ->where('id', '<=', $snapshotMaxId)
-            ->reorder()
-            ->count();
-        if ($matchingCount < 1) {
-            return $this->sendError('No enrollees match the selected filters.', [], 404);
-        }
-
-        $generatedAt = now();
-        $expiresAt = $generatedAt->copy()->addMinutes(self::BULK_ENROLLMENT_SLIP_TOKEN_TTL_MINUTES);
-        $totalParts = (int) ceil($matchingCount / self::BULK_ENROLLMENT_SLIP_CHUNK_SIZE);
-        $token = Crypt::encryptString(json_encode([
-            'requested_by' => (int) auth()->id(),
-            'filters' => $data,
-            'snapshot_max_id' => $snapshotMaxId,
-            'enrollee_count' => $matchingCount,
-            'generated_at' => $generatedAt->timestamp,
-            'expires_at' => $expiresAt->timestamp,
-        ], JSON_THROW_ON_ERROR));
-
-        return $this->sendResponse(
-            [
-                'token' => $token,
-                'enrollee_count' => $matchingCount,
-                'chunk_size' => self::BULK_ENROLLMENT_SLIP_CHUNK_SIZE,
-                'total_parts' => $totalParts,
-                'processed_count' => 0,
-                'progress' => 0,
-                'expires_at' => $expiresAt->toIso8601String(),
-                'file_name' => 'bulk_enrollment_slips_' . $generatedAt->format('Ymd_His') . '.zip',
-            ],
-            "Preparing all {$matchingCount} matching enrollment slips in smaller parts."
-        );
+        $enrollees = $lists->rows($filters, $request->user()->id);
+        $bytes = $lists->pdf($enrollees, $filters['batch_id'] ?? null);
+        return response($bytes, 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'inline; filename="enrollment_slip_collection_form_c_'.now('Africa/Lagos')->format('Y-m-d').'.pdf"',
+            'Cache-Control' => 'no-store, private',
+        ]);
     }
 
-    public function bulkEnrollmentSlipPart(Request $request)
+    public function enrollmentSlipQueue(Request $request, EnrollmentSlipPrintingService $printing)
     {
+        $filters = $request->validate($printing->rules() + [
+            'page' => ['nullable', 'integer', 'min:1'],
+            'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],
+        ]);
+        $rows = $printing->query($filters)->select([
+            'id', 'enrollee_id', 'first_name', 'middle_name', 'last_name', 'facility_id',
+            'slip_first_generated_at', 'slip_last_generated_at', 'slip_last_generated_by',
+            'slip_generation_count', 'slip_reserved_until', 'slip_last_batch_id',
+        ])->with(['facility:id,name', 'slipLastGeneratedBy:id,name'])
+            ->orderBy('id')->paginate($filters['per_page'] ?? 25);
+        $rows->through(fn (Enrollee $row) => [
+            'id' => $row->id, 'enrollee_id' => $row->enrollee_id,
+            'name' => trim(implode(' ', array_filter([$row->first_name, $row->middle_name, $row->last_name]))),
+            'facility' => $row->facility?->name,
+            'printing_status' => $row->slip_first_generated_at ? 'generated' : 'outstanding',
+            'first_generated_at' => $row->slip_first_generated_at?->toIso8601String(),
+            'last_generated_at' => $row->slip_last_generated_at?->toIso8601String(),
+            'last_generated_by' => $row->slipLastGeneratedBy?->name,
+            'generation_count' => $row->slip_generation_count,
+            'last_batch_id' => $row->slip_last_batch_id,
+            'available' => !$row->slip_reserved_until || $row->slip_reserved_until->isPast(),
+        ]);
+        return $this->sendResponse($rows);
+    }
+
+    public function enrollmentSlipBatches(Request $request, EnrollmentSlipPrintingService $printing)
+    {
+        $request->validate(['page' => ['nullable', 'integer', 'min:1']]);
+        $rows = EnrollmentSlipPrintBatch::where('user_id', $request->user()->id)
+            ->whereDoesntHave('items', fn ($q) => $q->whereDoesntHave('enrollee'))
+            ->latest()->paginate(10);
+        $rows->through(fn (EnrollmentSlipPrintBatch $batch) => $printing->manifest($batch));
+        return $this->sendResponse($rows);
+    }
+
+    public function enrollmentSlipBatch(Request $request, string $batch, EnrollmentSlipPrintingService $printing)
+    {
+        return $this->sendResponse($printing->manifest($printing->batch($batch, $request->user()->id)));
+    }
+
+    public function completeEnrollmentSlipBatch(Request $request, string $batch, EnrollmentSlipPrintingService $printing)
+    {
+        return $this->sendResponse($printing->manifest($printing->complete($batch, $request->user()->id)), 'Slips marked as generated for printing.');
+    }
+
+    public function cancelEnrollmentSlipBatch(Request $request, string $batch, EnrollmentSlipPrintingService $printing)
+    {
+        return $this->sendResponse($printing->manifest($printing->cancel($batch, $request->user()->id)), 'Printing exercise closed.');
+    }
+
+    public function bulkEnrollmentSlip(Request $request, EnrollmentSlipPrintingService $printing)
+    {
+        $data = $request->validate($printing->rules() + ['tracked' => ['nullable', 'boolean']]);
+        if (!$request->boolean('tracked')) {
+            $data += ['approval_status' => 'all', 'printing_status' => 'all'];
+            $data['auto_complete'] = true;
+        }
+        $batch = $printing->prepare($data, $request->user()->id);
+        if (trim((string) ($data['identifier'] ?? '')) !== '' && !$request->boolean('tracked')) {
+            // Older clients download a single PDF directly. Record successful server generation.
+            $part = $this->generateEnrollmentSlipPart($printing, $batch->id, $request->user()->id, 1);
+            $printing->complete($batch->id, $request->user()->id);
+            return $this->enrollmentSlipPartResponse($part, 1);
+        }
+        return $this->sendResponse($printing->manifest($batch), 'Printing exercise prepared.');
+    }
+
+    private function generateEnrollmentSlipPart(EnrollmentSlipPrintingService $printing, string $id, int $userId, int $part): array
+    {
+        $this->extendPdfExecutionWindow(300, '512M');
+        return $printing->part($id, $userId, $part, function (Collection $enrollees, EnrollmentSlipPrintBatch $batch, int $part) {
+            $this->hydratePdfPhotoSources($enrollees, 120, 150, 70, false);
+            $this->hydratePdfQrSources($enrollees);
+            return $this->makeBulkEnrollmentSlipPdf(
+                $enrollees, $batch->filters, $batch->user, $batch->created_at,
+                $part, (int) ceil($batch->enrollee_count / $batch->chunk_size)
+            )->output();
+        });
+    }
+
+    private function enrollmentSlipPartResponse(array $part, int $number)
+    {
+        return response($part['bytes'], 200, [
+            'Content-Type' => 'application/pdf',
+            'Content-Disposition' => 'attachment; filename="'.$part['filename'].'"',
+            'Cache-Control' => 'no-store, private',
+            'X-Enrollment-Slip-Count' => (string) $part['count'],
+            'X-Enrollment-Slip-Part' => (string) $number,
+            'X-Enrollment-Slip-Total-Parts' => (string) $part['total_parts'],
+            'X-Enrollment-Slip-Next-Cursor' => (string) $part['cursor'],
+        ]);
+    }
+
+    public function bulkEnrollmentSlipPart(Request $request, EnrollmentSlipPrintingService $printing)
+    {
+        if (\Illuminate\Support\Str::isUuid((string) $request->input('token'))) {
+            $data = $request->validate(['token' => ['required', 'uuid'], 'part' => ['required', 'integer', 'min:1']]);
+            return $this->enrollmentSlipPartResponse(
+                $this->generateEnrollmentSlipPart($printing, $data['token'], $request->user()->id, $data['part']),
+                $data['part']
+            );
+        }
         $this->extendPdfExecutionWindow(120, '512M');
 
         $data = $request->validate([
@@ -1004,23 +1025,22 @@ class EnrolleeController extends BaseController
 
         $generatedAt = Carbon::createFromTimestamp((int) ($payload['generated_at'] ?? now()->timestamp));
         $filename = $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts);
-        $response = $this->streamBulkEnrollmentSlipPdf(
-            $enrollees,
-            $filters,
-            auth()->user(),
-            $generatedAt,
-            $partNumber,
-            $totalParts,
-            $filename
-        );
-
-        $response->headers->set('Cache-Control', 'no-store, private');
-        $response->headers->set('X-Enrollment-Slip-Count', (string) $enrollees->count());
-        $response->headers->set('X-Enrollment-Slip-Part', (string) $partNumber);
-        $response->headers->set('X-Enrollment-Slip-Total-Parts', (string) $totalParts);
-        $response->headers->set('X-Enrollment-Slip-Next-Cursor', (string) $enrollees->last()->id);
-
-        return $response;
+        // Exports opened before the upgrade retain their token/cursor contract. Each
+        // returned legacy part is recorded once, even when its HTTP request is retried.
+        $legacyBatch = $printing->prepare(array_merge($filters, [
+            'enrollee_ids' => $enrollees->modelKeys(),
+            'approval_status' => $filters['approval_status'] ?? 'all',
+            'printing_status' => 'all', 'auto_complete' => true,
+            'request_id' => Uuid::uuid5(Uuid::NAMESPACE_URL, 'slip:'.$data['token'].':'.$partNumber)->toString(),
+        ]), $request->user()->id);
+        $result = $printing->part($legacyBatch->id, $request->user()->id, 1, function (Collection $rows) use ($filters, $generatedAt, $partNumber, $totalParts) {
+            $this->hydratePdfPhotoSources($rows, 120, 150, 70, false);
+            $this->hydratePdfQrSources($rows);
+            return $this->makeBulkEnrollmentSlipPdf($rows, $filters, auth()->user(), $generatedAt, $partNumber, $totalParts)->output();
+        });
+        $result['filename'] = $filename;
+        $result['total_parts'] = $totalParts;
+        return $this->enrollmentSlipPartResponse($result, $partNumber);
     }
 
     /**
@@ -1645,24 +1665,6 @@ class EnrolleeController extends BaseController
         if ($memoryLimit) {
             @ini_set('memory_limit', $memoryLimit);
         }
-    }
-
-    private function streamBulkEnrollmentSlipPdf(
-        Collection $enrollees,
-        array $filters,
-        $generatedBy,
-        Carbon $generatedAt,
-        ?int $partNumber = null,
-        ?int $totalParts = null,
-        ?string $filename = null
-    ) {
-        $this->hydratePdfPhotoSources($enrollees, 120, 150, 70, false);
-        $this->hydratePdfQrSources($enrollees);
-
-        $pdf = $this->makeBulkEnrollmentSlipPdf($enrollees, $filters, $generatedBy, $generatedAt, $partNumber, $totalParts);
-        $filename ??= $this->bulkEnrollmentSlipFileName($generatedAt, $partNumber, $totalParts);
-
-        return $pdf->stream($filename);
     }
 
     private function buildEnrollmentSlipQuery(array $filters, string $identifier = ''): Builder
