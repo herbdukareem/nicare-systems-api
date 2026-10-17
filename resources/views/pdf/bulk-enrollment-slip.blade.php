@@ -22,6 +22,9 @@
     width: 50%;
     vertical-align: top;
   }
+  .slip-grid-row + .slip-grid-row > .slip-grid-cell {
+    padding-top: 4mm;
+  }
   .slip {
     width: auto;
     /* DomPDF adds padding to fixed heights even with border-box. */
@@ -88,7 +91,7 @@
     border-right: 0.55pt solid #000000;
     border-bottom: 0.55pt solid #000000;
     padding: 0.65mm 1.1mm;
-    height: 5.9mm;
+    height: 5.4mm;
     vertical-align: middle;
     font-size: 9pt;
     white-space: nowrap;
