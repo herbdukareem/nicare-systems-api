@@ -1795,10 +1795,11 @@ class CapitationService
             ->where('enrollees.status', Enrollee::STATUS_ACTIVE)
             ->whereNotNull('enrollees.facility_id')
             ->whereNotNull('enrollees.coverage_start_date')
-            // Temporary exclusion requested for capitation generation.
+            // Keep phase 8 excluded until its enrollment slip has been generated for printing.
             ->where(function (EloquentBuilder $builder): void {
                 $builder->whereNull('enrollees.enrollment_phase_id')
-                    ->orWhere('enrollees.enrollment_phase_id', '!=', 8);
+                    ->orWhere('enrollees.enrollment_phase_id', '!=', 8)
+                    ->orWhereNotNull('enrollees.slip_first_generated_at');
             });
 
         if ($cutoffDate) {

@@ -28,3 +28,4 @@ Thumbs.db
 !/tests/Feature/BhcpfMandeReportTest.php
 !/tests/Feature/BulkEnrolleeNinUpdateTest.php
 !/tests/Feature/EnrollmentSlipPrintingTest.php
+# !/tests/Feature/CapitationSlipEligibilityTest.php
