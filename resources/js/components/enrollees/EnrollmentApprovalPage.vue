@@ -431,82 +431,75 @@
                 </div>
               </div>
 
-              <div v-if="selectedRow.comparison.length" class="tw-space-y-3">
-                <p class="tw-text-sm tw-text-slate-500">
+              <div class="tw-space-y-3">
+                <p v-if="selectedRow.comparison.length" class="tw-text-sm tw-text-slate-500">
                   Verified by {{ selectedRow.nin_verification_provider || 'configured provider' }}
                   <span v-if="selectedRow.nin_verified_at">on <DateDisplay :value="selectedRow.nin_verified_at" format="medium" /></span>
                 </p>
 
-                <div class="tw-grid tw-gap-3">
-                  <div class="tw-overflow-x-auto">
-                    <table class="tw-min-w-full tw-text-sm">
-                      <thead>
-                        <tr class="tw-border-b tw-border-slate-200">
-                          <th class="tw-px-2.5 tw-py-1.5 tw-text-left tw-font-semibold tw-text-slate-700">Field</th>
-                          <th class="tw-px-2.5 tw-py-1.5 tw-text-left tw-font-semibold tw-text-slate-700">Provided data</th>
-                          <th class="tw-px-2.5 tw-py-1.5 tw-text-left tw-font-semibold tw-text-slate-700">Verified data</th>
-                          <th class="tw-px-2.5 tw-py-1.5 tw-text-left tw-font-semibold tw-text-slate-700">Decision</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        <tr
-                          v-for="field in selectedRow.comparison"
-                          :key="`${selectedRow.id}-${field.field}`"
-                          class="tw-border-b tw-border-slate-100"
-                          :class="field.matches ? '' : 'tw-bg-amber-50/70'"
-                        >
-                          <td class="tw-px-2.5 tw-py-2 tw-font-medium tw-text-slate-900">
-                            <div class="tw-flex tw-items-center tw-gap-2">
-                              <v-icon :color="field.matches ? 'success' : 'warning'" size="16">
-                                {{ field.matches ? 'mdi-check-circle-outline' : 'mdi-alert-circle-outline' }}
-                              </v-icon>
-                              {{ field.label }}
-                            </div>
-                          </td>
-                          <td class="tw-px-2.5 tw-py-2 tw-text-slate-600">{{ field.provided || 'N/A' }}</td>
-                          <td class="tw-px-2.5 tw-py-2 tw-text-slate-600">{{ field.verified || 'N/A' }}</td>
-                          <td class="tw-px-2.5 tw-py-2">
-                            <v-select
-                              v-model="selectedRow.fieldSelection[field.field]"
-                              :items="decisionOptions"
-                              item-title="label"
-                              item-value="value"
-                              density="compact"
-                              variant="outlined"
-                              hide-details
-                              class="tw-min-w-40"
-                              @update:modelValue="setFieldDecision(selectedRow, field.field, $event)"
-                            />
-                            <p v-if="!field.matches" class="tw-mt-1 tw-text-[11px] tw-text-slate-500">
-                              Suggested: {{ field.recommended_source === 'verified' ? 'Use verified data' : 'Keep provided data' }}
-                            </p>
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+                <AppAlert
+                  v-else
+                  tone="info"
+                  title="Verified data unavailable"
+                  message="Submitted enrollment details are shown below. Verified values will appear after a successful NIN verification."
+                />
+
+                <AppDataTable
+                  :headers="comparisonHeaders"
+                  :items="reviewFields"
+                  :items-per-page="reviewFields.length"
+                  item-value="field"
+                  hide-footer
+                >
+                  <template #item.label="{ item: field }">
+                    <div class="tw-flex tw-items-center tw-gap-2 tw-font-medium">
+                      <v-icon v-if="selectedRow.comparison.length" :color="field.matches ? 'success' : 'warning'" size="16">
+                        {{ field.matches ? 'mdi-check-circle-outline' : 'mdi-alert-circle-outline' }}
+                      </v-icon>
+                      {{ field.label }}
+                    </div>
+                  </template>
+                  <template #item.provided="{ item: field }">
+                    {{ field.provided || 'Not provided' }}
+                  </template>
+                  <template #item.verified="{ item: field }">
+                    {{ field.verified || 'Unavailable' }}
+                  </template>
+                  <template #item.decision="{ item: field }">
+                    <template v-if="selectedRow.comparison.length">
+                      <v-select
+                        v-model="selectedRow.fieldSelection[field.field]"
+                        :items="decisionOptions"
+                        item-title="label"
+                        item-value="value"
+                        density="compact"
+                        variant="outlined"
+                        hide-details
+                        class="tw-min-w-40"
+                        @update:modelValue="setFieldDecision(selectedRow, field.field, $event)"
+                      />
+                      <p v-if="!field.matches" class="tw-mt-1 tw-text-[11px] tw-text-slate-500">
+                        Suggested: {{ field.recommended_source === 'verified' ? 'Use verified data' : 'Keep provided data' }}
+                      </p>
+                    </template>
+                    <span v-else class="tw-text-slate-500">Keep provided data</span>
+                  </template>
+                </AppDataTable>
               </div>
 
-              <AppEmptyState
-                v-else-if="selectedRow.nin"
-                icon="mdi-card-search-outline"
-                title="No verification comparison yet"
-                description="Verify the enrollee's NIN to load provider data and compare it against the submitted enrollment data."
-                compact
-              >
-                <v-btn
+              <div v-if="!selectedRow.comparison.length && selectedRow.nin" class="tw-mt-4">
+                <AppButton
                   color="primary"
                   prepend-icon="mdi-card-account-details-outline"
                   :loading="verifyingId === selectedRow.id"
                   @click="verifyNin(selectedRow, false)"
                 >
                   Verify NIN
-                </v-btn>
-              </AppEmptyState>
+                </AppButton>
+              </div>
 
               <AppEmptyState
-                v-else
+                v-if="!selectedRow.nin && !selectedRow.comparison.length"
                 icon="mdi-card-account-details-outline"
                 title="No NIN provided"
                 description="Approval can continue without NIN verification, but the enrollee will be marked as not provided in the verification status."
@@ -757,6 +750,7 @@ import { computed, defineComponent, h, onMounted, reactive, ref, watch } from 'v
 import AdminLayout from '../layout/AdminLayout.vue'
 import AppAlert from '../common/AppAlert.vue'
 import AppBadge from '../common/AppBadge.vue'
+import AppButton from '../common/AppButton.vue'
 import AppCard from '../common/AppCard.vue'
 import AppConfirmDialog from '../common/AppConfirmDialog.vue'
 import AppDataTable from '../common/AppDataTable.vue'
@@ -820,6 +814,13 @@ const headers = [
   { title: 'Flags', key: 'flags', sortable: false, minWidth: 180 },
   { title: 'Submitted', key: 'created_at', sortable: false, minWidth: 150 },
   { title: 'Actions', key: 'actions', sortable: false, align: 'end', minWidth: 230 },
+]
+
+const comparisonHeaders = [
+  { title: 'Field', key: 'label', sortable: false },
+  { title: 'Provided data', key: 'provided', sortable: false },
+  { title: 'Verified data', key: 'verified', sortable: false },
+  { title: 'Decision', key: 'decision', sortable: false },
 ]
 
 const metadata = reactive({
@@ -946,6 +947,26 @@ const readyCount = computed(() => rows.value.filter((row) => !cannotApprove(row)
 const attentionCount = computed(() => rows.value.filter((row) => row.local_status === 'failed' || row.local_status === 'rejected' || requiresVerification(row) || row.is_possible_duplicate).length)
 
 const selectedRow = computed(() => rows.value.find((row) => row.id === selectedRowId.value) || null)
+
+const reviewFields = computed(() => {
+  const row = selectedRow.value
+  if (!row) return []
+  if (row.comparison.length) return row.comparison
+
+  return [
+    ['first_name', 'First Name'],
+    ['middle_name', 'Middle Name'],
+    ['last_name', 'Last Name'],
+    ['date_of_birth', 'Date Of Birth'],
+    ['gender', 'Gender'],
+    ['phone', 'Phone'],
+  ].map(([field, label]) => ({
+    field,
+    label,
+    provided: field === 'date_of_birth' ? row[field]?.split('T')[0] : row[field],
+    verified: null,
+  }))
+})
 const facilityLgaId = (facility) => facility?.lga_id ?? facility?.lga?.id ?? null
 const filteredFacilities = computed(() => metadata.facilities.filter((facility) => {
   if (!filters.lga_id) return true

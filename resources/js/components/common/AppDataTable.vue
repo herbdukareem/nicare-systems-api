@@ -47,7 +47,7 @@
       </template>
     </v-data-table>
 
-    <div class="tw-flex tw-flex-col tw-gap-3 tw-border-t tw-border-slate-200 tw-bg-slate-50/80 tw-px-4 tw-py-3 sm:tw-flex-row sm:tw-items-center sm:tw-justify-between">
+    <div v-if="!hideFooter" class="tw-flex tw-flex-col tw-gap-3 tw-border-t tw-border-slate-200 tw-bg-slate-50/80 tw-px-4 tw-py-3 sm:tw-flex-row sm:tw-items-center sm:tw-justify-between">
       <div class="tw-flex tw-items-center tw-gap-4">
         <p class="tw-text-xs tw-text-slate-500">{{ recordsInfo }}</p>
         <div class="tw-flex tw-items-center tw-gap-1.5">
@@ -130,6 +130,7 @@ const props = defineProps({
   itemsPerPage: { type: Number, default: 25 },
   search: { type: String, default: '' },
   searchable: { type: Boolean, default: false },
+  hideFooter: { type: Boolean, default: false },
   searchPlaceholder: { type: String, default: 'Search...' },
   perPageOptions: { type: Array, default: () => [10, 25, 50, 100] },
 })
