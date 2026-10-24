@@ -201,11 +201,6 @@
             {{ periodStatusLabel(item) }}
           </v-chip>
         </template>
-        <template #item.approval_status="{ item }">
-          <v-chip size="small" :color="approvalStatusColor(item)" variant="flat">
-            {{ approvalStatusLabel(item) }}
-          </v-chip>
-        </template>
         <template #item.payment_status="{ item }">
           <v-chip size="small" :color="paymentStatusColor(item)" variant="flat">
             {{ paymentStatusLabel(item) }}
@@ -547,7 +542,6 @@ const periodHeaders = computed(() => {
 
   if (props.mode === 'approval') {
     headers.push(
-      { title: 'Approval Status', key: 'approval_status' },
       { title: 'Approved No.', key: 'approved_count' },
       { title: 'Approved Value', key: 'approved_value' },
       { title: 'Payment Status', key: 'payment_status' },
@@ -783,15 +777,6 @@ const approvalStatusLabel = (item) => {
   return 'Awaiting Review'
 }
 
-const approvalStatusColor = (item) => {
-  const label = approvalStatusLabel(item)
-
-  if (label === 'Approved') return 'success'
-  if (['Pending Review', 'Pending Approval'].includes(label)) return 'warning'
-  if (['Partially Approved', 'Awaiting Review'].includes(label)) return 'info'
-  return 'default'
-}
-
 const paymentStatusLabel = (item) => {
   const detailCount = Number(item.capitation_details_count || 0)
   const approvedCount = Number(item.approved_count || 0)
@@ -799,8 +784,7 @@ const paymentStatusLabel = (item) => {
   const paidCount = Number(item.paid_count || 0)
 
   if (detailCount === 0) return 'Not Generated'
-  if (paidCount >= detailCount) return 'Paid'
-  if (paidCount > 0) return 'Partially Paid'
+  if (paidCount > 0) return 'Paid'
   if (pendingPaymentCount > 0) return 'Pending Payment'
   if (approvedCount > 0) return 'Awaiting Payment'
   return 'Awaiting Approval'
@@ -810,7 +794,6 @@ const paymentStatusColor = (item) => {
   const label = paymentStatusLabel(item)
 
   if (label === 'Paid') return 'success'
-  if (label === 'Partially Paid') return 'info'
   if (label === 'Pending Payment') return 'warning'
   return 'default'
 }
