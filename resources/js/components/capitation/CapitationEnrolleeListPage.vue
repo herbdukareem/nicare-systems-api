@@ -24,6 +24,7 @@
             density="comfortable"
             variant="outlined"
             :loading="loadingPeriods"
+            :disabled="exporting"
             hide-details
           />
           <v-select
@@ -36,7 +37,7 @@
             variant="outlined"
             clearable
             hide-details
-            :disabled="!filters.periodId || loadingContext"
+            :disabled="!filters.periodId || loadingContext || exporting"
           />
           <v-select
             v-model="filters.facilityId"
@@ -48,7 +49,7 @@
             variant="outlined"
             clearable
             hide-details
-            :disabled="!filters.periodId || loadingContext"
+            :disabled="!filters.periodId || loadingContext || exporting"
           />
         </div>
 
@@ -57,7 +58,7 @@
             color="primary"
             prepend-icon="mdi-database-search"
             :loading="loadingSnapshots"
-            :disabled="!filters.periodId"
+            :disabled="!filters.periodId || exporting"
             @click="reloadSnapshots"
           >
             Load Enrollee List
@@ -69,6 +70,10 @@
             @click="exportSnapshots"
           />
         </div>
+        <AppAlert v-if="exportMessage" class="tw-mt-4" :tone="exportTone" aria-live="polite">
+          {{ exportMessage }}
+          <AppButton v-if="exporting" class="tw-ml-3" variant="outlined" @click="cancelExport">Cancel export</AppButton>
+        </AppAlert>
       </AppCard>
 
       <AppCard
@@ -128,14 +133,17 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue'
 import AdminLayout from '../layout/AdminLayout.vue'
 import AppCard from '../common/AppCard.vue'
+import AppAlert from '../common/AppAlert.vue'
+import AppButton from '../common/AppButton.vue'
 import AppDataTable from '../common/AppDataTable.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
 import AppExportButton from '../common/AppExportButton.vue'
 import AppPageHeader from '../common/AppPageHeader.vue'
 import { capitationAPI } from '../../utils/api'
+import { buildCapitationEnrolleeCsv } from '../../utils/capitationEnrolleeExport'
 import { useToast } from '../../composables/useToast'
 
 const { error } = useToast()
@@ -144,7 +152,11 @@ const loadingPeriods = ref(false)
 const loadingContext = ref(false)
 const loadingSnapshots = ref(false)
 const exporting = ref(false)
+const exportMessage = ref('')
+const exportTone = ref('info')
+let exportController
 const hasLoadedSnapshots = ref(false)
+const loadedSnapshotScope = ref('')
 const periods = ref([])
 const periodContext = ref(null)
 const snapshots = ref([])
@@ -208,7 +220,15 @@ const facilityOptions = computed(() => {
   return Array.from(options.values()).sort((a, b) => a.label.localeCompare(b.label))
 })
 
-const canExport = computed(() => Boolean(filters.periodId) && Number(summary.value.total_enrollees || 0) > 0)
+const snapshotScope = computed(() => JSON.stringify([
+  filters.periodId, filters.fundingTypeId, filters.facilityId, String(filters.search || '').trim(),
+]))
+const canExport = computed(() => (
+  Boolean(filters.periodId)
+  && !loadingSnapshots.value
+  && loadedSnapshotScope.value === snapshotScope.value
+  && Number(summary.value.total_enrollees || 0) > 0
+))
 const hasActiveSnapshotFilters = computed(() => Boolean(
   filters.fundingTypeId
   || filters.facilityId
@@ -275,6 +295,7 @@ const loadSnapshots = async () => {
     return
   }
 
+  const requestScope = snapshotScope.value
   loadingSnapshots.value = true
   try {
     const response = await capitationAPI.enrolleeList(filters.periodId, {
@@ -285,11 +306,13 @@ const loadSnapshots = async () => {
       per_page: filters.perPage,
     })
 
+    if (requestScope !== snapshotScope.value) return
     const payload = response.data?.data
     snapshots.value = payload?.data || []
     pagination.total = payload?.total || snapshots.value.length
     summary.value = response.data?.summary || defaultSummary()
     hasLoadedSnapshots.value = true
+    loadedSnapshotScope.value = requestScope
   } catch (err) {
     error(err?.response?.data?.message || 'Unable to load capitation enrollee snapshots.')
   } finally {
@@ -303,36 +326,62 @@ const reloadSnapshots = async () => {
 }
 
 const exportSnapshots = async () => {
-  if (!canExport.value) {
+  if (!canExport.value || exporting.value) {
     return
   }
 
+  // Capture the selection once so changing the preview cannot mix export rows.
+  const periodId = filters.periodId
+  const exportFilters = {
+    funding_type_id: filters.fundingTypeId || undefined,
+    facility_id: filters.facilityId || undefined,
+    search: filters.search || undefined,
+  }
+  const controller = new AbortController()
+  exportController = controller
   exporting.value = true
+  exportTone.value = 'info'
+  exportMessage.value = 'Preparing enrollee export...'
   try {
-    const response = await capitationAPI.exportEnrolleeList(filters.periodId, {
-      funding_type_id: filters.fundingTypeId || undefined,
-      facility_id: filters.facilityId || undefined,
-      search: filters.search || undefined,
+    const result = await buildCapitationEnrolleeCsv({
+      signal: controller.signal,
+      fetchChunk: async (params, signal) => {
+        const response = await capitationAPI.exportEnrolleeListChunk(periodId, { ...exportFilters, ...params }, { signal })
+        return response.data?.data
+      },
+      onProgress: (count) => {
+        exportMessage.value = `Preparing CSV: ${count.toLocaleString()} enrollees exported...`
+      },
     })
 
-    const contentType = response.headers?.['content-type'] || 'text/csv;charset=utf-8'
-    const blob = response.data instanceof Blob
-      ? response.data
-      : new Blob([response.data], { type: contentType })
-    const url = URL.createObjectURL(blob)
-    const disposition = response.headers?.['content-disposition'] || ''
-    const filename = disposition.match(/filename=\"?([^\"]+)\"?/i)?.[1] || `capitation_enrollee_list_${filters.periodId}.csv`
+    if (controller.signal.aborted) return
+    const url = URL.createObjectURL(result.blob)
     const link = document.createElement('a')
     link.href = url
-    link.download = filename
+    link.download = result.filename || `capitation_enrollee_list_${periodId}.csv`
+    document.body.appendChild(link)
     link.click()
-    URL.revokeObjectURL(url)
+    link.remove()
+    setTimeout(() => URL.revokeObjectURL(url), 10000)
+    exportTone.value = 'success'
+    exportMessage.value = `Exported ${result.count.toLocaleString()} enrollees. Your CSV download is ready.`
   } catch (err) {
-    error(err?.response?.data?.message || 'Unable to export the capitation enrollee snapshot.')
+    if (controller.signal.aborted) {
+      exportMessage.value = 'Export cancelled.'
+    } else {
+      exportTone.value = 'danger'
+      exportMessage.value = err?.response?.data?.message || err?.message || 'Unable to export the capitation enrollee snapshot.'
+      error(exportMessage.value)
+    }
   } finally {
     exporting.value = false
+    exportController = null
   }
 }
+
+const cancelExport = () => exportController?.abort()
+
+onBeforeUnmount(cancelExport)
 
 const handleSearch = async (value) => {
   filters.search = value || ''

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Exceptions\CapitationComputationException;
+use App\Exports\CapitationEnrolleeListExport;
 use App\Models\AuditTrail;
 use App\Models\Capitation;
 use App\Models\CapitationDetail;
@@ -670,6 +671,40 @@ class CapitationService
             ->orderBy('facility_name')
             ->orderBy('full_name')
             ->orderBy('enrollee_number');
+    }
+
+    public function getEnrolleeSnapshotExportChunk(Capitation $capitation, array $filters = []): array
+    {
+        // The preview prepares missing snapshots. Downloads only read stored rows;
+        // repeating historical backfills here can exceed the request timeout.
+        $afterId = (int) ($filters['after_id'] ?? 0);
+        $maxId = isset($filters['snapshot_max_id'])
+            ? (int) $filters['snapshot_max_id']
+            : (int) $capitation->enrolleeSnapshots()->max('id');
+        $chunkSize = max(1, min(5000, (int) ($filters['chunk_size'] ?? 2000)));
+
+        // Keep the scoped Eloquent query, but fetch plain records to avoid model
+        // hydration and date/metadata casts for every exported enrollee.
+        $rows = $this->enrolleeSnapshotQuery($capitation, $filters)
+            ->select(CapitationEnrolleeListExport::columns())
+            ->where('id', '>', $afterId)
+            ->where('id', '<=', $maxId)
+            ->orderBy('id')
+            ->limit($chunkSize + 1)
+            ->toBase()
+            ->get();
+
+        $hasMore = $rows->count() > $chunkSize;
+        if ($hasMore) {
+            $rows->pop();
+        }
+
+        return [
+            'rows' => $rows,
+            'next_cursor' => (int) ($rows->last()?->id ?? $afterId),
+            'snapshot_max_id' => $maxId,
+            'has_more' => $hasMore,
+        ];
     }
 
     public function getEnrolleeSnapshotSummary(Capitation $capitation, array $filters = []): array

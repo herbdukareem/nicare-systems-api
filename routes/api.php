@@ -677,6 +677,7 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('reports/history/export', [CapitationController::class, 'exportPaymentHistoryReport'])->middleware('permission:capitation.payment-report.view');
         Route::get('periods/{capitation}/enrollee-list', [CapitationController::class, 'enrolleeList'])->middleware('permission:capitation.enrollee-list.view');
         Route::get('periods/{capitation}/export-enrollee-list', [CapitationController::class, 'exportEnrolleeList'])->middleware('permission:capitation.enrollee-list.view');
+        Route::get('periods/{capitation}/export-enrollee-list/chunk', [CapitationController::class, 'exportEnrolleeListChunk'])->middleware('permission:capitation.enrollee-list.view');
         Route::get('periods/{capitation}/export-remita', [CapitationController::class, 'exportRemita'])->middleware('permission:capitation.export');
         Route::get('facilities/{facility}/capitation-history', [CapitationController::class, 'facilityHistory'])->middleware('permission:capitation.view');
     });

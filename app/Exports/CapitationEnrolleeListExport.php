@@ -24,6 +24,16 @@ class CapitationEnrolleeListExport implements FromQuery, WithHeadings, WithMappi
         return $this->query;
     }
 
+    public static function columns(): array
+    {
+        return [
+            'id', 'funding_type_name', 'facility_name', 'facility_code',
+            'enrollee_number', 'legacy_id', 'full_name', 'nin', 'phone', 'gender',
+            'date_of_birth', 'lga_name', 'ward_name', 'coverage_start_date',
+            'coverage_end_date', 'capitation_start_date', 'duplicate_nin_policy', 'captured_at',
+        ];
+    }
+
     public function headings(): array
     {
         return [
@@ -61,15 +71,26 @@ class CapitationEnrolleeListExport implements FromQuery, WithHeadings, WithMappi
             $row->nin,
             $row->phone,
             $row->gender,
-            $row->date_of_birth?->format('Y-m-d'),
+            $this->formatDate($row->date_of_birth),
             $row->lga_name,
             $row->ward_name,
-            $row->coverage_start_date?->format('Y-m-d'),
-            $row->coverage_end_date?->format('Y-m-d'),
-            $row->capitation_start_date?->format('Y-m-d'),
+            $this->formatDate($row->coverage_start_date),
+            $this->formatDate($row->coverage_end_date),
+            $this->formatDate($row->capitation_start_date),
             strtoupper((string) $row->duplicate_nin_policy),
-            $row->captured_at?->format('Y-m-d H:i:s'),
+            $this->formatDate($row->captured_at, true),
         ];
+    }
+
+    private function formatDate(mixed $value, bool $withTime = false): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return $value instanceof \DateTimeInterface
+            ? $value->format($withTime ? 'Y-m-d H:i:s' : 'Y-m-d')
+            : substr((string) $value, 0, $withTime ? 19 : 10);
     }
 
     public function title(): string

@@ -500,6 +500,52 @@ class CapitationController extends Controller
         }
     }
 
+    public function exportEnrolleeListChunk(Request $request, Capitation $capitation): JsonResponse
+    {
+        $validated = $request->validate([
+            'funding_type_id' => ['nullable', 'integer', 'exists:funding_types,id'],
+            'facility_id' => ['nullable', 'integer', 'exists:facilities,id'],
+            'search' => ['nullable', 'string', 'max:255'],
+            'after_id' => ['nullable', 'integer', 'min:0'],
+            'snapshot_max_id' => [$request->integer('after_id') > 0 ? 'required' : 'nullable', 'integer', 'min:0'],
+            'chunk_size' => ['nullable', 'integer', 'min:1', 'max:5000'],
+        ]);
+
+        $chunk = $this->service->getEnrolleeSnapshotExportChunk($capitation, $validated);
+        $export = new CapitationEnrolleeListExport($capitation, $capitation->enrolleeSnapshots()->getQuery());
+        $handle = fopen('php://temp', 'w+b');
+        if ($handle === false) {
+            throw new \RuntimeException('Unable to open export output stream.');
+        }
+
+        try {
+            if (empty($validated['after_id'])) {
+                fwrite($handle, "\xEF\xBB\xBF");
+                fputcsv($handle, $export->headings(), ',', '"', '');
+            }
+
+            foreach ($chunk['rows'] as $row) {
+                fputcsv($handle, $export->map($row), ',', '"', '');
+            }
+            rewind($handle);
+            $csv = stream_get_contents($handle);
+        } finally {
+            fclose($handle);
+        }
+
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'csv' => $csv,
+                'row_count' => $chunk['rows']->count(),
+                'next_cursor' => $chunk['next_cursor'],
+                'snapshot_max_id' => $chunk['snapshot_max_id'],
+                'has_more' => $chunk['has_more'],
+                'filename' => 'capitation_enrollee_list_' . $capitation->id . '_' . now()->format('Ymd_His') . '.csv',
+            ],
+        ])->header('Cache-Control', 'private, no-store');
+    }
+
     public function exportEnrolleeList(Request $request, Capitation $capitation)
     {
         $validated = $request->validate([
