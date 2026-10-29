@@ -18,6 +18,7 @@ class AccountDetailResource extends JsonResource
             'account_name' => $this->account_name,
             'account_number' => $this->account_number,
             'account_type' => $this->account_type,
+            'bank_id' => $this->bank_id,
             'bank' => new BankResource($this->whenLoaded('bank')),
             'status' => $this->status,
             'created_at' => $this->created_at,

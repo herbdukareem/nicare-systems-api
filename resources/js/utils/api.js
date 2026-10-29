@@ -221,6 +221,10 @@ export const facilityAPI = {
   getEnrollees: (id, params) => api.get(`/facilities/${id}/enrollees`, { params }),
 };
 
+export const bankAPI = {
+  getAll: () => api.get('/banks'),
+};
+
 export const lgaAPI = {
   getAll: (params) => api.get('/lgas', { params }),
   getById: (id) => api.get(`/lgas/${id}`),

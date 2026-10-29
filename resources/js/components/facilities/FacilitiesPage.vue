@@ -176,6 +176,57 @@
           />
           <v-textarea v-model="facilityForm.address" label="Address" variant="outlined" rows="3" class="md:tw-col-span-2" />
         </div>
+
+        <AppCard
+          title="Bank Details"
+          subtitle="Optional. Enter the bank, account name, and account number together. Leave all three blank to save without bank details."
+          icon="mdi-bank-outline"
+          tone="secondary"
+          class="tw-mt-4"
+        >
+          <div class="tw-grid tw-gap-4 md:tw-grid-cols-2">
+            <v-autocomplete
+              v-model="facilityForm.bank_id"
+              :items="banks"
+              item-title="name"
+              item-value="id"
+              label="Bank"
+              variant="outlined"
+              clearable
+              :disabled="saving"
+              :error-messages="facilityErrors['account_detail.bank_id']"
+            />
+            <v-text-field
+              v-model="facilityForm.account_name"
+              label="Account name"
+              variant="outlined"
+              :disabled="saving"
+              :error-messages="facilityErrors['account_detail.account_name']"
+            />
+            <v-text-field
+              v-model="facilityForm.account_number"
+              label="Account number"
+              variant="outlined"
+              :disabled="saving"
+              :error-messages="facilityErrors['account_detail.account_number']"
+            />
+            <v-combobox
+              v-model="facilityForm.account_type"
+              :items="['savings', 'current']"
+              label="Account type"
+              variant="outlined"
+              :disabled="saving"
+              :error-messages="facilityErrors['account_detail.account_type']"
+            />
+            <v-text-field
+              v-if="selectedBank?.sort_code"
+              :model-value="selectedBank.sort_code"
+              label="Bank sort code"
+              variant="outlined"
+              readonly
+            />
+          </div>
+        </AppCard>
       </AppModal>
 
       <AppModal
@@ -217,6 +268,17 @@
               <div><p class="tw-text-xs tw-text-slate-500">Email</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.email || 'N/A' }}</p></div>
               <div class="md:tw-col-span-2 xl:tw-col-span-3"><p class="tw-text-xs tw-text-slate-500">Address</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.address || 'N/A' }}</p></div>
             </div>
+          </AppCard>
+
+          <AppCard title="Bank Details" icon="mdi-bank-outline" tone="secondary">
+            <div v-if="viewingFacility.account_detail" class="tw-grid tw-gap-4 md:tw-grid-cols-2">
+              <div><p class="tw-text-xs tw-text-slate-500">Bank</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.account_detail.bank?.name || 'N/A' }}</p></div>
+              <div><p class="tw-text-xs tw-text-slate-500">Account Name</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.account_detail.account_name || 'N/A' }}</p></div>
+              <div><p class="tw-text-xs tw-text-slate-500">Account Number</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.account_detail.account_number || 'N/A' }}</p></div>
+              <div><p class="tw-text-xs tw-text-slate-500">Account Type</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.account_detail.account_type || 'N/A' }}</p></div>
+              <div><p class="tw-text-xs tw-text-slate-500">Bank Sort Code</p><p class="tw-font-semibold tw-text-slate-900">{{ viewingFacility.account_detail.bank?.sort_code || 'N/A' }}</p></div>
+            </div>
+            <AppEmptyState v-else title="No bank details" description="Edit this facility to add its bank account details." icon="mdi-bank-outline" />
           </AppCard>
 
           <AppCard
@@ -304,7 +366,7 @@ import AppPageHeader from '../common/AppPageHeader.vue'
 import AppStatusBadge from '../common/AppStatusBadge.vue'
 import DateDisplay from '../common/DateDisplay.vue'
 import FacilityBadge from '../common/FacilityBadge.vue'
-import { facilityAPI, lgaAPI, wardAPI } from '../../utils/api'
+import { bankAPI, facilityAPI, lgaAPI, wardAPI } from '../../utils/api'
 import { useToast } from '../../composables/useToast'
 
 const { success, error } = useToast()
@@ -316,6 +378,8 @@ const deleting = ref(false)
 const facilities = ref([])
 const lgas = ref([])
 const wards = ref([])
+const banks = ref([])
+const facilityErrors = ref({})
 const totalFacilities = ref(0)
 const currentPage = ref(1)
 const itemsPerPage = ref(15)
@@ -356,7 +420,13 @@ const facilityForm = reactive({
   capacity: '',
   status: 1,
   accreditation_status: 'active',
+  bank_id: null,
+  account_name: '',
+  account_number: '',
+  account_type: 'savings',
 })
+
+const selectedBank = computed(() => banks.value.find((bank) => Number(bank.id) === Number(facilityForm.bank_id)))
 
 const facilityTypes = ['Primary', 'Secondary', 'Tertiary']
 const ownershipOptions = ['Public', 'Private', 'Faith-Based']
@@ -418,12 +488,14 @@ const extractCollection = (response) => {
 
 const loadReferenceData = async () => {
   try {
-    const [lgaResponse, wardResponse] = await Promise.all([
+    const [lgaResponse, wardResponse, bankResponse] = await Promise.all([
       lgaAPI.getAll({ per_page: 500 }),
       wardAPI.getAll({ per_page: 1000 }),
+      bankAPI.getAll(),
     ])
     lgas.value = extractCollection(lgaResponse).items
     wards.value = extractCollection(wardResponse).items
+    banks.value = extractCollection(bankResponse).items.sort((a, b) => a.name.localeCompare(b.name))
   } catch (err) {
     error(err.response?.data?.message || 'Failed to load facility reference data')
   }
@@ -476,6 +548,7 @@ const openCreateDialog = () => {
 }
 
 const editFacility = (facility) => {
+  facilityErrors.value = {}
   editingFacility.value = facility
   Object.assign(facilityForm, {
     hcp_code: facility.hcp_code || '',
@@ -490,6 +563,10 @@ const editFacility = (facility) => {
     capacity: facility.capacity ?? '',
     status: Number(facility.status ?? 1),
     accreditation_status: facility.accreditation_status || 'active',
+    bank_id: facility.account_detail?.bank_id || facility.account_detail?.bank?.id || null,
+    account_name: facility.account_detail?.account_name || '',
+    account_number: facility.account_detail?.account_number || '',
+    account_type: facility.account_detail?.account_type || 'savings',
   })
   showViewDialog.value = false
   showAddDialog.value = true
@@ -508,8 +585,18 @@ const viewFacility = async (facility) => {
 }
 
 const saveFacility = async () => {
+  if (saving.value) return
+  facilityErrors.value = {}
   if (!facilityForm.hcp_code || !facilityForm.name || !facilityForm.lga_id || !facilityForm.ward_id) {
     error('HCP code, facility name, LGA, and ward are required')
+    return
+  }
+
+  const accountName = String(facilityForm.account_name || '').trim()
+  const accountNumber = String(facilityForm.account_number || '').trim()
+  const hasBankDetails = Boolean(facilityForm.bank_id || accountName || accountNumber)
+  if (hasBankDetails && (!facilityForm.bank_id || !accountName || !accountNumber)) {
+    error('Bank, account name, and account number are required when adding bank details')
     return
   }
 
@@ -529,6 +616,12 @@ const saveFacility = async () => {
       capacity: facilityForm.capacity === '' ? null : Number(facilityForm.capacity),
       status: Number(facilityForm.status),
       accreditation_status: facilityForm.accreditation_status,
+      account_detail: hasBankDetails ? {
+        bank_id: facilityForm.bank_id,
+        account_name: accountName,
+        account_number: accountNumber,
+        account_type: String(facilityForm.account_type || 'savings').trim(),
+      } : null,
     }
 
     if (editingFacility.value) {
@@ -542,7 +635,8 @@ const saveFacility = async () => {
     closeDialog()
     await loadFacilities()
   } catch (err) {
-    error(err.response?.data?.message || 'Failed to save facility')
+    facilityErrors.value = err.response?.data?.errors || {}
+    error(Object.values(facilityErrors.value).flat()[0] || err.response?.data?.message || 'Failed to save facility')
   } finally {
     saving.value = false
   }
@@ -555,6 +649,7 @@ const closeDialog = () => {
 }
 
 const resetFacilityForm = () => {
+  facilityErrors.value = {}
   Object.assign(facilityForm, {
     hcp_code: '',
     name: '',
@@ -568,6 +663,10 @@ const resetFacilityForm = () => {
     capacity: '',
     status: 1,
     accreditation_status: 'active',
+    bank_id: null,
+    account_name: '',
+    account_number: '',
+    account_type: 'savings',
   })
 }
 

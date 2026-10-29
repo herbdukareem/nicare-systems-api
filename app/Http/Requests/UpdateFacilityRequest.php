@@ -41,6 +41,11 @@ class UpdateFacilityRequest extends FormRequest
             'status' => 'nullable|integer|in:0,1',
             'accreditation_status' => 'nullable|in:active,suspended,revoked',
             'account_detail_id' => 'nullable|exists:account_details,id',
+            'account_detail' => 'sometimes|nullable|array:bank_id,account_name,account_number,account_type|min:1',
+            'account_detail.bank_id' => 'required_with:account_detail|integer|exists:banks,id',
+            'account_detail.account_name' => 'required_with:account_detail|string|max:255',
+            'account_detail.account_number' => 'required_with:account_detail|string|max:255',
+            'account_detail.account_type' => 'nullable|string|max:50',
         ];
     }
 

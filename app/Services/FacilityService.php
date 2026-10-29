@@ -2,9 +2,11 @@
 
 namespace App\Services;
 
+use App\Models\AccountDetail;
 use App\Models\Facility;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\LengthAwarePaginator;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Service class for handling facility operations.
@@ -13,7 +15,7 @@ class FacilityService
 {
     public function all(): Collection
     {
-        return Facility::with(['lga', 'ward', 'accountDetail'])->get();
+        return Facility::with(['lga', 'ward', 'accountDetail.bank'])->get();
     }
 
     /**
@@ -21,7 +23,7 @@ class FacilityService
      */
     public function paginate(array $filters = [], int $perPage = 500, string $sortBy = 'created_at', string $sortDirection = 'desc'): LengthAwarePaginator
     {
-        $query = Facility::with(['lga', 'ward', 'accountDetail']);
+        $query = Facility::with(['lga', 'ward', 'accountDetail.bank']);
 
         // Apply filters
         if (!empty($filters['search'])) {
@@ -82,13 +84,74 @@ class FacilityService
 
     public function create(array $data): Facility
     {
-        return Facility::create($data);
+        return DB::transaction(function () use ($data): Facility {
+            $hasAccountDetails = array_key_exists('account_detail', $data);
+            $accountDetails = $data['account_detail'] ?? null;
+            unset($data['account_detail']);
+
+            $facility = Facility::create($data);
+            if ($hasAccountDetails) {
+                $this->saveAccountDetails($facility, $accountDetails);
+            }
+
+            return $facility->load(['lga', 'ward', 'accountDetail.bank']);
+        });
     }
 
     public function update(Facility $facility, array $data): Facility
     {
-        $facility->update($data);
-        return $facility;
+        return DB::transaction(function () use ($facility, $data): Facility {
+            $hasAccountDetails = array_key_exists('account_detail', $data);
+            $accountDetails = $data['account_detail'] ?? null;
+            unset($data['account_detail']);
+
+            $facility->update($data);
+            if ($hasAccountDetails) {
+                $this->saveAccountDetails($facility, $accountDetails);
+            }
+
+            return $facility->load(['lga', 'ward', 'accountDetail.bank']);
+        });
+    }
+
+    private function saveAccountDetails(Facility $facility, ?array $data): void
+    {
+        if ($data === null) {
+            // Keep the old account record for historical references.
+            $facility->accountDetail()->dissociate();
+            $facility->save();
+            return;
+        }
+
+        $account = $facility->accountDetail()->first();
+        $belongsToFacility = $account
+            && $account->accountable_type === $facility->getMorphClass()
+            && (int) $account->accountable_id === (int) $facility->id;
+        $isShared = $account && Facility::query()
+            ->where('account_detail_id', $account->id)
+            ->where('id', '!=', $facility->id)
+            ->exists();
+
+        if (!$belongsToFacility || $isShared) {
+            // A legacy or shared link must not let an edit change another owner.
+            $account = new AccountDetail;
+            $account->accountable()->associate($facility);
+        }
+
+        $account->fill([
+            'bank_id' => $data['bank_id'],
+            'account_name' => $data['account_name'],
+            'account_number' => $data['account_number'],
+            'account_type' => $data['account_type'] ?? $account->account_type ?? 'savings',
+        ]);
+        if ($account->isDirty(['bank_id', 'account_name', 'account_number'])) {
+            $account->is_verified = false;
+            $account->verified_at = null;
+            $account->verification_method = null;
+        }
+        $account->save();
+        $facility->accountDetail()->associate($account);
+        $facility->save();
     }
 
     public function delete(Facility $facility): void

@@ -29,5 +29,6 @@ Thumbs.db
 !/tests/Feature/BulkEnrolleeNinUpdateTest.php
 !/tests/Feature/EnrollmentSlipPrintingTest.php
 !/tests/Feature/CapitationEnrolleeExportTest.php
+!/tests/Feature/FacilityBankDetailsTest.php
 !/tests/js/
 # !/tests/Feature/CapitationSlipEligibilityTest.php

@@ -58,7 +58,7 @@ class FacilityController extends BaseController
 
     public function show(Facility $facility)
     {
-        $facility->load(['lga', 'ward', 'accountDetail']);
+        $facility->load(['lga', 'ward', 'accountDetail.bank']);
         return $this->sendResponse(new FacilityResource($facility), 'Facility retrieved successfully');
     }
 
