@@ -82,6 +82,14 @@
             :rows="field.type === 'textarea' ? 3 : undefined"
           />
         </div>
+        <AppCard v-if="activeKey === 'facilities'" class="tw-mt-4" title="Bank Details" subtitle="Optional. Add the bank, account name, and account number together." icon="mdi-bank-outline" tone="secondary">
+          <div class="tw-grid tw-gap-3 md:tw-grid-cols-2">
+            <v-autocomplete v-model="form.bank_id" :items="lookups.banks" item-title="name" item-value="id" label="Bank" density="compact" variant="outlined" clearable />
+            <v-text-field v-model="form.account_name" label="Account name" density="compact" variant="outlined" />
+            <v-text-field v-model="form.account_number" label="Account number" density="compact" variant="outlined" />
+            <v-select v-model="form.account_type" :items="['savings', 'current']" label="Account type" density="compact" variant="outlined" />
+          </div>
+        </AppCard>
         <template #actions>
           <v-btn variant="outlined" @click="dialog = false">Cancel</v-btn>
           <v-btn color="primary" variant="flat" :loading="saving" @click="saveItem">{{ editingId ? 'Save Changes' : 'Create' }}</v-btn>
@@ -98,8 +106,9 @@ import { useAuthStore } from '../../stores/auth';
 import AdminLayout from '../layout/AdminLayout.vue';
 import AppModal from '../common/AppModal.vue';
 import AppDataTable from '../common/AppDataTable.vue';
+import AppCard from '../common/AppCard.vue';
 import { useToast } from '../../composables/useToast';
-import { benefactorAPI, benefitPackageAPI, facilityAPI, fundingTypeAPI, lgaAPI, wardAPI } from '../../utils/api';
+import { bankAPI, benefactorAPI, benefitPackageAPI, facilityAPI, fundingTypeAPI, lgaAPI, wardAPI } from '../../utils/api';
 
 const route = useRoute();
 const router = useRouter();
@@ -113,7 +122,7 @@ const facilityTypes = optionObjects(['Primary', 'Secondary', 'Tertiary']);
 const accreditationOptions = optionObjects(['active', 'suspended', 'revoked']);
 const benefactorTypes = optionObjects(['individual', 'employer', 'government', 'donor', 'institution', 'association', 'ngo', 'group', 'philanthropist']);
 
-const lookups = reactive({ lgas: [], wards: [] });
+const lookups = reactive({ lgas: [], wards: [], banks: [] });
 const filters = reactive({ search: '', status: null, lga_id: null, ownership: null, accreditation_status: null, type: null });
 const items = ref([]);
 const meta = reactive({ total: 0 });
@@ -385,6 +394,14 @@ const loadLookups = async () => {
     lookups.wards = [];
   }
 
+  if (activeKey.value === 'facilities') {
+    tasks.push(bankAPI.getAll().then((response) => {
+      lookups.banks = apiData(response).sort((a, b) => a.name.localeCompare(b.name));
+    }));
+  } else {
+    lookups.banks = [];
+  }
+
   await Promise.all(tasks);
 };
 
@@ -441,6 +458,12 @@ const openEdit = (item) => {
   current.value.fields.forEach((field) => {
     form[field.key] = item[field.key] ?? (field.key === 'lga_id' ? item.lga?.id : field.key === 'ward_id' ? item.ward?.id : null);
   });
+  if (current.value.key === 'facilities') {
+    form.bank_id = item.account_detail?.bank_id ?? item.account_detail?.bank?.id ?? null;
+    form.account_name = item.account_detail?.account_name || '';
+    form.account_number = item.account_detail?.account_number || '';
+    form.account_type = item.account_detail?.account_type || 'savings';
+  }
   dialog.value = true;
 };
 
@@ -454,6 +477,26 @@ const saveItem = async () => {
   try {
     const payload = { ...form };
     Object.keys(payload).forEach((key) => payload[key] === undefined && delete payload[key]);
+    if (current.value.key === 'facilities') {
+      const accountName = String(form.account_name || '').trim();
+      const accountNumber = String(form.account_number || '').trim();
+      const hasAccountDetails = Boolean(form.bank_id || accountName || accountNumber);
+      if (hasAccountDetails && (!form.bank_id || !accountName || !accountNumber)) {
+        error('Bank, account name, and account number are required when adding bank details.');
+        saving.value = false;
+        return;
+      }
+      payload.account_detail = hasAccountDetails ? {
+        bank_id: form.bank_id,
+        account_name: accountName,
+        account_number: accountNumber,
+        account_type: String(form.account_type || 'savings').trim(),
+      } : null;
+      delete payload.bank_id;
+      delete payload.account_name;
+      delete payload.account_number;
+      delete payload.account_type;
+    }
     if (editingId.value) {
       await current.value.api.update(editingId.value, payload);
       success(`${current.value.singular} updated`);
@@ -490,6 +533,7 @@ watch(activeKey, async (key) => {
   if (!key) return;
   if (route.params.section !== key) router.replace(`/setup/${key}`);
   page.value = 1;
+  await loadLookups();
   await loadItems();
 });
 watch([page, perPage], loadItems);
