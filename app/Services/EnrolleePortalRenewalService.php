@@ -106,6 +106,11 @@ class EnrolleePortalRenewalService
             'gateway_response' => $checkout['raw_response'] ?? null,
         ]);
 
+        // Switching from an open virtual account to online checkout makes the
+        // old transfer intent payable no longer. Late deposits are routed to
+        // review by the collection settlement handler.
+        $this->expirePendingCollections($enrollee);
+
         return [
             'purchase' => $purchase->fresh(['plan', 'fundingType']),
             'checkout' => $checkout,
@@ -146,14 +151,63 @@ class EnrolleePortalRenewalService
             return null;
         }
 
+        $expired = PaymentIntent::query()
+            ->whereMorphedTo('payable', PremiumPurchase::class)
+            ->whereIn('payable_id', $purchaseIds)
+            ->whereIn('status', ['pending', 'awaiting_payment'])
+            ->where(function ($query): void {
+                $query->where(fn ($query) => $query->whereNotNull('expires_at')->where('expires_at', '<=', now()))
+                    ->orWhereHas('accounts', fn ($accounts) => $accounts
+                        ->where('status', 'active')
+                        ->whereNotNull('expires_at')
+                        ->where('expires_at', '<=', now()));
+            })
+            ->get();
+
+        foreach ($expired as $expiredIntent) {
+            $expiredIntent->update(['status' => 'expired']);
+            $expiredIntent->accounts()->where('status', 'active')->update(['status' => 'expired']);
+        }
+
         $intent = PaymentIntent::with('accounts')
             ->where('payable_type', PremiumPurchase::class)
             ->whereIn('payable_id', $purchaseIds)
             ->whereIn('status', ['pending', 'awaiting_payment', 'review_required'])
+            ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now()))
+            ->whereHas('accounts', fn ($query) => $query
+                ->where('status', 'active')
+                ->where(fn ($query) => $query->whereNull('expires_at')->orWhere('expires_at', '>', now())))
             ->latest()
             ->first();
 
         return $intent ? $this->collectionService->present($intent) : null;
+    }
+
+    private function expirePendingCollections(Enrollee $enrollee): void
+    {
+        $purchaseIds = PremiumPurchase::query()
+            ->where('payment_status', 'pending')
+            ->where('payer_details->channel', 'enrollee_portal_renewal')
+            ->where('payer_details->enrollee_id', $enrollee->id)
+            ->pluck('id');
+
+        if ($purchaseIds->isEmpty()) {
+            return;
+        }
+
+        DB::transaction(function () use ($purchaseIds): void {
+            $intents = PaymentIntent::query()
+                ->where('payable_type', PremiumPurchase::class)
+                ->whereIn('payable_id', $purchaseIds)
+                ->whereIn('status', ['pending', 'awaiting_payment'])
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($intents as $intent) {
+                $intent->update(['status' => 'expired', 'expires_at' => now()]);
+                $intent->accounts()->where('status', 'active')->update(['status' => 'expired', 'expires_at' => now()]);
+            }
+        });
     }
 
     public function verify(Enrollee $enrollee, string $reference): array

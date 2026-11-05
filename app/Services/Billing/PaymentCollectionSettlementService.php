@@ -34,6 +34,10 @@ class PaymentCollectionSettlementService
             if (!$intent) { $event->update(['status' => 'unmatched', 'processing_error' => 'No payment intent matches the provider reference.', 'processed_at' => now()]); return; }
             $event->update(['payment_intent_id' => $intent->id]);
             if (data_get($payload, 'event') !== 'charge.success') { $event->update(['status' => 'ignored', 'processed_at' => now()]); return; }
+            if (!in_array($intent->status, ['pending', 'awaiting_payment'], true)) {
+                $event->update(['status' => 'review_required', 'processing_error' => 'The payment intent is no longer active.', 'processed_at' => now()]);
+                return;
+            }
             $received = round(((int) data_get($payload, 'data.amount', 0)) / 100, 2);
             if ($received !== round((float) $intent->amount_due, 2)) { $intent->update(['status' => 'review_required', 'amount_received' => $received]); $event->update(['status' => 'review_required', 'processing_error' => 'The received amount does not equal the intent amount.', 'processed_at' => now()]); return; }
             if ($intent->expires_at?->isPast() && $intent->collection_mode === 'per_payment') { $intent->update(['status' => 'review_required', 'amount_received' => $received]); $event->update(['status' => 'review_required', 'processing_error' => 'The temporary account had expired.', 'processed_at' => now()]); return; }

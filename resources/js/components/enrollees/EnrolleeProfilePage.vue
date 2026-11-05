@@ -422,14 +422,14 @@
     >
       <template #actions>
         <v-btn variant="outlined" :disabled="renewalSaving" @click="renewalDialog = false">Cancel</v-btn>
-        <v-btn v-if="paymentCollection" color="primary" variant="flat" :loading="renewalSaving" prepend-icon="mdi-refresh" @click="verifyTransferPayment">
+        <v-btn v-if="paymentCollection && !paymentCollectionExpired" color="primary" variant="flat" :loading="renewalSaving" prepend-icon="mdi-refresh" @click="verifyTransferPayment">
           Check payment status
         </v-btn>
-        <v-btn v-if="!paymentCollection" color="primary" variant="flat" :loading="renewalSaving" prepend-icon="mdi-credit-card-outline" @click="renewCoverage('online')">
-          Pay Online
+        <v-btn v-if="renewalQuote" color="primary" variant="flat" :loading="renewalSaving" prepend-icon="mdi-credit-card-outline" @click="renewCoverage('online')">
+          {{ paymentCollection ? 'Pay Online Instead' : 'Pay Online' }}
         </v-btn>
-        <v-btn v-if="!paymentCollection" color="success" variant="outlined" :loading="renewalSaving" prepend-icon="mdi-bank-transfer" @click="renewCoverage('bank_transfer')">
-          Bank Transfer
+        <v-btn v-if="!paymentCollection || paymentCollectionExpired" color="success" variant="outlined" :loading="renewalSaving" prepend-icon="mdi-bank-transfer" @click="renewCoverage('bank_transfer')">
+          {{ paymentCollection ? 'Generate New Account' : 'Bank Transfer' }}
         </v-btn>
       </template>
 
@@ -442,6 +442,9 @@
           <p class="tw-mt-2 tw-font-semibold tw-text-gray-900">{{ enrollee?.premium_plan?.name || 'N/A' }}</p>
           <p class="tw-mt-1 tw-text-sm tw-text-gray-500">Choose card/online checkout or a virtual-account bank transfer.</p>
         </div>
+        <v-alert v-if="paymentCollectionExpired" type="error" variant="tonal" density="comfortable">
+          This virtual account has expired. Generate a new account or continue with online payment.
+        </v-alert>
         <div v-if="renewalQuote" class="tw-overflow-hidden tw-rounded-xl tw-border tw-border-slate-200">
           <div class="tw-bg-slate-50 tw-px-4 tw-py-3">
             <p class="tw-text-sm tw-font-semibold tw-text-slate-900">Payment summary</p>
@@ -520,6 +523,10 @@ const renewalTransactionsLoading = ref(false)
 const renewalTransactionsPage = ref(1)
 const renewalTransactionsTotal = ref(0)
 const renewalTransactionCheckingId = ref(null)
+const paymentCollectionExpired = computed(() => {
+  const expiresAt = paymentCollection.value?.account?.expires_at || paymentCollection.value?.expires_at
+  return Boolean(expiresAt && new Date(expiresAt).getTime() <= Date.now())
+})
 const statusForm = ref({
   status: null,
   comment: '',
@@ -810,8 +817,6 @@ const openRenewalDialog = async () => {
   try {
     const pendingResponse = await enrolleeAPI.getPendingCoverageRenewalCollection(enrollee.value.id)
     paymentCollection.value = pendingResponse.data?.data || null
-    if (paymentCollection.value) return
-
     const response = await enrolleeAPI.getCoverageRenewalQuote(enrollee.value.id)
     renewalQuote.value = response.data?.data || null
   } catch (err) {
