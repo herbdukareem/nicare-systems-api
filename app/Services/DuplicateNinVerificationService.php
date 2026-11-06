@@ -118,6 +118,10 @@ class DuplicateNinVerificationService
     {
         $item->loadMissing('batch', 'candidates');
 
+        if ($item->verified_at) {
+            throw new RuntimeException('This NIN has already been verified.');
+        }
+
         $key = trim((string) config('services.duplicate_nin_provider.key'));
         if ($key === '') {
             throw new RuntimeException('Add DUPLICATE_NIN_PROVIDER_KEY to .env before running duplicate NIN verification.');
@@ -193,8 +197,8 @@ class DuplicateNinVerificationService
             ->whereIn('status', [
                 DuplicateNinVerificationItem::STATUS_PENDING,
                 DuplicateNinVerificationItem::STATUS_FAILED,
-                DuplicateNinVerificationItem::STATUS_NEEDS_REVIEW,
             ])
+            ->whereNull('verified_at')
             ->orderBy('id')
             ->get()
             ->each(function (DuplicateNinVerificationItem $item) use ($user): void {

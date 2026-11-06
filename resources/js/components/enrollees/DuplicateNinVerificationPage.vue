@@ -65,13 +65,13 @@
           <template #actions>
             <div v-if="currentBatch" class="tw-flex tw-flex-wrap tw-items-center tw-gap-2">
               <AppBadge :label="currentBatch.reference" tone="neutral" size="sm" />
-              <v-btn size="small" color="primary" prepend-icon="mdi-shield-check-outline" :loading="verifyingBatch" @click="verifyAll">
-                Verify All
+              <v-btn v-if="remainingCount > 0" size="small" color="primary" prepend-icon="mdi-shield-check-outline" :loading="verifyingBatch" @click="verifyAll">
+                Verify remaining {{ numberFormat(remainingCount) }}
               </v-btn>
             </div>
           </template>
 
-          <div v-if="currentBatch" class="tw-grid tw-gap-2 tw-border-b tw-border-slate-100 tw-p-4 md:tw-grid-cols-4">
+          <div v-if="currentBatch" class="tw-grid tw-gap-2 tw-border-b tw-border-slate-100 tw-p-4 md:tw-grid-cols-6">
             <div>
               <p class="tw-text-xs tw-font-semibold tw-uppercase tw-text-slate-400">Unique NINs</p>
               <p class="tw-text-xl tw-font-bold tw-text-slate-900">{{ numberFormat(currentBatch.unique_nin_count) }}</p>
@@ -79,6 +79,14 @@
             <div>
               <p class="tw-text-xs tw-font-semibold tw-uppercase tw-text-slate-400">Affected Enrollees</p>
               <p class="tw-text-xl tw-font-bold tw-text-slate-900">{{ numberFormat(currentBatch.total_candidate_count) }}</p>
+            </div>
+            <div>
+              <p class="tw-text-xs tw-font-semibold tw-uppercase tw-text-slate-400">NIN Verified</p>
+              <p class="tw-text-xl tw-font-bold tw-text-blue-700">{{ numberFormat(verifiedCount) }}</p>
+            </div>
+            <div>
+              <p class="tw-text-xs tw-font-semibold tw-uppercase tw-text-slate-400">Remaining</p>
+              <p class="tw-text-xl tw-font-bold tw-text-amber-700">{{ numberFormat(remainingCount) }}</p>
             </div>
             <div>
               <p class="tw-text-xs tw-font-semibold tw-uppercase tw-text-slate-400">Applied</p>
@@ -136,7 +144,7 @@
                 <v-btn size="small" variant="outlined" prepend-icon="mdi-eye-outline" @click="openDetails(item)">
                   Details
                 </v-btn>
-                <v-btn size="small" color="primary" variant="flat" prepend-icon="mdi-shield-sync-outline" :loading="verifyingItemId === item.id" @click="verifyOne(item)">
+                <v-btn v-if="isUnverified(item)" size="small" color="primary" variant="flat" prepend-icon="mdi-shield-sync-outline" :loading="verifyingItemId === item.id" @click="verifyOne(item)">
                   Verify
                 </v-btn>
                 <v-btn size="small" variant="outlined" prepend-icon="mdi-account-check-outline" @click="openDecision(item)">
@@ -178,16 +186,17 @@
           <div>
             <h3 class="tw-mb-2 tw-text-sm tw-font-bold tw-text-slate-900">Provider Data</h3>
             <div class="tw-grid tw-gap-3 lg:tw-grid-cols-[160px_1fr]">
-              <div class="tw-flex tw-h-44 tw-w-40 tw-items-center tw-justify-center tw-border tw-border-slate-200 tw-bg-slate-50">
-                <img
-                  v-if="providerPhoto(selectedItem)"
-                  :src="providerPhoto(selectedItem)"
-                  alt="Provider NIN photo"
-                  class="tw-h-full tw-w-full tw-object-cover"
-                />
-                <div v-else class="tw-text-center tw-text-xs tw-font-semibold tw-uppercase tw-text-slate-400">
-                  No Photo
-                </div>
+              <button
+                v-if="providerPhoto(selectedItem)"
+                type="button"
+                class="tw-flex tw-h-44 tw-w-40 tw-items-center tw-justify-center tw-border tw-border-slate-200 tw-bg-slate-50"
+                aria-label="View provider photo full screen"
+                @click="openPhoto(providerPhoto(selectedItem), 'Provider NIN photo')"
+              >
+                <img :src="providerPhoto(selectedItem)" alt="Provider NIN photo" class="tw-h-full tw-w-full tw-object-cover" />
+              </button>
+              <div v-else class="tw-flex tw-h-44 tw-w-40 tw-items-center tw-justify-center tw-border tw-border-slate-200 tw-bg-slate-50 tw-text-center tw-text-xs tw-font-semibold tw-uppercase tw-text-slate-400">
+                No Photo
               </div>
               <div class="tw-grid tw-gap-2 md:tw-grid-cols-3">
                 <div v-for="field in providerFields" :key="field.key" class="tw-border tw-border-slate-200 tw-p-3">
@@ -225,14 +234,17 @@
             <tbody>
               <tr v-for="candidate in filteredMatchCandidates" :key="candidate.id">
                 <td>
-                  <div class="tw-flex tw-h-10 tw-w-10 tw-items-center tw-justify-center tw-overflow-hidden tw-border tw-border-slate-200 tw-bg-slate-50">
-                    <img
-                      v-if="photoSrc(candidate.photo_url)"
-                      :src="photoSrc(candidate.photo_url)"
-                      alt="Enrollee photo"
-                      class="tw-h-full tw-w-full tw-object-cover"
-                    />
-                    <v-icon v-else size="18" color="grey">mdi-account-outline</v-icon>
+                  <button
+                    v-if="photoSrc(candidate.photo_url)"
+                    type="button"
+                    class="tw-flex tw-h-10 tw-w-10 tw-items-center tw-justify-center tw-overflow-hidden tw-border tw-border-slate-200 tw-bg-slate-50"
+                    :aria-label="`View ${candidate.full_name || 'enrollee'} photo full screen`"
+                    @click.stop="openPhoto(photoSrc(candidate.photo_url), `${candidate.full_name || 'Enrollee'} photo`)"
+                  >
+                    <img :src="photoSrc(candidate.photo_url)" alt="Enrollee photo" class="tw-h-full tw-w-full tw-object-cover" />
+                  </button>
+                  <div v-else class="tw-flex tw-h-10 tw-w-10 tw-items-center tw-justify-center tw-overflow-hidden tw-border tw-border-slate-200 tw-bg-slate-50">
+                    <v-icon size="18" color="grey">mdi-account-outline</v-icon>
                   </div>
                 </td>
                 <td class="tw-font-semibold">{{ candidate.enrollee_code }}</td>
@@ -271,14 +283,17 @@
             >
               <template #label>
                 <div class="tw-flex tw-items-center tw-gap-3">
-                  <div class="tw-flex tw-h-10 tw-w-10 tw-shrink-0 tw-items-center tw-justify-center tw-overflow-hidden tw-border tw-border-slate-200 tw-bg-slate-50">
-                    <img
-                      v-if="photoSrc(candidate.photo_url)"
-                      :src="photoSrc(candidate.photo_url)"
-                      alt="Enrollee photo"
-                      class="tw-h-full tw-w-full tw-object-cover"
-                    />
-                    <v-icon v-else size="18" color="grey">mdi-account-outline</v-icon>
+                  <button
+                    v-if="photoSrc(candidate.photo_url)"
+                    type="button"
+                    class="tw-flex tw-h-10 tw-w-10 tw-shrink-0 tw-items-center tw-justify-center tw-overflow-hidden tw-border tw-border-slate-200 tw-bg-slate-50"
+                    :aria-label="`View ${candidate.full_name || 'enrollee'} photo full screen`"
+                    @click.stop="openPhoto(photoSrc(candidate.photo_url), `${candidate.full_name || 'Enrollee'} photo`)"
+                  >
+                    <img :src="photoSrc(candidate.photo_url)" alt="Enrollee photo" class="tw-h-full tw-w-full tw-object-cover" />
+                  </button>
+                  <div v-else class="tw-flex tw-h-10 tw-w-10 tw-shrink-0 tw-items-center tw-justify-center tw-overflow-hidden tw-border tw-border-slate-200 tw-bg-slate-50">
+                    <v-icon size="18" color="grey">mdi-account-outline</v-icon>
                   </div>
                   <div>
                   <div class="tw-font-semibold tw-text-slate-900">{{ candidate.enrollee_code }} · {{ candidate.full_name }}</div>
@@ -297,6 +312,16 @@
           <v-btn variant="text" @click="decisionDialog = false">Cancel</v-btn>
           <v-btn color="primary" :loading="deciding" @click="applyDecision">Apply Decision</v-btn>
         </v-card-actions>
+      </v-card>
+    </v-dialog>
+    <v-dialog v-model="photoDialog" fullscreen>
+      <v-card class="tw-flex tw-min-h-screen tw-flex-col tw-bg-black">
+        <div class="tw-flex tw-justify-end tw-p-3">
+          <v-btn icon="mdi-close" color="white" variant="text" aria-label="Close photo preview" @click="photoDialog = false" />
+        </div>
+        <div class="tw-flex tw-flex-1 tw-items-center tw-justify-center tw-overflow-hidden tw-p-4">
+          <img v-if="photoPreviewSrc" :src="photoPreviewSrc" :alt="photoPreviewAlt" class="tw-max-h-full tw-max-w-full tw-object-contain" />
+        </div>
       </v-card>
     </v-dialog>
   </AdminLayout>
@@ -328,6 +353,9 @@ const selectedItem = ref(null)
 const matchSearch = ref('')
 const detailsDialog = ref(false)
 const decisionDialog = ref(false)
+const photoDialog = ref(false)
+const photoPreviewSrc = ref('')
+const photoPreviewAlt = ref('Enrollee photo')
 const page = ref(1)
 const perPage = ref(25)
 
@@ -355,6 +383,9 @@ const providerFields = [
 ]
 
 const currentItems = computed(() => currentBatch.value?.items || [])
+const isUnverified = (item) => !item?.verified_at && ['pending', 'failed'].includes(item?.status)
+const verifiedCount = computed(() => currentItems.value.filter((item) => Boolean(item.verified_at)).length)
+const remainingCount = computed(() => currentItems.value.filter(isUnverified).length)
 const appliedCount = computed(() => currentItems.value.filter((item) => item.status === 'applied').length)
 const needsReviewCount = computed(() => currentItems.value.filter((item) => item.status === 'needs_review').length)
 const filteredMatchCandidates = computed(() => {
@@ -410,6 +441,13 @@ const photoSrc = (value) => {
 const providerPhoto = (item) => {
   const data = item?.provider_data || {}
   return photoSrc(data.photo || data.image || data.passport || data.photo_url || data.image_url)
+}
+
+const openPhoto = (src, alt = 'Enrollee photo') => {
+  if (!src) return
+  photoPreviewSrc.value = src
+  photoPreviewAlt.value = alt
+  photoDialog.value = true
 }
 
 const setError = (message) => {
@@ -468,6 +506,7 @@ const replaceItem = (nextItem) => {
 }
 
 const verifyOne = async (item) => {
+  if (!isUnverified(item)) return
   verifyingItemId.value = item.id
   errorMessage.value = ''
   try {
