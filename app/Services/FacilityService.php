@@ -56,7 +56,7 @@ class FacilityService
             $query->where('lga_id', $filters['lga_id']);
         }
 
-        if (!empty($filters['status'])) {
+        if (array_key_exists('status', $filters) && $filters['status'] !== null && $filters['status'] !== '') {
             $query->where('status', $filters['status']);
         }
 

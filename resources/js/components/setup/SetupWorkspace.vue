@@ -6,7 +6,10 @@
           <h1 class="tw-text-2xl tw-font-bold tw-text-slate-950">Setup</h1>
           <p class="tw-text-sm tw-text-slate-500">Manage locations, facilities, funding, benefit packages, and sponsors.</p>
         </div>
-        <v-btn v-if="hasVisibleSections && canCreateCurrent" color="primary" prepend-icon="mdi-plus" @click="openCreate">New {{ current.singular }}</v-btn>
+        <div class="tw-flex tw-gap-2">
+          <AppExportButton v-if="activeKey === 'facilities'" :loading="exporting" @click="exportFacilities" />
+          <v-btn v-if="hasVisibleSections && canCreateCurrent" color="primary" prepend-icon="mdi-plus" @click="openCreate">New {{ current.singular }}</v-btn>
+        </div>
       </div>
 
       <div v-if="hasVisibleSections" class="tw-rounded-lg tw-border tw-border-slate-200 tw-bg-white">
@@ -107,6 +110,7 @@ import AdminLayout from '../layout/AdminLayout.vue';
 import AppModal from '../common/AppModal.vue';
 import AppDataTable from '../common/AppDataTable.vue';
 import AppCard from '../common/AppCard.vue';
+import AppExportButton from '../common/AppExportButton.vue';
 import { useToast } from '../../composables/useToast';
 import { bankAPI, benefactorAPI, benefitPackageAPI, facilityAPI, fundingTypeAPI, lgaAPI, wardAPI } from '../../utils/api';
 
@@ -129,6 +133,7 @@ const meta = reactive({ total: 0 });
 const page = ref(1);
 const perPage = ref(25);
 const loading = ref(false);
+const exporting = ref(false);
 const saving = ref(false);
 const dialog = ref(false);
 const editingId = ref(null);
@@ -429,6 +434,28 @@ const loadItems = async () => {
 const clearFilters = () => {
   Object.assign(filters, { search: '', status: null, lga_id: null, ownership: null, accreditation_status: null, type: null });
   loadItems();
+};
+
+const exportFacilities = async () => {
+  exporting.value = true;
+  try {
+    const params = { ...filters };
+    Object.keys(params).forEach((key) => (params[key] === '' || params[key] === null) && delete params[key]);
+    const response = await facilityAPI.export(params);
+    const blob = new Blob([response.data], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const disposition = response.headers?.['content-disposition'] || '';
+    const match = disposition.match(/filename="?([^";]+)"?/i);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = match?.[1] || `facilities_account_details_${new Date().toISOString().slice(0, 10)}.xls`;
+    link.click();
+    URL.revokeObjectURL(url);
+  } catch (e) {
+    error(e.response?.data?.message || 'Could not export facilities');
+  } finally {
+    exporting.value = false;
+  }
 };
 
 const resetForm = () => {

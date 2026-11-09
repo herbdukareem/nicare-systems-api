@@ -373,6 +373,8 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::apiResource('enrollee-types', EnrolleeTypeController::class);
     Route::apiResource('banks', BankController::class);
+    Route::get('facilities/export', [FacilityController::class, 'export'])
+        ->middleware('permission:any,setup.facility.view,facilities.view');
     Route::get('facilities/{facility}/enrollees', [FacilityController::class, 'enrollees'])
         ->middleware('permission:any,setup.facility.view,facilities.view');
     Route::apiResource('facilities', FacilityController::class)->only(['index', 'show'])

@@ -214,6 +214,7 @@ export const capitationAPI = {
 
 export const facilityAPI = {
   getAll: (params) => api.get('/facilities', { params }),
+  export: (params) => api.get('/facilities/export', { params, responseType: 'blob' }),
   getById: (id) => api.get(`/facilities/${id}`),
   create: (data) => api.post('/facilities', data),
   update: (id, data) => api.put(`/facilities/${id}`, data),

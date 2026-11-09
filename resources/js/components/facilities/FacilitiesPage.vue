@@ -3,6 +3,7 @@
     <div class="tw-space-y-4">
       <AppPageHeader title="Facilities" icon="mdi-hospital-building">
         <v-btn size="small" variant="outlined" prepend-icon="mdi-refresh" :loading="loading" @click="loadFacilities">Refresh</v-btn>
+        <AppExportButton size="small" :loading="exporting" @click="exportFacilities" />
         <v-btn size="small" color="primary" prepend-icon="mdi-plus" @click="openCreateDialog">Add Facility</v-btn>
       </AppPageHeader>
 
@@ -359,6 +360,7 @@ import AppCard from '../common/AppCard.vue'
 import AppConfirmDialog from '../common/AppConfirmDialog.vue'
 import AppDataTable from '../common/AppDataTable.vue'
 import AppEmptyState from '../common/AppEmptyState.vue'
+import AppExportButton from '../common/AppExportButton.vue'
 import AppFilterBar from '../common/AppFilterBar.vue'
 import AppStatCard from '../common/AppStatCard.vue'
 import AppModal from '../common/AppModal.vue'
@@ -372,6 +374,7 @@ import { useToast } from '../../composables/useToast'
 const { success, error } = useToast()
 
 const loading = ref(false)
+const exporting = ref(false)
 const loadingEnrollees = ref(false)
 const saving = ref(false)
 const deleting = ref(false)
@@ -518,6 +521,32 @@ const loadFacilities = async () => {
     totalFacilities.value = 0
   } finally {
     loading.value = false
+  }
+}
+
+const exportFacilities = async () => {
+  exporting.value = true
+  try {
+    const response = await facilityAPI.export({
+      search: searchQuery.value.trim() || undefined,
+      type: filters.type || undefined,
+      lga_id: filters.lga_id || undefined,
+      ward_id: filters.ward_id || undefined,
+      status: filters.status === null ? undefined : filters.status,
+    })
+    const blob = new Blob([response.data], { type: 'application/vnd.ms-excel' })
+    const url = URL.createObjectURL(blob)
+    const disposition = response.headers?.['content-disposition'] || ''
+    const match = disposition.match(/filename="?([^";]+)"?/i)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = match?.[1] || `facilities_account_details_${new Date().toISOString().slice(0, 10)}.xls`
+    link.click()
+    URL.revokeObjectURL(url)
+  } catch (err) {
+    error(err.response?.data?.message || 'Could not export facilities')
+  } finally {
+    exporting.value = false
   }
 }
 

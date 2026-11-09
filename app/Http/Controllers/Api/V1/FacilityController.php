@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Exports\FacilitiesExport;
 use App\Http\Requests\StoreFacilityRequest;
 use App\Http\Requests\UpdateFacilityRequest;
 use App\Http\Resources\FacilityResource;
@@ -46,6 +47,13 @@ class FacilityController extends BaseController
         ]);
 
         return $this->sendResponse($response, 'Facilities retrieved successfully');
+    }
+
+    public function export(Request $request)
+    {
+        return (new FacilitiesExport($request->only([
+            'search', 'type', 'ownership', 'lga_id', 'ward_id', 'status', 'accreditation_status',
+        ])))->download();
     }
 
     public function store(StoreFacilityRequest $request)
