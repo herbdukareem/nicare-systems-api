@@ -8,7 +8,6 @@ use App\Models\EnrollmentSlipPrintBatch;
 use App\Models\EnrollmentSlipPrintItem;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -33,6 +32,7 @@ class EnrollmentSlipPrintingService
             'status' => ['nullable', 'integer', 'in:0,1,2,3,4'],
             'approval_status' => ['nullable', 'in:pending,approved,all'],
             'printing_status' => ['nullable', 'in:outstanding,generated,all'],
+            'date_field' => ['nullable', 'in:enrollment_date,created_at'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'enrollee_ids' => ['nullable', 'array', 'min:1', 'max:1000'],
@@ -78,11 +78,23 @@ class EnrollmentSlipPrintingService
         } elseif ($printing === 'generated') {
             $query->whereNotNull('slip_first_generated_at');
         }
-        if (!empty($filters['date_from'])) {
-            $query->where('created_at', '>=', Carbon::parse($filters['date_from'])->startOfDay());
-        }
-        if (!empty($filters['date_to'])) {
-            $query->where('created_at', '<=', Carbon::parse($filters['date_to'])->endOfDay());
+        foreach (['date_from' => '>=', 'date_to' => '<='] as $field => $operator) {
+            if (empty($filters[$field])) {
+                continue;
+            }
+
+            if (($filters['date_field'] ?? 'created_at') === 'created_at') {
+                $query->whereDate('created_at', $operator, $filters[$field]);
+                continue;
+            }
+
+            $query->where(function (Builder $dateQuery) use ($operator, $filters, $field): void {
+                $dateQuery->whereDate('enrollment_date', $operator, $filters[$field])
+                    ->orWhere(function (Builder $fallbackQuery) use ($operator, $filters, $field): void {
+                        $fallbackQuery->whereNull('enrollment_date')
+                            ->whereDate('created_at', $operator, $filters[$field]);
+                    });
+            });
         }
         return $query;
     }

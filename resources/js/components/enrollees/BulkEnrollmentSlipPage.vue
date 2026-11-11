@@ -21,7 +21,7 @@
           </AppAlert>
           <AppCard title="Find enrolment slips">
             <div class="tw-grid tw-gap-3 md:tw-grid-cols-3">
-              <v-text-field v-model="filters.identifier" :disabled="downloading" label="Enrollment Number or NIN" hint="Find one enrollee, including previously generated slips." persistent-hint density="compact" variant="outlined" clearable />
+              <v-text-field v-model="filters.identifier" class="md:tw-col-span-3" :disabled="downloading" label="Enrollment Number or NIN" hint="Find one enrollee, including previously generated slips." persistent-hint density="compact" variant="outlined" clearable />
               <v-autocomplete v-model="filters.benefactor_id" :items="metadata.benefactors" :disabled="batchFiltersDisabled" item-title="name" item-value="id" label="Benefactor" density="compact" variant="outlined" clearable />
               <v-autocomplete v-model="selectedLgaId" :items="metadata.lgas" :disabled="batchFiltersDisabled" item-title="name" item-value="id" label="LGA" density="compact" variant="outlined" clearable />
               <v-autocomplete v-model="filters.facility_id" :items="filteredFacilities" :disabled="batchFiltersDisabled" item-title="name" item-value="id" label="Provider / Facility" density="compact" variant="outlined" clearable />
@@ -31,8 +31,9 @@
               <v-autocomplete v-model="filters.enrollment_phase_id" :items="metadata.enrollment_phases" :disabled="batchFiltersDisabled" item-title="name" item-value="id" label="Enrollment Phase" density="compact" variant="outlined" clearable />
               <v-select v-model="filters.approval_status" :items="approvalOptions" :disabled="batchFiltersDisabled" item-title="title" item-value="value" label="Approval Status" density="compact" variant="outlined" />
               <v-select v-model="filters.printing_status" :items="printingOptions" :disabled="batchFiltersDisabled" item-title="title" item-value="value" label="Printing Status" density="compact" variant="outlined" />
-              <v-text-field v-model="filters.date_from" :disabled="batchFiltersDisabled" type="date" label="Enrolled From" density="compact" variant="outlined" />
-              <v-text-field v-model="filters.date_to" :disabled="batchFiltersDisabled" type="date" label="Enrolled To" density="compact" variant="outlined" />
+              <v-select v-model="filters.date_field" :items="dateFieldOptions" :disabled="batchFiltersDisabled" item-title="title" item-value="value" label="Date Type" density="compact" variant="outlined" />
+              <v-text-field v-model="filters.date_from" :disabled="batchFiltersDisabled" type="date" :label="filters.date_field === 'created_at' ? 'Created From' : 'Enrolled From'" density="compact" variant="outlined" />
+              <v-text-field v-model="filters.date_to" :disabled="batchFiltersDisabled" type="date" :label="filters.date_field === 'created_at' ? 'Created To' : 'Enrolled To'" density="compact" variant="outlined" />
             </div>
             <div class="tw-flex tw-flex-wrap tw-justify-end tw-gap-2">
               <AppButton variant="outlined" prepend-icon="mdi-printer-outline" :disabled="downloading || !!printingList || loading" :loading="printingList === 'queue'" @click="printCollectionList()">{{ selectedIds.length ? 'Print selected collection list' : 'Print generated slips list' }}</AppButton>
@@ -119,7 +120,7 @@ const activeTab = ref('queue');
 const tabs = [{ value: 'queue', label: 'Printing queue', icon: 'mdi-printer-outline' }, { value: 'history', label: 'My printing exercises', icon: 'mdi-history' }];
 const metadata = reactive({ benefactors: [], lgas: [], facilities: [], insurance_programmes: [], enrollee_categories: [], funding_types: [], enrollment_phases: [] });
 const selectedLgaId = ref(null);
-const filters = reactive({ identifier: '', benefactor_id: null, facility_id: null, insurance_programme_id: null, enrollee_category_id: null, funding_type_id: null, enrollment_phase_id: null, approval_status: 'approved', printing_status: 'outstanding', date_from: '', date_to: '' });
+const filters = reactive({ identifier: '', benefactor_id: null, facility_id: null, insurance_programme_id: null, enrollee_category_id: null, funding_type_id: null, enrollment_phase_id: null, approval_status: 'approved', printing_status: 'outstanding', date_field: 'enrollment_date', date_from: '', date_to: '' });
 const filteredFacilities = computed(() => metadata.facilities.filter((facility) => !selectedLgaId.value || Number(facility.lga_id ?? facility.lga?.id) === Number(selectedLgaId.value)));
 const batchFiltersDisabled = computed(() => downloading.value || !!printingList.value || Boolean(String(filters.identifier || '').trim()));
 const unfinishedCount = computed(() => batches.value.filter((batch) => batch.status === 'preparing').length);
@@ -127,6 +128,7 @@ const exportState = reactive({ status: '', message: '', progress: 0, enrolleeCou
 const exportAlertType = computed(() => exportState.status === 'failed' ? 'danger' : exportState.status === 'completed' ? 'success' : 'info');
 const approvalOptions = [{ title: 'All', value: 'all' }, { title: 'Pending', value: 'pending' }, { title: 'Approved', value: 'approved' }];
 const printingOptions = [{ title: 'Not yet generated', value: 'outstanding' }, { title: 'Generated for printing', value: 'generated' }, { title: 'All', value: 'all' }];
+const dateFieldOptions = [{ title: 'Enrollment Date', value: 'enrollment_date' }, { title: 'Record Created Date', value: 'created_at' }];
 const queueHeaders = [
   { title: 'Enrollment Number', key: 'enrollee_id' }, { title: 'Name', key: 'name' }, { title: 'Facility', key: 'facility' },
   { title: 'Printing Status', key: 'printing_status' }, { title: 'Last Generated', key: 'last_generated_at' },

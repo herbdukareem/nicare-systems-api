@@ -58,6 +58,48 @@ class EnrollmentSlipPrintingTest extends TestCase
         $this->assertSame(0, EnrollmentSlipPrintBatch::count());
     }
 
+    public function test_queue_and_preparation_filter_by_enrollment_date_with_creation_date_fallback(): void
+    {
+        $matching = $this->approved([
+            'enrollment_date' => '2026-07-19 10:00:00',
+            'created_at' => '2026-11-11 10:00:00',
+        ]);
+        $legacy = $this->approved([
+            'enrollment_date' => null,
+            'created_at' => '2026-07-20 10:00:00',
+        ]);
+        $outside = $this->approved([
+            'enrollment_date' => '2026-07-22 10:00:00',
+            'created_at' => '2026-07-20 10:00:00',
+        ]);
+
+        $filters = [
+            'approval_status' => 'all',
+            'printing_status' => 'all',
+            'date_field' => 'enrollment_date',
+            'date_from' => '2026-07-19',
+            'date_to' => '2026-07-21',
+        ];
+        $response = $this->getJson('/api/enrollees/slip-printing/queue?'.http_build_query($filters))
+            ->assertOk()->assertJsonPath('data.total', 2);
+        $this->assertEqualsCanonicalizing([$matching->id, $legacy->id], array_column($response->json('data.data'), 'id'));
+
+        $createdResponse = $this->getJson('/api/enrollees/slip-printing/queue?'.http_build_query([...$filters, 'date_field' => 'created_at']))
+            ->assertOk()->assertJsonPath('data.total', 2);
+        $this->assertEqualsCanonicalizing([$legacy->id, $outside->id], array_column($createdResponse->json('data.data'), 'id'));
+        $defaultResponse = $this->getJson('/api/enrollees/slip-printing/queue?'.http_build_query(collect($filters)->except('date_field')->all()))
+            ->assertOk()->assertJsonPath('data.total', 2);
+        $this->assertEqualsCanonicalizing([$legacy->id, $outside->id], array_column($defaultResponse->json('data.data'), 'id'));
+        $this->getJson('/api/enrollees/slip-printing/queue?date_field=invalid')
+            ->assertUnprocessable()->assertJsonValidationErrors('date_field');
+
+        $batch = $this->prepare($filters);
+        $this->assertEqualsCanonicalizing([$matching->id, $legacy->id], $batch->items()->pluck('enrollee_id')->all());
+        $this->printing->cancel($batch->id, $this->printer->id);
+        $createdBatch = $this->prepare([...$filters, 'date_field' => 'created_at']);
+        $this->assertEqualsCanonicalizing([$legacy->id, $outside->id], $createdBatch->items()->pluck('enrollee_id')->all());
+    }
+
     public function test_preparation_freezes_membership_and_later_approvals_remain_outstanding(): void
     {
         $olderPending = Enrollee::factory()->create(['status' => 0, 'approval_date' => null]);
