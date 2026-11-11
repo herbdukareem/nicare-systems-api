@@ -28,11 +28,15 @@ class BhcpfExecutiveDashboardController extends BaseController
         ]);
 
         $availablePhases = EnrollmentPhase::query()
-            ->whereHas('bhcpfExecutiveTargets')
+            ->select(['id', 'name', 'start_date', 'end_date', 'is_current'])
+            ->withExists('bhcpfExecutiveTargets')
             ->orderByDesc('is_current')
             ->orderByDesc('start_date')
-            ->get(['id', 'name', 'start_date', 'end_date', 'is_current']);
+            ->get();
+        $targetedPhases = $availablePhases->where('bhcpf_executive_targets_exists', true);
         $phase = $availablePhases->firstWhere('id', (int) ($validated['enrollment_phase_id'] ?? 0))
+            ?? $targetedPhases->firstWhere('is_current', true)
+            ?? $targetedPhases->first()
             ?? $availablePhases->firstWhere('is_current', true)
             ?? $availablePhases->first();
 
