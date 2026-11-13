@@ -87,7 +87,13 @@
         </div>
         <AppCard v-if="activeKey === 'facilities'" class="tw-mt-4" title="Bank Details" subtitle="Optional. Add the bank, account name, and account number together." icon="mdi-bank-outline" tone="secondary">
           <div class="tw-grid tw-gap-3 md:tw-grid-cols-2">
-            <v-autocomplete v-model="form.bank_id" :items="lookups.banks" item-title="name" item-value="id" label="Bank" density="compact" variant="outlined" clearable />
+            <v-autocomplete v-model="form.bank_id" v-model:menu="bankMenu" v-model:search="bankSearch" :items="lookups.banks" item-title="name" item-value="id" label="Bank" density="compact" variant="outlined" clearable>
+              <template v-if="canCreateBank" #append-item>
+                <div class="tw-sticky tw-bottom-0 tw-border-t tw-border-slate-200 tw-bg-white tw-p-2">
+                  <AppButton block variant="text" prepend-icon="mdi-plus" @mousedown.prevent @click.stop="openCreateBank">Add new bank</AppButton>
+                </div>
+              </template>
+            </v-autocomplete>
             <v-text-field v-model="form.account_name" label="Account name" density="compact" variant="outlined" />
             <v-text-field v-model="form.account_number" label="Account number" density="compact" variant="outlined" />
             <v-select v-model="form.account_type" :items="['savings', 'current']" label="Account type" density="compact" variant="outlined" />
@@ -96,6 +102,18 @@
         <template #actions>
           <v-btn variant="outlined" @click="dialog = false">Cancel</v-btn>
           <v-btn color="primary" variant="flat" :loading="saving" @click="saveItem">{{ editingId ? 'Save Changes' : 'Create' }}</v-btn>
+        </template>
+      </AppModal>
+
+      <AppModal v-model="bankDialog" title="Add new bank" subtitle="Save the bank and select it for this facility." icon="mdi-bank-plus" size="sm" :loading="savingBank">
+        <v-form id="create-facility-bank" @submit.prevent="saveBank">
+          <v-text-field v-model="bankForm.name" label="Bank name" density="compact" variant="outlined" :error-messages="bankErrors.name" :disabled="savingBank" maxlength="255" autofocus />
+          <v-text-field v-model="bankForm.code" label="Bank code" hint="Use the bank's official code." persistent-hint density="compact" variant="outlined" :error-messages="bankErrors.code" :disabled="savingBank" maxlength="255" />
+          <v-text-field v-model="bankForm.sort_code" label="Sort code (optional)" density="compact" variant="outlined" :error-messages="bankErrors.sort_code" :disabled="savingBank" maxlength="255" />
+        </v-form>
+        <template #actions>
+          <AppButton variant="outlined" :disabled="savingBank" @click="bankDialog = false">Cancel</AppButton>
+          <AppButton type="submit" form="create-facility-bank" :loading="savingBank">Add bank</AppButton>
         </template>
       </AppModal>
     </div>
@@ -110,6 +128,7 @@ import AdminLayout from '../layout/AdminLayout.vue';
 import AppModal from '../common/AppModal.vue';
 import AppDataTable from '../common/AppDataTable.vue';
 import AppCard from '../common/AppCard.vue';
+import AppButton from '../common/AppButton.vue';
 import AppExportButton from '../common/AppExportButton.vue';
 import { useToast } from '../../composables/useToast';
 import { bankAPI, benefactorAPI, benefitPackageAPI, facilityAPI, fundingTypeAPI, lgaAPI, wardAPI } from '../../utils/api';
@@ -138,6 +157,12 @@ const saving = ref(false);
 const dialog = ref(false);
 const editingId = ref(null);
 const form = reactive({});
+const bankMenu = ref(false);
+const bankSearch = ref('');
+const bankDialog = ref(false);
+const savingBank = ref(false);
+const bankForm = reactive({ name: '', code: '', sort_code: '' });
+const bankErrors = ref({});
 
 const apiData = (response) => response?.data?.data?.data || response?.data?.data || [];
 const apiMeta = (response) => response?.data?.data?.meta || response?.data?.meta || {};
@@ -330,6 +355,7 @@ const current = computed(() => visibleSections.value.find((item) => item.key ===
 const canCreateCurrent = computed(() => hasAnyPermission(current.value?.permissions?.create || []));
 const canUpdateCurrent = computed(() => hasAnyPermission(current.value?.permissions?.update || []));
 const canDeleteCurrent = computed(() => hasAnyPermission(current.value?.permissions?.delete || []));
+const canCreateBank = computed(() => auth.hasPermission('setup.facility.create'));
 const needsLgaLookups = computed(() => hasAnyPermission([
   'setup.lga.view',
   'setup.ward.view',
@@ -458,7 +484,47 @@ const exportFacilities = async () => {
   }
 };
 
+const openCreateBank = () => {
+  if (!canCreateBank.value) return;
+  bankForm.name = bankSearch.value?.trim() || '';
+  bankForm.code = '';
+  bankForm.sort_code = '';
+  bankErrors.value = {};
+  bankMenu.value = false;
+  bankDialog.value = true;
+};
+
+const saveBank = async () => {
+  if (!canCreateBank.value || savingBank.value) return;
+  bankErrors.value = {};
+  const payload = {
+    name: bankForm.name.trim(),
+    code: bankForm.code.trim(),
+    sort_code: bankForm.sort_code.trim() || null,
+  };
+  if (!payload.name) bankErrors.value.name = ['Bank name is required.'];
+  if (!payload.code) bankErrors.value.code = ['Bank code is required.'];
+  if (Object.keys(bankErrors.value).length) return;
+
+  savingBank.value = true;
+  try {
+    const response = await bankAPI.create(payload);
+    const bank = apiData(response);
+    lookups.banks = [...lookups.banks, bank].sort((a, b) => a.name.localeCompare(b.name));
+    form.bank_id = bank.id;
+    bankSearch.value = bank.name;
+    bankDialog.value = false;
+    success('Bank added and selected');
+  } catch (e) {
+    bankErrors.value = e.response?.data?.errors || {};
+    error(e.response?.data?.message || 'Could not add bank');
+  } finally {
+    savingBank.value = false;
+  }
+};
+
 const resetForm = () => {
+  bankSearch.value = '';
   Object.keys(form).forEach((key) => delete form[key]);
   current.value.fields.forEach((field) => {
     form[field.key] = field.key === 'status' ? 1 : field.key === 'accreditation_status' ? 'active' : null;

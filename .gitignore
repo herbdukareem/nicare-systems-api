@@ -31,5 +31,6 @@ Thumbs.db
 !/tests/Feature/EnrollmentSlipPrintingTest.php
 !/tests/Feature/CapitationEnrolleeExportTest.php
 !/tests/Feature/FacilityBankDetailsTest.php
+!/tests/Feature/FacilityBankCreationTest.php
 !/tests/js/
 # !/tests/Feature/CapitationSlipEligibilityTest.php

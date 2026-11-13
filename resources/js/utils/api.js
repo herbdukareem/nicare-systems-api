@@ -224,6 +224,7 @@ export const facilityAPI = {
 
 export const bankAPI = {
   getAll: () => api.get('/banks'),
+  create: (data) => api.post('/banks', data),
 };
 
 export const lgaAPI = {

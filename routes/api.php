@@ -372,7 +372,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::patch('users/{user}/password', [UserController::class, 'updatePassword']);
 
     Route::apiResource('enrollee-types', EnrolleeTypeController::class);
-    Route::apiResource('banks', BankController::class);
+    Route::apiResource('banks', BankController::class)->except(['store']);
+    Route::apiResource('banks', BankController::class)->only(['store'])
+        ->middleware('permission:setup.facility.create');
     Route::get('facilities/export', [FacilityController::class, 'export'])
         ->middleware('permission:any,setup.facility.view,facilities.view');
     Route::get('facilities/{facility}/enrollees', [FacilityController::class, 'enrollees'])
